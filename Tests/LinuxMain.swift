@@ -1,7 +1,8 @@
 import XCTest
 
-import nio_postgresTests
+import NIOPostgresTests
 
 var tests = [XCTestCaseEntry]()
-tests += nio_postgresTests.allTests()
+tests += NIOPostgresTests.__allTests()
+
 XCTMain(tests)

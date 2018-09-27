@@ -1,7 +1,9 @@
+import NIO
+
 extension PostgresMessage {
     /// Identifies an incoming or outgoing postgres message. Sent as the first byte, before the message size.
     /// Values are not unique across all identifiers, meaning some messages will require keeping state to identify.
-    struct Identifier: ExpressibleByIntegerLiteral {
+    struct Identifier: ExpressibleByIntegerLiteral, Equatable, CustomStringConvertible {
         /// AuthenticationOk (B)
         static let authenticationOk: Identifier = 0x52 // 'R'
         
@@ -151,8 +153,20 @@ extension PostgresMessage {
         
         let value: UInt8
         
+        /// See `CustomStringConvertible`.
+        var description: String {
+            return String(Character(Unicode.Scalar(value)))
+        }
+        
+        /// See `ExpressibleByIntegerLiteral`.
         init(integerLiteral value: UInt8) {
             self.value = value
         }
+    }
+}
+
+extension ByteBuffer {
+    mutating func write(identifier: PostgresMessage.Identifier) {
+        write(integer: identifier.value)
     }
 }

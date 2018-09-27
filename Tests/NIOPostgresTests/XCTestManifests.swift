@@ -1,9 +1,16 @@
 import XCTest
 
+extension NIOPostgresTests {
+    static let __allTests = [
+        ("testConnectAndClose", testConnectAndClose),
+        ("testSimpleQueryVersion", testSimpleQueryVersion),
+    ]
+}
+
 #if !os(macOS)
-public func allTests() -> [XCTestCaseEntry] {
+public func __allTests() -> [XCTestCaseEntry] {
     return [
-        testCase(nio_postgresTests.allTests),
+        testCase(NIOPostgresTests.__allTests),
     ]
 }
 #endif
