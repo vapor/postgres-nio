@@ -1,0 +1,27 @@
+version: '2'
+
+services:
+  psql-10:
+    image: postgres:10
+    environment:
+      POSTGRES_USER: vapor_username
+      POSTGRES_DB: vapor_database
+      POSTGRES_PASSWORD: vapor_password
+    ports:
+      - 5432:5432
+  psql-9:
+    image: postgres:9
+    environment:
+      POSTGRES_USER: vapor_username
+      POSTGRES_DB: vapor_database
+      POSTGRES_PASSWORD: vapor_password
+    ports:
+      - 5432:5432
+  psql-ssl:
+    image: scenecheck/postgres-ssl:latest
+    environment:
+      POSTGRES_USER: vapor_username
+      POSTGRES_DB: vapor_database
+      POSTGRES_PASSWORD: vapor_password
+    ports:
+      - 5432:5432
