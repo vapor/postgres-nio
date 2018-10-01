@@ -1,7 +1,7 @@
 import NIO
 
 extension PostgresConnection {
-    final class ChannelHandler: ChannelInboundHandler {
+    final class InboundHandler: ChannelInboundHandler {
         typealias InboundIn = PostgresMessage
         typealias OutboundOut = PostgresMessage
         

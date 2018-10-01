@@ -1,7 +1,7 @@
 import NIO
 
 public final class PostgresConnection {
-    let handler: ChannelHandler
+    let handler: InboundHandler
     
     #warning("publicize these values?")
     var status: [String: String]
@@ -12,7 +12,7 @@ public final class PostgresConnection {
         return handler.channel.closeFuture
     }
     
-    init(_ handler: ChannelHandler) {
+    init(_ handler: InboundHandler) {
         self.handler = handler
         self.status = [:]
     }

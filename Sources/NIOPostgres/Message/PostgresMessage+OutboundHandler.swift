@@ -2,7 +2,7 @@ import NIO
 
 extension PostgresMessage {
     /// Encodes `PostgresMessage`s to outgoing data.
-    final class ChannelEncoder: MessageToByteEncoder {
+    final class OutboundHandler: MessageToByteEncoder {
         /// See `MessageToByteEncoder`.
         typealias OutboundIn = PostgresMessage
         

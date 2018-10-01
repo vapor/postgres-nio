@@ -2,20 +2,12 @@ import NIO
 
 internal extension ByteBuffer {
     mutating func readNullTerminatedString() -> String? {
-        // scan for null terminator
-        var currentIndex = readerIndex
-        while true {
-            guard let peek = getInteger(at: currentIndex, as: UInt8.self) else {
-                return nil
-            }
-            if peek == 0x00 {
-                break
-            }
-            currentIndex += 1
+        if let nullIndex = readableBytesView.firstIndex(of: 0) {
+            defer { moveReaderIndex(forwardBy: 1) }
+            return readString(length: nullIndex - readerIndex)
+        } else {
+            return nil
         }
-        // read the string and defer consuming the null terminator
-        defer { moveReaderIndex(forwardBy: 1) }
-        return readString(length: currentIndex - readerIndex)
     }
     
     mutating func readInteger<E>(endianness: Endianness = .big, rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {

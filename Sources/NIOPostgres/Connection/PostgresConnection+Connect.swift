@@ -6,10 +6,10 @@ extension PostgresConnection {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
         
         return bootstrap.connect(to: socketAddress).then { channel in
-            let handler = PostgresConnection.ChannelHandler(channel)
+            let handler = PostgresConnection.InboundHandler(channel)
             return channel.pipeline.addHandlers([
-                PostgresMessage.ChannelEncoder(),
-                PostgresMessage.ChannelDecoder(),
+                PostgresMessage.InboundHandler(),
+                PostgresMessage.OutboundHandler(),
                 handler,
             ], first: false).map {
                 return .init(handler)
