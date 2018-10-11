@@ -2,7 +2,7 @@ import NIO
 
 extension PostgresMessage {
     /// Identifies the message as a simple query.
-    struct SimpleQuery {
+    struct SimpleQuery: ByteBufferSerializable {
         /// The query string itself.
         var string: String
         

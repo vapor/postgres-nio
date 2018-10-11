@@ -2,7 +2,7 @@ public struct PostgresRow: CustomStringConvertible {
     let fields: [PostgresMessage.RowDescription.Field]
     let columns: [PostgresMessage.DataRow.Column]
     
-    public func decode<T>(_ type: T.Type, at column: String, tableOID: UInt32 = 0) -> T?
+    public func decode<T>(_ decodable: T.Type, at column: String, tableOID: UInt32 = 0) -> T?
         where T: PostgresDataDecodable
     {
         guard let data = self.data(at: column, tableOID: tableOID) else {

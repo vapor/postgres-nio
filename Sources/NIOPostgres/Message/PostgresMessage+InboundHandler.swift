@@ -48,6 +48,8 @@ extension PostgresMessage {
                 message = try .authentication(.parse(from: &buffer))
             case .backendKeyData:
                 message = try .backendKeyData(.parse(from: &buffer))
+            case .bindComplete:
+                message = .bindComplete
             case .commandComplete:
                 message = try .commandComplete(.parse(from: &buffer))
             case .dataRow:
@@ -56,8 +58,12 @@ extension PostgresMessage {
                 message = try .error(.parse(from: &buffer))
             case .noData:
                 message = .noData
+            case .parameterDescription:
+                message = try .parameterDescription(.parse(from: &buffer))
             case .parameterStatus:
                 message = try .parameterStatus(.parse(from: &buffer))
+            case .parseComplete:
+                message = .parseComplete
             case .readyForQuery:
                 message = try .readyForQuery(.parse(from: &buffer))
             case .rowDescription:

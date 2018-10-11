@@ -9,11 +9,34 @@ extension PostgresMessage {
         /// See `MessageToByteEncoder`.
         func encode(ctx: ChannelHandlerContext, data: PostgresMessage, out: inout ByteBuffer) throws {
             // print("PostgresMessage.ChannelEncoder.encode(\(data))")
-            // serialize identifier
+            
+            // serialize identifier + set packet
+            let packet: ByteBufferSerializable?
             switch data {
-            case .password: out.write(identifier: .passwordMessage)
-            case .simpleQuery: out.write(identifier: .query)
-            default: break
+            case .bind(let bind):
+                out.write(identifier: .bind)
+                packet = bind
+            case .describe(let describe):
+                out.write(identifier: .describe)
+                packet = describe
+            case .execute(let execute):
+                out.write(identifier: .execute)
+                packet = execute
+            case .parse(let parse):
+                out.write(identifier: .parse)
+                packet = parse
+            case .password(let password):
+                out.write(identifier: .passwordMessage)
+                packet = password
+            case .simpleQuery(let query):
+                out.write(identifier: .query)
+                packet = query
+            case .startup(let startup):
+                packet = startup
+            case .sync:
+                out.write(identifier: .sync)
+                packet = nil
+            default: fatalError("Unsupported outgoing message: \(data)")
             }
             
             // leave room for identifier and size
@@ -21,15 +44,14 @@ extension PostgresMessage {
             out.moveWriterIndex(forwardBy: 4)
             
             // serialize the message data
-            switch data {
-            case .startup(let startup): startup.serialize(into: &out)
-            case .password(let password): password.serialize(into: &out)
-            case .simpleQuery(let query): query.serialize(into: &out)
-            default: fatalError("Unsupported outgoing message: \(data)")
-            }
+            packet?.serialize(into: &out)
             
             // set message size
             out.set(integer: Int32(out.writerIndex - messageSizeIndex), at: messageSizeIndex)
         }
     }
+}
+
+protocol ByteBufferSerializable {
+    func serialize(into buffer: inout ByteBuffer)
 }

@@ -1,9 +1,13 @@
 public struct PostgresData {
+    public static var null: PostgresData {
+        return .init(type: .null)
+    }
+    
     /// The object ID of the field's data type.
     public var type: PostgresDataType
     
     /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
-    public var typeModifier: Int32
+    public var typeModifier: Int32?
     
     /// The format code being used for the field.
     /// Currently will be zero (text) or one (binary).
@@ -12,4 +16,11 @@ public struct PostgresData {
     public var formatCode: PostgresFormatCode
     
     public var value: [UInt8]?
+    
+    public init(type: PostgresDataType, typeModifier: Int32? = nil, formatCode: PostgresFormatCode = .binary, value: [UInt8]? = nil) {
+        self.type = type
+        self.typeModifier = typeModifier
+        self.formatCode = formatCode
+        self.value = value
+    }
 }

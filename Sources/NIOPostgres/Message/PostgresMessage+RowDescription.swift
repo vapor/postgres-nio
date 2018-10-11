@@ -32,7 +32,7 @@ extension PostgresMessage {
         
         /// Parses an instance of this message type from a byte buffer.
         static func parse(from buffer: inout ByteBuffer) throws -> RowDescription {
-            guard let fields = try buffer.readArray(Field.self, { buffer in
+            guard let fields = try buffer.read(array: Field.self, { buffer in
                 guard let name = buffer.readNullTerminatedString() else {
                     throw PostgresError(.protocol("Could not read row description field name"))
                 }

@@ -10,16 +10,37 @@ final class NIOPostgresTests: XCTestCase {
     
     func testSimpleQueryVersion() throws {
         let conn = try PostgresConnection.test().wait()
-        defer { try! conn.close().wait() }
+        defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
         let version = rows[0].decode(String.self, at: "version")
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
     }
     
+    func testQueryVersion() throws {
+        let conn = try PostgresConnection.test().wait()
+        defer { try? conn.close().wait() }
+        let rows = try conn.query("SELECT version()", .init()).wait()
+        XCTAssertEqual(rows.count, 1)
+        let version = rows[0].decode(String.self, at: "version")
+        XCTAssertEqual(version?.contains("PostgreSQL"), true)
+        
+    }
+    
+    func testQuerySelectParameter() throws {
+        let conn = try PostgresConnection.test().wait()
+        defer { try? conn.close().wait() }
+        var binds = PostgresBinds()
+        binds.encode("hello")
+        let rows = try conn.query("SELECT $1 as foo", binds).wait()
+        XCTAssertEqual(rows.count, 1)
+        let version = rows[0].decode(String.self, at: "foo")
+        XCTAssertEqual(version, "hello")
+    }
+    
     func testSQLError() throws {
         let conn = try PostgresConnection.test().wait()
-        defer { try! conn.close().wait() }
+        defer { try? conn.close().wait() }
         do {
             _ = try conn.simpleQuery("SELECT &").wait()
             XCTFail("An error should have been thrown")

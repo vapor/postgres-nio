@@ -2,7 +2,7 @@ import NIO
 
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
-    struct Startup {
+    struct Startup: ByteBufferSerializable {
         /// Creates a `Startup` with "3.0" as the protocol version.
         static func versionThree(parameters: [String: String]) -> Startup {
             return .init(protocolVersion: 0x00_03_00_00, parameters: parameters)

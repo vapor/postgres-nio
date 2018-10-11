@@ -10,6 +10,11 @@ internal extension ByteBuffer {
         }
     }
     
+    mutating func write(nullTerminated string: String) {
+        write(string: string)
+        write(integer: 0, as: UInt8.self)
+    }
+    
     mutating func readInteger<E>(endianness: Endianness = .big, rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
         guard let rawValue = readInteger(endianness: endianness, as: E.RawValue.self) else {
             return nil
@@ -29,7 +34,26 @@ internal extension ByteBuffer {
         }
     }
     
-    mutating func readArray<T>(_ type: T.Type, _ closure: (inout ByteBuffer) throws -> (T)) rethrows -> [T]? {
+    mutating func write<T>(array: [T], closure: (inout ByteBuffer, T) -> ()) {
+        write(integer: numericCast(array.count), as: Int16.self)
+        for el in array {
+            closure(&self, el)
+        }
+    }
+    
+    mutating func write<T>(array: [T]) where T: FixedWidthInteger {
+        write(array: array) { buffer, el in
+            buffer.write(integer: el)
+        }
+    }
+    
+    mutating func write<T>(array: [T]) where T: RawRepresentable, T.RawValue: FixedWidthInteger {
+        write(array: array) { buffer, el in
+            buffer.write(integer: el.rawValue)
+        }
+    }
+    
+    mutating func read<T>(array type: T.Type, _ closure: (inout ByteBuffer) throws -> (T)) rethrows -> [T]? {
         guard let count: Int = readInteger(as: Int16.self).flatMap(numericCast) else {
             return nil
         }
