@@ -30,9 +30,7 @@ final class NIOPostgresTests: XCTestCase {
     func testQuerySelectParameter() throws {
         let conn = try PostgresConnection.test().wait()
         defer { try? conn.close().wait() }
-        var binds = PostgresBinds()
-        binds.encode("hello")
-        let rows = try conn.query("SELECT $1 as foo", binds).wait()
+        let rows = try conn.query("SELECT $1 as foo", ["hello"]).wait()
         XCTAssertEqual(rows.count, 1)
         let version = rows[0].decode(String.self, at: "foo")
         XCTAssertEqual(version, "hello")
