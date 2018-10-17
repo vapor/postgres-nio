@@ -1,19 +1,21 @@
-extension String: PostgresDataCodable {
-    public static func decode(from data: PostgresData) -> String? {
-        guard let value = data.value else {
+extension String: PostgresDataConvertible {
+    public init(postgresData: PostgresData) {
+        guard let value = postgresData.value else {
             fatalError()
         }
-        switch data.formatCode {
+        switch postgresData.formatCode {
         case .binary:
-            switch data.type {
-            case .varchar, .text: return String(bytes: value, encoding: .utf8)!
+            switch postgresData.type {
+            case .varchar, .text:
+                self = String(bytes: value, encoding: .utf8)!
             default: fatalError()
             }
-        case .text: return String(bytes: value, encoding: .utf8)!
+        case .text:
+            self = String(bytes: value, encoding: .utf8)!
         }
     }
     
-    public func encode(to data: inout PostgresData?) {
-        data = PostgresData(type: .text, typeModifier: 0, formatCode: .binary, value: .init(utf8))
+    public var postgresData: PostgresData {
+        return PostgresData(type: .text, typeModifier: 0, formatCode: .binary, value: .init(utf8))
     }
 }

@@ -5,11 +5,16 @@ public struct PostgresBinds {
         self.data = []
     }
     
-    public mutating func encode<T>(_ encodable: T)
-        where T: PostgresDataEncodable
-    {
-        var data: PostgresData?
-        encodable.encode(to: &data)
-        self.data.append(data ?? .null)
+    public mutating func encode(_ encodable: PostgresDataConvertible) {
+        self.data.append(encodable.postgresData)
+    }
+}
+
+extension PostgresBinds: ExpressibleByArrayLiteral {
+    public init(arrayLiteral elements: PostgresDataConvertible...) {
+        self.init()
+        for element in elements {
+            self.encode(element)
+        }
     }
 }

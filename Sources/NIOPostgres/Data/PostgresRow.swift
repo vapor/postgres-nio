@@ -3,12 +3,12 @@ public struct PostgresRow: CustomStringConvertible {
     let columns: [PostgresMessage.DataRow.Column]
     
     public func decode<T>(_ decodable: T.Type, at column: String, tableOID: UInt32 = 0) -> T?
-        where T: PostgresDataDecodable
+        where T: PostgresDataConvertible
     {
         guard let data = self.data(at: column, tableOID: tableOID) else {
             return nil
         }
-        return T.decode(from: data)
+        return T(postgresData: data)
     }
     
     public func data(at column: String, tableOID: UInt32 = 0) -> PostgresData? {
