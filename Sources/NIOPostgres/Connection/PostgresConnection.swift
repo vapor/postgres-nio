@@ -4,7 +4,7 @@ public final class PostgresConnection {
     let handler: InboundHandler
     
     #warning("publicize these values?")
-    var status: [String: String]
+    public var status: [String: String]
     var processID: Int32?
     var secretKey: Int32?
     
