@@ -6,7 +6,7 @@ public struct PostgresBinds {
     }
     
     public mutating func encode(_ encodable: PostgresDataConvertible) {
-        self.data.append(encodable.postgresData)
+        self.data.append(encodable.postgresData ?? .null)
     }
 }
 

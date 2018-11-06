@@ -7,8 +7,6 @@ extension PostgresConnection {
     }
     
     public func query(_ string: String, _ binds: PostgresBinds, _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
-        var info: PostgresMessage.RowDescription?
-        
         let parse = PostgresMessage.Parse(
             statementName: "",
             query: string,
@@ -22,13 +20,14 @@ extension PostgresConnection {
             portalName: "",
             statementName: "",
             parameterFormatCodes: binds.data.map { $0.formatCode },
-            parameters: binds.data.map { .init(data: $0.value) },
+            parameters: binds.data.map { .init(value: $0.value) },
             resultFormatCodes: [.binary]
         )
         let execute = PostgresMessage.Execute(
             portalName: "",
             maxRows: 0
         )
+        var rowDescription: PostgresMessage.RowDescription?
         return handler.send([
             .parse(parse), .describe(describe), .bind(bind), .execute(execute), .sync
         ]) { message in
@@ -36,11 +35,11 @@ extension PostgresConnection {
             case .bindComplete:
                 return false
             case .dataRow(let data):
-                guard let fields = info?.fields else { fatalError() }
-                onRow(PostgresRow(fields: fields, columns: data.columns))
+                guard let rowDescription = rowDescription else { fatalError() }
+                onRow(PostgresRow(rowDescription: rowDescription, dataRow: data))
                 return false
             case .rowDescription(let r):
-                info = r
+                rowDescription = r
                 return false
             case .parseComplete:
                 return false

@@ -8,12 +8,12 @@ extension PostgresMessage {
             /// Can be zero. As a special case, -1 indicates a NULL column value. No value bytes follow in the NULL case.
             
             /// The value of the column, in the format indicated by the associated format code. n is the above length.
-            var value: [UInt8]?
+            var value: ByteBuffer?
             
             /// See `CustomStringConvertible`.
             var description: String {
                 if let value = value {
-                    return "0x" + value.hexdigest()
+                    return "0x" + value.readableBytesView.hexdigest()
                 } else {
                     return "<null>"
                 }
@@ -22,6 +22,7 @@ extension PostgresMessage {
         
         /// Parses an instance of this message type from a byte buffer.
         static func parse(from buffer: inout ByteBuffer) throws -> DataRow {
+            #warning("look into lazy parsing")
             guard let columns = buffer.read(array: Column.self, { buffer in
                 return .init(value: buffer.readNullableBytes())
             }) else {

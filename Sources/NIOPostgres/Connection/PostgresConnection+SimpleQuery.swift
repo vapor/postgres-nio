@@ -7,15 +7,15 @@ extension PostgresConnection {
     }
     
     public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
-        var info: PostgresMessage.RowDescription?
+        var rowDescription: PostgresMessage.RowDescription?
         return handler.send([.simpleQuery(.init(string: string))]) { message in
             switch message {
             case .dataRow(let data):
-                guard let fields = info?.fields else { fatalError() }
-                onRow(PostgresRow(fields: fields, columns: data.columns))
+                guard let rowDescription = rowDescription else { fatalError() }
+                onRow(PostgresRow(rowDescription: rowDescription, dataRow: data))
                 return false
             case .rowDescription(let r):
-                info = r
+                rowDescription = r
                 return false
             case .commandComplete(let complete):
                 return false

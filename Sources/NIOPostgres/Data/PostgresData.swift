@@ -1,3 +1,5 @@
+import NIO
+
 public struct PostgresData {
     public static var null: PostgresData {
         return .init(type: .null)
@@ -15,9 +17,9 @@ public struct PostgresData {
     /// the format code is not yet known and will always be zero.
     public var formatCode: PostgresFormatCode
     
-    public var value: [UInt8]?
+    public var value: ByteBuffer?
     
-    public init(type: PostgresDataType, typeModifier: Int32? = nil, formatCode: PostgresFormatCode = .binary, value: [UInt8]? = nil) {
+    public init(type: PostgresDataType, typeModifier: Int32? = nil, formatCode: PostgresFormatCode = .binary, value: ByteBuffer? = nil) {
         self.type = type
         self.typeModifier = typeModifier
         self.formatCode = formatCode
