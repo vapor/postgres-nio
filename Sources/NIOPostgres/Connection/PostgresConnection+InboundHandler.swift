@@ -12,7 +12,7 @@ extension PostgresConnection {
             let callback: (PostgresMessage) throws -> Bool
         }
         
-        var waiters: CircularBuffer<Request>
+        var waiters: [Request]
         
         init(_ channel: Channel) {
             self.channel = channel
@@ -52,13 +52,11 @@ extension PostgresConnection {
                     print("Discarding \(message)")
                     break
                 default:
-                    let request = waiters.removeFirst()
+                    let request = waiters[0]
                     do {
                         if try request.callback(message) {
+                            _ = waiters.removeFirst()
                             request.promise.succeed(result: ())
-                        } else {
-                            // put back in the buffer
-                            waiters.prepend(request)
                         }
                     } catch {
                         request.promise.fail(error: error)

@@ -29,7 +29,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
-        let version = rows[0].decode(String.self, at: "version")
+        let version = try rows[0].decode(String.self, at: "version")
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
     }
     
@@ -38,7 +38,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try? conn.close().wait() }
         let rows = try conn.query("SELECT version()", .init()).wait()
         XCTAssertEqual(rows.count, 1)
-        let version = rows[0].decode(String.self, at: "version")
+        let version = try rows[0].decode(String.self, at: "version")
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
         
     }
@@ -48,7 +48,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try? conn.close().wait() }
         let rows = try conn.query("SELECT $1 as foo", ["hello"]).wait()
         XCTAssertEqual(rows.count, 1)
-        let version = rows[0].decode(String.self, at: "foo")
+        let version = try rows[0].decode(String.self, at: "foo")
         XCTAssertEqual(version, "hello")
     }
     
@@ -64,36 +64,6 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     func testSelectTypes() throws {
-        // 1247.typisdefined: 0x01 (BOOLEAN)
-        // 1247.typbasetype: 0x00000000 (OID)
-        // 1247.typnotnull: 0x00 (BOOLEAN)
-        // 1247.typcategory: 0x42 (CHAR)
-        // 1247.typname: 0x626f6f6c (NAME)
-        // 1247.typbyval: 0x01 (BOOLEAN)
-        // 1247.typrelid: 0x00000000 (OID)
-        // 1247.typalign: 0x63 (CHAR)
-        // 1247.typndims: 0x00000000 (INTEGER)
-        // 1247.typacl: null
-        // 1247.typsend: 0x00000985 (REGPROC)
-        // 1247.typmodout: 0x00000000 (REGPROC)
-        // 1247.typstorage: 0x70 (CHAR)
-        // 1247.typispreferred: 0x01 (BOOLEAN)
-        // 1247.typinput: 0x000004da (REGPROC)
-        // 1247.typoutput: 0x000004db (REGPROC)
-        // 1247.typlen: 0x0001 (SMALLINT)
-        // 1247.typcollation: 0x00000000 (OID)
-        // 1247.typdefaultbin: null
-        // 1247.typelem: 0x00000000 (OID)
-        // 1247.typnamespace: 0x0000000b (OID)
-        // 1247.typtype: 0x62 (CHAR)
-        // 1247.typowner: 0x0000000a (OID)
-        // 1247.typdefault: null
-        // 1247.typtypmod: 0xffffffff (INTEGER)
-        // 1247.typarray: 0x000003e8 (OID)
-        // 1247.typreceive: 0x00000984 (REGPROC)
-        // 1247.typmodin: 0x00000000 (REGPROC)
-        // 1247.typanalyze: 0x00000000 (REGPROC)
-        // 1247.typdelim: 0x2c (CHAR)
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         let results = try conn.simpleQuery("SELECT * FROM pg_type").wait()
         XCTAssert(results.count >= 350, "Results count not large enough: \(results.count)")
@@ -136,13 +106,35 @@ final class NIOPostgresTests: XCTestCase {
         // ]
         switch results.count {
         case 1:
-            let result = results[0]
-            XCTAssertEqual(result.decode(String.self, at: "typname"), "float8")
-            XCTAssertEqual(result.decode(UInt32.self, at: "typnamespace"), 11)
-            XCTAssertEqual(result.decode(UInt32.self, at: "typowner"), 10)
-            XCTAssertEqual(result.decode(Int16.self, at: "typlen"), 8)
+            let pgtype = try results[0].decode(PGType.self, table: "pg_type")
+            XCTAssertEqual(pgtype.typname, "float8")
+            XCTAssertEqual(pgtype.typnamespace, 11)
+            XCTAssertEqual(pgtype.typowner, 10)
+            XCTAssertEqual(pgtype.typlen, 8)
             #warning("finish adding columns")
         default: XCTFail("Should be only one result")
+        }
+    }
+    
+    func testSelectPerformance() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        measure {
+            do {
+                _ = try conn.simpleQuery("SELECT * FROM pg_type").wait()
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
+    
+    func testRangeSelectPerformance() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        measure {
+            do {
+                _ = try conn.simpleQuery("SELECT * FROM generate_series(1, 10000) num").wait()
+            } catch {
+                XCTFail("\(error)")
+            }
         }
     }
 }

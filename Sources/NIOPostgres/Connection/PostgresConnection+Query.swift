@@ -27,7 +27,7 @@ extension PostgresConnection {
             portalName: "",
             maxRows: 0
         )
-        var rowDescription: PostgresMessage.RowDescription?
+        var rowLookupTable: PostgresRow.LookupTable?
         return handler.send([
             .parse(parse), .describe(describe), .bind(bind), .execute(execute), .sync
         ]) { message in
@@ -35,11 +35,15 @@ extension PostgresConnection {
             case .bindComplete:
                 return false
             case .dataRow(let data):
-                guard let rowDescription = rowDescription else { fatalError() }
-                onRow(PostgresRow(rowDescription: rowDescription, dataRow: data))
+                guard let rowLookupTable = rowLookupTable else { fatalError() }
+                let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
+                onRow(row)
                 return false
             case .rowDescription(let r):
-                rowDescription = r
+                rowLookupTable = PostgresRow.LookupTable(
+                    rowDescription: r,
+                    tableNames: self.tableNames
+                )
                 return false
             case .parseComplete:
                 return false
