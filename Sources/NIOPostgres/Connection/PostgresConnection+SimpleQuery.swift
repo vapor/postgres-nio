@@ -7,15 +7,19 @@ extension PostgresConnection {
     }
     
     public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
-        var info: PostgresMessage.RowDescription?
+        var rowLookupTable: PostgresRow.LookupTable?
         return handler.send([.simpleQuery(.init(string: string))]) { message in
             switch message {
             case .dataRow(let data):
-                guard let fields = info?.fields else { fatalError() }
-                onRow(PostgresRow(fields: fields, columns: data.columns))
+                guard let rowLookupTable = rowLookupTable else { fatalError() }
+                let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
+                onRow(row)
                 return false
             case .rowDescription(let r):
-                info = r
+                rowLookupTable = PostgresRow.LookupTable(
+                    rowDescription: r,
+                    tableNames: self.tableNames
+                )
                 return false
             case .commandComplete(let complete):
                 return false

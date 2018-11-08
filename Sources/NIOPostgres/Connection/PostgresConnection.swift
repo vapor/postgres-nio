@@ -8,6 +8,12 @@ public final class PostgresConnection {
     var processID: Int32?
     var secretKey: Int32?
     
+    var tableNames: TableNames?
+    
+    public var eventLoop: EventLoop {
+        return self.handler.channel.eventLoop
+    }
+    
     public var closeFuture: EventLoopFuture<Void> {
         return handler.channel.closeFuture
     }

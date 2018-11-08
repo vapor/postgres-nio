@@ -5,7 +5,7 @@ extension PostgresMessage {
     struct Bind: ByteBufferSerializable {
         struct Parameter {
             /// The value of the parameter, in the format indicated by the associated format code. n is the above length.
-            var data: [UInt8]?
+            var value: ByteBuffer?
         }
 
         /// The name of the destination portal (an empty string selects the unnamed portal).
@@ -36,11 +36,11 @@ extension PostgresMessage {
             
             buffer.write(array: self.parameterFormatCodes)
             buffer.write(array: self.parameters) {
-                if let data = $1.data {
+                if var data = $1.value {
                     // The length of the parameter value, in bytes (this count does not include itself). Can be zero.
-                    $0.write(integer: numericCast(data.count), as: Int32.self)
+                    $0.write(integer: numericCast(data.readableBytes), as: Int32.self)
                     // The value of the parameter, in the format indicated by the associated format code. n is the above length.
-                    $0.write(bytes: data)
+                    $0.write(buffer: &data)
                 } else {
                     // As a special case, -1 indicates a NULL parameter value. No value bytes follow in the NULL case.
                     $0.write(integer: -1, as: Int32.self)

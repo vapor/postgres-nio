@@ -22,7 +22,7 @@ internal extension ByteBuffer {
         return E.init(rawValue: rawValue)
     }
     
-    mutating func readNullableBytes() -> [UInt8]? {
+    mutating func readNullableBytes() -> ByteBuffer? {
         guard let count: Int = readInteger(as: Int32.self).flatMap(numericCast) else {
             return nil
         }
@@ -30,7 +30,7 @@ internal extension ByteBuffer {
         case -1:
             // As a special case, -1 indicates a NULL parameter value. No value bytes follow in the NULL case.
             return nil
-        default: return readBytes(length: count)
+        default: return readSlice(length: count)
         }
     }
     
@@ -66,7 +66,7 @@ internal extension ByteBuffer {
     }
 }
 
-internal extension Array where Element == UInt8 {
+internal extension Sequence where Element == UInt8 {
     func hexdigest() -> String {
         return reduce("") { $0 + String(format: "%02x", $1) }
     }

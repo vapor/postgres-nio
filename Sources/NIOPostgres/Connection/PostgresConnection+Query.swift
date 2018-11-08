@@ -7,8 +7,12 @@ extension PostgresConnection {
     }
     
     public func query(_ string: String, _ binds: PostgresBinds, _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
-        var info: PostgresMessage.RowDescription?
-        
+        let data: [PostgresData]
+        do {
+            data = try binds.serialize(allocator: self.handler.channel.allocator)
+        } catch {
+            return self.eventLoop.newFailedFuture(error: error)
+        }
         let parse = PostgresMessage.Parse(
             statementName: "",
             query: string,
@@ -21,14 +25,15 @@ extension PostgresConnection {
         let bind = PostgresMessage.Bind(
             portalName: "",
             statementName: "",
-            parameterFormatCodes: binds.data.map { $0.formatCode },
-            parameters: binds.data.map { .init(data: $0.value) },
+            parameterFormatCodes: data.map { $0.formatCode },
+            parameters: data.map { .init(value: $0.value) },
             resultFormatCodes: [.binary]
         )
         let execute = PostgresMessage.Execute(
             portalName: "",
             maxRows: 0
         )
+        var rowLookupTable: PostgresRow.LookupTable?
         return handler.send([
             .parse(parse), .describe(describe), .bind(bind), .execute(execute), .sync
         ]) { message in
@@ -36,11 +41,15 @@ extension PostgresConnection {
             case .bindComplete:
                 return false
             case .dataRow(let data):
-                guard let fields = info?.fields else { fatalError() }
-                onRow(PostgresRow(fields: fields, columns: data.columns))
+                guard let rowLookupTable = rowLookupTable else { fatalError() }
+                let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
+                onRow(row)
                 return false
             case .rowDescription(let r):
-                info = r
+                rowLookupTable = PostgresRow.LookupTable(
+                    rowDescription: r,
+                    tableNames: self.tableNames
+                )
                 return false
             case .parseComplete:
                 return false
