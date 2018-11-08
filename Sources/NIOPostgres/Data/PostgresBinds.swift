@@ -1,17 +1,27 @@
+import NIO
+
 public struct PostgresBinds {
-    public var data: [PostgresData]
+    var data: [Encodable]
     
     public init() {
         self.data = []
     }
     
-    public mutating func encode(_ encodable: PostgresDataConvertible) {
-        self.data.append(encodable.postgresData ?? .null)
+    internal func serialize(allocator: ByteBufferAllocator) throws -> [PostgresData] {
+        let encoder = PostgresDataEncoder(allocator: allocator)
+        return try data.map { encodable in
+            try encodable.encode(to: encoder)
+            return encoder.data!
+        }
+    }
+    
+    public mutating func encode(_ encodable: Encodable) {
+        self.data.append(encodable)
     }
 }
 
 extension PostgresBinds: ExpressibleByArrayLiteral {
-    public init(arrayLiteral elements: PostgresDataConvertible...) {
+    public init(arrayLiteral elements: Encodable...) {
         self.init()
         for element in elements {
             self.encode(element)

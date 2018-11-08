@@ -10,6 +10,10 @@ public final class PostgresConnection {
     
     var tableNames: TableNames?
     
+    public var eventLoop: EventLoop {
+        return self.handler.channel.eventLoop
+    }
+    
     public var closeFuture: EventLoopFuture<Void> {
         return handler.channel.closeFuture
     }

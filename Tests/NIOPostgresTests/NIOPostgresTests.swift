@@ -137,4 +137,22 @@ final class NIOPostgresTests: XCTestCase {
             }
         }
     }
+    
+    func testRangeSelectDecodePerformance() throws {
+        struct Series: Decodable {
+            var num: Int
+        }
+        
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        measure {
+            do {
+                let results = try conn.simpleQuery("SELECT * FROM generate_series(1, 10000) num").wait()
+                for result in results {
+                    _ = try result.decode(Series.self)
+                }
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
 }

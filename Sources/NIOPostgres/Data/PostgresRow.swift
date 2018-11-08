@@ -64,26 +64,26 @@ public struct PostgresRow: CustomStringConvertible {
     
     let lookupTable: LookupTable
     
-    public func decode<T>(_ decodable: T.Type, table: String? = nil) throws -> T
+    public func decode<T>(_ decodable: T.Type, table: String) throws -> T
         where T: Decodable
     {
         return try decode(T.self, tableOID: lookupTable.tableOID(name: table))
     }
     
-    public func decode<T>(_ decodable: T.Type, at column: String, table: String? = nil) throws -> T?
-        where T: Decodable
-    {
-        return try decode(T.self, at: column, tableOID: lookupTable.tableOID(name: table))
-    }
-    
-    public func decode<T>(_ decodable: T.Type, tableOID: UInt32) throws -> T
+    public func decode<T>(_ decodable: T.Type, tableOID: UInt32 = 0) throws -> T
         where T: Decodable
     {
         let decoder = PostgresRowDecoder(row: self, tableOID: tableOID)
         return try T(from: decoder)
     }
     
-    public func decode<T>(_ decodable: T.Type, at column: String, tableOID: UInt32) throws -> T?
+    public func decode<T>(_ decodable: T.Type, at column: String, table: String) throws -> T?
+        where T: Decodable
+    {
+        return try decode(T.self, at: column, tableOID: lookupTable.tableOID(name: table))
+    }
+    
+    public func decode<T>(_ decodable: T.Type, at column: String, tableOID: UInt32 = 0) throws -> T?
         where T: Decodable
     {
         guard let data = self.data(at: column, tableOID: tableOID) else {

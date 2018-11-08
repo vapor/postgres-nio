@@ -7,6 +7,12 @@ extension PostgresConnection {
     }
     
     public func query(_ string: String, _ binds: PostgresBinds, _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
+        let data: [PostgresData]
+        do {
+            data = try binds.serialize(allocator: self.handler.channel.allocator)
+        } catch {
+            return self.eventLoop.newFailedFuture(error: error)
+        }
         let parse = PostgresMessage.Parse(
             statementName: "",
             query: string,
@@ -19,8 +25,8 @@ extension PostgresConnection {
         let bind = PostgresMessage.Bind(
             portalName: "",
             statementName: "",
-            parameterFormatCodes: binds.data.map { $0.formatCode },
-            parameters: binds.data.map { .init(value: $0.value) },
+            parameterFormatCodes: data.map { $0.formatCode },
+            parameters: data.map { .init(value: $0.value) },
             resultFormatCodes: [.binary]
         )
         let execute = PostgresMessage.Execute(
