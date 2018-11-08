@@ -8,6 +8,10 @@ extension NIOPostgresTests {
         ("testQuerySelectParameter", testQuerySelectParameter),
         ("testSQLError", testSQLError),
         ("testSelectTypes", testSelectTypes),
+        ("testSelectType", testSelectType),
+        ("testSelectPerformance", testSelectPerformance),
+        ("testRangeSelectPerformance", testRangeSelectPerformance),
+        ("testRangeSelectDecodePerformance", testRangeSelectDecodePerformance),
     ]
 }
 
