@@ -18,7 +18,8 @@ extension PostgresConnection {
             case .rowDescription(let r):
                 rowLookupTable = PostgresRow.LookupTable(
                     rowDescription: r,
-                    tableNames: self.tableNames
+                    tableNames: self.tableNames,
+                    resultFormat: []
                 )
                 return false
             case .commandComplete(let complete):

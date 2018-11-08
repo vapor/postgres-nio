@@ -1,3 +1,4 @@
+import Foundation
 import NIO
 
 internal extension ByteBuffer {
@@ -63,6 +64,67 @@ internal extension ByteBuffer {
             try array.append(closure(&self))
         }
         return array
+    }
+    
+    mutating func readFloat<T: BinaryFloatingPoint>(as: T.Type = T.self) -> T? {
+        guard self.readableBytes >= MemoryLayout<T>.size else {
+            return nil
+        }
+        
+        let value: T = self.getFloat(at: self.readerIndex)! /* must work as we have enough bytes */
+        // should be _moveReaderIndex
+        self.moveReaderIndex(forwardBy: MemoryLayout<T>.size)
+        return value
+    }
+
+    func getFloat<T: BinaryFloatingPoint>(at index: Int, as: T.Type = T.self) -> T? {
+        precondition(index >= 0, "index must not be negative")
+        return self.withVeryUnsafeBytes { ptr in
+            guard index <= ptr.count - MemoryLayout<T>.size else {
+                return nil
+            }
+            var value: T = 0
+            withUnsafeMutableBytes(of: &value) { valuePtr in
+                #warning("improve performance")
+                valuePtr.copyBytes(
+                    from: UnsafeRawBufferPointer(
+                        start: ptr.baseAddress!.advanced(by: index),
+                        count: MemoryLayout<T>.size
+                    ).reversed()
+                )
+            }
+            return value
+        }
+    }
+    
+    mutating func readUUID() -> UUID? {
+        guard self.readableBytes >= MemoryLayout<UUID>.size else {
+            return nil
+        }
+        
+        let value: UUID = self.getUUID(at: self.readerIndex)! /* must work as we have enough bytes */
+        // should be _moveReaderIndex
+        self.moveReaderIndex(forwardBy: MemoryLayout<UUID>.size)
+        return value
+    }
+    
+    func getUUID(at index: Int) -> UUID? {
+        precondition(index >= 0, "index must not be negative")
+        return self.withVeryUnsafeBytes { ptr in
+            guard index <= ptr.count - MemoryLayout<uuid_t>.size else {
+                return nil
+            }
+            var value: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+            withUnsafeMutableBytes(of: &value) { valuePtr in
+                valuePtr.copyMemory(
+                    from: UnsafeRawBufferPointer(
+                        start: ptr.baseAddress!.advanced(by: index),
+                        count: MemoryLayout<UUID>.size
+                    )
+                )
+            }
+            return UUID(uuid: value)
+        }
     }
 }
 

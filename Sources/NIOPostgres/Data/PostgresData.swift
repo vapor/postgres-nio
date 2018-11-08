@@ -1,6 +1,6 @@
 import NIO
 
-public struct PostgresData {
+public struct PostgresData: CustomStringConvertible {
     public static var null: PostgresData {
         return .init(type: .null)
     }
@@ -24,5 +24,22 @@ public struct PostgresData {
         self.typeModifier = typeModifier
         self.formatCode = formatCode
         self.value = value
+    }
+    
+    /// See `CustomStringConvertible`
+    public var description: String {
+        let string: String
+        if var value = self.value {
+            switch self.formatCode {
+            case .text:
+                let raw = value.readString(length: value.readableBytes) ?? ""
+                string = "\"\(raw)\""
+            case .binary:
+                string = "0x" + value.readableBytesView.hexdigest()
+            }
+        } else {
+            string = "<null>"
+        }
+        return string + " (\(self.type))"
     }
 }

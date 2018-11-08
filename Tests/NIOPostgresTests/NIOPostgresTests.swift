@@ -116,11 +116,105 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
     
+    func testIntegers() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        struct Integers: Decodable {
+            let smallint: Int16
+            let smallint_min: Int16
+            let smallint_max: Int16
+            let int: Int32
+            let int_min: Int32
+            let int_max: Int32
+            let bigint: Int64
+            let bigint_min: Int64
+            let bigint_max: Int64
+        }
+        let results = try conn.query("""
+        SELECT
+            1::SMALLINT                   as smallint,
+            -32767::SMALLINT              as smallint_min,
+            32767::SMALLINT               as smallint_max,
+            1::INT                        as int,
+            -2147483647::INT              as int_min,
+            2147483647::INT               as int_max,
+            1::BIGINT                     as bigint,
+            -9223372036854775807::BIGINT  as bigint_min,
+            9223372036854775807::BIGINT   as bigint_max
+        """).wait()
+        switch results.count {
+        case 1:
+            print(results[0])
+            let kitchenSink = try results[0].decode(Integers.self)
+            XCTAssertEqual(kitchenSink.smallint, 1)
+            XCTAssertEqual(kitchenSink.smallint_min, -32_767)
+            XCTAssertEqual(kitchenSink.smallint_max, 32_767)
+            XCTAssertEqual(kitchenSink.int, 1)
+            XCTAssertEqual(kitchenSink.int_min, -2_147_483_647)
+            XCTAssertEqual(kitchenSink.int_max, 2_147_483_647)
+            XCTAssertEqual(kitchenSink.bigint, 1)
+            XCTAssertEqual(kitchenSink.bigint_min, -9_223_372_036_854_775_807)
+            XCTAssertEqual(kitchenSink.bigint_max, 9_223_372_036_854_775_807)
+        default: XCTFail("incorrect result count")
+        }
+    }
+
+    func testPi() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        struct Pi: Decodable {
+            let text: String
+            let numeric_string: String
+            let numeric_decimal: Decimal
+            let double: Double
+            let float: Float
+        }
+        let results = try conn.query("""
+        SELECT
+            pi()::TEXT     as text,
+            pi()::NUMERIC  as numeric_string,
+            pi()::NUMERIC  as numeric_decimal,
+            pi()::FLOAT8   as double,
+            pi()::FLOAT4   as float
+        """).wait()
+        switch results.count {
+        case 1:
+            print(results[0])
+            let kitchenSink = try results[0].decode(Pi.self)
+            XCTAssertEqual(kitchenSink.text, "3.14159265358979")
+            XCTAssertEqual(kitchenSink.numeric_string, "3.14159265358979")
+            XCTAssertTrue(kitchenSink.numeric_decimal.isLess(than: 3.14159265358980))
+            XCTAssertFalse(kitchenSink.numeric_decimal.isLess(than: 3.14159265358978))
+            XCTAssertTrue(kitchenSink.double.description.hasPrefix("3.141592"))
+            XCTAssertTrue(kitchenSink.float.description.hasPrefix("3.141592"))
+        default: XCTFail("incorrect result count")
+        }
+    }
+    
+    func testUUID() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        struct Model: Decodable {
+            let id: UUID
+            let string: String
+        }
+        let results = try conn.query("""
+        SELECT
+            '123e4567-e89b-12d3-a456-426655440000'::UUID as id,
+            '123e4567-e89b-12d3-a456-426655440000'::UUID as string
+        """).wait()
+        switch results.count {
+        case 1:
+            print(results[0])
+            let kitchenSink = try results[0].decode(Model.self)
+            XCTAssertEqual(kitchenSink.id.uuidString, "123E4567-E89B-12D3-A456-426655440000")
+            XCTAssertEqual(kitchenSink.string, "123E4567-E89B-12D3-A456-426655440000")
+        default: XCTFail("incorrect result count")
+        }
+    }
+    
     func testSelectPerformance() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         measure {
             do {
-                _ = try conn.simpleQuery("SELECT * FROM pg_type").wait()
+                _ = try conn.query("SELECT * FROM pg_type").wait()
             } catch {
                 XCTFail("\(error)")
             }
