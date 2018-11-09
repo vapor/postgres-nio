@@ -12,6 +12,7 @@ extension NIOPostgresTests {
         ("testIntegers", testIntegers),
         ("testPi", testPi),
         ("testUUID", testUUID),
+        ("testDates", testDates),
         ("testSelectPerformance", testSelectPerformance),
         ("testRangeSelectPerformance", testRangeSelectPerformance),
         ("testRangeSelectDecodePerformance", testRangeSelectDecodePerformance),
