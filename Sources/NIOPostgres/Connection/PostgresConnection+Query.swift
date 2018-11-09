@@ -1,12 +1,12 @@
 import NIO
 
 extension PostgresConnection {
-    public func query(_ string: String, _ binds: PostgresBinds) -> EventLoopFuture<[PostgresRow]> {
+    public func query(_ string: String, _ binds: PostgresBinds = []) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return query(string, binds) { rows.append($0) }.map { rows }
     }
     
-    public func query(_ string: String, _ binds: PostgresBinds, _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
+    public func query(_ string: String, _ binds: PostgresBinds = [], _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
         let data: [PostgresData]
         do {
             data = try binds.serialize(allocator: self.handler.channel.allocator)
@@ -48,7 +48,8 @@ extension PostgresConnection {
             case .rowDescription(let r):
                 rowLookupTable = PostgresRow.LookupTable(
                     rowDescription: r,
-                    tableNames: self.tableNames
+                    tableNames: self.tableNames,
+                    resultFormat: bind.resultFormatCodes
                 )
                 return false
             case .parseComplete:

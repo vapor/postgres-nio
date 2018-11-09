@@ -17,15 +17,18 @@ public struct PostgresRow: CustomStringConvertible {
         
         private var isInitialized: Bool
         private var map: [FieldKey: FieldValue]
+        var resultFormat: [PostgresFormatCode]
         
         init(
             rowDescription: PostgresMessage.RowDescription,
-            tableNames: PostgresConnection.TableNames?
+            tableNames: PostgresConnection.TableNames?,
+            resultFormat: [PostgresFormatCode]
         ) {
             self.rowDescription = rowDescription
             self.isInitialized = false
             self.map = [:]
             self.tableNames = tableNames
+            self.resultFormat = resultFormat
         }
         
         func initialize(with rowDescription: PostgresMessage.RowDescription) {
@@ -96,28 +99,24 @@ public struct PostgresRow: CustomStringConvertible {
         guard let result = self.lookupTable.lookup(column: column, tableOID: tableOID) else {
             return nil
         }
+        let formatCode: PostgresFormatCode
+        switch self.lookupTable.resultFormat.count {
+        case 1: formatCode = self.lookupTable.resultFormat[0]
+        default: formatCode = result.field.formatCode
+        }
         return PostgresData(
             type: result.field.dataType,
             typeModifier: result.field.dataTypeModifier,
-            formatCode: result.field.formatCode,
+            formatCode: formatCode,
             value: dataRow.columns[result.offset].value
         )
     }
     
     public var description: String {
-        var row: [String: String] = [:]
-        for (i, field) in lookupTable.rowDescription.fields.enumerated() {
-            let column = dataRow.columns[i]
-            let data: String
-            if let value = column.value {
-                switch field.formatCode {
-                case .text: data = value.getString(at: value.readerIndex, length: value.readableBytes) ?? "<mal-encoded string>"
-                case .binary: data = "0x" + value.readableBytesView.hexdigest()
-                }
-            } else {
-                data = "<null>"
-            }
-            row[field.name] = data
+        var row: [String: PostgresData] = [:]
+        for field in lookupTable.rowDescription.fields {
+            #warning("reverse lookup table names for desc")
+            row[field.name] = self.data(at: field.name, tableOID: field.tableOID)
         }
         return row.description
     }
