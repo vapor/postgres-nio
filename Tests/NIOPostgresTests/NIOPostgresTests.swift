@@ -1,3 +1,4 @@
+import Foundation
 import NIO
 import NIOPostgres
 import XCTest
@@ -203,9 +204,33 @@ final class NIOPostgresTests: XCTestCase {
         switch results.count {
         case 1:
             print(results[0])
-            let kitchenSink = try results[0].decode(Model.self)
-            XCTAssertEqual(kitchenSink.id.uuidString, "123E4567-E89B-12D3-A456-426655440000")
-            XCTAssertEqual(kitchenSink.string, "123E4567-E89B-12D3-A456-426655440000")
+            let model = try results[0].decode(Model.self)
+            XCTAssertEqual(model.id.uuidString, "123E4567-E89B-12D3-A456-426655440000")
+            XCTAssertEqual(model.string, "123E4567-E89B-12D3-A456-426655440000")
+        default: XCTFail("incorrect result count")
+        }
+    }
+    
+    func testDates() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        struct Dates: Decodable {
+            var date: Date
+            var timestamp: Date
+            var timestamptz: Date
+        }
+        let results = try conn.query("""
+        SELECT
+            '2016-01-18 01:02:03 +0042'::DATE         as date,
+            '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
+            '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
+        """).wait()
+        switch results.count {
+        case 1:
+            print(results[0])
+            let dates = try results[0].decode(Dates.self)
+            XCTAssertEqual(dates.date.description, "2016-01-18 00:00:00 +0000")
+            XCTAssertEqual(dates.timestamp.description, "2016-01-18 01:02:03 +0000")
+            XCTAssertEqual(dates.timestamptz.description, "2016-01-18 00:20:03 +0000")
         default: XCTFail("incorrect result count")
         }
     }
