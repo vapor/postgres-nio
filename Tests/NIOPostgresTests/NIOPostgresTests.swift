@@ -235,6 +235,25 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
     
+    func testRemoteTLSServer() throws {
+        let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
+        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { try! elg.syncShutdownGracefully() }
+        
+        let conn = try PostgresConnection.connect(
+            to: SocketAddress.newAddressResolving(host: "elmer.db.elephantsql.com", port: 5432),
+            on: elg.next()
+        ).wait()
+        let upgraded = try conn.requestTLS(using: .forClient(certificateVerification: .none)).wait()
+        XCTAssertTrue(upgraded)
+        try conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
+        defer { try? conn.close().wait() }
+        let rows = try conn.simpleQuery("SELECT version()").wait()
+        XCTAssertEqual(rows.count, 1)
+        let version = try rows[0].decode(String.self, at: "version")
+        XCTAssertEqual(version?.contains("PostgreSQL"), true)
+    }
+    
     func testSelectPerformance() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         measure {

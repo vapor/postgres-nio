@@ -19,6 +19,18 @@ extension PostgresMessage {
         
         /// See `ByteToMessageDecoder`.
         func decode(ctx: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
+            // special check for SSL response
+            if
+                !self.hasRequestedAuthentication,
+                let sslResponse = buffer.getInteger(
+                    at: buffer.readerIndex, as: UInt8.self
+                ).flatMap(PostgresMessage.SSLResponse.init)
+            {
+                buffer.moveReaderIndex(forwardBy: 1)
+                ctx.fireChannelRead(wrapInboundOut(.sslResponse(sslResponse)))
+                return .continue
+            }
+        
             // peek at the message identifier
             // the message identifier is always the first byte of a message
             guard let messageIdentifier = buffer.getInteger(at: buffer.readerIndex, as: UInt8.self).map(PostgresMessage.Identifier.init) else {
@@ -45,6 +57,7 @@ extension PostgresMessage {
             let message: PostgresMessage
             switch messageIdentifier {
             case .authenticationCleartextPassword, .authenticationMD5Password:
+                self.hasRequestedAuthentication = true
                 message = try .authentication(.parse(from: &buffer))
             case .backendKeyData:
                 message = try .backendKeyData(.parse(from: &buffer))

@@ -13,6 +13,7 @@ extension NIOPostgresTests {
         ("testPi", testPi),
         ("testUUID", testUUID),
         ("testDates", testDates),
+        ("testRemoteTLSServer", testRemoteTLSServer),
         ("testSelectPerformance", testSelectPerformance),
         ("testRangeSelectPerformance", testRangeSelectPerformance),
         ("testRangeSelectDecodePerformance", testRangeSelectDecodePerformance),
