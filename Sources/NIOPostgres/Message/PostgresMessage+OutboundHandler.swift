@@ -31,6 +31,8 @@ extension PostgresMessage {
             case .simpleQuery(let query):
                 out.write(identifier: .query)
                 packet = query
+            case .sslRequest(let ssl):
+                packet = ssl
             case .startup(let startup):
                 packet = startup
             case .sync:

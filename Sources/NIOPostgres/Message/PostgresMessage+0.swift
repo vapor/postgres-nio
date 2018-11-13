@@ -57,6 +57,10 @@ enum PostgresMessage {
     /// Identifies the message as a simple query.
     case simpleQuery(SimpleQuery)
     
+    case sslRequest(SSLRequest)
+    
+    case sslResponse(SSLResponse)
+    
     /// Startup message
     case startup(Startup)
     
