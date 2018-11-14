@@ -205,8 +205,8 @@ final class NIOPostgresTests: XCTestCase {
         case 1:
             print(results[0])
             let model = try results[0].decode(Model.self)
-            XCTAssertEqual(model.id.uuidString, "123E4567-E89B-12D3-A456-426655440000")
-            XCTAssertEqual(model.string, "123E4567-E89B-12D3-A456-426655440000")
+            XCTAssertEqual(model.id, UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
+            XCTAssertEqual(UUID(uuidString: model.string), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
         default: XCTFail("incorrect result count")
         }
     }
