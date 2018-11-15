@@ -43,24 +43,19 @@ extension PostgresConnection {
         func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
             let message = unwrapInboundIn(data)
             // print("PostgresConnection.ChannelHandler.channelRead(\(message))")
-            switch message {
-            case .error(let error):
-                errorCaught(ctx: ctx, error: PostgresError(.server(error)))
+            switch waiters.count {
+            case 0:
+                print("Discarding \(message)")
+                break
             default:
-                switch waiters.count {
-                case 0:
-                    print("Discarding \(message)")
-                    break
-                default:
-                    let request = waiters[0]
-                    do {
-                        if try request.callback(message) {
-                            _ = waiters.removeFirst()
-                            request.promise.succeed(result: ())
-                        }
-                    } catch {
-                        request.promise.fail(error: error)
+                let request = waiters[0]
+                do {
+                    if try request.callback(message) {
+                        _ = waiters.removeFirst()
+                        request.promise.succeed(result: ())
                     }
+                } catch {
+                    request.promise.fail(error: error)
                 }
             }
         }

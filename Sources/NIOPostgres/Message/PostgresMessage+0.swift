@@ -33,6 +33,9 @@ enum PostgresMessage {
     /// Identifies the message as a no-data indicator.
     case noData
     
+    /// Identifies the message as a notice.
+    case notice(Error)
+    
     /// Identifies the message as a parameter description.
     case parameterDescription(ParameterDescription)
     

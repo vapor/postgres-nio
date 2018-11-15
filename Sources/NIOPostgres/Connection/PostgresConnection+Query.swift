@@ -6,13 +6,14 @@ extension PostgresConnection {
         return query(string, binds) { rows.append($0) }.map { rows }
     }
     
-    public func query(_ string: String, _ binds: PostgresBinds = [], _ onRow: @escaping (PostgresRow) -> ()) -> EventLoopFuture<Void> {
+    public func query(_ string: String, _ binds: PostgresBinds = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         let data: [PostgresData]
         do {
             data = try binds.serialize(allocator: self.handler.channel.allocator)
         } catch {
             return self.eventLoop.newFailedFuture(error: error)
         }
+        print("[NIOPostgres] \(string) \(data)")
         let parse = PostgresMessage.Parse(
             statementName: "",
             query: string,
@@ -34,6 +35,7 @@ extension PostgresConnection {
             maxRows: 0
         )
         var rowLookupTable: PostgresRow.LookupTable?
+        var error: PostgresMessage.Error?
         return handler.send([
             .parse(parse), .describe(describe), .bind(bind), .execute(execute), .sync
         ]) { message in
@@ -43,7 +45,7 @@ extension PostgresConnection {
             case .dataRow(let data):
                 guard let rowLookupTable = rowLookupTable else { fatalError() }
                 let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
-                onRow(row)
+                try onRow(row)
                 return false
             case .rowDescription(let r):
                 rowLookupTable = PostgresRow.LookupTable(
@@ -52,13 +54,24 @@ extension PostgresConnection {
                     resultFormat: bind.resultFormatCodes
                 )
                 return false
+            case .noData:
+                return false
             case .parseComplete:
                 return false
             case .parameterDescription(let desc):
                 return false
             case .commandComplete(let complete):
                 return false
+            case .error(let e):
+                error = e
+                return false
+            case .notice(let notice):
+                print("[NIOPostgres] [NOTICE] \(notice)")
+                return false
             case .readyForQuery:
+                if let error = error {
+                    throw PostgresError(.server(error))
+                }
                 return true
             default: throw PostgresError(.protocol("Unexpected message during query: \(message)"))
             }
