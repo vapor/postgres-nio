@@ -69,6 +69,8 @@ extension PostgresMessage {
                 message = try .dataRow(.parse(from: &buffer))
             case .errorResponse:
                 message = try .error(.parse(from: &buffer))
+            case .noticeResponse:
+                message = try .notice(.parse(from: &buffer))
             case .noData:
                 message = .noData
             case .parameterDescription:

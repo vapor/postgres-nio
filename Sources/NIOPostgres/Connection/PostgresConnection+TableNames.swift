@@ -26,7 +26,6 @@ extension PostgresConnection {
     }
     
     public func loadTableNames() -> EventLoopFuture<Void> {
-        assert(self.tableNames == nil, "Table names have already been loaded")
         return TableNames.load(on: self).map { tableNames in
             self.tableNames = tableNames
         }
