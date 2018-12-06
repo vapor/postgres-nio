@@ -18,4 +18,3 @@ let package = Package(
         .testTarget(name: "NIOPostgresTests", dependencies: ["NIOPostgres"]),
     ]
 )
-
