@@ -8,7 +8,7 @@ extension PostgresConnection {
         return bootstrap.connect(to: socketAddress).then { channel in
             let handler = PostgresConnection.InboundHandler(channel)
             return channel.pipeline.addHandlers([
-                PostgresMessage.InboundHandler(),
+                ByteToMessageHandler(PostgresMessage.InboundHandler()),
                 PostgresMessage.OutboundHandler(),
                 handler,
             ], first: false).map {

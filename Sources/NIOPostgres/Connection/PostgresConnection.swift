@@ -49,7 +49,7 @@ extension PostgresConnection {
                 let handler = try! OpenSSLClientHandler(context: sslContext)
                 return self.handler.channel.pipeline.add(handler: handler, first: true).map { true }
             case .unsupported:
-                return self.eventLoop.newSucceededFuture(result: false)
+                return self.eventLoop.makeSucceededFuture(result: false)
             }
         }
     }

@@ -16,7 +16,7 @@ extension PostgresConnection {
                     .map { conn }
             }
         } catch {
-            return eventLoop.newFailedFuture(error: error)
+            return eventLoop.makeFailedFuture(error: error)
         }
     }
 }

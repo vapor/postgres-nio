@@ -20,39 +20,37 @@ extension PostgresMessage {
         /// See `ByteToMessageDecoder`.
         func decode(ctx: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
             // special check for SSL response
+            var sslBuffer = buffer
             if
                 !self.hasRequestedAuthentication,
-                let sslResponse = buffer.getInteger(
-                    at: buffer.readerIndex, as: UInt8.self
-                ).flatMap(PostgresMessage.SSLResponse.init)
+                let sslResponse = sslBuffer.readInteger(as: UInt8.self)
+                    .flatMap(PostgresMessage.SSLResponse.init)
             {
-                buffer.moveReaderIndex(forwardBy: 1)
+                buffer = sslBuffer
                 ctx.fireChannelRead(wrapInboundOut(.sslResponse(sslResponse)))
                 return .continue
             }
         
+            var peekBuffer = buffer
             // peek at the message identifier
             // the message identifier is always the first byte of a message
-            guard let messageIdentifier = buffer.getInteger(at: buffer.readerIndex, as: UInt8.self).map(PostgresMessage.Identifier.init) else {
+            guard let messageIdentifier = peekBuffer.readInteger(as: UInt8.self).map(PostgresMessage.Identifier.init) else {
                 return .needMoreData
             }
-            // print("PostgresMessage.ChannelDecoder.decode(\(messageIdentifier))")
-            
-            #warning("check for TLS support")
             
             // peek at the message size
             // the message size is always a 4 byte integer appearing immediately after the message identifier
-            guard let messageSize = buffer.getInteger(at: buffer.readerIndex + 1, as: Int32.self).flatMap(Int.init) else {
+            guard let messageSize = peekBuffer.readInteger(as: Int32.self).flatMap(Int.init) else {
                 return .needMoreData
             }
             
             // ensure message is large enough (skipping message type) or reject
-            guard buffer.readableBytes - 1 >= messageSize else {
+            guard peekBuffer.readableBytes >= messageSize - 4 else {
                 return .needMoreData
             }
             
-            // skip message identifier and message size
-            buffer.moveReaderIndex(forwardBy: 1 + 4)
+            // there is sufficient data, use this buffer
+            buffer = peekBuffer
             
             let message: PostgresMessage
             switch messageIdentifier {

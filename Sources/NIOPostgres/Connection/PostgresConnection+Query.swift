@@ -11,7 +11,7 @@ extension PostgresConnection {
         do {
             data = try binds.serialize(allocator: self.handler.channel.allocator)
         } catch {
-            return self.eventLoop.newFailedFuture(error: error)
+            return self.eventLoop.makeFailedFuture(error: error)
         }
         print("[NIOPostgres] \(string) \(data)")
         let parse = PostgresMessage.Parse(
