@@ -241,7 +241,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try! elg.syncShutdownGracefully() }
         
         let conn = try PostgresConnection.connect(
-            to: SocketAddress.newAddressResolving(host: "elmer.db.elephantsql.com", port: 5432),
+            to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
             on: elg.next()
         ).wait()
         let upgraded = try conn.requestTLS(using: .forClient(certificateVerification: .none)).wait()

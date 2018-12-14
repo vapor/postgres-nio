@@ -21,7 +21,7 @@ extension PostgresConnection {
         
         func send(_ messages: [PostgresMessage], _ callback: @escaping (PostgresMessage) throws -> Bool) -> EventLoopFuture<Void> {
             // print("PostgresConnection.ChannelHandler.send(\(messages))")
-            let promise: EventLoopPromise<Void> = channel.eventLoop.newPromise()
+            let promise: EventLoopPromise<Void> = channel.eventLoop.makePromise()
             waiters.append(Request(promise: promise, callback: callback))
             messages.forEach { channel.write(wrapOutboundOut($0)).cascadeFailure(promise: promise) }
             channel.flush()
