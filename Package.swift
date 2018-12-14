@@ -1,4 +1,4 @@
-// swift-tools-version:4.2
+// swift-tools-version:5.0
 import PackageDescription
 
 let package = Package(
@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", .branch("master")),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "1.0.0"),
+        .package(url: "https://github.com/tanner0101/swift-nio-ssl.git", .branch("master")),
     ],
     targets: [
         .target(name: "CMD5", dependencies: []),
