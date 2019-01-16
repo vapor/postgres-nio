@@ -1,56 +1,53 @@
-import NIO
-import NIOOpenSSL
-
 public final class PostgresConnection {
-    let handler: InboundHandler
-    
-    #warning("publicize these values?")
-    public var status: [String: String]
-    var processID: Int32?
-    var secretKey: Int32?
-    
-    var tableNames: TableNames?
+//    #warning("publicize these values?")
+//    public var status: [String: String]
+//    var processID: Int32?
+//    var secretKey: Int32?
+    let channel: Channel
     
     public var eventLoop: EventLoop {
-        return self.handler.channel.eventLoop
+        return self.channel.eventLoop
     }
     
     public var closeFuture: EventLoopFuture<Void> {
-        return handler.channel.closeFuture
+        return channel.closeFuture
     }
     
-    init(_ handler: InboundHandler) {
-        self.handler = handler
-        self.status = [:]
+    init(channel: Channel) {
+        self.channel = channel
     }
     
     public func close() -> EventLoopFuture<Void> {
-        return handler.channel.close(mode: .all)
+        return self.channel.close(mode: .all)
     }
 }
 
-extension PostgresConnection {
-    public func requestTLS(using tlsConfiguration: TLSConfiguration) -> EventLoopFuture<Bool> {
-        var sslResponse: PostgresMessage.SSLResponse?
-        return self.handler.send([.sslRequest(.init())]) { message in
-            switch message {
-            case .sslResponse(let res):
-                sslResponse = res
-                return true
-            default: fatalError("Unexpected message during TLS request: \(message)")
-            }
-        }.then {
-            guard let res = sslResponse else {
-                fatalError("SSL response should not be nil")
-            }
-            switch res {
-            case .supported:
-                let sslContext = try! SSLContext(configuration: tlsConfiguration)
-                let handler = try! OpenSSLClientHandler(context: sslContext)
-                return self.handler.channel.pipeline.add(handler: handler, first: true).map { true }
-            case .unsupported:
-                return self.eventLoop.makeSucceededFuture(result: false)
-            }
+protocol PostgresConnectionHandler: ChannelInboundHandler where
+    InboundIn == PostgresMessage,
+    OutboundOut == PostgresMessage
+{
+    func read(message: inout PostgresMessage, ctx: ChannelHandlerContext) throws
+}
+
+extension PostgresConnectionHandler {
+    func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
+        var message = self.unwrapInboundIn(data)
+        do {
+            try self.read(message: &message, ctx: ctx)
+        } catch {
+            ctx.fireErrorCaught(error)
+        }
+    }
+}
+
+extension ChannelHandlerContext {
+    func write(message type: PostgresMessageType, promise: EventLoopPromise<Void>?) {
+        do {
+            var message = PostgresMessage(identifier: .none, data: self.channel.allocator.buffer(capacity: 0))
+            try type.serialize(to: &message)
+            self.write(NIOAny(message), promise: promise)
+        } catch {
+            self.fireErrorCaught(error)
         }
     }
 }

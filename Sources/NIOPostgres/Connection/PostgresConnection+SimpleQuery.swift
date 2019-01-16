@@ -7,37 +7,70 @@ extension PostgresConnection {
     }
     
     public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        var error: PostgresMessage.Error?
+        let promise = self.channel.eventLoop.makePromise(of: Void.self)
+        let handler = SimpleQueryHandler(query: string, onRow: onRow, promise: promise)
+        return self.channel.pipeline.add(handler: handler).then {
+            return promise.futureResult
+        }
+    }
+    
+    // MARK: Private
+    
+    private final class SimpleQueryHandler: PostgresConnectionHandler {
+        var query: String
+        var onRow: (PostgresRow) throws -> ()
+        var promise: EventLoopPromise<Void>
+        var error: Error?
         var rowLookupTable: PostgresRow.LookupTable?
-        return handler.send([.simpleQuery(.init(string: string))]) { message in
-            switch message {
-            case .dataRow(let data):
-                guard let rowLookupTable = rowLookupTable else { fatalError() }
+        
+        init(query: String, onRow: @escaping (PostgresRow) throws -> (), promise: EventLoopPromise<Void>) {
+            self.query = query
+            self.onRow = onRow
+            self.promise = promise
+        }
+        
+        func read(message: inout PostgresMessage, ctx: ChannelHandlerContext) throws {
+            switch message.identifier {
+            case .dataRow:
+                let data = try PostgresMessage.DataRow.parse(from: &message)
+                guard let rowLookupTable = self.rowLookupTable else { fatalError() }
                 let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
-                try onRow(row)
-                return false
-            case .rowDescription(let r):
-                rowLookupTable = PostgresRow.LookupTable(
-                    rowDescription: r,
-                    tableNames: self.tableNames,
+                do {
+                    try onRow(row)
+                } catch {
+                    self.error = error
+                }
+            case .rowDescription:
+                let row = try PostgresMessage.RowDescription.parse(from: &message)
+                self.rowLookupTable = PostgresRow.LookupTable(
+                    rowDescription: row,
                     resultFormat: []
                 )
-                return false
-            case .commandComplete(let complete):
-                return false
-            case .error(let e):
-                error = e
-                return false
-            case .notice(let notice):
+            case .commandComplete: break
+            case .error:
+                let error = try PostgresMessage.Error.parse(from: &message)
+                self.error = PostgresError(.server(error))
+            case .notice:
+                let notice = try PostgresMessage.Error.parse(from: &message)
                 print("[NIOPostgres] [NOTICE] \(notice)")
-                return false
             case .readyForQuery:
-                if let error = error {
-                    throw PostgresError(.server(error))
-                }
-                return true
-            default: throw PostgresError(.protocol("Unexpected message during simple query: \(message)"))
+                ctx.pipeline.remove(handler: self, promise: nil)
+            default:
+                self.promise.fail(error: PostgresError(.protocol("Unexpected message during simple query: \(message)")))
             }
+        }
+        
+        func handlerRemoved(ctx: ChannelHandlerContext) {
+            if let error = self.error {
+                self.promise.fail(error: error)
+            } else {
+                self.promise.succeed(result: ())
+            }
+        }
+        
+        func handlerAdded(ctx: ChannelHandlerContext) {
+            ctx.write(message: PostgresMessage.SimpleQuery(string: self.query), promise: nil)
+            ctx.flush()
         }
     }
 }

@@ -1,7 +1,62 @@
+
+public protocol PostgresMessageType: CustomStringConvertible {
+    static var identifier: PostgresMessage.Identifier { get }
+    
+    static func parse(from buffer: inout ByteBuffer) throws -> Self
+    
+    func serialize(into buffer: inout ByteBuffer) throws
+}
+
+extension PostgresMessageType {
+    public static func parse(from message: inout PostgresMessage) throws -> Self {
+        return try Self.parse(from: &message.data)
+    }
+    
+    public func serialize(to message: inout PostgresMessage) throws {
+        try self.serialize(into: &message.data)
+        message.identifier = Self.identifier
+    }
+}
+
+extension PostgresMessage {
+    public struct Sync: PostgresMessageType {
+        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Sync {
+            return .init()
+        }
+        
+        public static var identifier: PostgresMessage.Identifier {
+            return .sync
+        }
+        
+        public var description: String {
+            return "Sync()"
+        }
+        
+        public init() {} 
+        
+        
+        public func serialize(into buffer: inout ByteBuffer) throws {
+            
+        }
+        
+    }
+}
+
+
 // note: Please list enum cases alphabetically.
 
 /// A frontend or backend Postgres message.
-enum PostgresMessage {
+public struct PostgresMessage {
+    public var identifier: Identifier
+    
+    public var data: ByteBuffer
+    
+    public init(identifier: Identifier, data: ByteBuffer) {
+        self.identifier = identifier
+        self.data = data
+    }
+    
+    /*
     /// One of the various authentication request message formats.
     case authentication(Authentication)
     
@@ -69,4 +124,5 @@ enum PostgresMessage {
     
     /// Identifies the message as a Sync command.
     case sync
+     */
 }

@@ -2,36 +2,40 @@ import NIO
 
 extension PostgresMessage {
     /// Identifies the message as a row description.
-    struct RowDescription {
+    public struct RowDescription: PostgresMessageType {
+        public static var identifier: PostgresMessage.Identifier {
+            return .rowDescription
+        }
+        
         /// Describes a single field returns in a `RowDescription` message.
-        struct Field {
+        public struct Field {
             /// The field name.
-            var name: String
+            public var name: String
             
             /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
-            var tableOID: UInt32
+            public var tableOID: UInt32
             
             /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
-            var columnAttributeNumber: Int16
+            public var columnAttributeNumber: Int16
             
             /// The object ID of the field's data type.
-            var dataType: PostgresDataType
+            public var dataType: PostgresDataType
             
             /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
-            var dataTypeSize: Int16
+            public var dataTypeSize: Int16
             
             /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
-            var dataTypeModifier: Int32
+            public var dataTypeModifier: Int32
             
             /// The format code being used for the field.
             /// Currently will be zero (text) or one (binary).
             /// In a RowDescription returned from the statement variant of Describe,
             /// the format code is not yet known and will always be zero.
-            var formatCode: PostgresFormatCode
+            public var formatCode: PostgresFormatCode
         }
         
         /// Parses an instance of this message type from a byte buffer.
-        static func parse(from buffer: inout ByteBuffer) throws -> RowDescription {
+        public static func parse(from buffer: inout ByteBuffer) throws -> RowDescription {
             #warning("look into lazy parsing")
             guard let fields = try buffer.read(array: Field.self, { buffer in
                 guard let name = buffer.readNullTerminatedString() else {
@@ -63,6 +67,14 @@ extension PostgresMessage {
         }
         
         /// The fields supplied in the row description.
-        var fields: [Field]
+        public var fields: [Field]
+        
+        public var description: String {
+            return "Row(\(fields.count) fields)"
+        }
+        
+        public func serialize(into buffer: inout ByteBuffer) throws {
+            fatalError()
+        }
     }
 }
