@@ -27,9 +27,14 @@ extension PostgresConnection {
                 self.promise.succeed(result: true)
             case .sslUnsupported:
                 self.promise.succeed(result: false)
-            default: fatalError("Unexpected message during TLS request: \(message)")
+            default: throw PostgresError(.protocol("Unexpected message during TLS request: \(message)"))
             }
             ctx.channel.pipeline.remove(handler: self, promise: nil)
+        }
+        
+        func errorCaught(ctx: ChannelHandlerContext, error: Error) {
+            ctx.close(mode: .all, promise: nil)
+            self.promise.fail(error: error)
         }
         
         func handlerAdded(ctx: ChannelHandlerContext) {

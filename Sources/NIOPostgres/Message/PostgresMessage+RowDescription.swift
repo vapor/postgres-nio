@@ -3,12 +3,46 @@ import NIO
 extension PostgresMessage {
     /// Identifies the message as a row description.
     public struct RowDescription: PostgresMessageType {
+        /// See `PostgresMessageType`.
         public static var identifier: PostgresMessage.Identifier {
             return .rowDescription
         }
         
         /// Describes a single field returns in a `RowDescription` message.
-        public struct Field {
+        public struct Field: CustomStringConvertible {
+            static func parse(from buffer: inout ByteBuffer) throws -> Field {
+                guard let name = buffer.readNullTerminatedString() else {
+                    throw PostgresError(.protocol("Could not read row description field name"))
+                }
+                guard let tableOID = buffer.readInteger(as: UInt32.self) else {
+                    throw PostgresError(.protocol("Could not read row description field table OID"))
+                }
+                guard let columnAttributeNumber = buffer.readInteger(as: Int16.self) else {
+                    throw PostgresError(.protocol("Could not read row description field column attribute number"))
+                }
+                guard let dataType = buffer.readInteger(as: Int32.self).flatMap(PostgresDataType.init(_:)) else {
+                    throw PostgresError(.protocol("Could not read row description field data type"))
+                }
+                guard let dataTypeSize = buffer.readInteger(as: Int16.self) else {
+                    throw PostgresError(.protocol("Could not read row description field data type size"))
+                }
+                guard let dataTypeModifier = buffer.readInteger(as: Int32.self) else {
+                    throw PostgresError(.protocol("Could not read row description field data type modifier"))
+                }
+                guard let formatCode = buffer.readInteger(rawRepresentable: PostgresFormatCode.self) else {
+                    throw PostgresError(.protocol("Could not read row description field format code"))
+                }
+                return .init(
+                    name: name,
+                    tableOID: tableOID,
+                    columnAttributeNumber: columnAttributeNumber,
+                    dataType: dataType,
+                    dataTypeSize: dataTypeSize,
+                    dataTypeModifier: dataTypeModifier,
+                    formatCode: formatCode
+                )
+            }
+            
             /// The field name.
             public var name: String
             
@@ -32,34 +66,17 @@ extension PostgresMessage {
             /// In a RowDescription returned from the statement variant of Describe,
             /// the format code is not yet known and will always be zero.
             public var formatCode: PostgresFormatCode
+            
+            /// See `CustomStringConvertible`.
+            public var description: String {
+                return self.name.description
+            }
         }
         
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> RowDescription {
-            #warning("look into lazy parsing")
             guard let fields = try buffer.read(array: Field.self, { buffer in
-                guard let name = buffer.readNullTerminatedString() else {
-                    throw PostgresError(.protocol("Could not read row description field name"))
-                }
-                guard let tableOID = buffer.readInteger(as: UInt32.self) else {
-                    throw PostgresError(.protocol("Could not read row description field table OID"))
-                }
-                guard let columnAttributeNumber = buffer.readInteger(as: Int16.self) else {
-                    throw PostgresError(.protocol("Could not read row description field column attribute number"))
-                }
-                guard let dataType = buffer.readInteger(as: Int32.self).flatMap(PostgresDataType.init(_:)) else {
-                    throw PostgresError(.protocol("Could not read row description field data type"))
-                }
-                guard let dataTypeSize = buffer.readInteger(as: Int16.self) else {
-                    throw PostgresError(.protocol("Could not read row description field data type size"))
-                }
-                guard let dataTypeModifier = buffer.readInteger(as: Int32.self) else {
-                    throw PostgresError(.protocol("Could not read row description field data type modifier"))
-                }
-                guard let formatCode = buffer.readInteger(rawRepresentable: PostgresFormatCode.self) else {
-                    throw PostgresError(.protocol("Could not read row description field format code"))
-                }
-                return .init(name: name, tableOID: tableOID, columnAttributeNumber: columnAttributeNumber, dataType: dataType, dataTypeSize: dataTypeSize, dataTypeModifier: dataTypeModifier, formatCode: formatCode)
+                return try.parse(from: &buffer)
             }) else {
                 throw PostgresError(.protocol("Could not read row description fields"))
             }
@@ -69,12 +86,9 @@ extension PostgresMessage {
         /// The fields supplied in the row description.
         public var fields: [Field]
         
+        /// See `CustomStringConverible`.
         public var description: String {
-            return "Row(\(fields.count) fields)"
-        }
-        
-        public func serialize(into buffer: inout ByteBuffer) throws {
-            fatalError()
+            return "Row(\(self.fields)"
         }
     }
 }

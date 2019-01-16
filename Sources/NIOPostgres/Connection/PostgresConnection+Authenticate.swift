@@ -53,8 +53,7 @@ extension PostgresConnection {
                     case .ok:
                         self.state = .done
                     }
-                default:
-                    self.promise.fail(error: PostgresError(.protocol("Unexpected response to start message: \(message)")))
+                default: throw PostgresError(.protocol("Unexpected response to start message: \(message)"))
                 }
             case .done:
                 switch message.identifier {
@@ -64,13 +63,16 @@ extension PostgresConnection {
                     // self.processID = data.processID
                     // self.secretKey = data.secretKey
                 case .readyForQuery:
-                    self.promise.succeed(result: ())
                     ctx.channel.pipeline.remove(handler: self, promise: nil)
-                default:
-                    self.promise.fail(error: PostgresError(.protocol("Unexpected response to password authentication: \(message)")))
+                default: throw PostgresError(.protocol("Unexpected response to password authentication: \(message)"))
                 }
             }
             
+        }
+        
+        func errorCaught(ctx: ChannelHandlerContext, error: Error) {
+            ctx.close(mode: .all, promise: nil)
+            self.promise.fail(error: error)
         }
         
         func handlerAdded(ctx: ChannelHandlerContext) {
@@ -79,6 +81,10 @@ extension PostgresConnection {
                 "database": self.database ?? username
             ]), promise: nil)
             ctx.flush()
+        }
+        
+        func handlerRemoved(ctx: ChannelHandlerContext) {
+            self.promise.succeed(result: ())
         }
         
         // MARK: Private

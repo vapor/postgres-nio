@@ -69,9 +69,13 @@ extension PostgresConnection {
                 print("[NIOPostgres] [NOTICE] \(notice)")
             case .readyForQuery:
                 ctx.pipeline.remove(handler: self, promise: nil)
-            default:
-                self.promise.fail(error: PostgresError(.protocol("Unexpected message during query: \(message)")))
+            default: throw PostgresError(.protocol("Unexpected message during query: \(message)"))
             }
+        }
+        
+        func errorCaught(ctx: ChannelHandlerContext, error: Error) {
+            ctx.close(mode: .all, promise: nil)
+            self.promise.fail(error: error)
         }
         
         func handlerRemoved(ctx: ChannelHandlerContext) {
