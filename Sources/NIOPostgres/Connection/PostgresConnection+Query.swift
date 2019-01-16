@@ -45,11 +45,7 @@ extension PostgresConnection {
                 let data = try PostgresMessage.DataRow.parse(from: &message)
                 guard let rowLookupTable = self.rowLookupTable else { fatalError() }
                 let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
-                do {
-                    try onRow(row)
-                } catch {
-                    self.promise.fail(error: error)
-                }
+                try onRow(row)
             case .rowDescription:
                 let row = try PostgresMessage.RowDescription.parse(from: &message)
                 self.rowLookupTable = PostgresRow.LookupTable(
