@@ -7,37 +7,50 @@ extension PostgresConnection {
     }
     
     public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        var error: PostgresMessage.Error?
-        var rowLookupTable: PostgresRow.LookupTable?
-        return handler.send([.simpleQuery(.init(string: string))]) { message in
-            switch message {
-            case .dataRow(let data):
-                guard let rowLookupTable = rowLookupTable else { fatalError() }
-                let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
-                try onRow(row)
-                return false
-            case .rowDescription(let r):
-                rowLookupTable = PostgresRow.LookupTable(
-                    rowDescription: r,
-                    tableNames: self.tableNames,
-                    resultFormat: []
-                )
-                return false
-            case .commandComplete(let complete):
-                return false
-            case .error(let e):
-                error = e
-                return false
-            case .notice(let notice):
-                print("[NIOPostgres] [NOTICE] \(notice)")
-                return false
-            case .readyForQuery:
-                if let error = error {
-                    throw PostgresError(.server(error))
-                }
-                return true
-            default: throw PostgresError(.protocol("Unexpected message during simple query: \(message)"))
-            }
+        let query = PostgresSimpleQuery(query: string, onRow: onRow)
+        return self.send(query)
+    }
+}
+
+// MARK: Private
+
+private final class PostgresSimpleQuery: PostgresConnectionRequest {
+    var query: String
+    var onRow: (PostgresRow) throws -> ()
+    var rowLookupTable: PostgresRow.LookupTable?
+    
+    init(query: String, onRow: @escaping (PostgresRow) throws -> ()) {
+        self.query = query
+        self.onRow = onRow
+    }
+    
+    func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
+        switch message.identifier {
+        case .dataRow:
+            let data = try PostgresMessage.DataRow(message: message)
+            guard let rowLookupTable = self.rowLookupTable else { fatalError() }
+            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
+            try onRow(row)
+            return []
+        case .rowDescription:
+            let row = try PostgresMessage.RowDescription(message: message)
+            self.rowLookupTable = PostgresRow.LookupTable(
+                rowDescription: row,
+                resultFormat: []
+            )
+            return []
+        case .commandComplete:
+            return []
+        case .readyForQuery:
+            return nil
+        default:
+            throw PostgresError(.protocol("Unexpected message during simple query: \(message)"))
         }
+    }
+    
+    func start() throws -> [PostgresMessage] {
+        return try [
+            PostgresMessage.SimpleQuery(string: self.query).message()
+        ]
     }
 }

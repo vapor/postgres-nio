@@ -1,22 +1,72 @@
 import NIO
 
 extension PostgresConnection {
-    public func query(_ string: String, _ binds: PostgresBinds = []) -> EventLoopFuture<[PostgresRow]> {
+    public func query(_ string: String, _ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return query(string, binds) { rows.append($0) }.map { rows }
     }
     
-    public func query(_ string: String, _ binds: PostgresBinds = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        let data: [PostgresData]
-        do {
-            data = try binds.serialize(allocator: self.handler.channel.allocator)
-        } catch {
-            return self.eventLoop.makeFailedFuture(error: error)
+    public func query(_ string: String, _ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+        let query = PostgresParameterizedQuery(query: string, binds: binds, onRow: onRow)
+        return self.send(query)
+    }
+}
+
+// MARK: Private
+
+private final class PostgresParameterizedQuery: PostgresConnectionRequest {
+    let query: String
+    let binds: [PostgresData]
+    var onRow: (PostgresRow) throws -> ()
+    var rowLookupTable: PostgresRow.LookupTable?
+    var resultFormatCodes: [PostgresFormatCode]
+    
+    init(
+        query: String,
+        binds: [PostgresData],
+        onRow: @escaping (PostgresRow) throws -> ()
+    ) {
+        self.query = query
+        self.binds = binds
+        self.onRow = onRow
+        self.resultFormatCodes = [.binary]
+    }
+    
+    func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
+        switch message.identifier {
+        case .bindComplete:
+            return []
+        case .dataRow:
+            let data = try PostgresMessage.DataRow(message: message)
+            guard let rowLookupTable = self.rowLookupTable else { fatalError() }
+            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
+            try onRow(row)
+            return []
+        case .rowDescription:
+            let row = try PostgresMessage.RowDescription(message: message)
+            self.rowLookupTable = PostgresRow.LookupTable(
+                rowDescription: row,
+                resultFormat: self.resultFormatCodes
+            )
+            return []
+        case .noData:
+            return []
+        case .parseComplete:
+            return []
+        case .parameterDescription:
+            return []
+        case .commandComplete:
+            return []
+        case .readyForQuery:
+            return nil
+        default: throw PostgresError(.protocol("Unexpected message during query: \(message)"))
         }
-        print("[NIOPostgres] \(string) \(data)")
+    }
+    
+    func start() throws -> [PostgresMessage] {
         let parse = PostgresMessage.Parse(
             statementName: "",
-            query: string,
+            query: self.query,
             parameterTypes: []
         )
         let describe = PostgresMessage.Describe(
@@ -26,55 +76,16 @@ extension PostgresConnection {
         let bind = PostgresMessage.Bind(
             portalName: "",
             statementName: "",
-            parameterFormatCodes: data.map { $0.formatCode },
-            parameters: data.map { .init(value: $0.value) },
-            resultFormatCodes: [.binary]
+            parameterFormatCodes: self.binds.map { $0.formatCode },
+            parameters: self.binds.map { .init(value: $0.value) },
+            resultFormatCodes: self.resultFormatCodes
         )
         let execute = PostgresMessage.Execute(
             portalName: "",
             maxRows: 0
         )
-        var rowLookupTable: PostgresRow.LookupTable?
-        var error: PostgresMessage.Error?
-        return handler.send([
-            .parse(parse), .describe(describe), .bind(bind), .execute(execute), .sync
-        ]) { message in
-            switch message {
-            case .bindComplete:
-                return false
-            case .dataRow(let data):
-                guard let rowLookupTable = rowLookupTable else { fatalError() }
-                let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
-                try onRow(row)
-                return false
-            case .rowDescription(let r):
-                rowLookupTable = PostgresRow.LookupTable(
-                    rowDescription: r,
-                    tableNames: self.tableNames,
-                    resultFormat: bind.resultFormatCodes
-                )
-                return false
-            case .noData:
-                return false
-            case .parseComplete:
-                return false
-            case .parameterDescription(let desc):
-                return false
-            case .commandComplete(let complete):
-                return false
-            case .error(let e):
-                error = e
-                return false
-            case .notice(let notice):
-                print("[NIOPostgres] [NOTICE] \(notice)")
-                return false
-            case .readyForQuery:
-                if let error = error {
-                    throw PostgresError(.server(error))
-                }
-                return true
-            default: throw PostgresError(.protocol("Unexpected message during query: \(message)"))
-            }
-        }
+        
+        let sync = PostgresMessage.Sync()
+        return try [parse.message(), describe.message(), bind.message(), execute.message(), sync.message()]
     }
 }

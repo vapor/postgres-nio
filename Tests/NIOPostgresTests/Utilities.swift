@@ -12,7 +12,6 @@ extension PostgresConnection {
             #endif
             return connect(to: address, on: eventLoop).then { conn in
                 return conn.authenticate(username: "vapor_username", database: "vapor_database", password: "vapor_password")
-                    .then { conn.loadTableNames() }
                     .map { conn }
             }
         } catch {

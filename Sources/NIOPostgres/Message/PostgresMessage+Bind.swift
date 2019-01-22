@@ -2,35 +2,47 @@ import NIO
 
 extension PostgresMessage {
     /// Identifies the message as a Bind command.
-    struct Bind: ByteBufferSerializable {
-        struct Parameter {
+    public struct Bind: PostgresMessageType {
+        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Bind {
+            fatalError()
+        }
+        
+        public static var identifier: PostgresMessage.Identifier {
+            return .bind
+        }
+        
+        public var description: String {
+            return "Bind(\(self.parameters.count))"
+        }
+        
+        public struct Parameter {
             /// The value of the parameter, in the format indicated by the associated format code. n is the above length.
             var value: ByteBuffer?
         }
 
         /// The name of the destination portal (an empty string selects the unnamed portal).
-        var portalName: String
+        public var portalName: String
         
         /// The name of the source prepared statement (an empty string selects the unnamed prepared statement).
-        var statementName: String
+        public var statementName: String
         
         /// The number of parameter format codes that follow (denoted C below).
         /// This can be zero to indicate that there are no parameters or that the parameters all use the default format (text);
         /// or one, in which case the specified format code is applied to all parameters; or it can equal the actual number of parameters.
         /// The parameter format codes. Each must presently be zero (text) or one (binary).
-        var parameterFormatCodes: [PostgresFormatCode]
+        public var parameterFormatCodes: [PostgresFormatCode]
         
         /// The number of parameter values that follow (possibly zero). This must match the number of parameters needed by the query.
-        var parameters: [Parameter]
+        public var parameters: [Parameter]
         
         /// The number of result-column format codes that follow (denoted R below).
         /// This can be zero to indicate that there are no result columns or that the result columns should all use the default format (text);
         /// or one, in which case the specified format code is applied to all result columns (if any);
         /// or it can equal the actual number of result columns of the query.
-        var resultFormatCodes: [PostgresFormatCode]
+        public var resultFormatCodes: [PostgresFormatCode]
         
         /// Serializes this message into a byte buffer.
-        func serialize(into buffer: inout ByteBuffer) {
+        public func serialize(into buffer: inout ByteBuffer) {
             buffer.write(nullTerminated: self.portalName)
             buffer.write(nullTerminated: self.statementName)
             

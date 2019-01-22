@@ -2,16 +2,28 @@ import NIO
 
 extension PostgresMessage {
     /// Identifies the message as an Execute command.
-    struct Execute: ByteBufferSerializable {
+    public struct Execute: PostgresMessageType {
+        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Execute {
+            fatalError()
+        }
+        
+        public static var identifier: PostgresMessage.Identifier {
+            return .execute
+        }
+        
+        public var description: String {
+            return "Execute()"
+        }
+        
         /// The name of the destination portal (an empty string selects the unnamed portal).
-        var portalName: String
+        public var portalName: String
         
         /// Maximum number of rows to return, if portal contains a query that
         /// returns rows (ignored otherwise). Zero denotes “no limit”.
-        var maxRows: Int32
+        public var maxRows: Int32
         
         /// Serializes this message into a byte buffer.
-        func serialize(into buffer: inout ByteBuffer) {
+        public func serialize(into buffer: inout ByteBuffer) {
             buffer.write(nullTerminated: portalName)
             buffer.write(integer: maxRows)
         }

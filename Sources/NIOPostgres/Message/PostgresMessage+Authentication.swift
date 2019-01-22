@@ -2,9 +2,13 @@ import NIO
 
 extension PostgresMessage {
     /// Authentication request returned by the server.
-    enum Authentication: CustomStringConvertible {
+    public enum Authentication: PostgresMessageType {
+        public static var identifier: PostgresMessage.Identifier {
+            return .authentication
+        }
+        
         /// Parses an instance of this message type from a byte buffer.
-        static func parse(from buffer: inout ByteBuffer) throws -> Authentication {
+        public static func parse(from buffer: inout ByteBuffer) throws -> Authentication {
             guard let type = buffer.readInteger(as: Int32.self) else {
                 throw PostgresError(.protocol("Could not read authentication message type"))
             }
@@ -34,12 +38,16 @@ extension PostgresMessage {
         case md5([UInt8])
         
         /// See `CustomStringConvertible`.
-        var description: String {
+        public var description: String {
             switch self {
             case .ok: return "Ok"
             case .plaintext: return "CleartextPassword"
-            case .md5(let salt): return "MD5Password(salt: 0x\(salt)"
+            case .md5(let salt): return "MD5Password(salt: 0x\(salt.hexdigest()))"
             }
+        }
+        
+        public func serialize(into buffer: inout ByteBuffer) {
+            fatalError()
         }
     }
 }

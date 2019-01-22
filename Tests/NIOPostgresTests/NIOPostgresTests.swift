@@ -1,5 +1,3 @@
-import Foundation
-import NIO
 import NIOPostgres
 import XCTest
 
@@ -30,7 +28,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
-        let version = try rows[0].decode(String.self, at: "version")
+        let version = rows[0].column("version")?.string
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
     }
     
@@ -39,7 +37,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try? conn.close().wait() }
         let rows = try conn.query("SELECT version()", .init()).wait()
         XCTAssertEqual(rows.count, 1)
-        let version = try rows[0].decode(String.self, at: "version")
+        let version = rows[0].column("version")?.string
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
         
     }
@@ -47,9 +45,9 @@ final class NIOPostgresTests: XCTestCase {
     func testQuerySelectParameter() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try? conn.close().wait() }
-        let rows = try conn.query("SELECT $1::TEXT as foo", ["hello"]).wait()
+        let rows = try conn.query("SELECT $1::TEXT as foo", [.init(string: "hello")]).wait()
         XCTAssertEqual(rows.count, 1)
-        let version = try rows[0].decode(String.self, at: "foo")
+        let version = rows[0].column("foo")?.string
         XCTAssertEqual(version, "hello")
     }
     
@@ -107,11 +105,10 @@ final class NIOPostgresTests: XCTestCase {
         // ]
         switch results.count {
         case 1:
-            let pgtype = try results[0].decode(PGType.self, table: "pg_type")
-            XCTAssertEqual(pgtype.typname, "float8")
-            XCTAssertEqual(pgtype.typnamespace, 11)
-            XCTAssertEqual(pgtype.typowner, 10)
-            XCTAssertEqual(pgtype.typlen, 8)
+            XCTAssertEqual(results[0].column("typname")?.string, "float8")
+            XCTAssertEqual(results[0].column("typnamespace")?.int, 11)
+            XCTAssertEqual(results[0].column("typowner")?.int, 10)
+            XCTAssertEqual(results[0].column("typlen")?.int, 8)
             #warning("finish adding columns")
         default: XCTFail("Should be only one result")
         }
@@ -144,17 +141,15 @@ final class NIOPostgresTests: XCTestCase {
         """).wait()
         switch results.count {
         case 1:
-            print(results[0])
-            let kitchenSink = try results[0].decode(Integers.self)
-            XCTAssertEqual(kitchenSink.smallint, 1)
-            XCTAssertEqual(kitchenSink.smallint_min, -32_767)
-            XCTAssertEqual(kitchenSink.smallint_max, 32_767)
-            XCTAssertEqual(kitchenSink.int, 1)
-            XCTAssertEqual(kitchenSink.int_min, -2_147_483_647)
-            XCTAssertEqual(kitchenSink.int_max, 2_147_483_647)
-            XCTAssertEqual(kitchenSink.bigint, 1)
-            XCTAssertEqual(kitchenSink.bigint_min, -9_223_372_036_854_775_807)
-            XCTAssertEqual(kitchenSink.bigint_max, 9_223_372_036_854_775_807)
+            XCTAssertEqual(results[0].column("smallint")?.int16, 1)
+            XCTAssertEqual(results[0].column("smallint_min")?.int16, -32_767)
+            XCTAssertEqual(results[0].column("smallint_max")?.int16, 32_767)
+            XCTAssertEqual(results[0].column("int")?.int32, 1)
+            XCTAssertEqual(results[0].column("int_min")?.int32, -2_147_483_647)
+            XCTAssertEqual(results[0].column("int_max")?.int32, 2_147_483_647)
+            XCTAssertEqual(results[0].column("bigint")?.int64, 1)
+            XCTAssertEqual(results[0].column("bigint_min")?.int64, -9_223_372_036_854_775_807)
+            XCTAssertEqual(results[0].column("bigint_max")?.int64, 9_223_372_036_854_775_807)
         default: XCTFail("incorrect result count")
         }
     }
@@ -179,13 +174,12 @@ final class NIOPostgresTests: XCTestCase {
         switch results.count {
         case 1:
             print(results[0])
-            let kitchenSink = try results[0].decode(Pi.self)
-            XCTAssertEqual(kitchenSink.text, "3.14159265358979")
-            XCTAssertEqual(kitchenSink.numeric_string, "3.14159265358979")
-            XCTAssertTrue(kitchenSink.numeric_decimal.isLess(than: 3.14159265358980))
-            XCTAssertFalse(kitchenSink.numeric_decimal.isLess(than: 3.14159265358978))
-            XCTAssertTrue(kitchenSink.double.description.hasPrefix("3.141592"))
-            XCTAssertTrue(kitchenSink.float.description.hasPrefix("3.141592"))
+            XCTAssertEqual(results[0].column("text")?.string, "3.14159265358979")
+            XCTAssertEqual(results[0].column("numeric_string")?.string, "3.14159265358979")
+            XCTAssertTrue(results[0].column("numeric_decimal")?.as(custom: Decimal.self)?.isLess(than: 3.14159265358980) ?? false)
+            XCTAssertFalse(results[0].column("numeric_decimal")?.as(custom: Decimal.self)?.isLess(than: 3.14159265358978) ?? true)
+            XCTAssertTrue(results[0].column("double")?.double?.description.hasPrefix("3.141592") ?? false)
+            XCTAssertTrue(results[0].column("float")?.float?.description.hasPrefix("3.141592") ?? false)
         default: XCTFail("incorrect result count")
         }
     }
@@ -204,9 +198,8 @@ final class NIOPostgresTests: XCTestCase {
         switch results.count {
         case 1:
             print(results[0])
-            let model = try results[0].decode(Model.self)
-            XCTAssertEqual(model.id, UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
-            XCTAssertEqual(UUID(uuidString: model.string), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
+            XCTAssertEqual(results[0].column("id")?.uuid, UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
+            XCTAssertEqual(UUID(uuidString: results[0].column("id")?.string ?? ""), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
         default: XCTFail("incorrect result count")
         }
     }
@@ -227,10 +220,9 @@ final class NIOPostgresTests: XCTestCase {
         switch results.count {
         case 1:
             print(results[0])
-            let dates = try results[0].decode(Dates.self)
-            XCTAssertEqual(dates.date.description, "2016-01-18 00:00:00 +0000")
-            XCTAssertEqual(dates.timestamp.description, "2016-01-18 01:02:03 +0000")
-            XCTAssertEqual(dates.timestamptz.description, "2016-01-18 00:20:03 +0000")
+            XCTAssertEqual(results[0].column("date")?.date?.description, "2016-01-18 00:00:00 +0000")
+            XCTAssertEqual(results[0].column("timestamp")?.date?.description, "2016-01-18 01:02:03 +0000")
+            XCTAssertEqual(results[0].column("timestamptz")?.date?.description, "2016-01-18 00:20:03 +0000")
         default: XCTFail("incorrect result count")
         }
     }
@@ -250,7 +242,7 @@ final class NIOPostgresTests: XCTestCase {
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
-        let version = try rows[0].decode(String.self, at: "version")
+        let version = rows[0].column("version")?.string
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
     }
     
@@ -284,10 +276,9 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         measure {
             do {
-                let results = try conn.simpleQuery("SELECT * FROM generate_series(1, 10000) num").wait()
-                for result in results {
-                    _ = try result.decode(Series.self)
-                }
+                try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
+                    _ = row.column("num")?.int
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }

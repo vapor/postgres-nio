@@ -2,9 +2,13 @@ import NIO
 
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
-    struct Error: CustomStringConvertible {
+    public struct Error: PostgresMessageType {
+        public static var identifier: PostgresMessage.Identifier {
+            return .error
+        }
+        
         /// Parses an instance of this message type from a byte buffer.
-        static func parse(from buffer: inout ByteBuffer) throws -> Error {
+        public static func parse(from buffer: inout ByteBuffer) throws -> Error {
             var fields: [Field: String] = [:]
             while let field = buffer.readInteger(rawRepresentable: Field.self) {
                 guard let string = buffer.readNullTerminatedString() else {
@@ -15,7 +19,7 @@ extension PostgresMessage {
             return .init(fields: fields)
         }
         
-        enum Field: UInt8, Hashable {
+        public enum Field: UInt8, Hashable {
             /// Severity: the field contents are ERROR, FATAL, or PANIC (in an error message),
             /// or WARNING, NOTICE, DEBUG, INFO, or LOG (in a notice message), or a
             //// localized translation of one of these. Always present.
@@ -94,11 +98,15 @@ extension PostgresMessage {
         }
         
         /// The diagnostic messages.
-        var fields: [Field: String]
+        public var fields: [Field: String]
         
         /// See `CustomStringConvertible`.
-        var description: String {
+        public var description: String {
             return (fields[.severity] ?? "ERROR") + ": " + (fields[.message] ?? "unknown")
+        }
+        
+        public func serialize(into buffer: inout ByteBuffer) throws {
+            fatalError()
         }
     }
 }
