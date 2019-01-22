@@ -1,7 +1,7 @@
 extension PostgresConnection {
     public func requestTLS(using tlsConfig: TLSConfiguration) -> EventLoopFuture<Bool> {
         let tls = RequestTLSQuery()
-        return self.send(tls).thenThrowing { _ in
+        return self.send(tls).flatMapThrowing { _ in
             if tls.isSupported {
                 let sslContext = try SSLContext(configuration: tlsConfig)
                 let handler = try OpenSSLClientHandler(context: sslContext)

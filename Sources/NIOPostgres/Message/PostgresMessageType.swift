@@ -20,7 +20,7 @@ extension PostgresMessageType {
         return .none
     }
     
-    public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.SSLRequest {
+    public static func parse(from buffer: inout ByteBuffer) throws -> Self {
         fatalError("\(Self.self) does not support parsing.")
     }
     
