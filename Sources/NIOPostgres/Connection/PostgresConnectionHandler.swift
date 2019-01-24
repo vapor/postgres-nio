@@ -61,9 +61,9 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
             } else {
                 self.queue.removeFirst()
                 if let error = request.error {
-                    request.promise.fail(error: error)
+                    request.promise.fail(error)
                 } else {
-                    request.promise.succeed(result: ())
+                    request.promise.succeed(())
                 }
             }
         }
@@ -100,7 +100,7 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
             assertionFailure("PostgresRequest queue empty, discarded: \(error)")
             return
         }
-        self.queue[0].promise.fail(error: error)
+        self.queue[0].promise.fail(error)
         ctx.close(mode: .all, promise: nil)
     }
 }
