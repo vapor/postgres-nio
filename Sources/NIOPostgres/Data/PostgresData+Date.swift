@@ -2,7 +2,10 @@ import Foundation
 
 extension PostgresData {
     public init(date: Date) {
-        fatalError()
+        var buffer = ByteBufferAllocator().buffer(capacity: 0)
+        let seconds = date.timeIntervalSince(_psqlDateStart) * Double(_microsecondsPerSecond)
+        buffer.write(integer: Int64(seconds))
+        self.init(type: .timestamptz, value: buffer)
     }
     
     public var date: Date? {
