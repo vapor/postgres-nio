@@ -36,6 +36,19 @@ extension PostgresData {
     }
 }
 
+extension Date: PostgresDataCustomConvertible {
+    public init?(postgresData: PostgresData) {
+        guard let date = postgresData.date else {
+            return nil
+        }
+        self = date
+    }
+    
+    public var postgresData: PostgresData? {
+        return .init(date: self)
+    }
+}
+
 // MARK: Private
 private let _microsecondsPerSecond: Int64 = 1_000_000
 private let _secondsInDay: Int64 = 24 * 60 * 60
