@@ -2,7 +2,7 @@ extension PostgresConnection {
     public func send(_ request: PostgresConnectionRequest) -> EventLoopFuture<Void> {
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let request = PostgresConnectionRequestContext(delegate: request, promise: promise)
-        self.channel.write(request).cascadeFailure(promise: promise)
+        self.channel.write(request).cascadeFailure(to: promise)
         self.channel.flush()
         return promise.futureResult
     }
