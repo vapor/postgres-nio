@@ -1,3 +1,3 @@
-# nio-postgres
+# NIOPostgres 
 
-A description of this package.
+🐘 Non-blocking, event-driven Swift client for PostgreSQL.
