@@ -48,7 +48,7 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         switch message.identifier {
         case .error:
             let error = try PostgresMessage.Error(message: message)
-            request.error = PostgresError(.server(error))
+            request.error = PostgresError.server(error)
         case .notice:
             let notice = try PostgresMessage.Error(message: message)
             print("[NIOPostgres] [NOTICE] \(notice)")
@@ -102,5 +102,13 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         }
         self.queue[0].promise.fail(error)
         ctx.close(mode: .all, promise: nil)
+    }
+    
+    func close(ctx: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+        for current in self.queue {
+            current.promise.fail(PostgresError.connectionClosed)
+        }
+        self.queue = []
+        ctx.close(mode: mode, promise: promise)
     }
 }

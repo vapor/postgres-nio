@@ -29,10 +29,10 @@ extension PostgresMessage {
         
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
-            buffer.write(string: statementName + "\0")
-            buffer.write(string: query + "\0")
-            buffer.write(integer: numericCast(self.parameterTypes.count), as: Int16.self)
-            self.parameterTypes.forEach { buffer.write(integer: $0.rawValue) }
+            buffer.writeString(statementName + "\0")
+            buffer.writeString(query + "\0")
+            buffer.writeInteger(numericCast(self.parameterTypes.count), as: Int16.self)
+            self.parameterTypes.forEach { buffer.writeInteger($0.rawValue) }
         }
     }
 }

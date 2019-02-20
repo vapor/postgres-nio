@@ -50,12 +50,12 @@ extension PostgresMessage {
             buffer.write(array: self.parameters) {
                 if var data = $1.value {
                     // The length of the parameter value, in bytes (this count does not include itself). Can be zero.
-                    $0.write(integer: numericCast(data.readableBytes), as: Int32.self)
+                    $0.writeInteger(numericCast(data.readableBytes), as: Int32.self)
                     // The value of the parameter, in the format indicated by the associated format code. n is the above length.
-                    $0.write(buffer: &data)
+                    $0.writeBuffer(&data)
                 } else {
                     // As a special case, -1 indicates a NULL parameter value. No value bytes follow in the NULL case.
-                    $0.write(integer: -1, as: Int32.self)
+                    $0.writeInteger(-1, as: Int32.self)
                 }
             }
             buffer.write(array: self.resultFormatCodes)

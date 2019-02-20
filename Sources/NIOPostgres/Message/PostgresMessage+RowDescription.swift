@@ -12,25 +12,25 @@ extension PostgresMessage {
         public struct Field: CustomStringConvertible {
             static func parse(from buffer: inout ByteBuffer) throws -> Field {
                 guard let name = buffer.readNullTerminatedString() else {
-                    throw PostgresError(.protocol("Could not read row description field name"))
+                    throw PostgresError.protocol("Could not read row description field name")
                 }
                 guard let tableOID = buffer.readInteger(as: UInt32.self) else {
-                    throw PostgresError(.protocol("Could not read row description field table OID"))
+                    throw PostgresError.protocol("Could not read row description field table OID")
                 }
                 guard let columnAttributeNumber = buffer.readInteger(as: Int16.self) else {
-                    throw PostgresError(.protocol("Could not read row description field column attribute number"))
+                    throw PostgresError.protocol("Could not read row description field column attribute number")
                 }
                 guard let dataType = buffer.readInteger(as: Int32.self).flatMap(PostgresDataType.init(_:)) else {
-                    throw PostgresError(.protocol("Could not read row description field data type"))
+                    throw PostgresError.protocol("Could not read row description field data type")
                 }
                 guard let dataTypeSize = buffer.readInteger(as: Int16.self) else {
-                    throw PostgresError(.protocol("Could not read row description field data type size"))
+                    throw PostgresError.protocol("Could not read row description field data type size")
                 }
                 guard let dataTypeModifier = buffer.readInteger(as: Int32.self) else {
-                    throw PostgresError(.protocol("Could not read row description field data type modifier"))
+                    throw PostgresError.protocol("Could not read row description field data type modifier")
                 }
                 guard let formatCode = buffer.readInteger(rawRepresentable: PostgresFormatCode.self) else {
-                    throw PostgresError(.protocol("Could not read row description field format code"))
+                    throw PostgresError.protocol("Could not read row description field format code")
                 }
                 return .init(
                     name: name,
@@ -78,7 +78,7 @@ extension PostgresMessage {
             guard let fields = try buffer.read(array: Field.self, { buffer in
                 return try.parse(from: &buffer)
             }) else {
-                throw PostgresError(.protocol("Could not read row description fields"))
+                throw PostgresError.protocol("Could not read row description fields")
             }
             return .init(fields: fields)
         }

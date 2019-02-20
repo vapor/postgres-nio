@@ -1,7 +1,7 @@
 extension PostgresData {
     public init(string: String) {
         var buffer = ByteBufferAllocator().buffer(capacity: string.utf8.count)
-        buffer.write(string: string)
+        buffer.writeString(string)
         self.init(type: .text, formatCode: .binary, value: buffer)
     }
     
@@ -33,7 +33,7 @@ extension PostgresData {
                 }
                 
                 /// grab the numeric metadata from the beginning of the array
-                #warning("handle ! better")
+                #warning("TODO: fix force unwrap")
                 let metadata = PostgreSQLNumericMetadata(
                     ndigits: value.readInteger()!,
                     weight: value.readInteger()!,
@@ -49,7 +49,7 @@ extension PostgresData {
                 var fractional = ""
                 for offset in 0..<metadata.ndigits {
                     /// extract current char and advance memory
-                    #warning("handle ! better")
+                    #warning("TODO: fix force unwrap")
                     let char = value.readInteger(as: Int16.self)!
                     
                     /// convert the current char to its string form

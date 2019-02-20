@@ -49,7 +49,7 @@ private final class PostgresAuthenticationRequest: PostgresConnectionRequest {
                     self.state = .done
                     return []
                 }
-            default: throw PostgresError(.protocol("Unexpected response to start message: \(message)"))
+            default: throw PostgresError.protocol("Unexpected response to start message: \(message)")
             }
         case .done:
             switch message.identifier {
@@ -62,7 +62,7 @@ private final class PostgresAuthenticationRequest: PostgresConnectionRequest {
                 return []
             case .readyForQuery:
                 return nil
-            default: throw PostgresError(.protocol("Unexpected response to password authentication: \(message)"))
+            default: throw PostgresError.protocol("Unexpected response to password authentication: \(message)")
             }
         }
         

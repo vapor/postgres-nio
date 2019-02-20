@@ -44,7 +44,7 @@ public struct PostgresRow: CustomStringConvertible {
     public var description: String {
         var row: [String: PostgresData] = [:]
         for field in self.lookupTable.rowDescription.fields {
-            #warning("reverse lookup table names for desc")
+            #warning("TODO: reverse lookup table names for desc")
             row[field.name] = self.column(field.name, tableOID: field.tableOID)
         }
         return row.description

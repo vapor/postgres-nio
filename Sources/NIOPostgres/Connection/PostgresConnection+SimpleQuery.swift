@@ -44,7 +44,7 @@ private final class PostgresSimpleQuery: PostgresConnectionRequest {
         case .readyForQuery:
             return nil
         default:
-            throw PostgresError(.protocol("Unexpected message during simple query: \(message)"))
+            throw PostgresError.protocol("Unexpected message during simple query: \(message)")
         }
     }
     

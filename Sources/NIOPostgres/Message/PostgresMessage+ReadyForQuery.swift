@@ -6,7 +6,7 @@ extension PostgresMessage {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> ReadyForQuery {
             guard let status = buffer.readInteger(as: UInt8.self) else {
-                throw PostgresError(.protocol("Could not read transaction status from ready for query message"))
+                throw PostgresError.protocol("Could not read transaction status from ready for query message")
             }
             return .init(transactionStatus: status)
         }
