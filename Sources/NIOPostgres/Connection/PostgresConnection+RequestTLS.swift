@@ -5,7 +5,7 @@ extension PostgresConnection {
             if tls.isSupported {
                 let sslContext = try SSLContext(configuration: tlsConfig)
                 let handler = try OpenSSLClientHandler(context: sslContext)
-                _ = self.channel.pipeline.add(handler: handler, first: true)
+                _ = self.channel.pipeline.addHandler(handler, position: .first)
             }
             return tls.isSupported
         }

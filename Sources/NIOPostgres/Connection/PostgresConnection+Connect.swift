@@ -10,7 +10,7 @@ extension PostgresConnection {
                 ByteToMessageHandler(PostgresMessageDecoder()),
                 PostgresMessageEncoder(),
                 PostgresConnectionHandler(),
-            ], first: false).map {
+            ]).map {
                 return .init(channel: channel)
             }
         }

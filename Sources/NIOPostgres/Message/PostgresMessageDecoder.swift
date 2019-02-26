@@ -16,7 +16,7 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
     }
     
     /// See `ByteToMessageDecoder`.
-    public func decode(ctx: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
+    public func decode(context: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
         var peekBuffer = buffer
         
         // peek at the message identifier
@@ -29,7 +29,7 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
         
         // special ssl case, no body
         if !self.hasSeenFirstMessage && (identifier == .sslSupported || identifier == .sslUnsupported) {
-            message = PostgresMessage(identifier: identifier, data: ctx.channel.allocator.buffer(capacity: 0))
+            message = PostgresMessage(identifier: identifier, data: context.channel.allocator.buffer(capacity: 0))
         } else {
             // peek at the message size
             // the message size is always a 4 byte integer appearing immediately after the message identifier
@@ -49,11 +49,11 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
         // there is sufficient data, use this buffer
         buffer = peekBuffer
         
-        ctx.fireChannelRead(wrapInboundOut(message))
+        context.fireChannelRead(wrapInboundOut(message))
         return .continue
     }
     
-    public func decodeLast(ctx: ChannelHandlerContext, buffer: inout ByteBuffer) throws -> DecodingState {
+    public func decodeLast(context: ChannelHandlerContext, buffer: inout ByteBuffer, seenEOF: Bool) throws -> DecodingState {
         // ignore
         return .needMoreData
     }

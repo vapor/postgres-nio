@@ -37,7 +37,7 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         self.queue = []
     }
     
-    private func _channelRead(ctx: ChannelHandlerContext, data: NIOAny) throws {
+    private func _channelRead(context: ChannelHandlerContext, data: NIOAny) throws {
         let message = self.unwrapInboundIn(data)
         guard self.queue.count > 0 else {
             assertionFailure("PostgresRequest queue empty, discarded: \(message)")
@@ -55,9 +55,9 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         default:
             if let responses = try request.delegate.respond(to: message) {
                 for response in responses {
-                    ctx.write(self.wrapOutboundOut(response), promise: nil)
+                    context.write(self.wrapOutboundOut(response), promise: nil)
                 }
-                ctx.flush()
+                context.flush()
             } else {
                 self.queue.removeFirst()
                 if let error = request.error {
@@ -69,46 +69,46 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         }
     }
     
-    private func _write(ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) throws {
+    private func _write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) throws {
         let request = self.unwrapOutboundIn(data)
         self.queue.append(request)
         let messages = try request.delegate.start()
         for message in messages {
-            ctx.write(self.wrapOutboundOut(message), promise: nil)
+            context.write(self.wrapOutboundOut(message), promise: nil)
         }
-        ctx.flush()
+        context.flush()
     }
     
-    func channelRead(ctx: ChannelHandlerContext, data: NIOAny) {
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         do {
-            try self._channelRead(ctx: ctx, data: data)
+            try self._channelRead(context: context, data: data)
         } catch {
-            self.errorCaught(ctx: ctx, error: error)
+            self.errorCaught(context: context, error: error)
         }
     }
     
-    func write(ctx: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         do {
-            try self._write(ctx: ctx, data: data, promise: promise)
+            try self._write(context: context, data: data, promise: promise)
         } catch {
-            self.errorCaught(ctx: ctx, error: error)
+            self.errorCaught(context: context, error: error)
         }
     }
     
-    func errorCaught(ctx: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
         guard self.queue.count > 0 else {
             assertionFailure("PostgresRequest queue empty, discarded: \(error)")
             return
         }
         self.queue[0].promise.fail(error)
-        ctx.close(mode: .all, promise: nil)
+        context.close(mode: .all, promise: nil)
     }
     
-    func close(ctx: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+    func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
         for current in self.queue {
             current.promise.fail(PostgresError.connectionClosed)
         }
         self.queue = []
-        ctx.close(mode: mode, promise: promise)
+        context.close(mode: mode, promise: promise)
     }
 }

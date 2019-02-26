@@ -238,7 +238,7 @@ final class NIOPostgresTests: XCTestCase {
         ).wait()
         let upgraded = try conn.requestTLS(using: .forClient(certificateVerification: .none)).wait()
         XCTAssertTrue(upgraded)
-        try conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
+        try! conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
