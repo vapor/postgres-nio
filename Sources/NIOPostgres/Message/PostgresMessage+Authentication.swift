@@ -10,18 +10,18 @@ extension PostgresMessage {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> Authentication {
             guard let type = buffer.readInteger(as: Int32.self) else {
-                throw PostgresError(.protocol("Could not read authentication message type"))
+                throw PostgresError.protocol("Could not read authentication message type")
             }
             switch type {
             case 0: return .ok
             case 3: return .plaintext
             case 5:
                 guard let salt = buffer.readBytes(length: 4) else {
-                    throw PostgresError(.protocol("Could not parse MD5 salt from authentication message"))
+                    throw PostgresError.protocol("Could not parse MD5 salt from authentication message")
                 }
                 return .md5(salt)
             default:
-                throw PostgresError(.protocol("Unkonwn authentication request type: \(type)"))
+                throw PostgresError.protocol("Unkonwn authentication request type: \(type)")
             }
         }
         

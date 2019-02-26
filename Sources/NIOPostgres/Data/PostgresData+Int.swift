@@ -101,7 +101,7 @@ private extension PostgresData {
             fatalError("Cannot encode \(I.self) to PostgresData")
         }
         var buffer = ByteBufferAllocator().buffer(capacity: capacity)
-        buffer.write(integer: fwi)
+        buffer.writeInteger(fwi)
         self.init(type: type, formatCode: .binary, value: buffer)
     }
     
@@ -114,7 +114,7 @@ private extension PostgresData {
         
         switch self.formatCode {
         case .binary:
-            #warning("Account for bit-size mismatch")
+            #warning("TODO: Account for bit-size mismatch")
             switch self.type {
             case .int2:
                 assert(value.readableBytes == 2)
@@ -141,7 +141,7 @@ private extension PostgresData {
                 }
                 return I(int64)
             case .numeric:
-                #warning("Use numeric converter")
+                #warning("TODO: Use numeric converter")
                 fatalError("use numeric converter")
             default: fatalError("Cannot decode \(I.self) from \(self)")
             }

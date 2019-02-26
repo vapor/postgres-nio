@@ -7,10 +7,10 @@ extension PostgresMessage {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> BackendKeyData {
             guard let processID = buffer.readInteger(as: Int32.self) else {
-                throw PostgresError(.protocol("Could not parse process id from backend key data"))
+                throw PostgresError.protocol("Could not parse process id from backend key data")
             }
             guard let secretKey = buffer.readInteger(as: Int32.self) else {
-                throw PostgresError(.protocol("Could not parse secret key from backend key data"))
+                throw PostgresError.protocol("Could not parse secret key from backend key data")
             }
             return .init(processID: processID, secretKey: secretKey)
         }

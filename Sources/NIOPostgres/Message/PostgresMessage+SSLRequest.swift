@@ -20,7 +20,7 @@ extension PostgresMessage {
         
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
-            buffer.write(integer: self.code)
+            buffer.writeInteger(self.code)
         }
     }
 }

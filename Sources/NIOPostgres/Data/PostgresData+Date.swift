@@ -4,7 +4,7 @@ extension PostgresData {
     public init(date: Date) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
         let seconds = date.timeIntervalSince(_psqlDateStart) * Double(_microsecondsPerSecond)
-        buffer.write(integer: Int64(seconds))
+        buffer.writeInteger(Int64(seconds))
         self.init(type: .timestamptz, value: buffer)
     }
     
@@ -24,7 +24,7 @@ extension PostgresData {
         case .binary:
             switch self.type {
             case .timestamp, .timestamptz:
-                #warning("fix !")
+                #warning("TODO: fix force unwrap")
                 let microseconds = value.readInteger(as: Int64.self)!
                 let seconds = Double(microseconds) / Double(_microsecondsPerSecond)
                 return Date(timeInterval: seconds, since: _psqlDateStart)

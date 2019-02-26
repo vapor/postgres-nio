@@ -109,7 +109,7 @@ final class NIOPostgresTests: XCTestCase {
             XCTAssertEqual(results[0].column("typnamespace")?.int, 11)
             XCTAssertEqual(results[0].column("typowner")?.int, 10)
             XCTAssertEqual(results[0].column("typlen")?.int, 8)
-            #warning("finish adding columns")
+            #warning("TODO: finish adding columns")
         default: XCTFail("Should be only one result")
         }
     }

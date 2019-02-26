@@ -12,8 +12,8 @@ internal extension ByteBuffer {
     }
     
     mutating func write(nullTerminated string: String) {
-        write(string: string)
-        write(integer: 0, as: UInt8.self)
+        self.writeString(string)
+        self.writeInteger(0, as: UInt8.self)
     }
     
     mutating func readInteger<E>(endianness: Endianness = .big, rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
@@ -36,21 +36,21 @@ internal extension ByteBuffer {
     }
     
     mutating func write<T>(array: [T], closure: (inout ByteBuffer, T) -> ()) {
-        write(integer: numericCast(array.count), as: Int16.self)
+        self.writeInteger(numericCast(array.count), as: Int16.self)
         for el in array {
             closure(&self, el)
         }
     }
     
     mutating func write<T>(array: [T]) where T: FixedWidthInteger {
-        write(array: array) { buffer, el in
-            buffer.write(integer: el)
+        self.write(array: array) { buffer, el in
+            buffer.writeInteger(el)
         }
     }
     
     mutating func write<T>(array: [T]) where T: RawRepresentable, T.RawValue: FixedWidthInteger {
-        write(array: array) { buffer, el in
-            buffer.write(integer: el.rawValue)
+        self.write(array: array) { buffer, el in
+            buffer.writeInteger(el.rawValue)
         }
     }
     
@@ -85,7 +85,7 @@ internal extension ByteBuffer {
             }
             var value: T = 0
             withUnsafeMutableBytes(of: &value) { valuePtr in
-                #warning("improve performance")
+                #warning("TODO: improve performance")
                 valuePtr.copyBytes(
                     from: UnsafeRawBufferPointer(
                         start: ptr.baseAddress!.advanced(by: index),

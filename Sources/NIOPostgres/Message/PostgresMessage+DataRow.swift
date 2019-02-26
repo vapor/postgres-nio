@@ -30,7 +30,7 @@ extension PostgresMessage {
             guard let columns = buffer.read(array: Column.self, { buffer in
                 return .init(value: buffer.readNullableBytes())
             }) else {
-                throw PostgresError(.protocol("Could not parse data row columns"))
+                throw PostgresError.protocol("Could not parse data row columns")
             }
             return .init(columns: columns)
         }

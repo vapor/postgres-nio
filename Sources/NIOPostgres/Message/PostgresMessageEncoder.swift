@@ -21,10 +21,10 @@ public final class PostgresMessageEncoder: MessageToByteEncoder {
         out.moveWriterIndex(forwardBy: 4)
         
         // serialize the message data
-        out.write(buffer: &message.data)
+        out.writeBuffer(&message.data)
         
         // set message size
-        out.set(integer: Int32(out.writerIndex - messageSizeIndex), at: messageSizeIndex)
+        out.setInteger(Int32(out.writerIndex - messageSizeIndex), at: messageSizeIndex)
     }
 }
 

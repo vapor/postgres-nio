@@ -39,13 +39,13 @@ extension PostgresMessage {
         
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
-            buffer.write(integer: protocolVersion)
+            buffer.writeInteger(self.protocolVersion)
             for (key, val) in parameters {
-                buffer.write(string: key + "\0")
-                buffer.write(string: val + "\0")
+                buffer.writeString(key + "\0")
+                buffer.writeString(val + "\0")
             }
             // terminator
-            buffer.write(string: "\0")
+            buffer.writeString("\0")
         }
     }
 }

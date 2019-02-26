@@ -59,7 +59,7 @@ private final class PostgresParameterizedQuery: PostgresConnectionRequest {
             return []
         case .readyForQuery:
             return nil
-        default: throw PostgresError(.protocol("Unexpected message during query: \(message)"))
+        default: throw PostgresError.protocol("Unexpected message during query: \(message)")
         }
     }
     

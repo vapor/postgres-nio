@@ -29,7 +29,7 @@ private final class RequestTLSQuery: PostgresConnectionRequest {
         case .sslUnsupported:
             self.isSupported = false
             return nil
-        default: throw PostgresError(.protocol("Unexpected message during TLS request: \(message)"))
+        default: throw PostgresError.protocol("Unexpected message during TLS request: \(message)")
         }
     }
     

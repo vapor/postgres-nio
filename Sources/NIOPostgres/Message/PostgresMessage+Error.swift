@@ -12,7 +12,7 @@ extension PostgresMessage {
             var fields: [Field: String] = [:]
             while let field = buffer.readInteger(rawRepresentable: Field.self) {
                 guard let string = buffer.readNullTerminatedString() else {
-                    throw PostgresError(.protocol("Could not read error response string."))
+                    throw PostgresError.protocol("Could not read error response string.")
                 }
                 fields[field] = string
             }
