@@ -1,6 +1,6 @@
 import NIO
 
-extension PostgresConnection {
+extension PostgresDatabase {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return simpleQuery(string) { rows.append($0) }.map { rows }
@@ -14,7 +14,7 @@ extension PostgresConnection {
 
 // MARK: Private
 
-private final class PostgresSimpleQuery: PostgresConnectionRequest {
+private final class PostgresSimpleQuery: PostgresRequestHandler {
     var query: String
     var onRow: (PostgresRow) throws -> ()
     var rowLookupTable: PostgresRow.LookupTable?

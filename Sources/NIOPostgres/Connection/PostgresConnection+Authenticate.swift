@@ -14,7 +14,7 @@ extension PostgresConnection {
 
 // MARK: Private
 
-private final class PostgresAuthenticationRequest: PostgresConnectionRequest {
+private final class PostgresAuthenticationRequest: PostgresRequestHandler {
     enum State {
         case ready
         case done

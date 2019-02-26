@@ -1,6 +1,6 @@
 import NIO
 
-extension PostgresConnection {
+extension PostgresDatabase {
     public func query(_ string: String, _ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return query(string, binds) { rows.append($0) }.map { rows }
@@ -14,7 +14,7 @@ extension PostgresConnection {
 
 // MARK: Private
 
-private final class PostgresParameterizedQuery: PostgresConnectionRequest {
+private final class PostgresParameterizedQuery: PostgresRequestHandler {
     let query: String
     let binds: [PostgresData]
     var onRow: (PostgresRow) throws -> ()

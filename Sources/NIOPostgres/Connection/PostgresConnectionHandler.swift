@@ -1,26 +1,26 @@
 extension PostgresConnection {
-    public func send(_ request: PostgresConnectionRequest) -> EventLoopFuture<Void> {
+    public func send(_ request: PostgresRequestHandler) -> EventLoopFuture<Void> {
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
-        let request = PostgresConnectionRequestContext(delegate: request, promise: promise)
+        let request = PostgresRequest(delegate: request, promise: promise)
         self.channel.write(request).cascadeFailure(to: promise)
         self.channel.flush()
         return promise.futureResult
     }
 }
 
-public protocol PostgresConnectionRequest {
+public protocol PostgresRequestHandler {
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
     func start() throws -> [PostgresMessage]
 }
 
 // MARK: Private
 
-final class PostgresConnectionRequestContext {
-    let delegate: PostgresConnectionRequest
+final class PostgresRequest {
+    let delegate: PostgresRequestHandler
     let promise: EventLoopPromise<Void>
     var error: Error?
     
-    init(delegate: PostgresConnectionRequest, promise: EventLoopPromise<Void>) {
+    init(delegate: PostgresRequestHandler, promise: EventLoopPromise<Void>) {
         self.delegate = delegate
         self.promise = promise
     }
@@ -28,10 +28,10 @@ final class PostgresConnectionRequestContext {
 
 final class PostgresConnectionHandler: ChannelDuplexHandler {
     typealias InboundIn = PostgresMessage
-    typealias OutboundIn = PostgresConnectionRequestContext
+    typealias OutboundIn = PostgresRequest
     typealias OutboundOut = PostgresMessage
     
-    private var queue: [PostgresConnectionRequestContext]
+    private var queue: [PostgresRequest]
     
     public init() {
         self.queue = []

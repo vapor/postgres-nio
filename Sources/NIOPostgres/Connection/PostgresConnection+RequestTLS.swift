@@ -14,7 +14,7 @@ extension PostgresConnection {
 
 // MARK: Private
 
-private final class RequestTLSQuery: PostgresConnectionRequest {
+private final class RequestTLSQuery: PostgresRequestHandler {
     var isSupported: Bool
     
     init() {
