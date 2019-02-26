@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", .branch("master")),
-        .package(url: "https://github.com/tanner0101/swift-nio-ssl.git", .branch("master")),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", .branch("master")),
     ],
     targets: [
         .target(name: "CMD5", dependencies: []),
