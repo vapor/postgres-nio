@@ -13,7 +13,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "CMD5", dependencies: []),
-        .target(name: "NIOPostgres", dependencies: ["CMD5", "NIO", "NIOOpenSSL"]),
+        .target(name: "NIOPostgres", dependencies: ["CMD5", "NIO", "NIOSSL"]),
         .target(name: "NIOPostgresBenchmark", dependencies: ["NIOPostgres"]),
         .testTarget(name: "NIOPostgresTests", dependencies: ["NIOPostgres"]),
     ]

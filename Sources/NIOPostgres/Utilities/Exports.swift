@@ -1,2 +1,2 @@
 @_exported import NIO
-@_exported import NIOOpenSSL
+@_exported import NIOSSL
