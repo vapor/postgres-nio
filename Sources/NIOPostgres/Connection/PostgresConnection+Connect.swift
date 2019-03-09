@@ -8,7 +8,7 @@ extension PostgresConnection {
         return bootstrap.connect(to: socketAddress).flatMap { channel in
             return channel.pipeline.addHandlers([
                 ByteToMessageHandler(PostgresMessageDecoder()),
-                PostgresMessageEncoder(),
+                MessageToByteHandler(PostgresMessageEncoder()),
                 PostgresConnectionHandler(),
             ]).map {
                 return .init(channel: channel)
