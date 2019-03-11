@@ -5,7 +5,7 @@ public final class PostgresMessageEncoder: MessageToByteEncoder {
     public typealias OutboundIn = PostgresMessage
     
     /// See `MessageToByteEncoder`.
-    public func encode(context: ChannelHandlerContext, data message: PostgresMessage, out: inout ByteBuffer) throws {
+    public func encode(data message: PostgresMessage, out: inout ByteBuffer) throws {
         // print("PostgresMessage.ChannelEncoder.encode(\(data))")
         
         // serialize identifier
