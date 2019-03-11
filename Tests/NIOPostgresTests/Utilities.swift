@@ -2,20 +2,26 @@ import NIO
 import NIOPostgres
 
 extension PostgresConnection {
-    static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+    static func address() throws -> SocketAddress {
+        #if os(Linux)
+        return try .newAddressResolving(host: "psql", port: 5432)
+        #else
+        return try .init(ipAddress: "127.0.0.1", port: 5432)
+        #endif
+    }
+
+    static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         do {
-            let address: SocketAddress
-            #if os(Linux)
-            address = try .newAddressResolving(host: "psql", port: 5432)
-            #else
-            address = try .init(ipAddress: "127.0.0.1", port: 5432)
-            #endif
-            return connect(to: address, on: eventLoop).flatMap { conn in
-                return conn.authenticate(username: "vapor_username", database: "vapor_database", password: "vapor_password")
-                    .map { conn }
-            }
+            return connect(to: try address(), on: eventLoop)
         } catch {
             return eventLoop.makeFailedFuture(error)
+        }
+    }
+
+    static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+        return testUnauthenticated(on: eventLoop).flatMap { conn in
+            return conn.authenticate(username: "vapor_username", database: "vapor_database", password: "vapor_password")
+                .map { conn }
         }
     }
 }

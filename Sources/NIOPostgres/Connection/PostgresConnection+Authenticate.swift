@@ -24,7 +24,11 @@ private final class PostgresAuthenticationRequest: PostgresRequestHandler {
     let database: String?
     let password: String?
     var state: State
-    
+
+    var errorMessageIsFinal: Bool {
+        return true
+    }
+
     init(username: String, database: String?, password: String?) {
         self.state = .ready
         self.username = username
