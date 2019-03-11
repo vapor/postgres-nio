@@ -12,6 +12,7 @@ public protocol PostgresRequestHandler {
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
     func start() throws -> [PostgresMessage]
 
+    #warning("TODO: Workaround for Authentication see #14")
     var errorMessageIsFinal: Bool { get }
 }
 
