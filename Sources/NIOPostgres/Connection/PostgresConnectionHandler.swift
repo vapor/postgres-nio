@@ -12,7 +12,7 @@ public protocol PostgresRequestHandler {
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
     func start() throws -> [PostgresMessage]
 
-    var errorMessageIsFinal: Bool {get}
+    var errorMessageIsFinal: Bool { get }
 }
 
 
