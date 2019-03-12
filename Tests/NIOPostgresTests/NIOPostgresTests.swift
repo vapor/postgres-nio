@@ -284,4 +284,16 @@ final class NIOPostgresTests: XCTestCase {
             }
         }
     }
+
+    func testInvalidPassword() throws {
+        let auth = PostgresConnection.testUnauthenticated(on: eventLoop).flatMap({ (connection) in
+            connection.authenticate(username: "invalid", database: "invalid", password: "bad").map { connection }
+        })
+        do {
+            let _ = try auth.wait()
+            XCTFail("The authentication should fail")
+        } catch let error as PostgresError {
+           XCTAssertEqual(error.code, .invalid_password)
+        }
+    }
 }

@@ -17,6 +17,7 @@ extension NIOPostgresTests {
         ("testSelectPerformance", testSelectPerformance),
         ("testRangeSelectPerformance", testRangeSelectPerformance),
         ("testRangeSelectDecodePerformance", testRangeSelectDecodePerformance),
+        ("testInvalidPassword", testInvalidPassword),
     ]
 }
 

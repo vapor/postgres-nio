@@ -11,6 +11,16 @@ extension PostgresConnection {
 public protocol PostgresRequestHandler {
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
     func start() throws -> [PostgresMessage]
+
+    #warning("TODO: Workaround for Authentication see #14")
+    var errorMessageIsFinal: Bool { get }
+}
+
+
+extension PostgresRequestHandler {
+    var errorMessageIsFinal: Bool {
+        return false
+    }
 }
 
 // MARK: Private
@@ -48,7 +58,12 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         switch message.identifier {
         case .error:
             let error = try PostgresMessage.Error(message: message)
-            request.error = PostgresError.server(error)
+            let postgresError = PostgresError.server(error)
+            if request.delegate.errorMessageIsFinal {
+                request.promise.fail(postgresError)
+                self.queue.removeFirst()
+            }
+            request.error = postgresError
         case .notice:
             let notice = try PostgresMessage.Error(message: message)
             print("[NIOPostgres] [NOTICE] \(notice)")
