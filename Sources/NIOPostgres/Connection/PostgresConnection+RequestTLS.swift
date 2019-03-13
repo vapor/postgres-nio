@@ -1,12 +1,12 @@
 import NIOSSL
 
 extension PostgresConnection {
-    public func requestTLS(using tlsConfig: TLSConfiguration) -> EventLoopFuture<Bool> {
+    public func requestTLS(using tlsConfig: TLSConfiguration, serverHostname: String?) -> EventLoopFuture<Bool> {
         let tls = RequestTLSQuery()
         return self.send(tls).flatMapThrowing { _ in
             if tls.isSupported {
                 let sslContext = try NIOSSLContext(configuration: tlsConfig)
-                let handler = try NIOSSLClientHandler(context: sslContext)
+                let handler = try NIOSSLClientHandler(context: sslContext, serverHostname: serverHostname)
                 _ = self.channel.pipeline.addHandler(handler, position: .first)
             }
             return tls.isSupported
