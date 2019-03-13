@@ -8,8 +8,8 @@ let package = Package(
         .executable(name: "NIOPostgresBenchmark", targets: ["NIOPostgresBenchmark"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", .branch("master")),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", .branch("master")),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0-convergence"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.0.0-convergence"),
     ],
     targets: [
         .target(name: "CMD5", dependencies: []),

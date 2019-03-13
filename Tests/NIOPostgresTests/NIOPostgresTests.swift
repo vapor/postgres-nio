@@ -236,7 +236,10 @@ final class NIOPostgresTests: XCTestCase {
             to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
             on: elg.next()
         ).wait()
-        let upgraded = try conn.requestTLS(using: .forClient(certificateVerification: .none)).wait()
+        let upgraded = try conn.requestTLS(
+            using: .forClient(certificateVerification: .none),
+            serverHostname: "elmer.db.elephantsql.com"
+        ).wait()
         XCTAssertTrue(upgraded)
         try! conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
         defer { try? conn.close().wait() }
