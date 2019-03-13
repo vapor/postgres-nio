@@ -4,7 +4,7 @@ import NIOPostgres
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
         #if os(Linux)
-        return try .newAddressResolving(host: "psql", port: 5432)
+        return try .makeAddressResolvingHost("psql", port: 5432)
         #else
         return try .init(ipAddress: "127.0.0.1", port: 5432)
         #endif
