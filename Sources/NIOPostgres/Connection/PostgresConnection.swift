@@ -1,3 +1,4 @@
+import Foundation
 public final class PostgresConnection {
 //    #warning("publicize these values?")
 //    public var status: [String: String]
@@ -22,4 +23,9 @@ public final class PostgresConnection {
     }
     
     #warning("TODO: add error handler that closes connection")
+    deinit {
+        if self.channel.isActive {
+            assertionFailure("PostgresConnection deinitialized before being closed.")
+        }
+    }
 }
