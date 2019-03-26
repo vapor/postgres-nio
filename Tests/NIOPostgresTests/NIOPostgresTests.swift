@@ -263,7 +263,6 @@ final class NIOPostgresTests: XCTestCase {
     
     func testSelectPerformance() throws {
         // std deviation too high
-        return;
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         measure {
             do {
@@ -276,7 +275,6 @@ final class NIOPostgresTests: XCTestCase {
     
     func testRangeSelectPerformance() throws {
         // std deviation too high
-        return;
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         measure {
             do {
@@ -289,7 +287,6 @@ final class NIOPostgresTests: XCTestCase {
     
     func testRangeSelectDecodePerformance() throws {
         // std deviation too high
-        return;
         struct Series: Decodable {
             var num: Int
         }
