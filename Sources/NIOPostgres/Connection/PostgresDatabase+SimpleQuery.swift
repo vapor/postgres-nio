@@ -1,6 +1,6 @@
 import NIO
 
-extension PostgresDatabase {
+extension PostgresClient {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return simpleQuery(string) { rows.append($0) }.map { rows }
