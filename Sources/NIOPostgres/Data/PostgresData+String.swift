@@ -111,3 +111,9 @@ extension PostgresData {
         }
     }
 }
+
+extension PostgresData: ExpressibleByStringLiteral {
+    public init(stringLiteral value: String) {
+        self.init(string: value)
+    }
+}

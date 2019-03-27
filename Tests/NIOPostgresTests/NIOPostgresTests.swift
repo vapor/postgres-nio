@@ -25,7 +25,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testSimpleQueryVersion() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try? conn.close().wait() }
+        defer { try! conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
         let version = rows[0].column("version")?.string
@@ -34,7 +34,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testQueryVersion() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try? conn.close().wait() }
+        defer { try! conn.close().wait() }
         let rows = try conn.query("SELECT version()", .init()).wait()
         XCTAssertEqual(rows.count, 1)
         let version = rows[0].column("version")?.string
@@ -44,8 +44,8 @@ final class NIOPostgresTests: XCTestCase {
     
     func testQuerySelectParameter() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try? conn.close().wait() }
-        let rows = try conn.query("SELECT $1::TEXT as foo", [.init(string: "hello")]).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("SELECT $1::TEXT as foo", ["hello"]).wait()
         XCTAssertEqual(rows.count, 1)
         let version = rows[0].column("foo")?.string
         XCTAssertEqual(version, "hello")
@@ -53,7 +53,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testSQLError() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try? conn.close().wait() }
+        defer { try! conn.close().wait() }
         do {
             _ = try conn.simpleQuery("SELECT &").wait()
             XCTFail("An error should have been thrown")
@@ -64,12 +64,14 @@ final class NIOPostgresTests: XCTestCase {
     
     func testSelectTypes() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         let results = try conn.simpleQuery("SELECT * FROM pg_type").wait()
         XCTAssert(results.count >= 350, "Results count not large enough: \(results.count)")
     }
     
     func testSelectType() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         let results = try conn.simpleQuery("SELECT * FROM pg_type WHERE typname = 'float8'").wait()
         // [
         //     "typreceive": "float8recv",
@@ -116,6 +118,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testIntegers() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         struct Integers: Decodable {
             let smallint: Int16
             let smallint_min: Int16
@@ -156,6 +159,7 @@ final class NIOPostgresTests: XCTestCase {
 
     func testPi() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         struct Pi: Decodable {
             let text: String
             let numeric_string: String
@@ -186,6 +190,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testUUID() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         struct Model: Decodable {
             let id: UUID
             let string: String
@@ -206,6 +211,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testDates() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         struct Dates: Decodable {
             var date: Date
             var timestamp: Date
@@ -250,9 +256,9 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     func testInvalidPassword() throws {
-        let auth = PostgresConnection.testUnauthenticated(on: eventLoop).flatMap({ (connection) in
-            connection.authenticate(username: "invalid", database: "invalid", password: "bad").map { connection }
-        })
+        let conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let auth = conn.authenticate(username: "invalid", database: "invalid", password: "bad")
         do {
             let _ = try auth.wait()
             XCTFail("The authentication should fail")
@@ -264,6 +270,7 @@ final class NIOPostgresTests: XCTestCase {
     func testSelectPerformance() throws {
         // std deviation too high
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         measure {
             do {
                 _ = try conn.query("SELECT * FROM pg_type").wait()
@@ -276,6 +283,7 @@ final class NIOPostgresTests: XCTestCase {
     func testRangeSelectPerformance() throws {
         // std deviation too high
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         measure {
             do {
                 _ = try conn.simpleQuery("SELECT * FROM generate_series(1, 10000) num").wait()
@@ -292,6 +300,7 @@ final class NIOPostgresTests: XCTestCase {
         }
         
         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
         measure {
             do {
                 try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
