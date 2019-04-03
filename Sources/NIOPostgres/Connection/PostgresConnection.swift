@@ -19,6 +19,9 @@ public final class PostgresConnection {
     }
     
     public func close() -> EventLoopFuture<Void> {
+        guard self.channel.isActive else {
+            return self.eventLoop.makeSucceededFuture(())
+        }
         return self.channel.close(mode: .all)
     }
     

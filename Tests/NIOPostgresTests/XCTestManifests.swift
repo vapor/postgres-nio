@@ -6,6 +6,7 @@ extension NIOPostgresTests {
     //   `swift test --generate-linuxmain`
     // to regenerate.
     static let __allTests__NIOPostgresTests = [
+        ("testBindInteger", testBindInteger),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),
         ("testIntegers", testIntegers),

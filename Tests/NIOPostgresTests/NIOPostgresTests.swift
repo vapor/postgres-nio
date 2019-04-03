@@ -233,6 +233,17 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
     
+    /// https://github.com/vapor/nio-postgres/issues/20
+    func testBindInteger() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        _ = try conn.simpleQuery("drop table if exists person;").wait()
+        _ = try conn.simpleQuery("create table person(id serial primary key, first_name text, last_name text);").wait()
+        defer { _ = try! conn.simpleQuery("drop table person;").wait() }
+        let id = PostgresData(int32: 5)
+        _ = try conn.query("SELECT id, first_name, last_name FROM person WHERE id = $1", [id]).wait()
+    }
+    
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
