@@ -7,6 +7,7 @@ extension NIOPostgresTests {
     // to regenerate.
     static let __allTests__NIOPostgresTests = [
         ("testBindInteger", testBindInteger),
+        ("testColumnsInJoin", testColumnsInJoin),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),
         ("testIntegers", testIntegers),
@@ -17,7 +18,12 @@ extension NIOPostgresTests {
         ("testRangeSelectDecodePerformance", testRangeSelectDecodePerformance),
         ("testRangeSelectPerformance", testRangeSelectPerformance),
         ("testRemoteTLSServer", testRemoteTLSServer),
+        ("testSelectHugeModel", testSelectHugeModel),
+        ("testSelectLargeModel", testSelectLargeModel),
+        ("testSelectLargeModelWithLongFieldNames", testSelectLargeModelWithLongFieldNames),
+        ("testSelectMediumModel", testSelectMediumModel),
         ("testSelectPerformance", testSelectPerformance),
+        ("testSelectTinyModel", testSelectTinyModel),
         ("testSelectType", testSelectType),
         ("testSelectTypes", testSelectTypes),
         ("testSimpleQueryVersion", testSimpleQueryVersion),
