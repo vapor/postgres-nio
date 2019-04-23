@@ -243,6 +243,18 @@ final class NIOPostgresTests: XCTestCase {
         let id = PostgresData(int32: 5)
         _ = try conn.query("SELECT id, first_name, last_name FROM person WHERE id = $1", [id]).wait()
     }
+
+    // https://github.com/vapor/nio-postgres/issues/21
+    func testAverageLengthNumeric() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("select avg(length('foo')) as average_length").wait()
+        guard let length = rows[0].column("average_length")?.double else {
+            XCTFail("could not decode length")
+            return
+        }
+        XCTAssertEqual(length, 3.0)
+    }
     
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
