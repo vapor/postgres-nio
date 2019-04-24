@@ -7,20 +7,26 @@ public struct PostgresRow: CustomStringConvertible {
             let indexInRow: Int
             let field: PostgresMessage.RowDescription.Field
         }
-        let columnNameToIndexLookupTable: [String: [Entry]]
-
-        init(
-            rowDescription: PostgresMessage.RowDescription,
-            resultFormat: [PostgresFormatCode]
-            ) {
-            self.rowDescription = rowDescription
-            self.resultFormat = resultFormat
+        private var _columnNameToIndexLookupTable: [String: [Entry]]?
+        var columnNameToIndexLookupTable: [String: [Entry]] {
+            if let existing = _columnNameToIndexLookupTable {
+                return existing
+            }
 
             var columnNameToIndexLookupTable: [String: [Entry]] = [:]
             for (fieldIndex, field) in rowDescription.fields.enumerated() {
                 columnNameToIndexLookupTable[field.name, default: []].append(.init(indexInRow: fieldIndex, field: field))
             }
-            self.columnNameToIndexLookupTable = columnNameToIndexLookupTable
+            self._columnNameToIndexLookupTable = columnNameToIndexLookupTable
+            return columnNameToIndexLookupTable
+        }
+
+        init(
+            rowDescription: PostgresMessage.RowDescription,
+            resultFormat: [PostgresFormatCode]
+        ) {
+            self.rowDescription = rowDescription
+            self.resultFormat = resultFormat
         }
 
         func lookup(column: String, tableOID: UInt32) -> Entry? {

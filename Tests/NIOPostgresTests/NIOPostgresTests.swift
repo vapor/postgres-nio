@@ -277,32 +277,6 @@ final class NIOPostgresTests: XCTestCase {
             XCTAssertEqual(error.code, .invalid_password)
         }
     }
-    
-    func testSelectPerformance() throws {
-        // std deviation too high
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-        measure {
-            do {
-                _ = try conn.query("SELECT * FROM pg_type").wait()
-            } catch {
-                XCTFail("\(error)")
-            }
-        }
-    }
-    
-    func testRangeSelectPerformance() throws {
-        // std deviation too high
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-        measure {
-            do {
-                _ = try conn.simpleQuery("SELECT * FROM generate_series(1, 10000) num").wait()
-            } catch {
-                XCTFail("\(error)")
-            }
-        }
-    }
 
     func testRangeSelectDecodePerformance() throws {
         // std deviation too high
@@ -314,9 +288,11 @@ final class NIOPostgresTests: XCTestCase {
         defer { try! conn.close().wait() }
         measure {
             do {
-                try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
-                    _ = row.column("num")?.int
-                    }.wait()
+                for _ in 0..<50 {
+                    try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
+                        _ = row.column("num")?.int
+                        }.wait()
+                }
             } catch {
                 XCTFail("\(error)")
             }
@@ -359,17 +335,16 @@ final class NIOPostgresTests: XCTestCase {
             .wait()
             .map { row -> (String, UInt32) in (row.column("relname")!.string!, row.column("oid")!.uint32!) })
 
-        let row = try conn.simpleQuery("SELECT * FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id").wait().first!
+        let row = try conn.query("SELECT * FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id").wait().first!
         XCTAssertEqual(12, row.column("id", tableOID: tableNameToOID["table1"]!)?.int)
         XCTAssertEqual(34, row.column("table2_id", tableOID: tableNameToOID["table1"]!)?.int)
         XCTAssertEqual(56, row.column("intValue", tableOID: tableNameToOID["table1"]!)?.int)
         XCTAssertEqual("stringInTable1", row.column("stringValue", tableOID: tableNameToOID["table1"]!)?.string)
-        // TODO: Also test date extraction once parsing dates from string works.
-        //XCTAssertEqual(dateInTable1, row.column("dateValue", tableOID: tableNameToOID["table1"]!)?.date)
+        XCTAssertEqual(dateInTable1, row.column("dateValue", tableOID: tableNameToOID["table1"]!)?.date)
         XCTAssertEqual(34, row.column("id", tableOID: tableNameToOID["table2"]!)?.int)
         XCTAssertEqual(78, row.column("intValue", tableOID: tableNameToOID["table2"]!)?.int)
         XCTAssertEqual("stringInTable2", row.column("stringValue", tableOID: tableNameToOID["table2"]!)?.string, "stringInTable2")
-        //XCTAssertEqual(dateInTable2, row.column("dateValue", tableOID: tableNameToOID["table2"]!)?.date)
+        XCTAssertEqual(dateInTable2, row.column("dateValue", tableOID: tableNameToOID["table2"]!)?.date)
     }
 
     private func prepareTableToMeasureSelectPerformance(
@@ -415,7 +390,6 @@ final class NIOPostgresTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 300_000, batchSize: 5_000,
             schema:
-            // TODO: Also add a `Double` and a `Data` field to this performance test.
             """
                 "int" int8,
             """,
@@ -424,7 +398,7 @@ final class NIOPostgresTests: XCTestCase {
 
         measure {
             do {
-                try conn.simpleQuery("SELECT * FROM \"measureSelectPerformance\"") { row in
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
                     _ = row.column("int")?.int
                     }.wait()
             } catch {
@@ -455,12 +429,11 @@ final class NIOPostgresTests: XCTestCase {
 
         measure {
             do {
-                try conn.simpleQuery("SELECT * FROM \"measureSelectPerformance\"") { row in
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
                     _ = row.column("id")?.int
                     _ = row.column("string")?.string
                     _ = row.column("int")?.int
-                    // TODO: Also test date extraction once parsing dates from string works.
-                    //_ = row.column("date")?.date
+                    _ = row.column("date")?.date
                     _ = row.column("uuid")?.uuid
                     }.wait()
             } catch {
@@ -509,7 +482,7 @@ final class NIOPostgresTests: XCTestCase {
 
         measure {
             do {
-                try conn.simpleQuery("SELECT * FROM \"measureSelectPerformance\"") { row in
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
                     _ = row.column("id")?.int
                     _ = row.column("string1")?.string
                     _ = row.column("string2")?.string
@@ -521,12 +494,11 @@ final class NIOPostgresTests: XCTestCase {
                     _ = row.column("int3")?.int
                     _ = row.column("int4")?.int
                     _ = row.column("int5")?.int
-                    // TODO: Also test date extraction once parsing dates from string works.
-                    //_ = row.column("date1")?.date
-                    //_ = row.column("date2")?.date
-                    //_ = row.column("date3")?.date
-                    //_ = row.column("date4")?.date
-                    //_ = row.column("date5")?.date
+                    _ = row.column("date1")?.date
+                    _ = row.column("date2")?.date
+                    _ = row.column("date3")?.date
+                    _ = row.column("date4")?.date
+                    _ = row.column("date5")?.date
                     _ = row.column("uuid1")?.uuid
                     _ = row.column("uuid2")?.uuid
                     _ = row.column("uuid3")?.uuid
@@ -553,7 +525,7 @@ final class NIOPostgresTests: XCTestCase {
 
         measure {
             do {
-                try conn.simpleQuery("SELECT * FROM \"measureSelectPerformance\"") { row in
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
                     _ = row.column("id")?.int
                     for fieldName in fieldNames {
                         _ = row.column(fieldName)?.int
@@ -579,7 +551,7 @@ final class NIOPostgresTests: XCTestCase {
 
         measure {
             do {
-                try conn.simpleQuery("SELECT * FROM \"measureSelectPerformance\"") { row in
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
                     _ = row.column("id")?.int
                     for fieldName in fieldNames {
                         _ = row.column(fieldName)?.int
