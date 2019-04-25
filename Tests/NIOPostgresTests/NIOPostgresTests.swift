@@ -277,46 +277,286 @@ final class NIOPostgresTests: XCTestCase {
             XCTAssertEqual(error.code, .invalid_password)
         }
     }
-    
-    func testSelectPerformance() throws {
-        // std deviation too high
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-        measure {
-            do {
-                _ = try conn.query("SELECT * FROM pg_type").wait()
-            } catch {
-                XCTFail("\(error)")
-            }
-        }
-    }
-    
-    func testRangeSelectPerformance() throws {
-        // std deviation too high
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-        measure {
-            do {
-                _ = try conn.simpleQuery("SELECT * FROM generate_series(1, 10000) num").wait()
-            } catch {
-                XCTFail("\(error)")
-            }
-        }
-    }
-    
+
     func testRangeSelectDecodePerformance() throws {
         // std deviation too high
         struct Series: Decodable {
             var num: Int
         }
-        
+
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         measure {
             do {
-                try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
-                    _ = row.column("num")?.int
-                }.wait()
+                for _ in 0..<50 {
+                    try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
+                        _ = row.column("num")?.int
+                        }.wait()
+                }
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
+
+    func testColumnsInJoin() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let dateInTable1 = Date(timeIntervalSince1970: 1234)
+        let dateInTable2 = Date(timeIntervalSince1970: 5678)
+        _ = try conn.simpleQuery("""
+            CREATE TABLE table1 (
+            "id" int8 NOT NULL,
+            "table2_id" int8,
+            "intValue" int8,
+            "stringValue" text,
+            "dateValue" timestamptz,
+            PRIMARY KEY ("id")
+            );
+            """).wait()
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"table1\"").wait() }
+
+        _ = try conn.simpleQuery("""
+            CREATE TABLE table2 (
+            "id" int8 NOT NULL,
+            "intValue" int8,
+            "stringValue" text,
+            "dateValue" timestamptz,
+            PRIMARY KEY ("id")
+            );
+            """).wait()
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"table2\"").wait() }
+
+        _ = try conn.simpleQuery("INSERT INTO table1 VALUES (12, 34, 56, 'stringInTable1', to_timestamp(1234))").wait()
+        _ = try conn.simpleQuery("INSERT INTO table2 VALUES (34, 78, 'stringInTable2', to_timestamp(5678))").wait()
+
+        let tableNameToOID = Dictionary(uniqueKeysWithValues: try conn.simpleQuery("SELECT relname, oid FROM pg_class WHERE relname in ('table1', 'table2')")
+            .wait()
+            .map { row -> (String, UInt32) in (row.column("relname")!.string!, row.column("oid")!.uint32!) })
+
+        let row = try conn.query("SELECT * FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id").wait().first!
+        XCTAssertEqual(12, row.column("id", tableOID: tableNameToOID["table1"]!)?.int)
+        XCTAssertEqual(34, row.column("table2_id", tableOID: tableNameToOID["table1"]!)?.int)
+        XCTAssertEqual(56, row.column("intValue", tableOID: tableNameToOID["table1"]!)?.int)
+        XCTAssertEqual("stringInTable1", row.column("stringValue", tableOID: tableNameToOID["table1"]!)?.string)
+        XCTAssertEqual(dateInTable1, row.column("dateValue", tableOID: tableNameToOID["table1"]!)?.date)
+        XCTAssertEqual(34, row.column("id", tableOID: tableNameToOID["table2"]!)?.int)
+        XCTAssertEqual(78, row.column("intValue", tableOID: tableNameToOID["table2"]!)?.int)
+        XCTAssertEqual("stringInTable2", row.column("stringValue", tableOID: tableNameToOID["table2"]!)?.string, "stringInTable2")
+        XCTAssertEqual(dateInTable2, row.column("dateValue", tableOID: tableNameToOID["table2"]!)?.date)
+    }
+
+    private func prepareTableToMeasureSelectPerformance(
+        rowCount: Int, batchSize: Int = 1_000, schema: String, fixtureData: [PostgresData],
+        file: StaticString = #file, line: UInt = #line) throws {
+        XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: file, line: line)
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.simpleQuery("""
+        CREATE TABLE "measureSelectPerformance" (
+            "id" int8 NOT NULL,
+            \(schema)
+            PRIMARY KEY ("id")
+        );
+        """).wait()
+
+        // Batch `batchSize` inserts into one for better insert performance.
+        let totalArgumentsPerRow = fixtureData.count + 1
+        let insertArgumentsPlaceholder = (0..<batchSize).map { indexInBatch in
+            "("
+                + (0..<totalArgumentsPerRow).map { argumentIndex in "$\(indexInBatch * totalArgumentsPerRow + argumentIndex + 1)" }
+                .joined(separator: ", ")
+                + ")"
+        }.joined(separator: ", ")
+        let insertQuery = "INSERT INTO \"measureSelectPerformance\" VALUES \(insertArgumentsPlaceholder)"
+        var batchedFixtureData = Array(repeating: [PostgresData(int: 0)] + fixtureData, count: batchSize).flatMap { $0 }
+        for batchIndex in 0..<(rowCount / batchSize) {
+            for indexInBatch in 0..<batchSize {
+                let rowIndex = batchIndex * batchSize + indexInBatch
+                batchedFixtureData[indexInBatch * totalArgumentsPerRow] = PostgresData(int: rowIndex)
+            }
+            _ = try conn.query(insertQuery, batchedFixtureData).wait()
+        }
+    }
+
+    func testSelectTinyModel() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let now = Date()
+        let uuid = UUID()
+        try prepareTableToMeasureSelectPerformance(
+            rowCount: 300_000, batchSize: 5_000,
+            schema:
+            """
+                "int" int8,
+            """,
+            fixtureData: [PostgresData(int: 1234)])
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
+
+        measure {
+            do {
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
+                    _ = row.column("int")?.int
+                    }.wait()
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
+
+    func testSelectMediumModel() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let now = Date()
+        let uuid = UUID()
+        try prepareTableToMeasureSelectPerformance(
+            rowCount: 300_000,
+            schema:
+            // TODO: Also add a `Double` and a `Data` field to this performance test.
+            """
+                "string" text,
+                "int" int8,
+                "date" timestamptz,
+                "uuid" uuid,
+            """,
+            fixtureData: [PostgresData(string: "foo"), PostgresData(int: 0),
+                          now.postgresData!, PostgresData(uuid: uuid)])
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
+
+        measure {
+            do {
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
+                    _ = row.column("id")?.int
+                    _ = row.column("string")?.string
+                    _ = row.column("int")?.int
+                    _ = row.column("date")?.date
+                    _ = row.column("uuid")?.uuid
+                    }.wait()
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
+
+    func testSelectLargeModel() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let now = Date()
+        let uuid = UUID()
+        try prepareTableToMeasureSelectPerformance(
+            rowCount: 100_000,
+            schema:
+            // TODO: Also add `Double` and `Data` fields to this performance test.
+            """
+                "string1" text,
+                "string2" text,
+                "string3" text,
+                "string4" text,
+                "string5" text,
+                "int1" int8,
+                "int2" int8,
+                "int3" int8,
+                "int4" int8,
+                "int5" int8,
+                "date1" timestamptz,
+                "date2" timestamptz,
+                "date3" timestamptz,
+                "date4" timestamptz,
+                "date5" timestamptz,
+                "uuid1" uuid,
+                "uuid2" uuid,
+                "uuid3" uuid,
+                "uuid4" uuid,
+                "uuid5" uuid,
+            """,
+            fixtureData: [PostgresData(string: "string1"), PostgresData(string: "string2"), PostgresData(string: "string3"), PostgresData(string: "string4"), PostgresData(string: "string5"),
+                          PostgresData(int: 1), PostgresData(int: 2), PostgresData(int: 3), PostgresData(int: 4), PostgresData(int: 5),
+                          now.postgresData!, now.postgresData!, now.postgresData!, now.postgresData!, now.postgresData!,
+                          PostgresData(uuid: uuid), PostgresData(uuid: uuid), PostgresData(uuid: uuid), PostgresData(uuid: uuid), PostgresData(uuid: uuid)])
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
+
+        measure {
+            do {
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
+                    _ = row.column("id")?.int
+                    _ = row.column("string1")?.string
+                    _ = row.column("string2")?.string
+                    _ = row.column("string3")?.string
+                    _ = row.column("string4")?.string
+                    _ = row.column("string5")?.string
+                    _ = row.column("int1")?.int
+                    _ = row.column("int2")?.int
+                    _ = row.column("int3")?.int
+                    _ = row.column("int4")?.int
+                    _ = row.column("int5")?.int
+                    _ = row.column("date1")?.date
+                    _ = row.column("date2")?.date
+                    _ = row.column("date3")?.date
+                    _ = row.column("date4")?.date
+                    _ = row.column("date5")?.date
+                    _ = row.column("uuid1")?.uuid
+                    _ = row.column("uuid2")?.uuid
+                    _ = row.column("uuid3")?.uuid
+                    _ = row.column("uuid4")?.uuid
+                    _ = row.column("uuid5")?.uuid
+                    }.wait()
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
+
+    func testSelectLargeModelWithLongFieldNames() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let fieldIndices = Array(1...20)
+        let fieldNames = fieldIndices.map { "veryLongFieldNameVeryLongFieldName\($0)" }
+        try prepareTableToMeasureSelectPerformance(
+            rowCount: 50_000, batchSize: 200,
+            schema: fieldNames.map { "\"\($0)\" int8" }.joined(separator: ", ") + ",",
+            fixtureData: fieldIndices.map { PostgresData(int: $0) })
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
+
+        measure {
+            do {
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
+                    _ = row.column("id")?.int
+                    for fieldName in fieldNames {
+                        _ = row.column(fieldName)?.int
+                    }
+                    }.wait()
+            } catch {
+                XCTFail("\(error)")
+            }
+        }
+    }
+
+    func testSelectHugeModel() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let fieldIndices = Array(1...100)
+        let fieldNames = fieldIndices.map { "int\($0)" }
+        try prepareTableToMeasureSelectPerformance(
+            rowCount: 10_000, batchSize: 200,
+            schema: fieldNames.map { "\"\($0)\" int8" }.joined(separator: ", ") + ",",
+            fixtureData: fieldIndices.map { PostgresData(int: $0) })
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
+
+        measure {
+            do {
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
+                    _ = row.column("id")?.int
+                    for fieldName in fieldNames {
+                        _ = row.column(fieldName)?.int
+                    }
+                    }.wait()
             } catch {
                 XCTFail("\(error)")
             }

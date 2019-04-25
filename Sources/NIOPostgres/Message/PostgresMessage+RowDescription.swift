@@ -69,7 +69,7 @@ extension PostgresMessage {
             
             /// See `CustomStringConvertible`.
             public var description: String {
-                return self.name.description
+                return self.name.description + "(\(tableOID))"
             }
         }
         
