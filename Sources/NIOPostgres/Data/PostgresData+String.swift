@@ -18,9 +18,11 @@ extension PostgresData {
                 }
                 return string
             case .numeric:
-                return self.numeric?.description
+                return self.numeric?.string
             case .uuid:
                 return value.readUUID()!.uuidString
+            case .timestamp, .timestamptz, .date:
+                return self.date?.description
             case .money:
                 assert(value.readableBytes == 8)
                 guard let int64 = value.getInteger(at: value.readerIndex, as: Int64.self) else {

@@ -153,6 +153,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .date: return "DATE"
         case .time: return "TIME"
         case .timestamp: return "TIMESTAMP"
+        case .timestamptz: return "TIMESTAMPTZ"
         case ._timestamp: return "TIMESTAMP[]"
         case .numeric: return "NUMERIC"
         case .void: return "VOID"
