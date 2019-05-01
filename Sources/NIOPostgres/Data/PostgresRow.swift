@@ -3,22 +3,26 @@ public struct PostgresRow: CustomStringConvertible {
         let rowDescription: PostgresMessage.RowDescription
         let resultFormat: [PostgresFormatCode]
 
-        struct Entry {
-            let indexInRow: Int
+        struct Value {
+            let index: Int
             let field: PostgresMessage.RowDescription.Field
         }
-        private var _columnNameToIndexLookupTable: [String: [Entry]]?
-        var columnNameToIndexLookupTable: [String: [Entry]] {
-            if let existing = _columnNameToIndexLookupTable {
+        
+        private var _storage: [String: Value]?
+        var storage: [String: Value] {
+            if let existing = self._storage {
                 return existing
+            } else {
+                let all = self.rowDescription.fields.enumerated().map { (index, field) in
+                    return (field.name, Value(index: index, field: field))
+                }
+                let storage = [String: Value](all) { a, b in
+                    // take the first value
+                    return a
+                }
+                self._storage = storage
+                return storage
             }
-
-            var columnNameToIndexLookupTable: [String: [Entry]] = [:]
-            for (fieldIndex, field) in rowDescription.fields.enumerated() {
-                columnNameToIndexLookupTable[field.name, default: []].append(.init(indexInRow: fieldIndex, field: field))
-            }
-            self._columnNameToIndexLookupTable = columnNameToIndexLookupTable
-            return columnNameToIndexLookupTable
         }
 
         init(
@@ -29,14 +33,11 @@ public struct PostgresRow: CustomStringConvertible {
             self.resultFormat = resultFormat
         }
 
-        func lookup(column: String, tableOID: UInt32) -> Entry? {
-            guard let columnTable = columnNameToIndexLookupTable[column]
-                else { return nil }
-
-            if tableOID == 0 {
-                return columnTable.first
+        func lookup(column: String) -> Value? {
+            if let value = self.storage[column] {
+                return value
             } else {
-                return columnTable.first { $0.field.tableOID == tableOID }
+                return nil
             }
         }
     }
@@ -44,8 +45,8 @@ public struct PostgresRow: CustomStringConvertible {
     let dataRow: PostgresMessage.DataRow
     let lookupTable: LookupTable
 
-    public func column(_ column: String, tableOID: UInt32 = 0) -> PostgresData? {
-        guard let entry = self.lookupTable.lookup(column: column, tableOID: tableOID) else {
+    public func column(_ column: String) -> PostgresData? {
+        guard let entry = self.lookupTable.lookup(column: column) else {
             return nil
         }
         let formatCode: PostgresFormatCode
@@ -57,15 +58,14 @@ public struct PostgresRow: CustomStringConvertible {
             type: entry.field.dataType,
             typeModifier: entry.field.dataTypeModifier,
             formatCode: formatCode,
-            value: self.dataRow.columns[entry.indexInRow].value
+            value: self.dataRow.columns[entry.index].value
         )
     }
 
     public var description: String {
         var row: [String: PostgresData] = [:]
         for field in self.lookupTable.rowDescription.fields {
-            #warning("TODO: reverse lookup table names for desc")
-            row[field.name] = self.column(field.name, tableOID: field.tableOID)
+            row[field.name] = self.column(field.name)
         }
         return row.description
     }
