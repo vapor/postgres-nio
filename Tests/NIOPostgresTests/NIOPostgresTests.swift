@@ -293,6 +293,24 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(rows[0].column("c")?.string, "3.14159265358979")
     }
     
+    func testMoney() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '0'::money as a,
+            '0.05'::money as b,
+            '0.23'::money as c,
+            '3.14'::money as d,
+            '12345678.90'::money as e
+        """).wait()
+        XCTAssertEqual(rows[0].column("a")?.string, "0.00")
+        XCTAssertEqual(rows[0].column("b")?.string, "0.05")
+        XCTAssertEqual(rows[0].column("c")?.string, "0.23")
+        XCTAssertEqual(rows[0].column("d")?.string, "3.14")
+        XCTAssertEqual(rows[0].column("e")?.string, "12345678.90")
+    }
+    
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)

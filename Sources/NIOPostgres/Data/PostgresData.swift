@@ -34,7 +34,7 @@ public struct PostgresData: CustomStringConvertible {
         }
     }
     
-    public var debugDescription: String {
+    var debugDescription: String {
         let string: String
         if var value = self.value {
             switch self.formatCode {

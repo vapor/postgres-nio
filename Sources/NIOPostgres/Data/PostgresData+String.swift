@@ -19,8 +19,34 @@ extension PostgresData {
                 return string
             case .numeric:
                 return self.numeric?.description
-            case .uuid: return value.readUUID()!.uuidString
-            default: fatalError("Cannot decode String from \(self)")
+            case .uuid:
+                return value.readUUID()!.uuidString
+            case .money:
+                assert(value.readableBytes == 8)
+                guard let int64 = value.getInteger(at: value.readerIndex, as: Int64.self) else {
+                    fatalError()
+                }
+                let description = int64.description
+                switch description.count {
+                case 0:
+                    return "0.00"
+                case 1:
+                    return "0.0" + description
+                case 2:
+                    return "0." + description
+                default:
+                    return description[
+                        description.startIndex
+                        ..<
+                        description.index(description.endIndex, offsetBy: -2)
+                    ] + "." + description[
+                        description.index(description.endIndex, offsetBy: -2)
+                        ..<
+                        description.endIndex
+                    ]
+                }
+            default:
+                fatalError("Cannot decode String from \(self.type)")
             }
         case .text:
             guard let string = value.readString(length: value.readableBytes) else {

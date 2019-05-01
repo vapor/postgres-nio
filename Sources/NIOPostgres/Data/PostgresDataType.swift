@@ -49,6 +49,8 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let float4 = PostgresDataType(700)
     /// `701`
     public static let float8 = PostgresDataType(701)
+    /// `790`
+    public static let money = PostgresDataType(790)
     /// `1000`
     public static let _bool = PostgresDataType(1000)
     /// `1001`
@@ -133,6 +135,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .point: return "POINT"
         case .float4: return "REAL"
         case .float8: return "DOUBLE PRECISION"
+        case .money: return "MONEY"
         case ._bool: return "BOOLEAN[]"
         case ._bytea: return "BYTEA[]"
         case ._char: return "CHAR[]"
