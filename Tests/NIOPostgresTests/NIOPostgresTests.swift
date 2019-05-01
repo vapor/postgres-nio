@@ -243,6 +243,73 @@ final class NIOPostgresTests: XCTestCase {
         let id = PostgresData(int32: 5)
         _ = try conn.query("SELECT id, first_name, last_name FROM person WHERE id = $1", [id]).wait()
     }
+
+    // https://github.com/vapor/nio-postgres/issues/21
+    func testAverageLengthNumeric() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("select avg(length('foo')) as average_length").wait()
+        guard let length = rows[0].column("average_length")?.double else {
+            XCTFail("could not decode length")
+            return
+        }
+        XCTAssertEqual(length, 3.0)
+    }
+    
+    func testNumericParsing() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '1234.5678'::numeric as a,
+            '-123.456'::numeric as b,
+            '123456.789123'::numeric as c,
+            '3.14159265358979'::numeric as d
+        """).wait()
+        XCTAssertEqual(rows[0].column("a")?.string, "1234.5678")
+        XCTAssertEqual(rows[0].column("b")?.string, "-123.456")
+        XCTAssertEqual(rows[0].column("c")?.string, "123456.789123")
+        XCTAssertEqual(rows[0].column("d")?.string, "3.14159265358979")
+    }
+    
+    func testNumericSerialization() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let a = PostgresNumeric(string: "123456.789123")!
+        let b = PostgresNumeric(string: "-123456.789123")!
+        let c = PostgresNumeric(string: "3.14159265358979")!
+        let rows = try conn.query("""
+        select
+            $1::numeric::text as a,
+            $2::numeric::text as b,
+            $3::numeric::text as c
+        """, [
+            .init(numeric: a),
+            .init(numeric: b),
+            .init(numeric: c)
+        ]).wait()
+        XCTAssertEqual(rows[0].column("a")?.string, "123456.789123")
+        XCTAssertEqual(rows[0].column("b")?.string, "-123456.789123")
+        XCTAssertEqual(rows[0].column("c")?.string, "3.14159265358979")
+    }
+    
+    func testMoney() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '0'::money as a,
+            '0.05'::money as b,
+            '0.23'::money as c,
+            '3.14'::money as d,
+            '12345678.90'::money as e
+        """).wait()
+        XCTAssertEqual(rows[0].column("a")?.string, "0.00")
+        XCTAssertEqual(rows[0].column("b")?.string, "0.05")
+        XCTAssertEqual(rows[0].column("c")?.string, "0.23")
+        XCTAssertEqual(rows[0].column("d")?.string, "3.14")
+        XCTAssertEqual(rows[0].column("e")?.string, "12345678.90")
+    }
     
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"

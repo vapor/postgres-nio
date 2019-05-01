@@ -6,12 +6,16 @@ extension NIOPostgresTests {
     //   `swift test --generate-linuxmain`
     // to regenerate.
     static let __allTests__NIOPostgresTests = [
+        ("testAverageLengthNumeric", testAverageLengthNumeric),
         ("testBindInteger", testBindInteger),
         ("testColumnsInJoin", testColumnsInJoin),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),
         ("testIntegers", testIntegers),
         ("testInvalidPassword", testInvalidPassword),
+        ("testMoney", testMoney),
+        ("testNumericParsing", testNumericParsing),
+        ("testNumericSerialization", testNumericSerialization),
         ("testPi", testPi),
         ("testQuerySelectParameter", testQuerySelectParameter),
         ("testQueryVersion", testQueryVersion),

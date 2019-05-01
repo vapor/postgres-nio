@@ -26,8 +26,15 @@ public struct PostgresData: CustomStringConvertible {
         self.value = value
     }
     
-    /// See `CustomStringConvertible`
     public var description: String {
+        if let string = self.string {
+            return string
+        } else {
+            return self.debugDescription
+        }
+    }
+    
+    var debugDescription: String {
         let string: String
         if var value = self.value {
             switch self.formatCode {

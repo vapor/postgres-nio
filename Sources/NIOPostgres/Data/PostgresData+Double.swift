@@ -16,6 +16,8 @@ extension PostgresData {
                     .flatMap { Double($0) }
             case .float8:
                 return value.readFloat(as: Double.self)
+            case .numeric:
+                return self.numeric?.double
             default: fatalError("Cannot decode Double from \(self)")
             }
         case .text:
