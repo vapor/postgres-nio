@@ -37,16 +37,15 @@ extension PostgresData {
                 case 2:
                     return "0." + description
                 default:
-                    return description[
-                        description.startIndex
-                        ..<
-                        description.index(description.endIndex, offsetBy: -2)
-                    ] + "." + description[
-                        description.index(description.endIndex, offsetBy: -2)
-                        ..<
-                        description.endIndex
-                    ]
+                    let decimalIndex = description.index(description.endIndex, offsetBy: -2)
+                    return description[description.startIndex..<decimalIndex]
+                        + "."
+                        + description[decimalIndex..<description.endIndex]
                 }
+            case .float4, .float8:
+                return self.double?.description
+            case .int2, .int4, .int8:
+                return self.int?.description
             default:
                 fatalError("Cannot decode String from \(self.type)")
             }
