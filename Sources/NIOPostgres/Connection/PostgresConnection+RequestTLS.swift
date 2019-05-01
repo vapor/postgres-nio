@@ -1,4 +1,5 @@
 import NIOSSL
+import Logging
 
 extension PostgresConnection {
     public func requestTLS(using tlsConfig: TLSConfiguration, serverHostname: String?) -> EventLoopFuture<Bool> {
@@ -21,6 +22,10 @@ private final class RequestTLSQuery: PostgresRequestHandler {
     
     init() {
         self.isSupported = false
+    }
+    
+    func log(to logger: Logger) {
+        logger.debug("Requesting TLS")
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {

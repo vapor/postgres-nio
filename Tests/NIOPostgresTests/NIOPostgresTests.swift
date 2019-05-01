@@ -1,3 +1,4 @@
+import Logging
 import NIOPostgres
 import XCTest
 
@@ -8,6 +9,7 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     override func setUp() {
+        testLogLevel = .trace
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
     

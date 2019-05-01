@@ -1,4 +1,5 @@
 import NIO
+import Logging
 
 extension PostgresClient {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
@@ -22,6 +23,10 @@ private final class PostgresSimpleQuery: PostgresRequestHandler {
     init(query: String, onRow: @escaping (PostgresRow) throws -> ()) {
         self.query = query
         self.onRow = onRow
+    }
+    
+    func log(to logger: Logger) {
+        logger.debug("\(self.query)")
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {

@@ -1,4 +1,5 @@
 import NIO
+import Logging
 
 extension PostgresClient {
     public func query(_ string: String, _ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
@@ -30,6 +31,10 @@ private final class PostgresParameterizedQuery: PostgresRequestHandler {
         self.binds = binds
         self.onRow = onRow
         self.resultFormatCodes = [.binary]
+    }
+    
+    func log(to logger: Logger) {
+        logger.debug("\(self.query) \(self.binds)")
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {

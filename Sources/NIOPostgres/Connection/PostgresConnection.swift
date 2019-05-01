@@ -1,4 +1,6 @@
 import Foundation
+import Logging
+
 public final class PostgresConnection {
 //    #warning("publicize these values?")
 //    public var status: [String: String]
@@ -14,15 +16,18 @@ public final class PostgresConnection {
         return channel.closeFuture
     }
     
+    public var logger: Logger
+    
     init(channel: Channel) {
         self.channel = channel
+        self.logger = Logger(label: "codes.vapor.nio-postgres")
     }
     
     public func close() -> EventLoopFuture<Void> {
         guard self.channel.isActive else {
             return self.eventLoop.makeSucceededFuture(())
         }
-        return self.channel.close(mode: .all)
+        return self.channel.close()
     }
     
     #warning("TODO: add error handler that closes connection")

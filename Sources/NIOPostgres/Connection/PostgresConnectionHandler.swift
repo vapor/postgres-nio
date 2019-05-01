@@ -1,5 +1,8 @@
+import Logging
+
 extension PostgresConnection {
     public func send(_ request: PostgresRequestHandler) -> EventLoopFuture<Void> {
+        request.log(to: self.logger)
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let request = PostgresRequest(delegate: request, promise: promise)
         self.channel.write(request).cascadeFailure(to: promise)
@@ -11,6 +14,7 @@ extension PostgresConnection {
 public protocol PostgresRequestHandler {
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
     func start() throws -> [PostgresMessage]
+    func log(to logger: Logger)
 
     #warning("TODO: Workaround for Authentication see #14")
     var errorMessageIsFinal: Bool { get }
