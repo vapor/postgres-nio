@@ -256,6 +256,39 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(length, 3.0)
     }
     
+    func testNumeric() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '1234.5678'::numeric as a,
+            '-123.456'::numeric as b,
+            '123456.789123'::numeric as c
+        """).wait()
+        print(rows[0])
+    }
+    
+    func testNumericBind() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let a = PostgresNumeric(string: "123456.789123")!
+        let b = PostgresNumeric(string: "-123456.789123")!
+        let c = PostgresNumeric(string: "3.14159265358979")!
+        let rows = try conn.query("""
+        select
+            $1::numeric::text as a,
+            $2::numeric::text as b,
+            $3::numeric::text as c
+        """, [
+            .init(numeric: a),
+            .init(numeric: b),
+            .init(numeric: c)
+        ]).wait()
+        XCTAssertEqual(rows[0].column("a")?.string, "123456.789123")
+        XCTAssertEqual(rows[0].column("b")?.string, "-123456.789123")
+        XCTAssertEqual(rows[0].column("c")?.string, "3.14159265358979")
+    }
+    
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)

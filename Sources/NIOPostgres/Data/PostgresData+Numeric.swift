@@ -1,15 +1,15 @@
 public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible {
     /// The number of digits after this metadata
-    var ndigits: Int16
+    internal var ndigits: Int16
     /// How many of the digits are before the decimal point (always add 1)
-    var weight: Int16
+    internal var weight: Int16
     /// If 0x4000, this number is negative. See NUMERIC_NEG in
     /// https://github.com/postgres/postgres/blob/master/src/backend/utils/adt/numeric.c
-    var sign: Int16
+    internal var sign: Int16
     /// The number of sig digits after the decimal place (get rid of trailing 0s)
-    var dscale: Int16
-
-    var value: ByteBuffer
+    internal var dscale: Int16
+    /// Array of Int16, each representing 4 chars of the number
+    internal var value: ByteBuffer
 
     public var description: String {
         return self.string
@@ -27,6 +27,57 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
 
     public var double: Double? {
         return Double(self.string)
+    }
+
+    public init?(string: String) {
+        // validate string contents
+        guard Double(string) != nil else {
+            return nil
+        }
+        
+        // split on period, get integer and fractional
+        let parts = string.split(separator: ".")
+        var integer: Substring
+        let fractional: Substring?
+        switch parts.count {
+        case 1:
+            integer = parts[0]
+            fractional = nil
+        case 2:
+            integer = parts[0]
+            fractional = parts[1]
+        default:
+            return nil
+        }
+        
+        // check if negative
+        let isNegative: Bool
+        if integer.hasPrefix("-") {
+            integer = integer.dropFirst()
+            isNegative = true
+        } else {
+            isNegative = false
+        }
+        
+        var buffer = ByteBufferAllocator().buffer(capacity: 0)
+        var weight = -1
+        for chunk in integer.reverseChunked(by: 4) {
+            weight += 1
+            buffer.writeInteger(Int16(chunk)!, endianness: .big)
+        }
+        var dscale = 0
+        if let fractional = fractional {
+            for chunk in fractional.chunked(by: 4) {
+                dscale += chunk.count
+                let string = chunk + String(repeating: "0", count: 4 - chunk.count)
+                buffer.writeInteger(Int16(string)!, endianness: .big)
+            }
+        }
+        self.ndigits = numericCast(buffer.readableBytes / 2)
+        self.weight = numericCast(weight)
+        self.sign = isNegative ? 0x4000 : 0
+        self.dscale = numericCast(dscale)
+        self.value = buffer
     }
 
     public var string: String {
@@ -112,6 +163,17 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
 }
 
 extension PostgresData {
+    public init(numeric: PostgresNumeric) {
+        var buffer = ByteBufferAllocator().buffer(capacity: 0)
+        buffer.writeInteger(numeric.ndigits, endianness: .big)
+        buffer.writeInteger(numeric.weight, endianness: .big)
+        buffer.writeInteger(numeric.sign, endianness: .big)
+        buffer.writeInteger(numeric.dscale, endianness: .big)
+        var value = numeric.value
+        buffer.writeBuffer(&value)
+        self.init(type: .numeric, value: buffer)
+    }
+    
     public var numeric: PostgresNumeric? {
         /// create mutable value since we will be using `.extract` which advances the buffer's view
         guard var value = self.value else {
@@ -126,3 +188,34 @@ extension PostgresData {
         return metadata
     }
 }
+
+extension Collection {
+    func chunked(by maxSize: Int) -> [SubSequence] {
+        return stride(from: 0, to: self.count, by: maxSize).map { current in
+            let chunkStartIndex = self.index(self.startIndex, offsetBy: current)
+            let chunkEndOffset = Swift.min(
+                self.distance(from: chunkStartIndex, to: self.endIndex),
+                maxSize
+            )
+            let chunkEndIndex = self.index(chunkStartIndex, offsetBy: chunkEndOffset)
+            return self[chunkStartIndex..<chunkEndIndex]
+        }
+    }
+    
+    func reverseChunked(by maxSize: Int) -> [SubSequence] {
+        var lastDistance = 0
+        var chunkStartIndex = self.startIndex
+        return stride(from: 0, to: self.count, by: maxSize).reversed().map { current in
+            let distance = (self.count - current) - lastDistance
+            lastDistance = distance
+            let chunkEndOffset = Swift.min(
+                self.distance(from: chunkStartIndex, to: self.endIndex),
+                distance
+            )
+            let chunkEndIndex = self.index(chunkStartIndex, offsetBy: chunkEndOffset)
+            defer { chunkStartIndex = chunkEndIndex }
+            return self[chunkStartIndex..<chunkEndIndex]
+        }
+    }
+}
+

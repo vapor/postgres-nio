@@ -65,7 +65,7 @@ public struct PostgresRow: CustomStringConvertible {
         var row: [String: PostgresData] = [:]
         for field in self.lookupTable.rowDescription.fields {
             #warning("TODO: reverse lookup table names for desc")
-            row[field.name + "(\(field.tableOID))"] = self.column(field.name, tableOID: field.tableOID)
+            row[field.name] = self.column(field.name, tableOID: field.tableOID)
         }
         return row.description
     }
