@@ -1,4 +1,6 @@
-public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible {
+import struct Foundation.Decimal
+
+public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible, ExpressibleByStringLiteral {
     /// The number of digits after this metadata
     internal var ndigits: Int16
     /// How many of the digits are before the decimal point (always add 1)
@@ -28,15 +30,26 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
     public var double: Double? {
         return Double(self.string)
     }
-
+    
+    public init(decimal: Decimal) {
+        self.init(decimalString: decimal.description)
+    }
+    
     public init?(string: String) {
-        // validate string contents
+        // validate string contents are decimal
         guard Double(string) != nil else {
             return nil
         }
-        
+        self.init(decimalString: string)
+    }
+    
+    public init(stringLiteral value: String) {
+        self.init(decimalString: value)
+    }
+
+    internal init(decimalString: String) {
         // split on period, get integer and fractional
-        let parts = string.split(separator: ".")
+        let parts = decimalString.split(separator: ".")
         var integer: Substring
         let fractional: Substring?
         switch parts.count {
@@ -47,7 +60,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             integer = parts[0]
             fractional = parts[1]
         default:
-            return nil
+            fatalError("Unexpected decimal string: \(decimalString)")
         }
         
         // check if negative
@@ -59,25 +72,50 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             isNegative = false
         }
         
+        // buffer will store 1+ Int16 values representing
+        // 4 digit chunks of the number
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
+        
+        // weight always has 1 added to it, so start at -1
         var weight = -1
+        
+        // iterate over each chunk in the integer part of the numeric
+        // we use reverse chunked since the first chunk should be the
+        // shortest if the integer length is not evenly divisible by 4
         for chunk in integer.reverseChunked(by: 4) {
             weight += 1
+            // convert the 4 digits to an Int16
             buffer.writeInteger(Int16(chunk)!, endianness: .big)
         }
+        
+        // dscale will measure how many sig digits are in the fraction
         var dscale = 0
+        
         if let fractional = fractional {
+            // iterate over each chunk in the fractional part of the numeric
+            // we use normal chunking size the end chunk should be the shortest
+            // (potentially having extra zeroes)
             for chunk in fractional.chunked(by: 4) {
+                // for each _significant_ digit, increment dscale by count
                 dscale += chunk.count
+                // add trailing zeroes if the number is not 4 long
                 let string = chunk + String(repeating: "0", count: 4 - chunk.count)
+                // convert the 4 digits to an Int16
                 buffer.writeInteger(Int16(string)!, endianness: .big)
             }
         }
+        // ndigits is the number of int16's in the buffer
         self.ndigits = numericCast(buffer.readableBytes / 2)
         self.weight = numericCast(weight)
         self.sign = isNegative ? 0x4000 : 0
         self.dscale = numericCast(dscale)
         self.value = buffer
+    }
+    
+    public var decimal: Decimal {
+        // force cast should always succeed since we know
+        // string returns a valid decimal
+        return Decimal(string: self.string)!
     }
 
     public var string: String {
@@ -189,7 +227,9 @@ extension PostgresData {
     }
 }
 
-extension Collection {
+private extension Collection {
+    // splits the collection into chunks of the supplied size
+    // if the collection is not evenly divisible, the last chunk will be smaller
     func chunked(by maxSize: Int) -> [SubSequence] {
         return stride(from: 0, to: self.count, by: maxSize).map { current in
             let chunkStartIndex = self.index(self.startIndex, offsetBy: current)
@@ -202,6 +242,8 @@ extension Collection {
         }
     }
     
+    // splits the collection into chunks of the supplied size
+    // if the collection is not evenly divisible, the first chunk will be smaller
     func reverseChunked(by maxSize: Int) -> [SubSequence] {
         var lastDistance = 0
         var chunkStartIndex = self.startIndex

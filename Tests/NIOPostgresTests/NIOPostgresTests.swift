@@ -256,19 +256,23 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(length, 3.0)
     }
     
-    func testNumeric() throws {
+    func testNumericParsing() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         let rows = try conn.query("""
         select
             '1234.5678'::numeric as a,
             '-123.456'::numeric as b,
-            '123456.789123'::numeric as c
+            '123456.789123'::numeric as c,
+            '3.14159265358979'::numeric as d
         """).wait()
-        print(rows[0])
+        XCTAssertEqual(rows[0].column("a")?.string, "1234.5678")
+        XCTAssertEqual(rows[0].column("b")?.string, "-123.456")
+        XCTAssertEqual(rows[0].column("c")?.string, "123456.789123")
+        XCTAssertEqual(rows[0].column("d")?.string, "3.14159265358979")
     }
     
-    func testNumericBind() throws {
+    func testNumericSerialization() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         let a = PostgresNumeric(string: "123456.789123")!
