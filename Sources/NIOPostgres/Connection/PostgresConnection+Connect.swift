@@ -43,7 +43,6 @@ private final class PostgresErrorHandler: ChannelInboundHandler {
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
         self.logger.error("Uncaught error: \(error)")
-        print("close 1")
         context.close(promise: nil)
         context.fireErrorCaught(error)
     }

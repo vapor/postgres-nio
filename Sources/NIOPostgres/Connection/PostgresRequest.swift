@@ -102,16 +102,7 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
         }
     }
     
-//    func errorCaught(context: ChannelHandlerContext, error: Error) {
-//        guard self.queue.count > 0 else {
-//            assertionFailure("PostgresRequest queue empty, discarded: \(error)")
-//            return
-//        }
-//        self.queue[0].promise.fail(error)
-//    }
-    
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
-        print("close 2")
         for current in self.queue {
             current.promise.fail(PostgresError.connectionClosed)
         }
