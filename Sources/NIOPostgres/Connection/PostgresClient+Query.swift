@@ -15,7 +15,7 @@ extension PostgresClient {
 
 // MARK: Private
 
-private final class PostgresParameterizedQuery: PostgresRequestHandler {
+private final class PostgresParameterizedQuery: PostgresRequest {
     let query: String
     let binds: [PostgresData]
     var onRow: (PostgresRow) throws -> ()
@@ -38,6 +38,9 @@ private final class PostgresParameterizedQuery: PostgresRequestHandler {
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
+        if case .error = message.identifier {
+            return nil
+        }
         switch message.identifier {
         case .bindComplete:
             return []
@@ -61,6 +64,8 @@ private final class PostgresParameterizedQuery: PostgresRequestHandler {
         case .parameterDescription:
             return []
         case .commandComplete:
+            return []
+        case .notice:
             return []
         case .readyForQuery:
             return nil

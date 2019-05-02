@@ -85,7 +85,6 @@ internal extension ByteBuffer {
             }
             var value: T = 0
             withUnsafeMutableBytes(of: &value) { valuePtr in
-                #warning("TODO: improve performance")
                 valuePtr.copyBytes(
                     from: UnsafeRawBufferPointer(
                         start: ptr.baseAddress!.advanced(by: index),

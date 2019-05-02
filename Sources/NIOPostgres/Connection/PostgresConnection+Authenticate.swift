@@ -15,7 +15,7 @@ extension PostgresConnection {
 
 // MARK: Private
 
-private final class PostgresAuthenticationRequest: PostgresRequestHandler {
+private final class PostgresAuthenticationRequest: PostgresRequest {
     enum State {
         case ready
         case done
@@ -25,10 +25,6 @@ private final class PostgresAuthenticationRequest: PostgresRequestHandler {
     let database: String?
     let password: String?
     var state: State
-
-    var errorMessageIsFinal: Bool {
-        return true
-    }
 
     init(username: String, database: String?, password: String?) {
         self.state = .ready
@@ -42,6 +38,11 @@ private final class PostgresAuthenticationRequest: PostgresRequestHandler {
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
+        if case .error = message.identifier {
+            // terminate immediately on error
+            return nil
+        }
+        
         switch self.state {
         case .ready:
             switch message.identifier {
