@@ -113,7 +113,6 @@ final class NIOPostgresTests: XCTestCase {
             XCTAssertEqual(results[0].column("typnamespace")?.int, 11)
             XCTAssertEqual(results[0].column("typowner")?.int, 10)
             XCTAssertEqual(results[0].column("typlen")?.int, 8)
-            #warning("TODO: finish adding columns")
         default: XCTFail("Should be only one result")
         }
     }
@@ -403,44 +402,11 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     // MARK: Performance
-
-    private func prepareTableToMeasureSelectPerformance(
-        rowCount: Int, batchSize: Int = 1_000, schema: String, fixtureData: [PostgresData],
-        file: StaticString = #file, line: UInt = #line) throws {
-        XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: file, line: line)
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-
-        _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"measureSelectPerformance\"").wait()
-        _ = try conn.simpleQuery("""
-        CREATE TABLE "measureSelectPerformance" (
-            "id" int8 NOT NULL,
-            \(schema)
-            PRIMARY KEY ("id")
-        );
-        """).wait()
-
-        // Batch `batchSize` inserts into one for better insert performance.
-        let totalArgumentsPerRow = fixtureData.count + 1
-        let insertArgumentsPlaceholder = (0..<batchSize).map { indexInBatch in
-            "("
-                + (0..<totalArgumentsPerRow).map { argumentIndex in "$\(indexInBatch * totalArgumentsPerRow + argumentIndex + 1)" }
-                .joined(separator: ", ")
-                + ")"
-        }.joined(separator: ", ")
-        let insertQuery = "INSERT INTO \"measureSelectPerformance\" VALUES \(insertArgumentsPlaceholder)"
-        var batchedFixtureData = Array(repeating: [PostgresData(int: 0)] + fixtureData, count: batchSize).flatMap { $0 }
-        for batchIndex in 0..<(rowCount / batchSize) {
-            for indexInBatch in 0..<batchSize {
-                let rowIndex = batchIndex * batchSize + indexInBatch
-                batchedFixtureData[indexInBatch * totalArgumentsPerRow] = PostgresData(int: rowIndex)
-            }
-            _ = try conn.query(insertQuery, batchedFixtureData).wait()
+    
+    func testPerformanceRangeSelectDecodePerformance() throws {
+        guard performance() else {
+            return
         }
-    }
-    
-    
-    func testRangeSelectDecodePerformance() throws {
         struct Series: Decodable {
             var num: Int
         }
@@ -460,7 +426,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectTinyModel() throws {
+    func testPerformanceSelectTinyModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -472,7 +441,9 @@ final class NIOPostgresTests: XCTestCase {
             """
                 "int" int8,
             """,
-            fixtureData: [PostgresData(int: 1234)])
+            fixtureData: [PostgresData(int: 1234)],
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -486,7 +457,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectMediumModel() throws {
+    func testPerformanceSelectMediumModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -502,8 +476,14 @@ final class NIOPostgresTests: XCTestCase {
                 "date" timestamptz,
                 "uuid" uuid,
             """,
-            fixtureData: [PostgresData(string: "foo"), PostgresData(int: 0),
-                          now.postgresData!, PostgresData(uuid: uuid)])
+            fixtureData: [
+                PostgresData(string: "foo"),
+                PostgresData(int: 0),
+                now.postgresData!,
+                PostgresData(uuid: uuid)
+            ],
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -521,7 +501,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectLargeModel() throws {
+    func testPerformanceSelectLargeModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -574,7 +557,8 @@ final class NIOPostgresTests: XCTestCase {
                 PostgresData(uuid: uuid),
                 PostgresData(uuid: uuid),
                 PostgresData(uuid: uuid)
-            ]
+            ],
+            on: self.eventLoop
         )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
@@ -609,7 +593,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectLargeModelWithLongFieldNames() throws {
+    func testPerformanceSelectLargeModelWithLongFieldNames() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -618,7 +605,9 @@ final class NIOPostgresTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 50_000, batchSize: 200,
             schema: fieldNames.map { "\"\($0)\" int8" }.joined(separator: ", ") + ",",
-            fixtureData: fieldIndices.map { PostgresData(int: $0) })
+            fixtureData: fieldIndices.map { PostgresData(int: $0) },
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -635,7 +624,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectHugeModel() throws {
+    func testPerformanceSelectHugeModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -644,7 +636,9 @@ final class NIOPostgresTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 10_000, batchSize: 200,
             schema: fieldNames.map { "\"\($0)\" int8" }.joined(separator: ", ") + ",",
-            fixtureData: fieldIndices.map { PostgresData(int: $0) })
+            fixtureData: fieldIndices.map { PostgresData(int: $0) },
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -659,5 +653,57 @@ final class NIOPostgresTests: XCTestCase {
                 XCTFail("\(error)")
             }
         }
+    }
+}
+
+
+private func performance(function: String = #function) -> Bool {
+    if _isDebugAssertConfiguration() {
+        print("Debug build, skipping \(function)")
+        return false
+    } else {
+        print("Running performance test \(function)")
+        return true
+    }
+}
+
+private func prepareTableToMeasureSelectPerformance(
+    rowCount: Int,
+    batchSize: Int = 1_000,
+    schema: String,
+    fixtureData: [PostgresData],
+    on eventLoop: EventLoop,
+    file: StaticString = #file,
+    line: UInt = #line
+) throws {
+    XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: file, line: line)
+    let conn = try PostgresConnection.test(on: eventLoop).wait()
+    defer { try! conn.close().wait() }
+    
+    _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"measureSelectPerformance\"").wait()
+    _ = try conn.simpleQuery("""
+        CREATE TABLE "measureSelectPerformance" (
+        "id" int8 NOT NULL,
+        \(schema)
+        PRIMARY KEY ("id")
+        );
+        """).wait()
+    
+    // Batch `batchSize` inserts into one for better insert performance.
+    let totalArgumentsPerRow = fixtureData.count + 1
+    let insertArgumentsPlaceholder = (0..<batchSize).map { indexInBatch in
+        "("
+            + (0..<totalArgumentsPerRow).map { argumentIndex in "$\(indexInBatch * totalArgumentsPerRow + argumentIndex + 1)" }
+                .joined(separator: ", ")
+            + ")"
+        }.joined(separator: ", ")
+    let insertQuery = "INSERT INTO \"measureSelectPerformance\" VALUES \(insertArgumentsPlaceholder)"
+    var batchedFixtureData = Array(repeating: [PostgresData(int: 0)] + fixtureData, count: batchSize).flatMap { $0 }
+    for batchIndex in 0..<(rowCount / batchSize) {
+        for indexInBatch in 0..<batchSize {
+            let rowIndex = batchIndex * batchSize + indexInBatch
+            batchedFixtureData[indexInBatch * totalArgumentsPerRow] = PostgresData(int: rowIndex)
+        }
+        _ = try conn.query(insertQuery, batchedFixtureData).wait()
     }
 }

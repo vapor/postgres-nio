@@ -45,7 +45,7 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
     private func _channelRead(context: ChannelHandlerContext, data: NIOAny) throws {
         let message = self.unwrapInboundIn(data)
         guard self.queue.count > 0 else {
-            assertionFailure("PostgresRequest queue empty, discarded: \(message)")
+            // discard packet
             return
         }
         let request = self.queue[0]
