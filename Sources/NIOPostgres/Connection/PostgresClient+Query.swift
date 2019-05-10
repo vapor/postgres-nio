@@ -39,7 +39,8 @@ private final class PostgresParameterizedQuery: PostgresRequest {
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
         if case .error = message.identifier {
-            return nil
+            // we should continue after errors
+            return []
         }
         switch message.identifier {
         case .bindComplete:
