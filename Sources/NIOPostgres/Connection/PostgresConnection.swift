@@ -1,9 +1,7 @@
 import Foundation
+import Logging
+
 public final class PostgresConnection {
-//    #warning("publicize these values?")
-//    public var status: [String: String]
-//    var processID: Int32?
-//    var secretKey: Int32?
     let channel: Channel
     
     public var eventLoop: EventLoop {
@@ -14,18 +12,20 @@ public final class PostgresConnection {
         return channel.closeFuture
     }
     
-    init(channel: Channel) {
+    public var logger: Logger
+    
+    init(channel: Channel, logger: Logger) {
         self.channel = channel
+        self.logger = logger
     }
     
     public func close() -> EventLoopFuture<Void> {
         guard self.channel.isActive else {
             return self.eventLoop.makeSucceededFuture(())
         }
-        return self.channel.close(mode: .all)
+        return self.channel.close()
     }
     
-    #warning("TODO: add error handler that closes connection")
     deinit {
         if self.channel.isActive {
             assertionFailure("PostgresConnection deinitialized before being closed.")

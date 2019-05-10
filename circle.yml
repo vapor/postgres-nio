@@ -46,6 +46,18 @@ jobs:
     steps:
       - checkout
       - run: swift build -c release
+  linux-performance:
+    docker:
+      - image: vapor/swift:5.0
+      - image: circleci/postgres:9
+        name: psql
+        environment:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
+    steps:
+      - checkout
+      - run: swift test -c release
 workflows:
   version: 2
   tests:
@@ -54,3 +66,5 @@ workflows:
       - 10-linux
       - 9-linux
       - linux-release
+      - linux-performance
+

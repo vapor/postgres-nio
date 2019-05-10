@@ -72,7 +72,7 @@ internal extension ByteBuffer {
         }
         
         let value: T = self.getFloat(at: self.readerIndex)! /* must work as we have enough bytes */
-        // should be _moveReaderIndex
+        // should be MoveReaderIndex
         self.moveReaderIndex(forwardBy: MemoryLayout<T>.size)
         return value
     }
@@ -85,7 +85,6 @@ internal extension ByteBuffer {
             }
             var value: T = 0
             withUnsafeMutableBytes(of: &value) { valuePtr in
-                #warning("TODO: improve performance")
                 valuePtr.copyBytes(
                     from: UnsafeRawBufferPointer(
                         start: ptr.baseAddress!.advanced(by: index),
@@ -103,7 +102,7 @@ internal extension ByteBuffer {
         }
         
         let value: UUID = self.getUUID(at: self.readerIndex)! /* must work as we have enough bytes */
-        // should be _moveReaderIndex
+        // should be MoveReaderIndex
         self.moveReaderIndex(forwardBy: MemoryLayout<UUID>.size)
         return value
     }

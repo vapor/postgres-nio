@@ -1,4 +1,5 @@
 import NIO
+import Logging
 
 extension PostgresClient {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
@@ -14,7 +15,7 @@ extension PostgresClient {
 
 // MARK: Private
 
-private final class PostgresSimpleQuery: PostgresRequestHandler {
+private final class PostgresSimpleQuery: PostgresRequest {
     var query: String
     var onRow: (PostgresRow) throws -> ()
     var rowLookupTable: PostgresRow.LookupTable?
@@ -24,7 +25,14 @@ private final class PostgresSimpleQuery: PostgresRequestHandler {
         self.onRow = onRow
     }
     
+    func log(to logger: Logger) {
+        logger.debug("\(self.query)")
+    }
+    
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
+        if case .error = message.identifier {
+            return nil
+        }
         switch message.identifier {
         case .dataRow:
             let data = try PostgresMessage.DataRow(message: message)
@@ -43,6 +51,8 @@ private final class PostgresSimpleQuery: PostgresRequestHandler {
             return []
         case .readyForQuery:
             return nil
+        case .notice:
+            return []
         default:
             throw PostgresError.protocol("Unexpected message during simple query: \(message)")
         }

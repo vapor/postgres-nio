@@ -1,3 +1,4 @@
+import Logging
 import NIOPostgres
 import XCTest
 
@@ -8,6 +9,7 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     override func setUp() {
+        testLogLevel = .info
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
     
@@ -58,7 +60,7 @@ final class NIOPostgresTests: XCTestCase {
             _ = try conn.simpleQuery("SELECT &").wait()
             XCTFail("An error should have been thrown")
         } catch let error as PostgresError {
-            XCTAssertEqual(error.code, .syntax_error)
+            XCTAssertEqual(error.code, .syntaxError)
         }
     }
     
@@ -111,7 +113,6 @@ final class NIOPostgresTests: XCTestCase {
             XCTAssertEqual(results[0].column("typnamespace")?.int, 11)
             XCTAssertEqual(results[0].column("typowner")?.int, 10)
             XCTAssertEqual(results[0].column("typlen")?.int, 8)
-            #warning("TODO: finish adding columns")
         default: XCTFail("Should be only one result")
         }
     }
@@ -318,13 +319,10 @@ final class NIOPostgresTests: XCTestCase {
         
         let conn = try PostgresConnection.connect(
             to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
+            tlsConfiguration: .forClient(certificateVerification: .none),
+            serverHostname: "elmer.db.elephantsql.com",
             on: elg.next()
         ).wait()
-        let upgraded = try conn.requestTLS(
-            using: .forClient(certificateVerification: .none),
-            serverHostname: "elmer.db.elephantsql.com"
-        ).wait()
-        XCTAssertTrue(upgraded)
         try! conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
@@ -341,28 +339,7 @@ final class NIOPostgresTests: XCTestCase {
             let _ = try auth.wait()
             XCTFail("The authentication should fail")
         } catch let error as PostgresError {
-            XCTAssertEqual(error.code, .invalid_password)
-        }
-    }
-
-    func testRangeSelectDecodePerformance() throws {
-        // std deviation too high
-        struct Series: Decodable {
-            var num: Int
-        }
-
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-        measure {
-            do {
-                for _ in 0..<50 {
-                    try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
-                        _ = row.column("num")?.int
-                        }.wait()
-                }
-            } catch {
-                XCTFail("\(error)")
-            }
+            XCTAssertEqual(error.code, .invalidPassword)
         }
     }
 
@@ -372,83 +349,87 @@ final class NIOPostgresTests: XCTestCase {
 
         let dateInTable1 = Date(timeIntervalSince1970: 1234)
         let dateInTable2 = Date(timeIntervalSince1970: 5678)
+        _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"table1\"").wait()
         _ = try conn.simpleQuery("""
-            CREATE TABLE table1 (
+        CREATE TABLE table1 (
             "id" int8 NOT NULL,
             "table2_id" int8,
             "intValue" int8,
             "stringValue" text,
             "dateValue" timestamptz,
             PRIMARY KEY ("id")
-            );
-            """).wait()
+        );
+        """).wait()
         defer { _ = try! conn.simpleQuery("DROP TABLE \"table1\"").wait() }
 
+        _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"table2\"").wait()
         _ = try conn.simpleQuery("""
-            CREATE TABLE table2 (
+        CREATE TABLE table2 (
             "id" int8 NOT NULL,
             "intValue" int8,
             "stringValue" text,
             "dateValue" timestamptz,
             PRIMARY KEY ("id")
-            );
-            """).wait()
+        );
+        """).wait()
         defer { _ = try! conn.simpleQuery("DROP TABLE \"table2\"").wait() }
 
         _ = try conn.simpleQuery("INSERT INTO table1 VALUES (12, 34, 56, 'stringInTable1', to_timestamp(1234))").wait()
         _ = try conn.simpleQuery("INSERT INTO table2 VALUES (34, 78, 'stringInTable2', to_timestamp(5678))").wait()
 
-        let tableNameToOID = Dictionary(uniqueKeysWithValues: try conn.simpleQuery("SELECT relname, oid FROM pg_class WHERE relname in ('table1', 'table2')")
-            .wait()
-            .map { row -> (String, UInt32) in (row.column("relname")!.string!, row.column("oid")!.uint32!) })
-
-        let row = try conn.query("SELECT * FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id").wait().first!
-        XCTAssertEqual(12, row.column("id", tableOID: tableNameToOID["table1"]!)?.int)
-        XCTAssertEqual(34, row.column("table2_id", tableOID: tableNameToOID["table1"]!)?.int)
-        XCTAssertEqual(56, row.column("intValue", tableOID: tableNameToOID["table1"]!)?.int)
-        XCTAssertEqual("stringInTable1", row.column("stringValue", tableOID: tableNameToOID["table1"]!)?.string)
-        XCTAssertEqual(dateInTable1, row.column("dateValue", tableOID: tableNameToOID["table1"]!)?.date)
-        XCTAssertEqual(34, row.column("id", tableOID: tableNameToOID["table2"]!)?.int)
-        XCTAssertEqual(78, row.column("intValue", tableOID: tableNameToOID["table2"]!)?.int)
-        XCTAssertEqual("stringInTable2", row.column("stringValue", tableOID: tableNameToOID["table2"]!)?.string, "stringInTable2")
-        XCTAssertEqual(dateInTable2, row.column("dateValue", tableOID: tableNameToOID["table2"]!)?.date)
+        let row = try conn.query("""
+        SELECT
+            "table1"."id" as "t1_id",
+            "table1"."intValue" as "t1_intValue",
+            "table1"."dateValue" as "t1_dateValue",
+            "table1"."stringValue" as "t1_stringValue",
+            "table2"."id" as "t2_id",
+            "table2"."intValue" as "t2_intValue",
+            "table2"."dateValue" as "t2_dateValue",
+            "table2"."stringValue" as "t2_stringValue",
+            *
+        FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id
+        """).wait().first!
+        XCTAssertEqual(12, row.column("t1_id")?.int)
+        XCTAssertEqual(34, row.column("table2_id")?.int)
+        XCTAssertEqual(56, row.column("t1_intValue")?.int)
+        XCTAssertEqual("stringInTable1", row.column("t1_stringValue")?.string)
+        XCTAssertEqual(dateInTable1, row.column("t1_dateValue")?.date)
+        XCTAssertEqual(34, row.column("t2_id")?.int)
+        XCTAssertEqual(78, row.column("t2_intValue")?.int)
+        XCTAssertEqual("stringInTable2", row.column("t2_stringValue")?.string, "stringInTable2")
+        XCTAssertEqual(dateInTable2, row.column("t2_dateValue")?.date)
     }
-
-    private func prepareTableToMeasureSelectPerformance(
-        rowCount: Int, batchSize: Int = 1_000, schema: String, fixtureData: [PostgresData],
-        file: StaticString = #file, line: UInt = #line) throws {
-        XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: file, line: line)
+    
+    // MARK: Performance
+    
+    func testPerformanceRangeSelectDecodePerformance() throws {
+        guard performance() else {
+            return
+        }
+        struct Series: Decodable {
+            var num: Int
+        }
+        
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
-
-        _ = try conn.simpleQuery("""
-        CREATE TABLE "measureSelectPerformance" (
-            "id" int8 NOT NULL,
-            \(schema)
-            PRIMARY KEY ("id")
-        );
-        """).wait()
-
-        // Batch `batchSize` inserts into one for better insert performance.
-        let totalArgumentsPerRow = fixtureData.count + 1
-        let insertArgumentsPlaceholder = (0..<batchSize).map { indexInBatch in
-            "("
-                + (0..<totalArgumentsPerRow).map { argumentIndex in "$\(indexInBatch * totalArgumentsPerRow + argumentIndex + 1)" }
-                .joined(separator: ", ")
-                + ")"
-        }.joined(separator: ", ")
-        let insertQuery = "INSERT INTO \"measureSelectPerformance\" VALUES \(insertArgumentsPlaceholder)"
-        var batchedFixtureData = Array(repeating: [PostgresData(int: 0)] + fixtureData, count: batchSize).flatMap { $0 }
-        for batchIndex in 0..<(rowCount / batchSize) {
-            for indexInBatch in 0..<batchSize {
-                let rowIndex = batchIndex * batchSize + indexInBatch
-                batchedFixtureData[indexInBatch * totalArgumentsPerRow] = PostgresData(int: rowIndex)
+        measure {
+            do {
+                for _ in 0..<5 {
+                    try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
+                        _ = row.column("num")?.int
+                    }.wait()
+                }
+            } catch {
+                XCTFail("\(error)")
             }
-            _ = try conn.query(insertQuery, batchedFixtureData).wait()
         }
     }
 
-    func testSelectTinyModel() throws {
+    func testPerformanceSelectTinyModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -460,7 +441,9 @@ final class NIOPostgresTests: XCTestCase {
             """
                 "int" int8,
             """,
-            fixtureData: [PostgresData(int: 1234)])
+            fixtureData: [PostgresData(int: 1234)],
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -474,7 +457,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectMediumModel() throws {
+    func testPerformanceSelectMediumModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -490,8 +476,14 @@ final class NIOPostgresTests: XCTestCase {
                 "date" timestamptz,
                 "uuid" uuid,
             """,
-            fixtureData: [PostgresData(string: "foo"), PostgresData(int: 0),
-                          now.postgresData!, PostgresData(uuid: uuid)])
+            fixtureData: [
+                PostgresData(string: "foo"),
+                PostgresData(int: 0),
+                now.postgresData!,
+                PostgresData(uuid: uuid)
+            ],
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -509,7 +501,10 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
 
-    func testSelectLargeModel() throws {
+    func testPerformanceSelectLargeModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -541,10 +536,30 @@ final class NIOPostgresTests: XCTestCase {
                 "uuid4" uuid,
                 "uuid5" uuid,
             """,
-            fixtureData: [PostgresData(string: "string1"), PostgresData(string: "string2"), PostgresData(string: "string3"), PostgresData(string: "string4"), PostgresData(string: "string5"),
-                          PostgresData(int: 1), PostgresData(int: 2), PostgresData(int: 3), PostgresData(int: 4), PostgresData(int: 5),
-                          now.postgresData!, now.postgresData!, now.postgresData!, now.postgresData!, now.postgresData!,
-                          PostgresData(uuid: uuid), PostgresData(uuid: uuid), PostgresData(uuid: uuid), PostgresData(uuid: uuid), PostgresData(uuid: uuid)])
+            fixtureData: [
+                PostgresData(string: "string1"),
+                PostgresData(string: "string2"),
+                PostgresData(string: "string3"),
+                PostgresData(string: "string4"),
+                PostgresData(string: "string5"),
+                PostgresData(int: 1),
+                PostgresData(int: 2),
+                PostgresData(int: 3),
+                PostgresData(int: 4),
+                PostgresData(int: 5),
+                now.postgresData!,
+                now.postgresData!,
+                now.postgresData!,
+                now.postgresData!,
+                now.postgresData!,
+                PostgresData(uuid: uuid),
+                PostgresData(uuid: uuid),
+                PostgresData(uuid: uuid),
+                PostgresData(uuid: uuid),
+                PostgresData(uuid: uuid)
+            ],
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -571,14 +586,17 @@ final class NIOPostgresTests: XCTestCase {
                     _ = row.column("uuid3")?.uuid
                     _ = row.column("uuid4")?.uuid
                     _ = row.column("uuid5")?.uuid
-                    }.wait()
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }
         }
     }
 
-    func testSelectLargeModelWithLongFieldNames() throws {
+    func testPerformanceSelectLargeModelWithLongFieldNames() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -587,7 +605,9 @@ final class NIOPostgresTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 50_000, batchSize: 200,
             schema: fieldNames.map { "\"\($0)\" int8" }.joined(separator: ", ") + ",",
-            fixtureData: fieldIndices.map { PostgresData(int: $0) })
+            fixtureData: fieldIndices.map { PostgresData(int: $0) },
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -597,14 +617,17 @@ final class NIOPostgresTests: XCTestCase {
                     for fieldName in fieldNames {
                         _ = row.column(fieldName)?.int
                     }
-                    }.wait()
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }
         }
     }
 
-    func testSelectHugeModel() throws {
+    func testPerformanceSelectHugeModel() throws {
+        guard performance() else {
+            return
+        }
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
@@ -613,7 +636,9 @@ final class NIOPostgresTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 10_000, batchSize: 200,
             schema: fieldNames.map { "\"\($0)\" int8" }.joined(separator: ", ") + ",",
-            fixtureData: fieldIndices.map { PostgresData(int: $0) })
+            fixtureData: fieldIndices.map { PostgresData(int: $0) },
+            on: self.eventLoop
+        )
         defer { _ = try! conn.simpleQuery("DROP TABLE \"measureSelectPerformance\"").wait() }
 
         measure {
@@ -623,10 +648,62 @@ final class NIOPostgresTests: XCTestCase {
                     for fieldName in fieldNames {
                         _ = row.column(fieldName)?.int
                     }
-                    }.wait()
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }
         }
+    }
+}
+
+
+private func performance(function: String = #function) -> Bool {
+    if _isDebugAssertConfiguration() {
+        print("Debug build, skipping \(function)")
+        return false
+    } else {
+        print("Running performance test \(function)")
+        return true
+    }
+}
+
+private func prepareTableToMeasureSelectPerformance(
+    rowCount: Int,
+    batchSize: Int = 1_000,
+    schema: String,
+    fixtureData: [PostgresData],
+    on eventLoop: EventLoop,
+    file: StaticString = #file,
+    line: UInt = #line
+) throws {
+    XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: file, line: line)
+    let conn = try PostgresConnection.test(on: eventLoop).wait()
+    defer { try! conn.close().wait() }
+    
+    _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"measureSelectPerformance\"").wait()
+    _ = try conn.simpleQuery("""
+        CREATE TABLE "measureSelectPerformance" (
+        "id" int8 NOT NULL,
+        \(schema)
+        PRIMARY KEY ("id")
+        );
+        """).wait()
+    
+    // Batch `batchSize` inserts into one for better insert performance.
+    let totalArgumentsPerRow = fixtureData.count + 1
+    let insertArgumentsPlaceholder = (0..<batchSize).map { indexInBatch in
+        "("
+            + (0..<totalArgumentsPerRow).map { argumentIndex in "$\(indexInBatch * totalArgumentsPerRow + argumentIndex + 1)" }
+                .joined(separator: ", ")
+            + ")"
+        }.joined(separator: ", ")
+    let insertQuery = "INSERT INTO \"measureSelectPerformance\" VALUES \(insertArgumentsPlaceholder)"
+    var batchedFixtureData = Array(repeating: [PostgresData(int: 0)] + fixtureData, count: batchSize).flatMap { $0 }
+    for batchIndex in 0..<(rowCount / batchSize) {
+        for indexInBatch in 0..<batchSize {
+            let rowIndex = batchIndex * batchSize + indexInBatch
+            batchedFixtureData[indexInBatch * totalArgumentsPerRow] = PostgresData(int: rowIndex)
+        }
+        _ = try conn.query(insertQuery, batchedFixtureData).wait()
     }
 }

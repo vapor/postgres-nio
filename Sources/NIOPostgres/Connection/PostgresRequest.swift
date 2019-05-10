@@ -1,56 +1,51 @@
-extension PostgresConnection {
-    public func send(_ request: PostgresRequestHandler) -> EventLoopFuture<Void> {
+import Logging
+
+extension PostgresConnection: PostgresClient {
+    public func send(_ request: PostgresRequest) -> EventLoopFuture<Void> {
+        request.log(to: self.logger)
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
-        let request = PostgresRequest(delegate: request, promise: promise)
+        let request = PostgresRequestContext(delegate: request, promise: promise)
         self.channel.write(request).cascadeFailure(to: promise)
         self.channel.flush()
         return promise.futureResult
     }
 }
 
-public protocol PostgresRequestHandler {
+public protocol PostgresRequest {
+    // return nil to end request
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
     func start() throws -> [PostgresMessage]
-
-    #warning("TODO: Workaround for Authentication see #14")
-    var errorMessageIsFinal: Bool { get }
+    func log(to logger: Logger)
 }
 
-
-extension PostgresRequestHandler {
-    var errorMessageIsFinal: Bool {
-        return false
-    }
-}
-
-// MARK: Private
-
-final class PostgresRequest {
-    let delegate: PostgresRequestHandler
+final class PostgresRequestContext {
+    let delegate: PostgresRequest
     let promise: EventLoopPromise<Void>
-    var error: Error?
+    var lastError: Error?
     
-    init(delegate: PostgresRequestHandler, promise: EventLoopPromise<Void>) {
+    init(delegate: PostgresRequest, promise: EventLoopPromise<Void>) {
         self.delegate = delegate
         self.promise = promise
     }
 }
 
-final class PostgresConnectionHandler: ChannelDuplexHandler {
+final class PostgresRequestHandler: ChannelDuplexHandler {
     typealias InboundIn = PostgresMessage
-    typealias OutboundIn = PostgresRequest
+    typealias OutboundIn = PostgresRequestContext
     typealias OutboundOut = PostgresMessage
     
-    private var queue: [PostgresRequest]
+    private var queue: [PostgresRequestContext]
+    let logger: Logger
     
-    public init() {
+    public init(logger: Logger) {
         self.queue = []
+        self.logger = logger
     }
     
     private func _channelRead(context: ChannelHandlerContext, data: NIOAny) throws {
         let message = self.unwrapInboundIn(data)
         guard self.queue.count > 0 else {
-            assertionFailure("PostgresRequest queue empty, discarded: \(message)")
+            // discard packet
             return
         }
         let request = self.queue[0]
@@ -58,28 +53,25 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         switch message.identifier {
         case .error:
             let error = try PostgresMessage.Error(message: message)
-            let postgresError = PostgresError.server(error)
-            if request.delegate.errorMessageIsFinal {
-                request.promise.fail(postgresError)
-                self.queue.removeFirst()
-            }
-            request.error = postgresError
+            self.logger.error("\(error)")
+            request.lastError = PostgresError.server(error)
         case .notice:
             let notice = try PostgresMessage.Error(message: message)
-            print("[NIOPostgres] [NOTICE] \(notice)")
-        default:
-            if let responses = try request.delegate.respond(to: message) {
-                for response in responses {
-                    context.write(self.wrapOutboundOut(response), promise: nil)
-                }
-                context.flush()
+            self.logger.notice("\(notice)")
+        default: break
+        }
+        
+        if let responses = try request.delegate.respond(to: message) {
+            for response in responses {
+                context.write(self.wrapOutboundOut(response), promise: nil)
+            }
+            context.flush()
+        } else {
+            self.queue.removeFirst()
+            if let error = request.lastError {
+                request.promise.fail(error)
             } else {
-                self.queue.removeFirst()
-                if let error = request.error {
-                    request.promise.fail(error)
-                } else {
-                    request.promise.succeed(())
-                }
+                request.promise.succeed(())
             }
         }
     }
@@ -108,15 +100,6 @@ final class PostgresConnectionHandler: ChannelDuplexHandler {
         } catch {
             self.errorCaught(context: context, error: error)
         }
-    }
-    
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
-        guard self.queue.count > 0 else {
-            assertionFailure("PostgresRequest queue empty, discarded: \(error)")
-            return
-        }
-        self.queue[0].promise.fail(error)
-        context.close(mode: .all, promise: nil)
     }
     
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {

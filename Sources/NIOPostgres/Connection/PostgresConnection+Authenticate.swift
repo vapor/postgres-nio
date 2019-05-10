@@ -1,5 +1,6 @@
 import CMD5
 import NIO
+import Logging
 
 extension PostgresConnection {
     public func authenticate(username: String, database: String? = nil, password: String? = nil) -> EventLoopFuture<Void> {
@@ -14,7 +15,7 @@ extension PostgresConnection {
 
 // MARK: Private
 
-private final class PostgresAuthenticationRequest: PostgresRequestHandler {
+private final class PostgresAuthenticationRequest: PostgresRequest {
     enum State {
         case ready
         case done
@@ -25,10 +26,6 @@ private final class PostgresAuthenticationRequest: PostgresRequestHandler {
     let password: String?
     var state: State
 
-    var errorMessageIsFinal: Bool {
-        return true
-    }
-
     init(username: String, database: String?, password: String?) {
         self.state = .ready
         self.username = username
@@ -36,7 +33,16 @@ private final class PostgresAuthenticationRequest: PostgresRequestHandler {
         self.password = password
     }
     
+    func log(to logger: Logger) {
+        logger.debug("Logging into Postgres db \(self.database ?? "nil") as \(self.username)")
+    }
+    
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
+        if case .error = message.identifier {
+            // terminate immediately on error
+            return nil
+        }
+        
         switch self.state {
         case .ready:
             switch message.identifier {

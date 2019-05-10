@@ -114,7 +114,6 @@ private extension PostgresData {
         
         switch self.formatCode {
         case .binary:
-            #warning("TODO: Account for bit-size mismatch")
             switch self.type {
             case .int2:
                 assert(value.readableBytes == 2)
@@ -140,10 +139,8 @@ private extension PostgresData {
                     fatalError()
                 }
                 return I(int64)
-            case .numeric:
-                #warning("TODO: Use numeric converter")
-                fatalError("use numeric converter")
-            default: fatalError("Cannot decode \(I.self) from \(self)")
+            default:
+                return nil
             }
         case .text:
             guard let string = self.string else {

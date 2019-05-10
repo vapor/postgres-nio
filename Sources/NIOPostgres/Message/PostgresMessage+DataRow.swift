@@ -26,7 +26,6 @@ extension PostgresMessage {
         
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> DataRow {
-            #warning("look into lazy parsing")
             guard let columns = buffer.read(array: Column.self, { buffer in
                 return .init(value: buffer.readNullableBytes())
             }) else {

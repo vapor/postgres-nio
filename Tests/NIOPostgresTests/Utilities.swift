@@ -1,5 +1,8 @@
+import Logging
 import NIO
 import NIOPostgres
+
+var testLogLevel: Logger.Level = .info
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
@@ -21,7 +24,10 @@ extension PostgresConnection {
     static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         return testUnauthenticated(on: eventLoop).flatMap { conn in
             return conn.authenticate(username: "vapor_username", database: "vapor_database", password: "vapor_password")
-                .map { conn }
+                .map {
+                    conn.logger.logLevel = testLogLevel
+                    return conn
+                }
         }
     }
 }
