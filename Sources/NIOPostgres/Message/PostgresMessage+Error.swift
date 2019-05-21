@@ -104,9 +104,5 @@ extension PostgresMessage {
         public var description: String {
             return (fields[.severity] ?? "ERROR") + ": " + (fields[.message] ?? "unknown")
         }
-        
-        public func serialize(into buffer: inout ByteBuffer) throws {
-            fatalError()
-        }
     }
 }

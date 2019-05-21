@@ -41,9 +41,5 @@ extension PostgresMessage {
         public var description: String {
             return "Columns(" + columns.map { $0.description }.joined(separator: ", ") + ")"
         }
-        
-        public func serialize(into buffer: inout ByteBuffer) throws {
-            fatalError()
-        }
     }
 }

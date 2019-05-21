@@ -109,7 +109,7 @@ private extension PostgresData {
         where I: FixedWidthInteger
     {
         guard var value = self.value else {
-            fatalError()
+            return nil
         }
         
         switch self.formatCode {
@@ -118,25 +118,25 @@ private extension PostgresData {
             case .int2:
                 assert(value.readableBytes == 2)
                 guard let int16 = value.readInteger(as: Int16.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(int16)
             case .int4, .regproc:
                 assert(value.readableBytes == 4)
                 guard let int32 = value.getInteger(at: value.readerIndex, as: Int32.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(int32)
             case .oid:
                 assert(value.readableBytes == 4)
                 guard let uint32 = value.getInteger(at: value.readerIndex, as: UInt32.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(uint32)
             case .int8:
                 assert(value.readableBytes == 8)
                 guard let int64 = value.getInteger(at: value.readerIndex, as: Int64.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(int64)
             default:

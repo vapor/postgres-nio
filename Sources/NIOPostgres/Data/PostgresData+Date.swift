@@ -22,18 +22,20 @@ extension PostgresData {
                 let microseconds = value.readInteger(as: Int64.self)!
                 let seconds = Double(microseconds) / Double(_microsecondsPerSecond)
                 return Date(timeInterval: seconds, since: _psqlDateStart)
-            case .time, .timetz: fatalError()
+            case .time, .timetz:
+                return nil
             case .date:
                 let days = value.readInteger(as: Int32.self)!
                 let seconds = Int64(days) * _secondsInDay
                 return Date(timeInterval: Double(seconds), since: _psqlDateStart)
-            default: fatalError()
+            default:
+                return nil
             }
         }
     }
 }
 
-extension Date: PostgresDataCustomConvertible {
+extension Date: PostgresDataConvertible {
     public init?(postgresData: PostgresData) {
         guard let date = postgresData.date else {
             return nil

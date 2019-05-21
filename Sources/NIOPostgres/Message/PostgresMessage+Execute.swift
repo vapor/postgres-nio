@@ -3,10 +3,6 @@ import NIO
 extension PostgresMessage {
     /// Identifies the message as an Execute command.
     public struct Execute: PostgresMessageType {
-        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Execute {
-            fatalError()
-        }
-        
         public static var identifier: PostgresMessage.Identifier {
             return .execute
         }

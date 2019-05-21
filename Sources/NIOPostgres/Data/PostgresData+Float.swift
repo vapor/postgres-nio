@@ -1,6 +1,6 @@
 extension PostgresData {
     public init(float: Float) {
-        fatalError()
+        self.init(double: Double(float))
     }
     
     public var float: Float? {
@@ -16,7 +16,8 @@ extension PostgresData {
             case .float8:
                 return value.readFloat(as: Double.self)
                     .flatMap { Float($0) }
-            default: fatalError("Cannot decode Float from \(self)")
+            default:
+                return nil
             }
         case .text:
             guard let string = self.string else {

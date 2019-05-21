@@ -3,10 +3,6 @@ import NIO
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
     public struct Startup: PostgresMessageType {
-        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Startup {
-            fatalError()
-        }
-        
         public static var identifier: PostgresMessage.Identifier {
             return .none
         }
