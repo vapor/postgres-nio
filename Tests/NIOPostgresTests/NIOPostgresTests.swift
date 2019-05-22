@@ -19,7 +19,7 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     // MARK: Tests
-    
+
     func testConnectAndClose() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         try conn.close().wait()
