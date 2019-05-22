@@ -311,6 +311,16 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(rows[0].column("d")?.string, "3.14")
         XCTAssertEqual(rows[0].column("e")?.string, "12345678.90")
     }
+
+    func testIntegerArray() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            array[1, 2, 3]::int[] as array
+        """).wait()
+        XCTAssertEqual(rows[0].column("array")?.array?.map { $0.int }, [1, 2, 3])
+    }
     
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"

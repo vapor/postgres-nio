@@ -20,7 +20,7 @@ extension PostgresMessage {
                 guard let columnAttributeNumber = buffer.readInteger(as: Int16.self) else {
                     throw PostgresError.protocol("Could not read row description field column attribute number")
                 }
-                guard let dataType = buffer.readInteger(as: Int32.self).flatMap(PostgresDataType.init(_:)) else {
+                guard let dataType = buffer.readInteger(as: PostgresDataType.self) else {
                     throw PostgresError.protocol("Could not read row description field data type")
                 }
                 guard let dataTypeSize = buffer.readInteger(as: Int16.self) else {
@@ -29,7 +29,7 @@ extension PostgresMessage {
                 guard let dataTypeModifier = buffer.readInteger(as: Int32.self) else {
                     throw PostgresError.protocol("Could not read row description field data type modifier")
                 }
-                guard let formatCode = buffer.readInteger(rawRepresentable: PostgresFormatCode.self) else {
+                guard let formatCode = buffer.readInteger(as: PostgresFormatCode.self) else {
                     throw PostgresError.protocol("Could not read row description field format code")
                 }
                 return .init(

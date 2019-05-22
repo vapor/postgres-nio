@@ -149,5 +149,10 @@ private extension PostgresData {
             return I(string)
         }
     }
-    
+}
+
+extension PostgresData: ExpressibleByIntegerLiteral {
+    public init(integerLiteral value: Int) {
+        self.init(int: value)
+    }
 }

@@ -11,6 +11,7 @@ extension NIOPostgresTests {
         ("testColumnsInJoin", testColumnsInJoin),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),
+        ("testIntegerArray", testIntegerArray),
         ("testIntegers", testIntegers),
         ("testInvalidPassword", testInvalidPassword),
         ("testMoney", testMoney),

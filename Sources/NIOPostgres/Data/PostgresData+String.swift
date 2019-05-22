@@ -47,7 +47,7 @@ extension PostgresData {
             case .int2, .int4, .int8:
                 return self.int?.description
             default:
-                fatalError("Cannot decode String from \(self.type)")
+                return nil
             }
         case .text:
             guard let string = value.readString(length: value.readableBytes) else {

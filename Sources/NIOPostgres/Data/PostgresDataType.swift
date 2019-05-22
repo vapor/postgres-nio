@@ -16,7 +16,7 @@ public enum PostgresFormatCode: Int16, Codable, CustomStringConvertible {
 
 /// The data type's raw object ID.
 /// Use `select * from pg_type where oid = <idhere>;` to lookup more information.
-public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral, CustomStringConvertible {
+public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral, CustomStringConvertible, RawRepresentable {
     /// `0`
     public static let null = PostgresDataType(0)
     /// `16`
@@ -41,8 +41,8 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let oid = PostgresDataType(26)
     /// `114`
     public static let json = PostgresDataType(114)
-    /// `194`
-    public static let pg_node_tree = PostgresDataType(194)
+    /// `194` pg_node_tree
+    public static let pgNodeTree = PostgresDataType(194)
     /// `600`
     public static let point = PostgresDataType(600)
     /// `700`
@@ -51,30 +51,30 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let float8 = PostgresDataType(701)
     /// `790`
     public static let money = PostgresDataType(790)
-    /// `1000`
-    public static let _bool = PostgresDataType(1000)
-    /// `1001`
-    public static let _bytea = PostgresDataType(1001)
-    /// `1002`
-    public static let _char = PostgresDataType(1002)
-    /// `1003`
-    public static let _name = PostgresDataType(1003)
-    /// `1005`
-    public static let _int2 = PostgresDataType(1005)
-    /// `1007`
-    public static let _int4 = PostgresDataType(1007)
-    /// `1009`
-    public static let _text = PostgresDataType(1009)
-    /// `1016`
-    public static let _int8 = PostgresDataType(1016)
-    /// `1017`
-    public static let _point = PostgresDataType(1017)
-    /// `1021`
-    public static let _float4 = PostgresDataType(1021)
-    /// `1022`
-    public static let _float8 = PostgresDataType(1022)
-    /// `1034`
-    public static let _aclitem = PostgresDataType(1034)
+    /// `1000` _bool
+    public static let boolArray = PostgresDataType(1000)
+    /// `1001` _bytea
+    public static let byteaArray = PostgresDataType(1001)
+    /// `1002` _char
+    public static let charArray = PostgresDataType(1002)
+    /// `1003` _name
+    public static let nameArray = PostgresDataType(1003)
+    /// `1005` _int2
+    public static let int2Array = PostgresDataType(1005)
+    /// `1007` _int4
+    public static let int4Array = PostgresDataType(1007)
+    /// `1009` _text
+    public static let textArray = PostgresDataType(1009)
+    /// `1016` _int8
+    public static let int8Array = PostgresDataType(1016)
+    /// `1017` _point
+    public static let pointArray = PostgresDataType(1017)
+    /// `1021` _float4
+    public static let float4Array = PostgresDataType(1021)
+    /// `1022` _float8
+    public static let float8Array = PostgresDataType(1022)
+    /// `1034` _aclitem
+    public static let aclitemArray = PostgresDataType(1034)
     /// `1042`
     public static let bpchar = PostgresDataType(1042)
     /// `1043`
@@ -85,8 +85,8 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let time = PostgresDataType(1083)
     /// `1114`
     public static let timestamp = PostgresDataType(1114)
-    /// `1115`
-    public static let _timestamp = PostgresDataType(1115)
+    /// `1115` _timestamp
+    public static let timestampArray = PostgresDataType(1115)
     /// `1184`
     public static let timestamptz = PostgresDataType(1184)
     /// `1266`
@@ -97,23 +97,27 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let void = PostgresDataType(2278)
     /// `2950`
     public static let uuid = PostgresDataType(2950)
-    /// `2951`
-    public static let _uuid = PostgresDataType(2951)
+    /// `2951` _uuid
+    public static let uuidArray = PostgresDataType(2951)
     /// `3802`
     public static let jsonb = PostgresDataType(3802)
-    /// `3807`
-    public static let _jsonb = PostgresDataType(3807)
+    /// `3807` _jsonb
+    public static let jsonbArray = PostgresDataType(3807)
 
     /// The raw data type code recognized by PostgreSQL.
-    public var raw: Int32
+    public var rawValue: UInt32
     
     /// See `ExpressibleByIntegerLiteral.init(integerLiteral:)`
-    public init(integerLiteral value: Int32) {
+    public init(integerLiteral value: UInt32) {
         self.init(value)
     }
     
-    public init(_ raw: Int32) {
-        self.raw = raw
+    public init(_ rawValue: UInt32) {
+        self.rawValue = rawValue
+    }
+
+    public init?(rawValue: UInt32) {
+        self.init(rawValue)
     }
     
     /// Returns the known SQL name, if one exists.
@@ -131,36 +135,36 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .text: return "TEXT"
         case .oid: return "OID"
         case .json: return "JSON"
-        case .pg_node_tree: return "PGNODETREE"
+        case .pgNodeTree: return "PGNODETREE"
         case .point: return "POINT"
         case .float4: return "REAL"
         case .float8: return "DOUBLE PRECISION"
         case .money: return "MONEY"
-        case ._bool: return "BOOLEAN[]"
-        case ._bytea: return "BYTEA[]"
-        case ._char: return "CHAR[]"
-        case ._name: return "NAME[]"
-        case ._int2: return "SMALLINT[]"
-        case ._int4: return "INTEGER[]"
-        case ._text: return "TEXT[]"
-        case ._int8: return "BIGINT[]"
-        case ._point: return "POINT[]"
-        case ._float4: return "REAL[]"
-        case ._float8: return "DOUBLE PRECISION[]"
-        case ._aclitem: return "ACLITEM[]"
+        case .boolArray: return "BOOLEAN[]"
+        case .byteaArray: return "BYTEA[]"
+        case .charArray: return "CHAR[]"
+        case .nameArray: return "NAME[]"
+        case .int2Array: return "SMALLINT[]"
+        case .int4Array: return "INTEGER[]"
+        case .textArray: return "TEXT[]"
+        case .int8Array: return "BIGINT[]"
+        case .pointArray: return "POINT[]"
+        case .float4Array: return "REAL[]"
+        case .float8Array: return "DOUBLE PRECISION[]"
+        case .aclitemArray: return "ACLITEM[]"
         case .bpchar: return "BPCHAR"
         case .varchar: return "VARCHAR"
         case .date: return "DATE"
         case .time: return "TIME"
         case .timestamp: return "TIMESTAMP"
         case .timestamptz: return "TIMESTAMPTZ"
-        case ._timestamp: return "TIMESTAMP[]"
+        case .timestampArray: return "TIMESTAMP[]"
         case .numeric: return "NUMERIC"
         case .void: return "VOID"
         case .uuid: return "UUID"
-        case ._uuid: return "UUID[]"
+        case .uuidArray: return "UUID[]"
         case .jsonb: return "JSONB"
-        case ._jsonb: return "JSONB[]"
+        case .jsonbArray: return "JSONB[]"
         default: return nil
         }
     }
@@ -168,25 +172,46 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     /// Returns the array type for this type if one is known.
     internal var arrayType: PostgresDataType? {
         switch self {
-        case .bool: return ._bool
-        case .bytea: return ._bytea
-        case .char: return ._char
-        case .name: return ._name
-        case .int2: return ._int2
-        case .int4: return ._int4
-        case .int8: return ._int8
-        case .point: return ._point
-        case .float4: return ._float4
-        case .float8: return ._float8
-        case .uuid: return ._uuid
-        case .jsonb: return ._jsonb
-        case .text: return ._text
+        case .bool: return .boolArray
+        case .bytea: return .byteaArray
+        case .char: return .charArray
+        case .name: return .nameArray
+        case .int2: return .int2Array
+        case .int4: return .int4Array
+        case .int8: return .int8Array
+        case .point: return .pointArray
+        case .float4: return .float4Array
+        case .float8: return .float8Array
+        case .uuid: return .uuidArray
+        case .jsonb: return .jsonbArray
+        case .text: return .textArray
+        default: return nil
+        }
+    }
+
+    /// Returns the element type for this type if one is known.
+    /// Returns nil if this is not an array type.
+    internal var elementType: PostgresDataType? {
+        switch self {
+        case .boolArray: return .bool
+        case .byteaArray: return .bytea
+        case .charArray: return .char
+        case .nameArray: return .name
+        case .int2Array: return .int2
+        case .int4Array: return .int4
+        case .int8Array: return .int8
+        case .pointArray: return .point
+        case .float4Array: return .float4
+        case .float8Array: return .float8
+        case .uuidArray: return .uuid
+        case .jsonbArray: return .jsonb
+        case .textArray: return .text
         default: return nil
         }
     }
     
     /// See `CustomStringConvertible`.
     public var description: String {
-        return knownSQLName ?? "UNKNOWN \(raw)"
+        return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"
     }
 }
