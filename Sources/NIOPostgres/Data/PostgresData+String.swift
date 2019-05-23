@@ -65,6 +65,10 @@ extension PostgresData: ExpressibleByStringLiteral {
 }
 
 extension String: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return .text
+    }
+    
     public var postgresData: PostgresData? {
         return .init(string: self)
     }

@@ -312,14 +312,58 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(rows[0].column("e")?.string, "12345678.90")
     }
 
-    func testIntegerArray() throws {
+    func testIntegerArrayParse() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         let rows = try conn.query("""
         select
-            array[1, 2, 3]::int[] as array
+            '{1,2,3}'::int[] as array
         """).wait()
-        XCTAssertEqual(rows[0].column("array")?.array?.map { $0.int }, [1, 2, 3])
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [1, 2, 3])
+    }
+
+    func testEmptyIntegerArrayParse() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '{}'::int[] as array
+        """).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [])
+    }
+
+    func testNullIntegerArrayParse() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            null::int[] as array
+        """).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), nil)
+    }
+
+    func testIntegerArraySerialize() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            $1::int8[] as array
+        """, [
+            PostgresData(array: [1, 2, 3])
+        ]).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [1, 2, 3])
+    }
+
+    func testEmptyIntegerArraySerialize() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            $1::int8[] as array
+        """, [
+            PostgresData(array: [] as [Int])
+        ]).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [])
     }
     
     func testRemoteTLSServer() throws {

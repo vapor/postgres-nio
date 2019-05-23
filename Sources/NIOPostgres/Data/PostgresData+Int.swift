@@ -151,6 +151,45 @@ private extension PostgresData {
     }
 }
 
+extension FixedWidthInteger {
+    public static var postgresDataType: PostgresDataType {
+        switch self.bitWidth {
+        case 8:
+            return .char
+        case 16:
+            return .int2
+        case 32:
+            return .int4
+        case 64:
+            return .int8
+        default:
+            fatalError("\(self.bitWidth) not supported")
+        }
+    }
+
+    public var postgresData: PostgresData? {
+        return .init(fwi: self)
+    }
+
+    public init?(postgresData: PostgresData) {
+        guard let fwi = postgresData.fwi(Self.self) else {
+            return nil
+        }
+        self = fwi
+    }
+}
+
+extension Int: PostgresDataConvertible { }
+extension Int8: PostgresDataConvertible { }
+extension Int16: PostgresDataConvertible { }
+extension Int32: PostgresDataConvertible { }
+extension Int64: PostgresDataConvertible { }
+extension UInt: PostgresDataConvertible { }
+extension UInt8: PostgresDataConvertible { }
+extension UInt16: PostgresDataConvertible { }
+extension UInt32: PostgresDataConvertible { }
+extension UInt64: PostgresDataConvertible { }
+
 extension PostgresData: ExpressibleByIntegerLiteral {
     public init(integerLiteral value: Int) {
         self.init(int: value)

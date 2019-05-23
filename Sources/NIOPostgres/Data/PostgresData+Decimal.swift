@@ -17,6 +17,10 @@ extension PostgresData {
 }
 
 extension Decimal: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return String.postgresDataType
+    }
+
     public init?(postgresData: PostgresData) {
         guard let decimal = postgresData.decimal else {
             return nil

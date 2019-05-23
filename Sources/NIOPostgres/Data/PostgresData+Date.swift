@@ -36,6 +36,10 @@ extension PostgresData {
 }
 
 extension Date: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return .timestamptz
+    }
+
     public init?(postgresData: PostgresData) {
         guard let date = postgresData.date else {
             return nil
