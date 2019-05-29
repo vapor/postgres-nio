@@ -1,6 +1,8 @@
 extension PostgresData {
     public init(double: Double) {
-        fatalError()
+        var buffer = ByteBufferAllocator().buffer(capacity: 0)
+        buffer.writeString(double.description)
+        self.init(type: .float8, formatCode: .text, value: buffer)
     }
     
     public var double: Double? {
@@ -18,7 +20,8 @@ extension PostgresData {
                 return value.readFloat(as: Double.self)
             case .numeric:
                 return self.numeric?.double
-            default: fatalError("Cannot decode Double from \(self)")
+            default:
+                return nil
             }
         case .text:
             guard let string = self.string else {

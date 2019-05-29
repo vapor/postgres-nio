@@ -19,7 +19,7 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     // MARK: Tests
-    
+
     func testConnectAndClose() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         try conn.close().wait()
@@ -181,8 +181,8 @@ final class NIOPostgresTests: XCTestCase {
             print(results[0])
             XCTAssertEqual(results[0].column("text")?.string, "3.14159265358979")
             XCTAssertEqual(results[0].column("numeric_string")?.string, "3.14159265358979")
-            XCTAssertTrue(results[0].column("numeric_decimal")?.as(custom: Decimal.self)?.isLess(than: 3.14159265358980) ?? false)
-            XCTAssertFalse(results[0].column("numeric_decimal")?.as(custom: Decimal.self)?.isLess(than: 3.14159265358978) ?? true)
+            XCTAssertTrue(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358980) ?? false)
+            XCTAssertFalse(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358978) ?? true)
             XCTAssertTrue(results[0].column("double")?.double?.description.hasPrefix("3.141592") ?? false)
             XCTAssertTrue(results[0].column("float")?.float?.description.hasPrefix("3.141592") ?? false)
         default: XCTFail("incorrect result count")
@@ -310,6 +310,60 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(rows[0].column("c")?.string, "0.23")
         XCTAssertEqual(rows[0].column("d")?.string, "3.14")
         XCTAssertEqual(rows[0].column("e")?.string, "12345678.90")
+    }
+
+    func testIntegerArrayParse() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '{1,2,3}'::int[] as array
+        """).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [1, 2, 3])
+    }
+
+    func testEmptyIntegerArrayParse() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '{}'::int[] as array
+        """).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [])
+    }
+
+    func testNullIntegerArrayParse() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            null::int[] as array
+        """).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), nil)
+    }
+
+    func testIntegerArraySerialize() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            $1::int8[] as array
+        """, [
+            PostgresData(array: [1, 2, 3])
+        ]).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [1, 2, 3])
+    }
+
+    func testEmptyIntegerArraySerialize() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            $1::int8[] as array
+        """, [
+            PostgresData(array: [] as [Int])
+        ]).wait()
+        XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [])
     }
     
     func testRemoteTLSServer() throws {

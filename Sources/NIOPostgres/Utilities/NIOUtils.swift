@@ -16,7 +16,7 @@ internal extension ByteBuffer {
         self.writeInteger(0, as: UInt8.self)
     }
     
-    mutating func readInteger<E>(endianness: Endianness = .big, rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
+    mutating func readInteger<E>(endianness: Endianness = .big, as rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
         guard let rawValue = readInteger(endianness: endianness, as: E.RawValue.self) else {
             return nil
         }

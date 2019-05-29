@@ -3,10 +3,6 @@ import NIO
 extension PostgresMessage {
     /// Identifies the message as a Describe command.
     public struct Describe: PostgresMessageType {
-        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Describe {
-            fatalError()
-        }
-        
         public static var identifier: PostgresMessage.Identifier {
             return .describe
         }

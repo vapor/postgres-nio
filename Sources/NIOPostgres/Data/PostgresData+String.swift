@@ -14,7 +14,7 @@ extension PostgresData {
             switch self.type {
             case .varchar, .text:
                 guard let string = value.readString(length: value.readableBytes) else {
-                    fatalError()
+                    return nil
                 }
                 return string
             case .numeric:
@@ -26,7 +26,7 @@ extension PostgresData {
             case .money:
                 assert(value.readableBytes == 8)
                 guard let int64 = value.getInteger(at: value.readerIndex, as: Int64.self) else {
-                    fatalError()
+                    return nil
                 }
                 let description = int64.description
                 switch description.count {
@@ -47,11 +47,11 @@ extension PostgresData {
             case .int2, .int4, .int8:
                 return self.int?.description
             default:
-                fatalError("Cannot decode String from \(self.type)")
+                return nil
             }
         case .text:
             guard let string = value.readString(length: value.readableBytes) else {
-                fatalError()
+                return nil
             }
             return string
         }
@@ -61,5 +61,22 @@ extension PostgresData {
 extension PostgresData: ExpressibleByStringLiteral {
     public init(stringLiteral value: String) {
         self.init(string: value)
+    }
+}
+
+extension String: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return .text
+    }
+    
+    public var postgresData: PostgresData? {
+        return .init(string: self)
+    }
+
+    public init?(postgresData: PostgresData) {
+        guard let string = postgresData.string else {
+            return nil
+        }
+        self = string
     }
 }

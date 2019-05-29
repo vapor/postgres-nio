@@ -45,9 +45,5 @@ extension PostgresMessage {
             case .md5(let salt): return "MD5Password(salt: 0x\(salt.hexdigest()))"
             }
         }
-        
-        public func serialize(into buffer: inout ByteBuffer) {
-            fatalError()
-        }
     }
 }

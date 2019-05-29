@@ -3,16 +3,8 @@ import NIO
 extension PostgresMessage {
     /// Identifies the message as a Parse command.
     public struct Parse: PostgresMessageType {
-        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Parse {
-            fatalError()
-        }
-        
         public static var identifier: PostgresMessage.Identifier {
             return .parse
-        }
-        
-        public var description: String {
-            return "Parse(\(self.query))"
         }
         
         /// The name of the destination prepared statement (an empty string selects the unnamed prepared statement).

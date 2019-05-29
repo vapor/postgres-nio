@@ -9,10 +9,6 @@ extension PostgresMessage {
             return .passwordMessage
         }
         
-        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Password {
-            fatalError()
-        }
-        
         public init(string: String) {
             self.string = string
         }

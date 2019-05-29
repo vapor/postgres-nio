@@ -109,7 +109,7 @@ private extension PostgresData {
         where I: FixedWidthInteger
     {
         guard var value = self.value else {
-            fatalError()
+            return nil
         }
         
         switch self.formatCode {
@@ -118,25 +118,25 @@ private extension PostgresData {
             case .int2:
                 assert(value.readableBytes == 2)
                 guard let int16 = value.readInteger(as: Int16.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(int16)
             case .int4, .regproc:
                 assert(value.readableBytes == 4)
                 guard let int32 = value.getInteger(at: value.readerIndex, as: Int32.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(int32)
             case .oid:
                 assert(value.readableBytes == 4)
                 guard let uint32 = value.getInteger(at: value.readerIndex, as: UInt32.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(uint32)
             case .int8:
                 assert(value.readableBytes == 8)
                 guard let int64 = value.getInteger(at: value.readerIndex, as: Int64.self) else {
-                    fatalError()
+                    return nil
                 }
                 return I(int64)
             default:
@@ -149,5 +149,49 @@ private extension PostgresData {
             return I(string)
         }
     }
-    
+}
+
+extension FixedWidthInteger {
+    public static var postgresDataType: PostgresDataType {
+        switch self.bitWidth {
+        case 8:
+            return .char
+        case 16:
+            return .int2
+        case 32:
+            return .int4
+        case 64:
+            return .int8
+        default:
+            fatalError("\(self.bitWidth) not supported")
+        }
+    }
+
+    public var postgresData: PostgresData? {
+        return .init(fwi: self)
+    }
+
+    public init?(postgresData: PostgresData) {
+        guard let fwi = postgresData.fwi(Self.self) else {
+            return nil
+        }
+        self = fwi
+    }
+}
+
+extension Int: PostgresDataConvertible { }
+extension Int8: PostgresDataConvertible { }
+extension Int16: PostgresDataConvertible { }
+extension Int32: PostgresDataConvertible { }
+extension Int64: PostgresDataConvertible { }
+extension UInt: PostgresDataConvertible { }
+extension UInt8: PostgresDataConvertible { }
+extension UInt16: PostgresDataConvertible { }
+extension UInt32: PostgresDataConvertible { }
+extension UInt64: PostgresDataConvertible { }
+
+extension PostgresData: ExpressibleByIntegerLiteral {
+    public init(integerLiteral value: Int) {
+        self.init(int: value)
+    }
 }

@@ -1,4 +1,4 @@
-public protocol PostgresMessageType: CustomStringConvertible {
+public protocol PostgresMessageType {
     static var identifier: PostgresMessage.Identifier { get }
     static func parse(from buffer: inout ByteBuffer) throws -> Self
     func serialize(into buffer: inout ByteBuffer) throws

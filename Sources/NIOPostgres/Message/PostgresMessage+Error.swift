@@ -10,7 +10,7 @@ extension PostgresMessage {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> Error {
             var fields: [Field: String] = [:]
-            while let field = buffer.readInteger(rawRepresentable: Field.self) {
+            while let field = buffer.readInteger(as: Field.self) {
                 guard let string = buffer.readNullTerminatedString() else {
                     throw PostgresError.protocol("Could not read error response string.")
                 }
@@ -103,10 +103,6 @@ extension PostgresMessage {
         /// See `CustomStringConvertible`.
         public var description: String {
             return (fields[.severity] ?? "ERROR") + ": " + (fields[.message] ?? "unknown")
-        }
-        
-        public func serialize(into buffer: inout ByteBuffer) throws {
-            fatalError()
         }
     }
 }

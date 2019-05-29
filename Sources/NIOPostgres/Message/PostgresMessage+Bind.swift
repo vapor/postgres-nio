@@ -3,10 +3,6 @@ import NIO
 extension PostgresMessage {
     /// Identifies the message as a Bind command.
     public struct Bind: PostgresMessageType {
-        public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.Bind {
-            fatalError()
-        }
-        
         public static var identifier: PostgresMessage.Identifier {
             return .bind
         }
