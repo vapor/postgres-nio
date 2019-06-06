@@ -95,11 +95,11 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
     
     private func md5(_ message: [UInt8]) -> [UInt8] {
         var message = message
-        var ctx = MD5_CTX()
-        MD5_Init(&ctx)
-        MD5_Update(&ctx, &message, numericCast(message.count))
+        var ctx = CMD5_CTX()
+        CMD5_Init(&ctx)
+        CMD5_Update(&ctx, &message, numericCast(message.count))
         var digest = [UInt8](repeating: 0, count: 16)
-        MD5_Final(&digest, &ctx)
+        CMD5_Final(&digest, &ctx)
         return digest
     }
     
