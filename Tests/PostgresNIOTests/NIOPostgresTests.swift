@@ -1,5 +1,5 @@
 import Logging
-import NIOPostgres
+import PostgresNIO
 import XCTest
 
 final class NIOPostgresTests: XCTestCase {

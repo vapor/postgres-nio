@@ -3,7 +3,7 @@ version: 2
 jobs:
   11-linux:
     docker:
-      - image: vapor/swift:5.0
+      - image: swift:5.0-bionic
       - image: circleci/postgres:11
         name: psql
         environment:
@@ -16,7 +16,7 @@ jobs:
       - run: swift test
   10-linux:
     docker:
-      - image: vapor/swift:5.0
+      - image: swift:5.0-bionic
       - image: circleci/postgres:10
         name: psql
         environment:
@@ -29,7 +29,7 @@ jobs:
       - run: swift test
   9-linux:
     docker:
-      - image: vapor/swift:5.0
+      - image: swift:5.0-bionic
       - image: circleci/postgres:9
         name: psql
         environment:
@@ -42,13 +42,13 @@ jobs:
       - run: swift test
   linux-release:
     docker:
-      - image: vapor/swift:5.0
+      - image: swift:5.0-bionic
     steps:
       - checkout
       - run: swift build -c release
   linux-performance:
     docker:
-      - image: vapor/swift:5.0
+      - image: swift:5.0-bionic
       - image: circleci/postgres:9
         name: psql
         environment:
@@ -67,4 +67,3 @@ workflows:
       - 9-linux
       - linux-release
       - linux-performance
-

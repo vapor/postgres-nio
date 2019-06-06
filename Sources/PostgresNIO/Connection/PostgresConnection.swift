@@ -15,6 +15,10 @@ public final class PostgresConnection {
     public var logger: Logger
 
     private var didClose: Bool
+
+    public var isClosed: Bool {
+        return !self.channel.isActive
+    }
     
     init(channel: Channel, logger: Logger) {
         self.channel = channel
