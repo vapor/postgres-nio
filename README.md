@@ -1,5 +1,5 @@
 <p align="center">
-    <img src="https://user-images.githubusercontent.com/1342803/58998319-27aa5d80-87ce-11e9-94e6-c142c86ab28d.png" alt="PostgresNIO">
+    <img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" alt="PostgresNIO">
     <br>
     <br>
     <a href="https://api.vapor.codes/postgres-nio/master/PostgresNIO/index.html">
@@ -32,7 +32,7 @@ Version | NIO | Swift | SPM
 Use the SPM string to easily include the dependendency in your `Package.swift` file.
 
 ```swift
-.package(url: "https://github.com/vapor/nio-postgres.git", from: ...)
+.package(url: "https://github.com/vapor/postgres-nio.git", from: ...)
 ```
 
 ### Supported Platforms
@@ -79,7 +79,7 @@ This package has no additional system dependencies.
 
 ## API Docs
 
-Check out the [PostgresNIO API docs]((https://api.vapor.codes/nio-postgres/master/PostgresNIO/index.html)) for a detailed look at all of the classes, structs, protocols, and more.
+Check out the [PostgresNIO API docs]((https://api.vapor.codes/postgres-nio/master/PostgresNIO/index.html)) for a detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting Started
 
