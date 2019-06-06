@@ -19,9 +19,6 @@
     </a>
 </p>
 
-
-# PostgresNIO 
-
 🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO](https://github.com/apple/swift-nio).
 
 ### Major Releases

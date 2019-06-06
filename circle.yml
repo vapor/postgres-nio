@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  11-linux:
+  11-bionic:
     docker:
       - image: swift:5.0-bionic
       - image: circleci/postgres:11
@@ -14,7 +14,7 @@ jobs:
       - checkout
       - run: swift build
       - run: swift test
-  10-linux:
+  10-bionic:
     docker:
       - image: swift:5.0-bionic
       - image: circleci/postgres:10
@@ -27,7 +27,7 @@ jobs:
       - checkout
       - run: swift build
       - run: swift test
-  9-linux:
+  9-bionic:
     docker:
       - image: swift:5.0-bionic
       - image: circleci/postgres:9
@@ -62,8 +62,8 @@ workflows:
   version: 2
   tests:
     jobs:
-      - 11-linux
-      - 10-linux
-      - 9-linux
+      - 11-bionic
+      - 10-bionic
+      - 9-bionic
       - linux-release
       - linux-performance
