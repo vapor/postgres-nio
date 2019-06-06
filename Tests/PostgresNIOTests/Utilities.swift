@@ -1,6 +1,5 @@
 import Logging
-import NIO
-import NIOPostgres
+import PostgresNIO
 
 var testLogLevel: Logger.Level = .info
 

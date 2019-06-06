@@ -2,10 +2,9 @@
 import PackageDescription
 
 let package = Package(
-    name: "nio-postgres",
+    name: "postgres-nio",
     products: [
-        .library(name: "NIOPostgres", targets: ["NIOPostgres"]),
-        .executable(name: "NIOPostgresBenchmark", targets: ["NIOPostgresBenchmark"]),
+        .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.0.0"),
@@ -15,8 +14,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "CMD5", dependencies: []),
-        .target(name: "NIOPostgres", dependencies: ["CMD5", "Logging", "Metrics", "NIO", "NIOSSL"]),
-        .target(name: "NIOPostgresBenchmark", dependencies: ["NIOPostgres"]),
-        .testTarget(name: "NIOPostgresTests", dependencies: ["NIOPostgres"]),
+        .target(name: "PostgresNIO", dependencies: ["CMD5", "Logging", "Metrics", "NIO", "NIOSSL"]),
+        .testTarget(name: "PostgresNIOTests", dependencies: ["PostgresNIO"]),
     ]
 )

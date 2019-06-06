@@ -1,10 +1,29 @@
-# NIOPostgres 
+<p align="center">
+    <img src="https://user-images.githubusercontent.com/1342803/58998319-27aa5d80-87ce-11e9-94e6-c142c86ab28d.png" alt="PostgresNIO">
+    <br>
+    <br>
+    <a href="https://api.vapor.codes/postgres-nio/master/PostgresNIO/index.html">
+        <img src="http://img.shields.io/badge/api-docs-2196f3.svg" alt="Documentation">
+    </a>
+    <a href="https://discord.gg/vapor">
+        <img src="https://img.shields.io/discord/431917998102675485.svg" alt="Team Chat">
+    </a>
+    <a href="LICENSE">
+        <img src="http://img.shields.io/badge/license-MIT-brightgreen.svg" alt="MIT License">
+    </a>
+    <a href="https://circleci.com/gh/vapor/postgres-nio">
+        <img src="https://circleci.com/gh/vapor/postgres-nio.svg?style=shield" alt="Continuous Integration">
+    </a>
+    <a href="https://swift.org">
+        <img src="http://img.shields.io/badge/swift-5-brightgreen.svg" alt="Swift 5">
+    </a>
+</p>
 
 🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO](https://github.com/apple/swift-nio).
 
 ### Major Releases
 
-The table below shows a list of NIOPostgres major releases alongside their compatible NIO and Swift versions. 
+The table below shows a list of PostgresNIO major releases alongside their compatible NIO and Swift versions. 
 
 Version | NIO | Swift | SPM
 --- | --- | --- | ---
@@ -18,14 +37,14 @@ Use the SPM string to easily include the dependendency in your `Package.swift` f
 
 ### Supported Platforms
 
-NIOPostgres supports the following platforms:
+PostgresNIO supports the following platforms:
 
 - Ubuntu 14.04+
 - macOS 10.12+
 
 ## Overview
 
-NIOPostgres is a client package for connecting to, authorizing, and querying a PostgreSQL server. At the heart of this module are NIO channel handlers for parsing and serializing messages in PostgreSQL's proprietary wire protocol. These channel handlers are combined in a request / response style connection type that provides a convenient, client-like interface for performing queries. 
+PostgresNIO is a client package for connecting to, authorizing, and querying a PostgreSQL server. At the heart of this module are NIO channel handlers for parsing and serializing messages in PostgreSQL's proprietary wire protocol. These channel handlers are combined in a request / response style connection type that provides a convenient, client-like interface for performing queries. 
 
 Support for both simple (text) and parameterized (binary) querying is provided out of the box alongside a `PostgresData` type that handles conversion between PostgreSQL's wire format and native Swift types.
 
@@ -35,15 +54,15 @@ Most Swift implementations of Postgres clients are based on the [libpq](https://
 
 ### Goals
 
-This package is meant to be a low-level, unopinionated PostgreSQL wire-protocol implementation for Swift. The hope is that higher level packages can share NIOPostgres as a foundation for interacting with PostgreSQL servers without needing to duplicate complex logic.
+This package is meant to be a low-level, unopinionated PostgreSQL wire-protocol implementation for Swift. The hope is that higher level packages can share PostgresNIO as a foundation for interacting with PostgreSQL servers without needing to duplicate complex logic.
 
-Because of this, NIOPostgres excludes some important concepts for the sake of simplicity, such as:
+Because of this, PostgresNIO excludes some important concepts for the sake of simplicity, such as:
 
 - Connection pooling
 - Swift `Codable` integration
 - Query building
 
-If you are looking for a PostgreSQL client package to use in your project, take a look at these higher-level packages built on top of NIOPostgres:
+If you are looking for a PostgreSQL client package to use in your project, take a look at these higher-level packages built on top of PostgresNIO:
 
 - [`vapor/postgres-kit`](https://github.com/vapor/postgresql)
 
@@ -60,18 +79,18 @@ This package has no additional system dependencies.
 
 ## API Docs
 
-Check out the [NIOPostgres API docs]((https://api.vapor.codes/nio-postgres/master/NIOPostgres/index.html)) for a detailed look at all of the classes, structs, protocols, and more.
+Check out the [PostgresNIO API docs]((https://api.vapor.codes/nio-postgres/master/PostgresNIO/index.html)) for a detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting Started
 
-This section will provide a quick look at using NIOPostgres.
+This section will provide a quick look at using PostgresNIO.
 
 ### Creating a Connection
 
 The first step to making a query is creating a new `PostgresConnection`. The minimum requirements to create one are a `SocketAddress` and `EventLoop`. 
 
 ```swift
-import NIOPostgres
+import PostgresNIO
 
 let eventLoop: EventLoop = ...
 let conn = try PostgresConnection.connect(
@@ -80,7 +99,7 @@ let conn = try PostgresConnection.connect(
 ).wait()
 ```
 
-Note: These examples will make use of `wait()` for simplicity. This is appropriate if you are using NIOPostgres on the main thread, like for a CLI tool or in tests. However, you should never use `wait()` on an event loop.
+Note: These examples will make use of `wait()` for simplicity. This is appropriate if you are using PostgresNIO on the main thread, like for a CLI tool or in tests. However, you should never use `wait()` on an event loop.
 
 There are a few ways to create a `SocketAddress`:
 
@@ -102,7 +121,7 @@ Interaction with a server revolves around the `PostgresClient` protocol. This pr
 `PostgresConnection` is the default implementation of `PostgresClient` provided by this package. Assume the client here is the connection from the previous example.
 
 ```swift
-import NIOPostgres
+import PostgresNIO
 
 let client: PostgresClient = ...
 // now we can use client to do queries
