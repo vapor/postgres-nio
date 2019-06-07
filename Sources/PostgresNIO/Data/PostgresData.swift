@@ -1,6 +1,6 @@
 import NIO
 
-public struct PostgresData: CustomStringConvertible {
+public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertible {
     public static var null: PostgresData {
         return .init(type: .null)
     }
@@ -30,23 +30,29 @@ public struct PostgresData: CustomStringConvertible {
         if let string = self.string {
             return string
         } else {
-            return self.debugDescription
+            let string: String
+            if var value = self.value {
+                switch self.formatCode {
+                case .text:
+                    let raw = value.readString(length: value.readableBytes) ?? ""
+                    string = "\"\(raw)\""
+                case .binary:
+                    string = "0x" + value.readableBytesView.hexdigest()
+                }
+            } else {
+                string = "<null>"
+            }
+            return string + " (\(self.type))"
         }
     }
-    
-    var debugDescription: String {
-        let string: String
-        if var value = self.value {
-            switch self.formatCode {
-            case .text:
-                let raw = value.readString(length: value.readableBytes) ?? ""
-                string = "\"\(raw)\""
-            case .binary:
-                string = "0x" + value.readableBytesView.hexdigest()
-            }
+
+    public var debugDescription: String {
+        let valueDescription: String
+        if let value = self.value {
+            valueDescription = "\(value.readableBytes.description) bytes"
         } else {
-            string = "<null>"
+            valueDescription = "nil"
         }
-        return string + " (\(self.type))"
+        return "PostgresData(type: \(self.type), value: \(valueDescription))"
     }
 }

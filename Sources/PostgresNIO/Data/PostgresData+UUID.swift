@@ -20,3 +20,20 @@ extension PostgresData {
         return value.readUUID()
     }
 }
+
+extension UUID: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return .uuid
+    }
+    
+    public init?(postgresData: PostgresData) {
+        guard let uuid = postgresData.uuid else {
+            return nil
+        }
+        self = uuid
+    }
+
+    public var postgresData: PostgresData? {
+        return .init(uuid: self)
+    }
+}

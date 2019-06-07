@@ -66,4 +66,4 @@ workflows:
       - 10-bionic
       - 9-bionic
       - linux-release
-      - linux-performance
+      # - linux-performance
