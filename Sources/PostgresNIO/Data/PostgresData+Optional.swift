@@ -1,6 +1,6 @@
 extension Optional: PostgresDataConvertible where Wrapped: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
-        Wrapped.postgresDataType
+        return Wrapped.postgresDataType
     }
 
     public init?(postgresData: PostgresData) {
