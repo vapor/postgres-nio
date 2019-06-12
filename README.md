@@ -196,6 +196,8 @@ print(data.uint16) // UInt16?
 print(data.uint32) // UInt32?
 print(data.uint64) // UInt64?
 
+print(data.bool) // Bool?
+
 print(data.float) // Float?
 print(data.double) // Double?
 
