@@ -37,7 +37,7 @@
 
 #include <string.h>
 
-#include "cmd5.h"
+#include "CMD5.h"
 
 /*
  * The basic MD5 functions.

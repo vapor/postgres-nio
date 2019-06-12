@@ -366,6 +366,27 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(rows[0].column("array")?.array(of: Int.self), [])
     }
     
+    func testBoolSerialize() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        do {
+            let rows = try conn.query("select $1::bool as bool", [true]).wait()
+            XCTAssertEqual(rows[0].column("bool")?.bool, true)
+        }
+        do {
+            let rows = try conn.query("select $1::bool as bool", [false]).wait()
+            XCTAssertEqual(rows[0].column("bool")?.bool, false)
+        }
+        do {
+            let rows = try conn.simpleQuery("select true::bool as bool").wait()
+            XCTAssertEqual(rows[0].column("bool")?.bool, true)
+        }
+        do {
+            let rows = try conn.simpleQuery("select false::bool as bool").wait()
+            XCTAssertEqual(rows[0].column("bool")?.bool, false)
+        }
+    }
+    
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
