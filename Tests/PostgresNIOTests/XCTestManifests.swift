@@ -8,6 +8,7 @@ extension NIOPostgresTests {
     static let __allTests__NIOPostgresTests = [
         ("testAverageLengthNumeric", testAverageLengthNumeric),
         ("testBindInteger", testBindInteger),
+        ("testBoolSerialize", testBoolSerialize),
         ("testColumnsInJoin", testColumnsInJoin),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),
