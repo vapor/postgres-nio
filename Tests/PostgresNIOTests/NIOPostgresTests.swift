@@ -387,6 +387,50 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
     
+    func testJSONBSerialize() throws {
+        struct Object: Codable, JSONBCodable {
+            let foo: Int
+            let bar: Int
+        }
+        
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        do {
+            let jsonData = try JSONEncoder().encode(Object(foo: 1, bar: 2))
+            let postgresData = PostgresData(jsonb: jsonData)
+            
+            let rows = try conn.query("select $1::jsonb as jsonb", [postgresData]).wait()
+            
+            let objectA = try JSONDecoder().decode(Object.self, from: rows[0].column("jsonb")?.jsonb ?? Data())
+            XCTAssertEqual(objectA.foo, 1)
+            XCTAssertEqual(objectA.bar, 2)
+            
+            XCTAssertEqual(objectA.postgresData?.type, .jsonb)
+            XCTAssertEqual(objectA.postgresData?.formatCode, .binary)
+            
+            let objectB = Object(postgresData: postgresData)
+            XCTAssertEqual(objectB?.foo, 1)
+            XCTAssertEqual(objectB?.bar, 2)
+        }
+    }
+    
+    func testJSONBParse() throws {
+        struct Object: Decodable {
+            let foo: Int
+            let bar: Int
+        }
+ 
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        do {
+            let rows = try conn.query("select jsonb_build_object('foo',1,'bar',2) as jsonb").wait()
+
+            let object = try JSONDecoder().decode(Object.self, from: rows[0].column("jsonb")?.jsonb ?? Data())
+            XCTAssertEqual(object.foo, 1)
+            XCTAssertEqual(object.bar, 2)
+        }
+    }
+    
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
