@@ -12,7 +12,12 @@ extension PostgresData {
         
         self.init(type: .jsonb, formatCode: .binary, value: buffer)
     }
-    
+
+    public init<T>(jsonb value: T) throws where T: Encodable {
+        let jsonData = try JSONEncoder().encode(value)
+        self.init(jsonb: jsonData)
+    }
+
     public var jsonb: Data? {
         guard var value = self.value else {
             return nil
@@ -21,12 +26,20 @@ extension PostgresData {
         guard let versionBytes = value.readBytes(length: jsonBVersionBytes.count), [UInt8](versionBytes) == jsonBVersionBytes else {
             return nil
         }
-        
+
         guard let dataBytes = value.readBytes(length: value.readableBytes) else {
             return nil
         }
-        
+
         return Data(dataBytes)
+    }
+
+    public func jsonb<T>(as type: T.Type) throws -> T? where T: Decodable {
+        guard let jsonData = jsonb else {
+            return nil
+        }
+
+        return try JSONDecoder().decode(T.self, from: jsonData)
     }
 }
 
@@ -39,22 +52,13 @@ extension JSONBCodable {
     }
     
     public var postgresData: PostgresData? {
-        guard let jsonData = try? JSONEncoder().encode(self) else {
-            return nil
-        }
-        
-        return .init(jsonb: jsonData)
+        return try? .init(jsonb: self)
     }
     
     public init?(postgresData: PostgresData) {
-        guard let jsonData = postgresData.jsonb else {
+        guard let value = try? postgresData.jsonb(as: Self.self) else {
             return nil
         }
-        
-        guard let value = try? JSONDecoder().decode(Self.self, from: jsonData) else {
-            return nil
-        }
-        
         self = value
     }
 }
