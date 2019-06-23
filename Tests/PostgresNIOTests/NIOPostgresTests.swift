@@ -388,7 +388,7 @@ final class NIOPostgresTests: XCTestCase {
     }
     
     func testJSONBSerialize() throws {
-        struct Object: Codable, JSONBCodable {
+        struct Object: Codable {
             let foo: Int
             let bar: Int
         }
@@ -396,39 +396,37 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         do {
-            let jsonData = try JSONEncoder().encode(Object(foo: 1, bar: 2))
-            let postgresData = PostgresData(jsonb: jsonData)
-            
+            let postgresData = try PostgresData(jsonb: Object(foo: 1, bar: 2))
             let rows = try conn.query("select $1::jsonb as jsonb", [postgresData]).wait()
             
-            let objectA = try JSONDecoder().decode(Object.self, from: rows[0].column("jsonb")?.jsonb ?? Data())
-            XCTAssertEqual(objectA.foo, 1)
-            XCTAssertEqual(objectA.bar, 2)
+            let object = try rows[0].column("jsonb")?.jsonb(as: Object.self)
+            XCTAssertEqual(object?.foo, 1)
+            XCTAssertEqual(object?.bar, 2)
+        }
+        
+        do {
+            let rows = try conn.query("select jsonb_build_object('foo',1,'bar',2) as jsonb").wait()
             
-            XCTAssertEqual(objectA.postgresData?.type, .jsonb)
-            XCTAssertEqual(objectA.postgresData?.formatCode, .binary)
-            
-            let objectB = Object(postgresData: postgresData)
-            XCTAssertEqual(objectB?.foo, 1)
-            XCTAssertEqual(objectB?.bar, 2)
+            let object = try rows[0].column("jsonb")?.jsonb(as: Object.self)
+            XCTAssertEqual(object?.foo, 1)
+            XCTAssertEqual(object?.bar, 2)
         }
     }
     
-    func testJSONBParse() throws {
-        struct Object: Decodable {
+    func testJSONBConvertible() throws {
+        struct Object: PostgresJSONBCodable {
             let foo: Int
             let bar: Int
         }
- 
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
-        do {
-            let rows = try conn.query("select jsonb_build_object('foo',1,'bar',2) as jsonb").wait()
 
-            let object = try JSONDecoder().decode(Object.self, from: rows[0].column("jsonb")?.jsonb ?? Data())
-            XCTAssertEqual(object.foo, 1)
-            XCTAssertEqual(object.bar, 2)
-        }
+        XCTAssertEqual(Object.postgresDataType, .jsonb)
+
+        let postgresData = Object(foo: 1, bar: 2).postgresData
+        XCTAssertEqual(postgresData?.type, .jsonb)
+        
+        let object = Object(postgresData: postgresData!)
+        XCTAssertEqual(object?.foo, 1)
+        XCTAssertEqual(object?.bar, 2)
     }
     
     func testRemoteTLSServer() throws {

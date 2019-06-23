@@ -10,7 +10,7 @@ extension NIOPostgresTests {
         ("testBindInteger", testBindInteger),
         ("testBoolSerialize", testBoolSerialize),
         ("testJSONBSerialize", testJSONBSerialize),
-        ("testJSONBParse", testJSONBParse),
+        ("testJSONBConvertible", testJSONBConvertible),
         ("testColumnsInJoin", testColumnsInJoin),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),

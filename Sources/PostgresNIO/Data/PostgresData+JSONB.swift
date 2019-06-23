@@ -43,10 +43,10 @@ extension PostgresData {
     }
 }
 
-public protocol JSONBCodable: Codable, PostgresDataConvertible {
+public protocol PostgresJSONBCodable: Codable, PostgresDataConvertible {
 }
 
-extension JSONBCodable {
+extension PostgresJSONBCodable {
     public static var postgresDataType: PostgresDataType {
         return .jsonb
     }
