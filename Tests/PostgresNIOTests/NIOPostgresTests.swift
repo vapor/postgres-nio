@@ -387,6 +387,48 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
     
+    func testJSONBSerialize() throws {
+        struct Object: Codable {
+            let foo: Int
+            let bar: Int
+        }
+        
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        do {
+            let postgresData = try PostgresData(jsonb: Object(foo: 1, bar: 2))
+            let rows = try conn.query("select $1::jsonb as jsonb", [postgresData]).wait()
+            
+            let object = try rows[0].column("jsonb")?.jsonb(as: Object.self)
+            XCTAssertEqual(object?.foo, 1)
+            XCTAssertEqual(object?.bar, 2)
+        }
+        
+        do {
+            let rows = try conn.query("select jsonb_build_object('foo',1,'bar',2) as jsonb").wait()
+            
+            let object = try rows[0].column("jsonb")?.jsonb(as: Object.self)
+            XCTAssertEqual(object?.foo, 1)
+            XCTAssertEqual(object?.bar, 2)
+        }
+    }
+    
+    func testJSONBConvertible() throws {
+        struct Object: PostgresJSONBCodable {
+            let foo: Int
+            let bar: Int
+        }
+
+        XCTAssertEqual(Object.postgresDataType, .jsonb)
+
+        let postgresData = Object(foo: 1, bar: 2).postgresData
+        XCTAssertEqual(postgresData?.type, .jsonb)
+        
+        let object = Object(postgresData: postgresData!)
+        XCTAssertEqual(object?.foo, 1)
+        XCTAssertEqual(object?.bar, 2)
+    }
+    
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)

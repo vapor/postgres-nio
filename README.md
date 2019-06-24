@@ -198,6 +198,8 @@ print(data.uint64) // UInt64?
 
 print(data.bool) // Bool?
 
+print(try data.jsonb(as: Foo.self)) // Foo?
+
 print(data.float) // Float?
 print(data.double) // Double?
 

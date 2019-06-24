@@ -9,6 +9,8 @@ extension NIOPostgresTests {
         ("testAverageLengthNumeric", testAverageLengthNumeric),
         ("testBindInteger", testBindInteger),
         ("testBoolSerialize", testBoolSerialize),
+        ("testJSONBSerialize", testJSONBSerialize),
+        ("testJSONBConvertible", testJSONBConvertible),
         ("testColumnsInJoin", testColumnsInJoin),
         ("testConnectAndClose", testConnectAndClose),
         ("testDates", testDates),
