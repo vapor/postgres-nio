@@ -386,6 +386,15 @@ final class NIOPostgresTests: XCTestCase {
             XCTAssertEqual(rows[0].column("bool")?.bool, false)
         }
     }
+
+    func testBytesSerialize() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("select $1::bytea as bytes", [
+            PostgresData(bytes: [1, 2, 3])
+        ]).wait()
+        XCTAssertEqual(rows[0].column("bytes")?.bytes, [1, 2, 3])
+    }
     
     func testJSONBSerialize() throws {
         struct Object: Codable {
