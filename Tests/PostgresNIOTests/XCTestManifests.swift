@@ -39,6 +39,7 @@ extension NIOPostgresTests {
         ("testSelectTypes", testSelectTypes),
         ("testSimpleQueryVersion", testSimpleQueryVersion),
         ("testSQLError", testSQLError),
+        ("testStringArrays", testStringArrays),
         ("testUUID", testUUID),
     ]
 }
