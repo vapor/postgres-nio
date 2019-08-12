@@ -74,15 +74,6 @@ internal extension ByteBuffer {
         return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
     }
 
-
-    func getFloat(at index: Int) -> Float? {
-        return self.getInteger(at: index, as: UInt32.self).map { Float(bitPattern: $0) }
-    }
-
-    func getDouble(at index: Int) -> Double? {
-        return self.getInteger(at: index, as: UInt64.self).map { Double(bitPattern: $0) }
-    }
-    
     mutating func readUUID() -> UUID? {
         guard self.readableBytes >= MemoryLayout<UUID>.size else {
             return nil
