@@ -16,10 +16,7 @@ public enum PostgresError: Error, LocalizedError, CustomStringConvertible {
         switch self {
         case .protocol(let message): description = "protocol error: \(message)"
         case .server(let error):
-            let severity = error.fields[.severity] ?? "ERROR"
-            let unique = error.fields[.routine] ?? error.fields[.sqlState] ?? "unknown"
-            let message = error.fields[.message] ?? "Unknown"
-            description = "server \(severity.lowercased()): \(message) (\(unique))"
+            return "server: \(error.description)"
         case .connectionClosed:
             description = "connection closed"
         }

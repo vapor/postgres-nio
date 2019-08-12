@@ -2,7 +2,7 @@ import NIO
 
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
-    public struct Error: PostgresMessageType {
+    public struct Error: PostgresMessageType, CustomStringConvertible {
         public static var identifier: PostgresMessage.Identifier {
             return .error
         }
@@ -102,7 +102,9 @@ extension PostgresMessage {
         
         /// See `CustomStringConvertible`.
         public var description: String {
-            return (fields[.severity] ?? "ERROR") + ": " + (fields[.message] ?? "unknown")
+            let unique = self.fields[.routine] ?? self.fields[.sqlState] ?? "unknown"
+            let message = self.fields[.message] ?? "Unknown"
+            return "\(message) (\(unique))"
         }
     }
 }
