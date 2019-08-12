@@ -65,35 +65,22 @@ internal extension ByteBuffer {
         }
         return array
     }
-    
-    mutating func readFloat<T: BinaryFloatingPoint>(as: T.Type = T.self) -> T? {
-        guard self.readableBytes >= MemoryLayout<T>.size else {
-            return nil
-        }
-        
-        let value: T = self.getFloat(at: self.readerIndex)! /* must work as we have enough bytes */
-        // should be MoveReaderIndex
-        self.moveReaderIndex(forwardBy: MemoryLayout<T>.size)
-        return value
+
+    mutating func readFloat() -> Float? {
+        return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }
     }
 
-    func getFloat<T: BinaryFloatingPoint>(at index: Int, as: T.Type = T.self) -> T? {
-        precondition(index >= 0, "index must not be negative")
-        return self.withVeryUnsafeBytes { ptr in
-            guard index <= ptr.count - MemoryLayout<T>.size else {
-                return nil
-            }
-            var value: T = 0
-            withUnsafeMutableBytes(of: &value) { valuePtr in
-                valuePtr.copyBytes(
-                    from: UnsafeRawBufferPointer(
-                        start: ptr.baseAddress!.advanced(by: index),
-                        count: MemoryLayout<T>.size
-                    ).reversed()
-                )
-            }
-            return value
-        }
+    mutating func readDouble() -> Double? {
+        return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
+    }
+
+
+    func getFloat(at index: Int) -> Float? {
+        return self.getInteger(at: index, as: UInt32.self).map { Float(bitPattern: $0) }
+    }
+
+    func getDouble(at index: Int) -> Double? {
+        return self.getInteger(at: index, as: UInt64.self).map { Double(bitPattern: $0) }
     }
     
     mutating func readUUID() -> UUID? {
