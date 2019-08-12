@@ -12,9 +12,9 @@ extension PostgresData {
         case .binary:
             switch self.type {
             case .float4:
-                return value.readFloat(as: Float.self)
+                return value.readFloat()
             case .float8:
-                return value.readFloat(as: Double.self)
+                return value.readDouble()
                     .flatMap { Float($0) }
             default:
                 return nil
