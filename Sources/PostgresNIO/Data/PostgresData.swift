@@ -1,4 +1,5 @@
 import NIO
+import Foundation
 
 public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertible {
     public static var null: PostgresData {
@@ -27,32 +28,54 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
     }
     
     public var description: String {
-        if let string = self.string {
-            return string
+        guard var value = self.value else {
+            return "<null>"
+        }
+        let description: String?
+
+        switch self.type {
+        case .bool:
+            description = self.bool?.description
+        case .float4:
+            description = self.float?.description
+        case .float8, .numeric:
+            description = self.double?.description
+        case .int2:
+            description = self.int16?.description
+        case .int4, .regproc, .oid:
+            description = self.int32?.description
+        case .int8:
+            description = self.int64?.description
+        case .timestamp, .timestamptz, .date, .time, .timetz:
+            description = self.date?.description
+        case .text:
+            description = self.string?.debugDescription
+        case .textArray:
+            description = self.array(of: String.self)?.description
+        case .uuid:
+            description = self.uuid?.description
+        case .uuidArray:
+            description = self.array(of: UUID.self)?.description
+        default:
+            description = nil
+        }
+
+        if let description = description {
+            return description
         } else {
-            let string: String
-            if var value = self.value {
-                switch self.formatCode {
-                case .text:
-                    let raw = value.readString(length: value.readableBytes) ?? ""
-                    string = "\"\(raw)\""
-                case .binary:
-                    string = "0x" + value.readableBytesView.hexdigest()
-                }
-            } else {
-                string = "<null>"
+            let raw: String
+            switch self.formatCode {
+            case .text:
+                raw = (value.readString(length: value.readableBytes) ?? "")
+                    .debugDescription
+            case .binary:
+                raw = "0x" + value.readableBytesView.hexdigest()
             }
-            return string + " (\(self.type))"
+            return "\(raw) (\(self.type))"
         }
     }
 
     public var debugDescription: String {
-        let valueDescription: String
-        if let value = self.value {
-            valueDescription = "\(value.readableBytes.description) bytes"
-        } else {
-            valueDescription = "nil"
-        }
-        return "PostgresData(type: \(self.type), value: \(valueDescription))"
+        return self.description
     }
 }

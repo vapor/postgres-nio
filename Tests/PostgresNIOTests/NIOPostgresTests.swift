@@ -526,6 +526,36 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual("stringInTable2", row.column("t2_stringValue")?.string, "stringInTable2")
         XCTAssertEqual(dateInTable2, row.column("t2_dateValue")?.date)
     }
+
+    func testStringArrays() throws {
+        let query = """
+        SELECT
+            $1::uuid as "id",
+            $2::bigint as "revision",
+            $3::timestamp as "updated_at",
+            $4::timestamp as "created_at",
+            $5::text as "name",
+            $6::text[] as "countries",
+            $7::text[] as "languages",
+            $8::text[] as "currencies"
+        """
+
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query(query, [
+            PostgresData(uuid: UUID(uuidString: "D2710E16-EB07-4FD6-A87E-B1BE41C9BD3D")!),
+            PostgresData(int: Int(0)),
+            PostgresData(date: Date(timeIntervalSince1970: 0)),
+            PostgresData(date: Date(timeIntervalSince1970: 0)),
+            PostgresData(string: "Foo"),
+            PostgresData(array: ["US"]),
+            PostgresData(array: ["en"]),
+            PostgresData(array: ["USD", "DKK"]),
+        ]).wait()
+        XCTAssertEqual(rows[0].column("countries")?.array(of: String.self), ["US"])
+        XCTAssertEqual(rows[0].column("languages")?.array(of: String.self), ["en"])
+        XCTAssertEqual(rows[0].column("currencies")?.array(of: String.self), ["USD", "DKK"])
+    }
     
     // MARK: Performance
     
