@@ -107,22 +107,14 @@ internal extension ByteBuffer {
         return value
     }
     
-    func getUUID(at index: Int) -> UUID? {
-        precondition(index >= 0, "index must not be negative")
-        return self.withVeryUnsafeBytes { ptr in
-            guard index <= ptr.count - MemoryLayout<uuid_t>.size else {
-                return nil
+    func getUUID(index: Int) -> UUID? {
+        var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        return self.viewBytes(at: index, length: MemoryLayout.size(ofValue: uuid)).map { bufferBytes in
+            withUnsafeMutableBytes(of: &uuid) { target in
+                precondition(target.count <= bufferBytes.count)
+                target.copyBytes(from: bufferBytes)
             }
-            var value: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-            withUnsafeMutableBytes(of: &value) { valuePtr in
-                valuePtr.copyMemory(
-                    from: UnsafeRawBufferPointer(
-                        start: ptr.baseAddress!.advanced(by: index),
-                        count: MemoryLayout<UUID>.size
-                    )
-                )
-            }
-            return UUID(uuid: value)
+            return UUID(uuid: uuid)
         }
     }
 }
