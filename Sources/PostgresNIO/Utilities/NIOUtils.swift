@@ -107,7 +107,7 @@ internal extension ByteBuffer {
         return value
     }
     
-    func getUUID(index: Int) -> UUID? {
+    func getUUID(at index: Int) -> UUID? {
         var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         return self.viewBytes(at: index, length: MemoryLayout.size(ofValue: uuid)).map { bufferBytes in
             withUnsafeMutableBytes(of: &uuid) { target in
