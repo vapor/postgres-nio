@@ -104,10 +104,6 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
     }
     
     func bytes(_ string: String) -> [UInt8] {
-        return string.withCString { ptr in
-            return UnsafeBufferPointer(start: ptr, count: string.count).withMemoryRebound(to: UInt8.self) { buffer in
-                return [UInt8](buffer)
-            }
-        }
+        return Array(string.utf8)
     }
 }
