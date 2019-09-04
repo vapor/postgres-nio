@@ -438,6 +438,30 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(object?.bar, 2)
     }
     
+    func testFloatConvertible() throws {
+        XCTAssertEqual(Float.postgresDataType, .float8)
+
+        let value: Float = 3.14159265358979
+
+        let postgresData = value.postgresData
+        XCTAssertEqual(postgresData?.type, .float8)
+
+        let float = Float(postgresData: postgresData!)
+        XCTAssertEqual(float, value)
+    }
+
+    func testDoubleConvertible() throws {
+        XCTAssertEqual(Double.postgresDataType, .float8)
+
+        let value: Double = 3.14159265358979
+
+        let postgresData = value.postgresData
+        XCTAssertEqual(postgresData?.type, .float8)
+
+        let double = Double(postgresData: postgresData!)
+        XCTAssertEqual(double, value)
+    }
+
     func testRemoteTLSServer() throws {
         let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)

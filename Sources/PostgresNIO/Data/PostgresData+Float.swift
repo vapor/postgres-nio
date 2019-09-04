@@ -27,3 +27,20 @@ extension PostgresData {
         }
     }
 }
+
+extension Float: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return .float8
+    }
+
+    public var postgresData: PostgresData? {
+        return .init(float: self)
+    }
+
+    public init?(postgresData: PostgresData) {
+        guard let float = postgresData.float else {
+            return nil
+        }
+        self = float
+    }
+}
