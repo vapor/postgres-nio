@@ -428,20 +428,26 @@ final class NIOPostgresTests: XCTestCase {
             let bar: Int
         }
 
+        let value = Object(foo: 1, bar: 2)
+
+        XCTAssertNoThrow(value as PostgresDataConvertible)
+
         XCTAssertEqual(Object.postgresDataType, .jsonb)
 
-        let postgresData = Object(foo: 1, bar: 2).postgresData
+        let postgresData = value.postgresData
         XCTAssertEqual(postgresData?.type, .jsonb)
-        
+
         let object = Object(postgresData: postgresData!)
-        XCTAssertEqual(object?.foo, 1)
-        XCTAssertEqual(object?.bar, 2)
+        XCTAssertEqual(object?.foo, value.foo)
+        XCTAssertEqual(object?.bar, value.bar)
     }
     
     func testFloatConvertible() throws {
-        XCTAssertEqual(Float.postgresDataType, .float8)
-
         let value: Float = 3.14159265358979
+
+        XCTAssertNoThrow(value as PostgresDataConvertible)
+
+        XCTAssertEqual(Float.postgresDataType, .float8)
 
         let postgresData = value.postgresData
         XCTAssertEqual(postgresData?.type, .float8)
@@ -451,9 +457,11 @@ final class NIOPostgresTests: XCTestCase {
     }
 
     func testDoubleConvertible() throws {
-        XCTAssertEqual(Double.postgresDataType, .float8)
-
         let value: Double = 3.14159265358979
+
+        XCTAssertNoThrow(value as PostgresDataConvertible)
+
+        XCTAssertEqual(Double.postgresDataType, .float8)
 
         let postgresData = value.postgresData
         XCTAssertEqual(postgresData?.type, .float8)
