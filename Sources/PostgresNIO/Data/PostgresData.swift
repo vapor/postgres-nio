@@ -79,3 +79,17 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
         return self.description
     }
 }
+
+extension PostgresData: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        return .void
+    }
+
+    public init?(postgresData: PostgresData) {
+        self = postgresData
+    }
+
+    public var postgresData: PostgresData? {
+        return self
+    }
+}
