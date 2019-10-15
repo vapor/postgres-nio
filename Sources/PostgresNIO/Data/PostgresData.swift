@@ -79,3 +79,17 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
         return self.description
     }
 }
+
+extension PostgresData: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType {
+        fatalError("PostgresData cannot be statically represented as a single data type")
+    }
+
+    public init?(postgresData: PostgresData) {
+        self = postgresData
+    }
+
+    public var postgresData: PostgresData? {
+        return self
+    }
+}
