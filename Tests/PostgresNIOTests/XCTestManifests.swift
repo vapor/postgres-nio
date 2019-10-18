@@ -7,6 +7,7 @@ extension NIOPostgresTests {
     // to regenerate.
     static let __allTests__NIOPostgresTests = [
         ("testAverageLengthNumeric", testAverageLengthNumeric),
+        ("testBindDate", testBindDate),
         ("testBindInteger", testBindInteger),
         ("testBoolSerialize", testBoolSerialize),
         ("testBytesSerialize", testBytesSerialize),

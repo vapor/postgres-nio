@@ -65,16 +65,16 @@ private final class PostgresParameterizedQuery: PostgresRequest {
         case .parseComplete:
             return []
         case .parameterDescription:
-//            let params = try PostgresMessage.ParameterDescription(message: message)
-//            if params.dataTypes.count != binds.count {
-//                self.logger!.warning("Expected parameters count (\(params.dataTypes.count)) does not equal binds count (\(binds.count))")
-//            } else {
-//                for (i, item) in zip(params.dataTypes, binds).enumerated() {
-//                    if item.0 != item.1.type {
-//                        self.logger!.warning("bind $\(i + 1) type (\(item.1.type)) does not match expected parameter type (\(item.0))")
-//                    }
-//                }
-//            }
+            let params = try PostgresMessage.ParameterDescription(message: message)
+            if params.dataTypes.count != self.binds.count {
+                self.logger!.warning("Expected parameters count (\(params.dataTypes.count)) does not equal binds count (\(binds.count))")
+            } else {
+                for (i, item) in zip(params.dataTypes, self.binds).enumerated() {
+                    if item.0 != item.1.type {
+                        self.logger!.warning("bind $\(i + 1) type (\(item.1.type)) does not match expected parameter type (\(item.0))")
+                    }
+                }
+            }
             return []
         case .commandComplete:
             return []
