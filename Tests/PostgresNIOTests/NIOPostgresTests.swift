@@ -556,6 +556,23 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(rows[0].column("languages")?.array(of: String.self), ["en"])
         XCTAssertEqual(rows[0].column("currencies")?.array(of: String.self), ["USD", "DKK"])
     }
+
+    func testBindDate() throws {
+        // https://github.com/vapor/postgres-nio/issues/53
+        let date =  Date(timeIntervalSince1970: 1571425782)
+        let query = """
+        SELECT $1::json as "date"
+        """
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        do {
+            _ = try conn.query(query, [.init(date: date)]).wait()
+            XCTFail("should have failed")
+        } catch PostgresError.server(let error) {
+            XCTAssertEqual(error.fields[.routine], "report_invalid_encoding")
+        }
+
+    }
     
     // MARK: Performance
     
