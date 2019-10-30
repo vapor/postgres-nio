@@ -210,3 +210,36 @@ print(data.numeric) // PostgresNumeric?
 ```
 
 `PostgresData` is also used for sending data _to_ the server via parameterized values. To create `PostgresData` from a Swift type, use the available intializer methods. 
+
+## Library development
+
+If you want to contribute to the library development, here is how to get started.
+
+### Testing
+
+To run the test, you need to start a local PostgreSQL database using Docker.
+
+If you have Docker installed and running, you can use Docker Compose to start PostgreSQL:
+
+The following command will download the required containers to run the test and start them:
+
+```
+$ docker-compose up -d psql-11
+```
+
+You can choose to run one of the following PostgreSQL version: `psql-11`, `psql-10`, `psql-9`, `psql-ssl`.
+
+From another console or from Xcode, you can then run the test:
+
+```
+$ swift test
+```
+
+You can check that the test are passing, before adding your own to the test suite.
+
+Finally, you can shut down and clean up Docker test environment with:
+
+```
+$ docker-compose down --volumes
+```
+
