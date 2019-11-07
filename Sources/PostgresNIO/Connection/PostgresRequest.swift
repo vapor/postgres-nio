@@ -5,7 +5,7 @@ extension PostgresConnection: PostgresClient {
         request.log(to: self.logger)
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let request = PostgresRequestContext(delegate: request, promise: promise)
-        self.channel.write(request, promise: nil) //.cascadeFailure(to: promise)
+        self.channel.write(request, promise: nil)
         self.channel.flush()
         return promise.futureResult
     }
