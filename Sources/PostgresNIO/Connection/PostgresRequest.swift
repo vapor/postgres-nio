@@ -5,7 +5,7 @@ extension PostgresConnection: PostgresClient {
         request.log(to: self.logger)
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let request = PostgresRequestContext(delegate: request, promise: promise)
-        self.channel.write(request, promise: nil)
+        self.channel.write(request).cascadeFailure(to: promise)
         self.channel.flush()
         return promise.futureResult
     }
@@ -76,16 +76,6 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
         }
     }
     
-    private func _write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) throws {
-        let request = self.unwrapOutboundIn(data)
-        self.queue.append(request)
-        let messages = try request.delegate.start()
-        for message in messages {
-            context.write(self.wrapOutboundOut(message), promise: nil)
-        }
-        context.flush()
-    }
-    
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         do {
             try self._channelRead(context: context, data: data)
@@ -95,9 +85,14 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
     }
     
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let request = self.unwrapOutboundIn(data)
+        self.queue.append(request)
         do {
-            try self._write(context: context, data: data, promise: promise)
+            let messages = try request.delegate.start()
+            self.write(context: context, items: messages, promise: promise)
+            context.flush()
         } catch {
+            promise?.fail(error)
             self.errorCaught(context: context, error: error)
         }
     }
@@ -108,5 +103,20 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
         }
         self.queue = []
         context.close(mode: mode, promise: promise)
+    }
+}
+
+
+extension ChannelInboundHandler {
+    func write(context: ChannelHandlerContext, items: [OutboundOut], promise: EventLoopPromise<Void>?) {
+        var items = items
+        if let last = items.popLast() {
+            for item in items {
+                context.write(self.wrapOutboundOut(item), promise: nil)
+            }
+            context.write(self.wrapOutboundOut(last), promise: promise)
+        } else {
+            promise?.succeed(())
+        }
     }
 }
