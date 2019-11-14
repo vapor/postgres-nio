@@ -1,8 +1,11 @@
 import Logging
 
-extension PostgresConnection: PostgresClient {
-    public func send(_ request: PostgresRequest) -> EventLoopFuture<Void> {
-        request.log(to: self.logger)
+extension PostgresConnection: PostgresDatabase {
+    public func send(
+        _ request: PostgresRequest,
+        logger: Logger
+    ) -> EventLoopFuture<Void> {
+        request.log(to: logger)
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let request = PostgresRequestContext(delegate: request, promise: promise)
         self.channel.write(request).cascadeFailure(to: promise)

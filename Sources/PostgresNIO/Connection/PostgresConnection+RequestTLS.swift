@@ -2,9 +2,13 @@ import NIOSSL
 import Logging
 
 extension PostgresConnection {
-    internal func requestTLS(using tlsConfig: TLSConfiguration, serverHostname: String?) -> EventLoopFuture<Void> {
+    internal func requestTLS(
+        using tlsConfig: TLSConfiguration,
+        serverHostname: String?,
+        logger: Logger
+    ) -> EventLoopFuture<Void> {
         let tls = RequestTLSQuery()
-        return self.send(tls).flatMapThrowing { _ in
+        return self.send(tls, logger: logger).flatMapThrowing { _ in
             guard tls.isSupported else {
                 throw PostgresError.protocol("Server does not support TLS")
             }

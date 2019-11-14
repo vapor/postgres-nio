@@ -1,7 +1,7 @@
 import NIO
 import Logging
 
-extension PostgresClient {
+extension PostgresDatabase {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return simpleQuery(string) { rows.append($0) }.map { rows }
@@ -9,7 +9,7 @@ extension PostgresClient {
     
     public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         let query = PostgresSimpleQuery(query: string, onRow: onRow)
-        return self.send(query)
+        return self.send(query, logger: self.logger)
     }
 }
 
