@@ -12,6 +12,10 @@ extension PostgresConnection: PostgresDatabase {
         self.channel.flush()
         return promise.futureResult
     }
+    
+    public func withConnection<T>(_ closure: (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+        closure(self)
+    }
 }
 
 public protocol PostgresRequest {

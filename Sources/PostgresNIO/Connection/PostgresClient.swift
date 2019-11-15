@@ -5,6 +5,8 @@ public protocol PostgresDatabase {
         _ request: PostgresRequest,
         logger: Logger
     ) -> EventLoopFuture<Void>
+    
+    func withConnection<T>(_ closure: @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T>
 }
 
 extension PostgresDatabase {
@@ -25,5 +27,9 @@ extension _PostgresDatabaseCustomLogger: PostgresDatabase {
     
     func send(_ request: PostgresRequest, logger: Logger) -> EventLoopFuture<Void> {
         self.database.send(request, logger: logger)
+    }
+    
+    func withConnection<T>(_ closure: @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+        self.database.withConnection(closure)
     }
 }
