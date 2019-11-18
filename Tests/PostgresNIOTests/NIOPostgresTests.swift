@@ -179,8 +179,8 @@ final class NIOPostgresTests: XCTestCase {
         switch results.count {
         case 1:
             print(results[0])
-            XCTAssertEqual(results[0].column("text")?.string, "3.14159265358979")
-            XCTAssertEqual(results[0].column("numeric_string")?.string, "3.14159265358979")
+            XCTAssertEqual(results[0].column("text")?.string?.hasPrefix("3.14159265"), true)
+            XCTAssertEqual(results[0].column("numeric_string")?.string?.hasPrefix("3.14159265"), true)
             XCTAssertTrue(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358980) ?? false)
             XCTAssertFalse(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358978) ?? true)
             XCTAssertTrue(results[0].column("double")?.double?.description.hasPrefix("3.141592") ?? false)
@@ -449,7 +449,11 @@ final class NIOPostgresTests: XCTestCase {
             serverHostname: "elmer.db.elephantsql.com",
             on: elg.next()
         ).wait()
-        try! conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
+        try! conn.authenticate(
+            username: "uymgphwj",
+            database: "uymgphwj",
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
+        ).wait()
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)
@@ -459,7 +463,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testInvalidPassword() throws {
         let conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
+        defer { try? conn.close().wait() }
         let auth = conn.authenticate(username: "invalid", database: "invalid", password: "bad")
         do {
             let _ = try auth.wait()

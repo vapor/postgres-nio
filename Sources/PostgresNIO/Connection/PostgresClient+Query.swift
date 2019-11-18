@@ -1,7 +1,7 @@
 import NIO
 import Logging
 
-extension PostgresClient {
+extension PostgresDatabase {
     public func query(_ string: String, _ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
         return query(string, binds) { rows.append($0) }.map { rows }
@@ -9,7 +9,7 @@ extension PostgresClient {
     
     public func query(_ string: String, _ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         let query = PostgresParameterizedQuery(query: string, binds: binds, onRow: onRow)
-        return self.send(query)
+        return self.send(query, logger: self.logger)
     }
 }
 

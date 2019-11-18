@@ -3,13 +3,18 @@ import NIO
 import Logging
 
 extension PostgresConnection {
-    public func authenticate(username: String, database: String? = nil, password: String? = nil) -> EventLoopFuture<Void> {
+    public func authenticate(
+        username: String,
+        database: String? = nil,
+        password: String? = nil,
+        logger: Logger = .init(label: "codes.vapor.postgres")
+    ) -> EventLoopFuture<Void> {
         let auth = PostgresAuthenticationRequest(
             username: username,
             database: database,
             password: password
         )
-        return self.send(auth)
+        return self.send(auth, logger: self.logger)
     }
 }
 
