@@ -179,8 +179,8 @@ final class NIOPostgresTests: XCTestCase {
         switch results.count {
         case 1:
             print(results[0])
-            XCTAssert(results[0].column("text")?.string?.hasPrefix("3.14159265"))
-            XCTAssert(results[0].column("numeric_string")?.string?.hasPrefix("3.14159265"))
+            XCTAssertEqual(results[0].column("text")?.string?.hasPrefix("3.14159265"), true)
+            XCTAssertEqual(results[0].column("numeric_string")?.string?.hasPrefix("3.14159265"), true)
             XCTAssertTrue(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358980) ?? false)
             XCTAssertFalse(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358978) ?? true)
             XCTAssertTrue(results[0].column("double")?.double?.description.hasPrefix("3.141592") ?? false)
