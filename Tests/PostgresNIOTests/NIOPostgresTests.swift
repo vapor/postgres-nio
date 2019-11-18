@@ -449,7 +449,11 @@ final class NIOPostgresTests: XCTestCase {
             serverHostname: "elmer.db.elephantsql.com",
             on: elg.next()
         ).wait()
-        try! conn.authenticate(username: "uymgphwj", database: "uymgphwj", password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA").wait()
+        try! conn.authenticate(
+            username: "uymgphwj",
+            database: "uymgphwj",
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
+        ).wait()
         defer { try? conn.close().wait() }
         let rows = try conn.simpleQuery("SELECT version()").wait()
         XCTAssertEqual(rows.count, 1)

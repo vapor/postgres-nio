@@ -7,7 +7,7 @@ extension PostgresConnection {
         username: String,
         database: String? = nil,
         password: String? = nil,
-        logger: Logger
+        logger: Logger = .init(label: "codes.vapor.postgres")
     ) -> EventLoopFuture<Void> {
         let auth = PostgresAuthenticationRequest(
             username: username,

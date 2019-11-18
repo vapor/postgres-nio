@@ -22,11 +22,14 @@ extension PostgresConnection {
 
     static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         return testUnauthenticated(on: eventLoop).flatMap { conn in
-            return conn.authenticate(username: "vapor_username", database: "vapor_database", password: "vapor_password")
-                .map {
-                    conn.logger.logLevel = testLogLevel
-                    return conn
-                }
+            return conn.authenticate(
+                username: "vapor_username",
+                database: "vapor_database",
+                password: "vapor_password"
+            ).map {
+                conn.logger.logLevel = testLogLevel
+                return conn
+            }
         }
     }
 }
