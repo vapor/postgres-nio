@@ -463,7 +463,7 @@ final class NIOPostgresTests: XCTestCase {
     
     func testInvalidPassword() throws {
         let conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
+        defer { try? conn.close().wait() }
         let auth = conn.authenticate(username: "invalid", database: "invalid", password: "bad")
         do {
             let _ = try auth.wait()
