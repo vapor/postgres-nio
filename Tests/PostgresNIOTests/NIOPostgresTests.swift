@@ -64,6 +64,38 @@ final class NIOPostgresTests: XCTestCase {
         }
     }
     
+    func testNotificationsEmptyPayload() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications: [PostgresMessage.NotificationResponse] = []
+        conn.notificationHandlers[channel: "example"] = { notification in
+            receivedNotifications.append(notification)
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications.count, 1)
+        XCTAssertEqual(receivedNotifications[0].channel, "example")
+        XCTAssertEqual(receivedNotifications[0].payload, "")
+    }
+
+    func testNotificationsNonEmptyPayload() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications: [PostgresMessage.NotificationResponse] = []
+        conn.notificationHandlers[channel: "example"] = { notification in
+            receivedNotifications.append(notification)
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example, 'Notification payload example'").wait()
+        // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications.count, 1)
+        XCTAssertEqual(receivedNotifications[0].channel, "example")
+        XCTAssertEqual(receivedNotifications[0].payload, "Notification payload example")
+    }
+
     func testSelectTypes() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }

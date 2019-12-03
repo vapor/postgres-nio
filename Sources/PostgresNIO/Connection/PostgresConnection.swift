@@ -19,10 +19,13 @@ public final class PostgresConnection {
     public var isClosed: Bool {
         return !self.channel.isActive
     }
+
+    public let notificationHandlers: PostgresNotificationHandlerMap
     
-    init(channel: Channel, logger: Logger) {
+    init(channel: Channel, logger: Logger, notificationHandlers: PostgresNotificationHandlerMap) {
         self.channel = channel
         self.logger = logger
+        self.notificationHandlers = notificationHandlers
         self.didClose = false
     }
     
