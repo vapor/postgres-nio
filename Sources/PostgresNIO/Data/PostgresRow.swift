@@ -42,8 +42,9 @@ public struct PostgresRow: CustomStringConvertible {
         }
     }
 
-    let dataRow: PostgresMessage.DataRow
-    let lookupTable: LookupTable
+    internal let dataRow: PostgresMessage.DataRow
+    internal let lookupTable: LookupTable
+    public let decoder: PostgresDecoder
 
     public func column(_ column: String) -> PostgresData? {
         guard let entry = self.lookupTable.lookup(column: column) else {

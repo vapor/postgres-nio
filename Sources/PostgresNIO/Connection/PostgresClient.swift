@@ -1,7 +1,10 @@
 public protocol PostgresDatabase {
     var logger: Logger { get }
     var eventLoop: EventLoop { get }
-    
+
+    var encoder: PostgresEncoder { get }
+    var decoder: PostgresDecoder { get }
+
     func send(_ request: PostgresRequest, logger: Logger) -> EventLoopFuture<Void>
     func withConnection<T>(_ closure: @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T>
 }
@@ -18,10 +21,10 @@ private struct _PostgresDatabaseCustomLogger {
 }
 
 extension _PostgresDatabaseCustomLogger: PostgresDatabase {
-    var eventLoop: EventLoop {
-        self.database.eventLoop
-    }
-    
+    var eventLoop: EventLoop { self.database.eventLoop }
+    var encoder: PostgresEncoder { self.database.encoder }
+    var decoder: PostgresDecoder { self.database.decoder }
+
     func send(_ request: PostgresRequest, logger: Logger) -> EventLoopFuture<Void> {
         self.database.send(request, logger: logger)
     }

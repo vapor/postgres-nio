@@ -13,6 +13,8 @@ public final class PostgresConnection {
     }
     
     public var logger: Logger
+    public let encoder: PostgresEncoder
+    public let decoder: PostgresDecoder
 
     private var didClose: Bool
 
@@ -20,9 +22,16 @@ public final class PostgresConnection {
         return !self.channel.isActive
     }
     
-    init(channel: Channel, logger: Logger) {
+    init(
+        channel: Channel,
+        logger: Logger,
+        encoder: PostgresEncoder,
+        decoder: PostgresDecoder
+    ) {
         self.channel = channel
         self.logger = logger
+        self.encoder = encoder
+        self.decoder = decoder
         self.didClose = false
     }
     

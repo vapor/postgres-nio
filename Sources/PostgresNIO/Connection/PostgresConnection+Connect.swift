@@ -7,7 +7,9 @@ extension PostgresConnection {
         tlsConfiguration: TLSConfiguration? = nil,
         serverHostname: String? = nil,
         logger: Logger = .init(label: "codes.vapor.postgres"),
-        on eventLoop: EventLoop
+        on eventLoop: EventLoop,
+        usingEncoder encoder: PostgresEncoder,
+        andDecoder decoder: PostgresDecoder
     ) -> EventLoopFuture<PostgresConnection> {
         let bootstrap = ClientBootstrap(group: eventLoop)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
@@ -18,7 +20,7 @@ extension PostgresConnection {
                 PostgresRequestHandler(logger: logger),
                 PostgresErrorHandler(logger: logger)
             ]).map {
-                return PostgresConnection(channel: channel, logger: logger)
+                return PostgresConnection(channel: channel, logger: logger, encoder: encoder, decoder: decoder)
             }
         }.flatMap { conn in
             if let tlsConfiguration = tlsConfiguration {
