@@ -16,7 +16,7 @@ jobs:
           POSTGRES_PASSWORD: vapor_password
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
     - run: swift test
   bionic:
     container: 
@@ -32,7 +32,7 @@ jobs:
           POSTGRES_PASSWORD: vapor_password
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
     - run: swift test
   thread:
     container: 
@@ -48,5 +48,5 @@ jobs:
           POSTGRES_PASSWORD: vapor_password
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v1
     - run: swift test --sanitize=thread
