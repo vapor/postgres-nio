@@ -46,6 +46,8 @@ extension PostgresData {
                 return self.double?.description
             case .int2, .int4, .int8:
                 return self.int?.description
+            case .bpchar:
+                return self.character?.description
             default:
                 return nil
             }
@@ -54,6 +56,27 @@ extension PostgresData {
                 return nil
             }
             return string
+        }
+    }
+    
+    public var character: Character? {
+        guard var value = self.value else {
+            return nil
+        }
+        
+        switch self.formatCode {
+        case .binary:
+            switch self.type {
+            case .bpchar:
+                guard let byte = value.readInteger(as: UInt8.self) else {
+                    return nil
+                }
+                return Character(UnicodeScalar(byte))
+            default:
+                return nil
+            }
+        case .text:
+            return nil
         }
     }
 }
