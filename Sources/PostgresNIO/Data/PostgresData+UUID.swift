@@ -17,7 +17,19 @@ extension PostgresData {
             return nil
         }
         
-        return value.readUUID()
+        switch self.formatCode {
+        case .binary:
+            switch self.type {
+            case .uuid:
+                return value.readUUID()
+            case .varchar, .text:
+                return self.string.flatMap { UUID(uuidString: $0) }
+            default:
+                return nil
+            }
+        case .text:
+            return nil
+        }
     }
 }
 

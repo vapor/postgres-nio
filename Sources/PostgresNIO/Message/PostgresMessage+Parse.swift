@@ -17,7 +17,7 @@ extension PostgresMessage {
         /// Note that this is not an indication of the number of parameters that might appear in the
         /// query string, only the number that the frontend wants to prespecify types for.
         /// Specifies the object ID of the parameter data type. Placing a zero here is equivalent to leaving the type unspecified.
-        public var parameterTypes: [PostgresFormatCode]
+        public var parameterTypes: [PostgresDataType]
         
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {

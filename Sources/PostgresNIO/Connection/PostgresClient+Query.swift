@@ -90,7 +90,7 @@ private final class PostgresParameterizedQuery: PostgresRequest {
         let parse = PostgresMessage.Parse(
             statementName: "",
             query: self.query,
-            parameterTypes: []
+            parameterTypes: self.binds.map { $0.type }
         )
         let describe = PostgresMessage.Describe(
             command: .statement,
