@@ -12,11 +12,9 @@ public final class PostgresNotificationHandlerMap {
 }
 
 /// NIO handler to filter out NotificationResponse messages, and divert them to an appropriate entry in the PostgresNotificationHandlerMap.
-final class PostgresNotificationHandler: ChannelDuplexHandler {
+final class PostgresNotificationHandler: ChannelInboundHandler {
     typealias InboundIn = PostgresMessage
     typealias InboundOut = PostgresMessage
-    typealias OutboundIn = PostgresMessage
-    typealias OutboundOut = PostgresMessage
 
     private let handlerMap: PostgresNotificationHandlerMap
 
