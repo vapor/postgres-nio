@@ -165,6 +165,17 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(receivedNotifications2, 2)
     }
 
+    func testNotificationHandlerFiltersOnChannel() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        conn.listen(channel: "desired") { notification, context in
+            XCTFail("Received notification on channel that handler was not registered for")
+        }
+        _ = try conn.simpleQuery("LISTEN undesired").wait()
+        _ = try conn.simpleQuery("NOTIFY undesired").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+    }
+
     func testSelectTypes() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }

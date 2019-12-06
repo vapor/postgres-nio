@@ -13,7 +13,7 @@ extension PostgresConnection {
     @discardableResult
     public func listen(channel: String, handler notificationHandler: @escaping (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void) -> PostgresListenContext {
         let listenContext = PostgresListenContext()
-        let channelHandler = PostgresNotificationHandler(notificationHandler: notificationHandler, listenContext: listenContext)
+        let channelHandler = PostgresNotificationHandler(channel: channel, notificationHandler: notificationHandler, listenContext: listenContext)
         let pipeline = self.channel.pipeline
         _ = pipeline.addHandler(channelHandler, name: nil, position: .before(requestHandler))
         listenContext.stopper = { [pipeline, unowned channelHandler] in
@@ -27,10 +27,12 @@ final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannel
     typealias InboundIn = PostgresMessage
     typealias InboundOut = PostgresMessage
 
+    let channel: String
     let notificationHandler: (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void
     let listenContext: PostgresListenContext
 
-    init(notificationHandler: @escaping (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void, listenContext: PostgresListenContext) {
+    init(channel: String, notificationHandler: @escaping (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void, listenContext: PostgresListenContext) {
+        self.channel = channel
         self.notificationHandler = notificationHandler
         self.listenContext = listenContext
     }
@@ -43,7 +45,9 @@ final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannel
             do {
                 var data = request.data
                 let notification = try PostgresMessage.NotificationResponse.parse(from: &data)
-                notificationHandler(notification, listenContext)
+                if notification.channel == channel {
+                    notificationHandler(notification, listenContext)
+                }
             } catch let error {
                 errorCaught(context: context, error: error)
             }
