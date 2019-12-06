@@ -80,6 +80,8 @@ private final class PostgresParameterizedQuery: PostgresRequest {
             return []
         case .notice:
             return []
+        case .notificationResponse:
+            return []
         case .readyForQuery:
             return nil
         default: throw PostgresError.protocol("Unexpected message during query: \(message)")

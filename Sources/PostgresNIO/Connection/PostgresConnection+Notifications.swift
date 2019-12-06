@@ -1,43 +1,52 @@
 import NIO
 
-public final class PostgresNotificationHandlerMap {
-    private var handlers: [String: (PostgresMessage.NotificationResponse) -> Void] = [:]
+public final class PostgresListenContext {
+    var stopper: (() -> Void)?
 
-    internal init() {}
-
-    public subscript(channel name: String) -> ((PostgresMessage.NotificationResponse) -> Void)? {
-        get { handlers[name] }
-        set { handlers[name] = newValue }
+    public func stop() {
+        stopper?()
+        stopper = nil
     }
 }
 
-/// NIO handler to filter out NotificationResponse messages, and divert them to an appropriate entry in the PostgresNotificationHandlerMap.
-final class PostgresNotificationHandler: ChannelInboundHandler {
+extension PostgresConnection {
+    @discardableResult
+    public func listen(channel: String, handler notificationHandler: @escaping (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void) -> PostgresListenContext {
+        let listenContext = PostgresListenContext()
+        let channelHandler = PostgresNotificationHandler(notificationHandler: notificationHandler, listenContext: listenContext)
+        let pipeline = self.channel.pipeline
+        _ = pipeline.addHandler(channelHandler, name: nil, position: .before(requestHandler))
+        listenContext.stopper = { [pipeline, unowned channelHandler] in
+            _ = pipeline.removeHandler(channelHandler)
+        }
+        return listenContext
+    }
+}
+
+final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannelHandler {
     typealias InboundIn = PostgresMessage
     typealias InboundOut = PostgresMessage
 
-    private let handlerMap: PostgresNotificationHandlerMap
+    let notificationHandler: (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void
+    let listenContext: PostgresListenContext
 
-    init(handlerMap: PostgresNotificationHandlerMap) {
-        self.handlerMap = handlerMap
+    init(notificationHandler: @escaping (PostgresMessage.NotificationResponse, PostgresListenContext) -> Void, listenContext: PostgresListenContext) {
+        self.notificationHandler = notificationHandler
+        self.listenContext = listenContext
     }
 
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        var request = unwrapInboundIn(data)
-        switch request.identifier {
-        case .notificationResponse:
+        let request = unwrapInboundIn(data)
+        // Slightly complicated: We need to dispatch downstream _before_ we handle the notification ourselves, because the notification handler could try to stop the listen, which removes ourselves from the pipeline and makes fireChannelRead not work any more.
+        context.fireChannelRead(wrapInboundOut(request))
+        if request.identifier == .notificationResponse {
             do {
-                let notification = try PostgresMessage.NotificationResponse.parse(from: &request.data)
-                if let handler = handlerMap[channel: notification.channel] {
-                    handler(notification)
-                }
+                var data = request.data
+                let notification = try PostgresMessage.NotificationResponse.parse(from: &data)
+                notificationHandler(notification, listenContext)
             } catch let error {
                 errorCaught(context: context, error: error)
             }
-            // We absorb the NotificationResponse message, and do not send it to the PostgresRequestHandler.
-        default:
-            // All other messages are forwarded on.
-            context.fireChannelRead(wrapInboundOut(request))
         }
     }
 }

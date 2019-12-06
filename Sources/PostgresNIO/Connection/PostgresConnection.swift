@@ -3,6 +3,7 @@ import Logging
 
 public final class PostgresConnection {
     let channel: Channel
+    let requestHandler: ChannelHandler
     
     public var eventLoop: EventLoop {
         return self.channel.eventLoop
@@ -19,13 +20,11 @@ public final class PostgresConnection {
     public var isClosed: Bool {
         return !self.channel.isActive
     }
-
-    public let notificationHandlers: PostgresNotificationHandlerMap
     
-    init(channel: Channel, logger: Logger, notificationHandlers: PostgresNotificationHandlerMap) {
+    init(channel: Channel, requestHandler: ChannelHandler, logger: Logger) {
         self.channel = channel
+        self.requestHandler = requestHandler
         self.logger = logger
-        self.notificationHandlers = notificationHandlers
         self.didClose = false
     }
     

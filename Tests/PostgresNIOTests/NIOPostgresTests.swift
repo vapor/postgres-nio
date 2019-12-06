@@ -68,7 +68,7 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications: [PostgresMessage.NotificationResponse] = []
-        conn.notificationHandlers[channel: "example"] = { notification in
+        conn.listen(channel: "example") { notification, context in
             receivedNotifications.append(notification)
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -84,7 +84,7 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications: [PostgresMessage.NotificationResponse] = []
-        conn.notificationHandlers[channel: "example"] = { notification in
+        conn.listen(channel: "example") { notification, context in
             receivedNotifications.append(notification)
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -94,6 +94,75 @@ final class NIOPostgresTests: XCTestCase {
         XCTAssertEqual(receivedNotifications.count, 1)
         XCTAssertEqual(receivedNotifications[0].channel, "example")
         XCTAssertEqual(receivedNotifications[0].payload, "Notification payload example")
+    }
+
+    func testNotificationsRemoveHandlerWithinHandler() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications = 0
+        conn.listen(channel: "example") { notification, context in
+            receivedNotifications += 1
+            context.stop()
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications, 1)
+    }
+
+    func testNotificationsRemoveHandlerOutsideHandler() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications = 0
+        let context = conn.listen(channel: "example") { notification, context in
+            receivedNotifications += 1
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        context.stop()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications, 1)
+    }
+
+    func testNotificationsMultipleRegisteredHandlers() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications1 = 0
+        conn.listen(channel: "example") { notification, context in
+            receivedNotifications1 += 1
+        }
+        var receivedNotifications2 = 0
+        conn.listen(channel: "example") { notification, context in
+            receivedNotifications2 += 1
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications1, 1)
+        XCTAssertEqual(receivedNotifications2, 1)
+    }
+
+    func testNotificationsMultipleRegisteredHandlersRemoval() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications1 = 0
+        conn.listen(channel: "example") { notification, context in
+            receivedNotifications1 += 1
+            context.stop()
+        }
+        var receivedNotifications2 = 0
+        conn.listen(channel: "example") { notification, context in
+            receivedNotifications2 += 1
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications1, 1)
+        XCTAssertEqual(receivedNotifications2, 2)
     }
 
     func testSelectTypes() throws {
