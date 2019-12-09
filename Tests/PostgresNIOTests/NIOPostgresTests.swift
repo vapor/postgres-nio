@@ -573,9 +573,31 @@ final class NIOPostgresTests: XCTestCase {
             _ = try conn.query(query, [.init(date: date)]).wait()
             XCTFail("should have failed")
         } catch PostgresError.server(let error) {
-            XCTAssertEqual(error.fields[.routine], "report_invalid_encoding")
+            XCTAssertEqual(error.fields[.routine], "transformTypeCast")
         }
 
+    }
+
+    func testBindCharString() throws {
+        // https://github.com/vapor/postgres-nio/issues/53
+        let query = """
+        SELECT $1::char as "char"
+        """
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query(query, [.init(string: "f")]).wait()
+        XCTAssertEqual(rows[0].column("char")?.string, "f")
+    }
+
+    func testBindCharUInt8() throws {
+        // https://github.com/vapor/postgres-nio/issues/53
+        let query = """
+        SELECT $1::char as "char"
+        """
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query(query, [.init(uint8: 42)]).wait()
+        XCTAssertEqual(rows[0].column("char")?.string, "*")
     }
     
     // MARK: Performance
