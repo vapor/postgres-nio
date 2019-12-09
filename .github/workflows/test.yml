@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - run: swift test
+    - run: swift test --enable-test-discovery --sanitize=thread
   bionic:
     container: 
       image: vapor/swift:5.1-bionic
@@ -33,20 +33,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
-    - run: swift test
-  thread:
-    container: 
-      image: vapor/swift:5.1-bionic
-    services:
-      psql:
-        image: postgres
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v1
-    - run: swift test --sanitize=thread
+    - run: swift test --enable-test-discovery --sanitize=thread
