@@ -100,14 +100,8 @@ private extension PostgresData {
         default:
             fatalError("Cannot encode \(I.self) to PostgresData")
         }
-
         var buffer = ByteBufferAllocator().buffer(capacity: capacity)
-        if I.bitWidth == 8 && fwi == 0 {
-            buffer.writeString("\(fwi)")
-        } else {
-            buffer.writeInteger(fwi)
-        }
-
+        buffer.writeInteger(fwi)
         self.init(type: type, formatCode: .binary, value: buffer)
     }
     
