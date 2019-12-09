@@ -8,7 +8,7 @@ extension PostgresDatabase {
     }
     
     public func query(_ string: String, _ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        let query = PostgresParameterizedQuery(query: string, binds: binds, decoder: self.decoder, onRow: onRow)
+        let query = PostgresParameterizedQuery(query: string, binds: binds, onRow: onRow)
         return self.send(query, logger: self.logger)
     }
 }
@@ -18,7 +18,6 @@ extension PostgresDatabase {
 private final class PostgresParameterizedQuery: PostgresRequest {
     let query: String
     let binds: [PostgresData]
-    let decoder: PostgresDecoder
     var onRow: (PostgresRow) throws -> ()
     var rowLookupTable: PostgresRow.LookupTable?
     var resultFormatCodes: [PostgresFormatCode]
@@ -27,12 +26,10 @@ private final class PostgresParameterizedQuery: PostgresRequest {
     init(
         query: String,
         binds: [PostgresData],
-        decoder: PostgresDecoder,
         onRow: @escaping (PostgresRow) throws -> ()
     ) {
         self.query = query
         self.binds = binds
-        self.decoder = decoder
         self.onRow = onRow
         self.resultFormatCodes = [.binary]
     }
@@ -53,7 +50,7 @@ private final class PostgresParameterizedQuery: PostgresRequest {
         case .dataRow:
             let data = try PostgresMessage.DataRow(message: message)
             guard let rowLookupTable = self.rowLookupTable else { fatalError() }
-            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable, decoder: self.decoder)
+            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
             try onRow(row)
             return []
         case .rowDescription:

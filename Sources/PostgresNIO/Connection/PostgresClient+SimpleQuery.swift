@@ -8,7 +8,7 @@ extension PostgresDatabase {
     }
     
     public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        let query = PostgresSimpleQuery(query: string, decoder: self.decoder, onRow: onRow)
+        let query = PostgresSimpleQuery(query: string, onRow: onRow)
         return self.send(query, logger: self.logger)
     }
 }
@@ -17,13 +17,11 @@ extension PostgresDatabase {
 
 private final class PostgresSimpleQuery: PostgresRequest {
     var query: String
-    let decoder: PostgresDecoder
     var onRow: (PostgresRow) throws -> ()
     var rowLookupTable: PostgresRow.LookupTable?
     
-    init(query: String, decoder: PostgresDecoder, onRow: @escaping (PostgresRow) throws -> ()) {
+    init(query: String, onRow: @escaping (PostgresRow) throws -> ()) {
         self.query = query
-        self.decoder = decoder
         self.onRow = onRow
     }
     
@@ -40,7 +38,7 @@ private final class PostgresSimpleQuery: PostgresRequest {
         case .dataRow:
             let data = try PostgresMessage.DataRow(message: message)
             guard let rowLookupTable = self.rowLookupTable else { fatalError() }
-            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable, decoder: self.decoder)
+            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
             try onRow(row)
             return []
         case .rowDescription:

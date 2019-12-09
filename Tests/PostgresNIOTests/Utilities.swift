@@ -1,4 +1,5 @@
 import Logging
+import Foundation
 import PostgresNIO
 
 var testLogLevel: Logger.Level = .info
@@ -14,7 +15,7 @@ extension PostgresConnection {
 
     static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         do {
-            return connect(to: try address(), on: eventLoop)
+            return connect(to: try address(), on: eventLoop, usingEncoder: JSONEncoder(), andDecoder: JSONDecoder())
         } catch {
             return eventLoop.makeFailedFuture(error)
         }
