@@ -56,6 +56,14 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
             description = self.uuid?.description
         case .uuidArray:
             description = self.array(of: UUID.self)?.description
+        case .int8Array:
+            description = self.array(of: Int.self)?.description
+        case .float8Array:
+            description = self.array(of: Double.self)?.description
+        case .float4Array:
+            description = self.array(of: Float.self)?.description
+        case .jsonb:
+            description = String(decoding: value.readableBytesView, as: UTF8.self)
         default:
             description = nil
         }

@@ -74,6 +74,14 @@ internal extension ByteBuffer {
         return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
     }
 
+    mutating func writeFloat(_ float: Float) {
+        self.writeInteger(float.bitPattern)
+    }
+
+    mutating func writeDouble(_ double: Double) {
+        self.writeInteger(double.bitPattern)
+    }
+
     mutating func readUUID() -> UUID? {
         guard self.readableBytes >= MemoryLayout<UUID>.size else {
             return nil
