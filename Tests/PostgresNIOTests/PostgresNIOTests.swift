@@ -2,7 +2,7 @@ import Logging
 import PostgresNIO
 import XCTest
 
-final class NIOPostgresTests: XCTestCase {
+final class PostgresNIOTests: XCTestCase {
     private var group: EventLoopGroup!
     private var eventLoop: EventLoop {
         return self.group.next()
@@ -853,6 +853,20 @@ final class NIOPostgresTests: XCTestCase {
             }
         }
     }
+
+    func testDoubleArraySerialization() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let doubles: [Double] = [3.14, 42]
+        let rows = try conn.query("""
+        select
+            $1::double precision[] as doubles
+        """, [
+            .init(array: doubles)
+        ]).wait()
+        XCTAssertEqual(rows[0].column("doubles")?.array(of: Double.self), doubles)
+    }
+
 }
 
 
