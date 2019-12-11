@@ -15,7 +15,7 @@ extension PostgresConnection {
         let listenContext = PostgresListenContext()
         let channelHandler = PostgresNotificationHandler(channel: channel, notificationHandler: notificationHandler, listenContext: listenContext)
         let pipeline = self.channel.pipeline
-        _ = pipeline.addHandler(channelHandler, name: nil, position: .before(requestHandler))
+        _ = pipeline.addHandler(channelHandler, name: nil, position: .last)
         listenContext.stopper = { [pipeline, unowned channelHandler] in
             _ = pipeline.removeHandler(channelHandler)
         }

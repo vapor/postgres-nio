@@ -89,6 +89,8 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
         } catch {
             self.errorCaught(context: context, error: error)
         }
+        // Regardless of error, also pass the message downstream; this is necessary for PostgresNotificationHandler (which is appended at the end) to receive notifications
+        context.fireChannelRead(data)
     }
     
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {

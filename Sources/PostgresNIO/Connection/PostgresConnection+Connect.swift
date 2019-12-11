@@ -12,14 +12,13 @@ extension PostgresConnection {
         let bootstrap = ClientBootstrap(group: eventLoop)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
         return bootstrap.connect(to: socketAddress).flatMap { channel in
-            let requestHandler = PostgresRequestHandler(logger: logger)
             return channel.pipeline.addHandlers([
                 ByteToMessageHandler(PostgresMessageDecoder()),
                 MessageToByteHandler(PostgresMessageEncoder()),
-                requestHandler,
+                PostgresRequestHandler(logger: logger),
                 PostgresErrorHandler(logger: logger)
             ]).map {
-                return PostgresConnection(channel: channel, requestHandler: requestHandler, logger: logger)
+                return PostgresConnection(channel: channel, logger: logger)
             }
         }.flatMap { (conn: PostgresConnection) in
             if let tlsConfiguration = tlsConfiguration {
