@@ -1,9 +1,11 @@
 import NIO
 import Logging
 
+/// Context for receiving NotificationResponse messages on a connection, used for PostgreSQL's `LISTEN`/`NOTIFY` support.
 public final class PostgresListenContext {
     var stopper: (() -> Void)?
 
+    /// Detach this listener so it no longer receives notifications. Other listeners, including those for the same channel, are unaffected. `UNLISTEN` is not sent; you are responsible for issuing an `UNLISTEN` query yourself if it is appropriate for your application.
     public func stop() {
         stopper?()
         stopper = nil
