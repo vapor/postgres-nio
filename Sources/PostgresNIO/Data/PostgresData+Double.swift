@@ -1,8 +1,8 @@
 extension PostgresData {
     public init(double: Double) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
-        buffer.writeString(double.description)
-        self.init(type: .float8, formatCode: .text, value: buffer)
+        buffer.writeDouble(double)
+        self.init(type: .float8, formatCode: .binary, value: buffer)
     }
     
     public var double: Double? {
