@@ -68,7 +68,7 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications: [PostgresMessage.NotificationResponse] = []
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications.append(notification)
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -84,7 +84,7 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications: [PostgresMessage.NotificationResponse] = []
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications.append(notification)
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -100,7 +100,7 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications = 0
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications += 1
             context.stop()
         }
@@ -115,7 +115,7 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications = 0
-        let context = conn.listen(channel: "example") { context, notification in
+        let context = conn.addListener(channel: "example") { context, notification in
             receivedNotifications += 1
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -131,11 +131,11 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications1 = 0
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications1 += 1
         }
         var receivedNotifications2 = 0
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications2 += 1
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -149,12 +149,12 @@ final class NIOPostgresTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         var receivedNotifications1 = 0
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications1 += 1
             context.stop()
         }
         var receivedNotifications2 = 0
-        conn.listen(channel: "example") { context, notification in
+        conn.addListener(channel: "example") { context, notification in
             receivedNotifications2 += 1
         }
         _ = try conn.simpleQuery("LISTEN example").wait()
@@ -168,7 +168,7 @@ final class NIOPostgresTests: XCTestCase {
     func testNotificationHandlerFiltersOnChannel() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
-        conn.listen(channel: "desired") { context, notification in
+        conn.addListener(channel: "desired") { context, notification in
             XCTFail("Received notification on channel that handler was not registered for")
         }
         _ = try conn.simpleQuery("LISTEN undesired").wait()

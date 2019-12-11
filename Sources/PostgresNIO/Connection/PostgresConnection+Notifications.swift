@@ -14,7 +14,7 @@ public final class PostgresListenContext {
 
 extension PostgresConnection {
     @discardableResult
-    public func listen(channel: String, handler notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void) -> PostgresListenContext {
+    public func addListener(channel: String, handler notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void) -> PostgresListenContext {
         let listenContext = PostgresListenContext()
         let channelHandler = PostgresNotificationHandler(logger: self.logger, channel: channel, notificationHandler: notificationHandler, listenContext: listenContext)
         let pipeline = self.channel.pipeline
