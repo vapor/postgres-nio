@@ -1,4 +1,5 @@
 import NIO
+import Logging
 
 public final class PostgresListenContext {
     var stopper: (() -> Void)?
@@ -13,7 +14,7 @@ extension PostgresConnection {
     @discardableResult
     public func listen(channel: String, handler notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void) -> PostgresListenContext {
         let listenContext = PostgresListenContext()
-        let channelHandler = PostgresNotificationHandler(channel: channel, notificationHandler: self.notificationHandler, listenContext: listenContext)
+        let channelHandler = PostgresNotificationHandler(logger: self.logger, channel: channel, notificationHandler: notificationHandler, listenContext: listenContext)
         let pipeline = self.channel.pipeline
         _ = pipeline.addHandler(channelHandler, name: nil, position: .last)
         listenContext.stopper = { [pipeline, unowned channelHandler] in
@@ -27,11 +28,13 @@ final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannel
     typealias InboundIn = PostgresMessage
     typealias InboundOut = PostgresMessage
 
+    let logger: Logger
     let channel: String
     let notificationHandler: (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
     let listenContext: PostgresListenContext
 
-    init(channel: String, notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void, listenContext: PostgresListenContext) {
+    init(logger: Logger, channel: String, notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void, listenContext: PostgresListenContext) {
+        self.logger = logger
         self.channel = channel
         self.notificationHandler = notificationHandler
         self.listenContext = listenContext
@@ -49,7 +52,7 @@ final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannel
                     self.notificationHandler(self.listenContext, notification)
                 }
             } catch let error {
-                self.errorCaught(context: context, error: error)
+                self.logger.error("\(error)")
             }
         }
     }
