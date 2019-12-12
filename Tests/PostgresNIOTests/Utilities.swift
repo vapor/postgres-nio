@@ -10,7 +10,11 @@ extension PostgresConnection {
 
     static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         do {
-            return connect(to: try address(), on: eventLoop)
+            return connect(
+                to: try address(),
+                tlsConfiguration: (env("POSTGRES_TLS") == "true") ? .forClient() : nil,
+                on: eventLoop
+            )
         } catch {
             return eventLoop.makeFailedFuture(error)
         }
