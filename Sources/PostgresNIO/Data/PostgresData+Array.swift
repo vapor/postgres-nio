@@ -2,10 +2,12 @@ extension PostgresData {
     public init<T>(array: [T])
         where T: PostgresDataConvertible
     {
-        let elementType = T.postgresDataType
-        guard let arrayType = elementType.arrayType else {
-            fatalError("No array type for \(elementType)")
-        }
+        self.init(
+            array: array.map { $0.postgresData },
+            elementType: T.postgresDataType
+        )
+    }
+    public init(array: [PostgresData?], elementType: PostgresDataType) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
         // 0 if empty, 1 if not
         buffer.writeInteger(array.isEmpty ? 0 : 1, as: UInt32.self)
@@ -22,7 +24,7 @@ extension PostgresData {
             buffer.writeInteger(1, as: UInt32.self)
 
             for item in array {
-                if var value = item.postgresData?.value {
+                if let item = item, var value = item.value {
                     buffer.writeInteger(numericCast(value.readableBytes), as: UInt32.self)
                     buffer.writeBuffer(&value)
                 } else {
@@ -31,12 +33,35 @@ extension PostgresData {
             }
         }
 
-        self.init(type: arrayType, typeModifier: nil, formatCode: .binary, value: buffer)
+        guard let arrayType = elementType.arrayType else {
+            fatalError("No array type for \(elementType)")
+        }
+        self.init(
+            type: arrayType,
+            typeModifier: nil,
+            formatCode: .binary,
+            value: buffer
+        )
     }
 
     public func array<T>(of type: T.Type = T.self) -> [T]?
         where T: PostgresDataConvertible
     {
+        guard let array = self.array else {
+            return nil
+        }
+        var items: [T] = []
+        for data in array {
+            guard let item = T(postgresData: data) else {
+                // if we fail to convert any data, fail the entire array
+                return nil
+            }
+            items.append(item)
+        }
+        return items
+    }
+
+    public var array: [PostgresData]? {
         guard var value = self.value else {
             return nil
         }
@@ -67,17 +92,18 @@ extension PostgresData {
         }
         assert(dimensions == 1, "Multi-dimensional arrays not yet supported")
 
-        var array: [T] = []
+        var array: [PostgresData] = []
         while
             let itemLength = value.readInteger(as: UInt32.self),
             let itemValue = value.readSlice(length: numericCast(itemLength))
         {
-            let data = PostgresData(type: type, typeModifier: nil, formatCode: self.formatCode, value: itemValue)
-            guard let t = T(postgresData: data) else {
-                // if we fail to convert any data, fail the entire array
-                return nil
-            }
-            array.append(t)
+            let data = PostgresData(
+                type: type,
+                typeModifier: nil,
+                formatCode: self.formatCode,
+                value: itemValue
+            )
+            array.append(data)
         }
         return array
     }
