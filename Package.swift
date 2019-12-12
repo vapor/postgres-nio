@@ -1,8 +1,11 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.1
 import PackageDescription
 
 let package = Package(
     name: "postgres-nio",
+    platforms: [
+       .macOS(.v10_14)
+    ],
     products: [
         .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
     ],
@@ -14,7 +17,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "CMD5", dependencies: []),
-        .target(name: "PostgresNIO", dependencies: ["CMD5", "Logging", "Metrics", "NIO", "NIOSSL"]),
-        .testTarget(name: "PostgresNIOTests", dependencies: ["PostgresNIO"]),
+        .target(name: "PostgresNIO", dependencies: [
+            "CMD5", "Logging", "Metrics", "NIO", "NIOSSL"
+        ]),
+        .testTarget(name: "PostgresNIOTests", dependencies: [
+            "PostgresNIO", "NIOTestUtils"
+        ]),
     ]
 )

@@ -24,7 +24,7 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
         guard let identifier = peekBuffer.readInteger(as: UInt8.self).map(PostgresMessage.Identifier.init) else {
             return .needMoreData
         }
-        
+
         let message: PostgresMessage
         
         // special ssl case, no body
@@ -48,7 +48,6 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
         
         // there is sufficient data, use this buffer
         buffer = peekBuffer
-        
         context.fireChannelRead(wrapInboundOut(message))
         return .continue
     }
