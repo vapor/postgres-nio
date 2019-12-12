@@ -1015,6 +1015,10 @@ final class PostgresNIOTests: XCTestCase {
 
     #if canImport(Network)
     func testNIOTS() throws {
+        #if os(macOS) || os(iOS)
+        #warning("TODO: cannot disable cert verification w/ network.framework")
+        return
+        #endif
         let elg = NIOTSEventLoopGroup()
         defer { try! elg.syncShutdownGracefully() }
         let conn = try PostgresConnection.test(on: elg.next()).wait()

@@ -1,6 +1,9 @@
 import Logging
 import NIO
 import NIOTransportServices
+#if canImport(Network)
+import Network
+#endif
 
 extension PostgresConnection {
     public static func connect(
