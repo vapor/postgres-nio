@@ -979,6 +979,19 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[0].column("doubles")?.array(of: Double.self), doubles)
     }
 
+    // https://github.com/vapor/postgres-nio/issues/42
+    func testUInt8Serialization() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            $1::char as int
+        """, [
+            .init(uint8: 5)
+        ]).wait()
+        XCTAssertEqual(rows[0].column("int")?.uint8, 5)
+    }
+
 }
 
 
