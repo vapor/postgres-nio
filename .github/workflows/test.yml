@@ -57,11 +57,29 @@ jobs:
       env:
         POSTGRES_HOSTNAME: psql
   mojave:
+    services:
+      psql:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
     runs-on: macOS-10.14
     steps:
     - uses: actions/checkout@v1
     - run: swift test --sanitize=thread
   ios:
+    services:
+      psql:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
     runs-on: macOS-10.14
     steps:
     - uses: actions/checkout@v1
