@@ -70,6 +70,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: swift test --sanitize=thread
+      env:
+        POSTGRES_HOSTNAME: psql
   ios:
     services:
       psql:
@@ -84,3 +86,5 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: xcodebuild test -destination 'name=iPhone 11' -scheme 'postgres-nio'
+      env:
+        POSTGRES_HOSTNAME: psql
