@@ -24,6 +24,18 @@ extension PostgresMessage {
                 throw PostgresError.protocol("Unkonwn authentication request type: \(type)")
             }
         }
+
+        public func serialize(into buffer: inout ByteBuffer) throws {
+            switch self {
+            case .ok:
+                buffer.writeInteger(0, as: Int32.self)
+            case .plaintext:
+                buffer.writeInteger(3, as: Int32.self)
+            case .md5(let salt):
+                buffer.writeInteger(5, as: Int32.self)
+                buffer.writeBytes(salt)
+            }
+        }
         
         /// AuthenticationOk
         /// Specifies that the authentication was successful.
