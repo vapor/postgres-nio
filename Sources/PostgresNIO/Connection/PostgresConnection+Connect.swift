@@ -20,7 +20,7 @@ extension PostgresConnection {
             ]).map {
                 return PostgresConnection(channel: channel, logger: logger)
             }
-        }.flatMap { conn in
+        }.flatMap { (conn: PostgresConnection) in
             if let tlsConfiguration = tlsConfiguration {
                 return conn.requestTLS(
                     using: tlsConfiguration,

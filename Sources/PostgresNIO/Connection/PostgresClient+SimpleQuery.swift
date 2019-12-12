@@ -54,6 +54,8 @@ private final class PostgresSimpleQuery: PostgresRequest {
             return nil
         case .notice:
             return []
+        case .notificationResponse:
+            return []
         default:
             throw PostgresError.protocol("Unexpected message during simple query: \(message)")
         }

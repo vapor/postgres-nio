@@ -64,6 +64,118 @@ final class PostgresNIOTests: XCTestCase {
         }
     }
     
+    func testNotificationsEmptyPayload() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications: [PostgresMessage.NotificationResponse] = []
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications.append(notification)
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications.count, 1)
+        XCTAssertEqual(receivedNotifications[0].channel, "example")
+        XCTAssertEqual(receivedNotifications[0].payload, "")
+    }
+
+    func testNotificationsNonEmptyPayload() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications: [PostgresMessage.NotificationResponse] = []
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications.append(notification)
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example, 'Notification payload example'").wait()
+        // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications.count, 1)
+        XCTAssertEqual(receivedNotifications[0].channel, "example")
+        XCTAssertEqual(receivedNotifications[0].payload, "Notification payload example")
+    }
+
+    func testNotificationsRemoveHandlerWithinHandler() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications = 0
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications += 1
+            context.stop()
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications, 1)
+    }
+
+    func testNotificationsRemoveHandlerOutsideHandler() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications = 0
+        let context = conn.addListener(channel: "example") { context, notification in
+            receivedNotifications += 1
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        context.stop()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications, 1)
+    }
+
+    func testNotificationsMultipleRegisteredHandlers() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications1 = 0
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications1 += 1
+        }
+        var receivedNotifications2 = 0
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications2 += 1
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications1, 1)
+        XCTAssertEqual(receivedNotifications2, 1)
+    }
+
+    func testNotificationsMultipleRegisteredHandlersRemoval() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        var receivedNotifications1 = 0
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications1 += 1
+            context.stop()
+        }
+        var receivedNotifications2 = 0
+        conn.addListener(channel: "example") { context, notification in
+            receivedNotifications2 += 1
+        }
+        _ = try conn.simpleQuery("LISTEN example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("NOTIFY example").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+        XCTAssertEqual(receivedNotifications1, 1)
+        XCTAssertEqual(receivedNotifications2, 2)
+    }
+
+    func testNotificationHandlerFiltersOnChannel() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        conn.addListener(channel: "desired") { context, notification in
+            XCTFail("Received notification on channel that handler was not registered for")
+        }
+        _ = try conn.simpleQuery("LISTEN undesired").wait()
+        _ = try conn.simpleQuery("NOTIFY undesired").wait()
+        _ = try conn.simpleQuery("SELECT 1").wait()
+    }
+
     func testSelectTypes() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
