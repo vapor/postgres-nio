@@ -12,7 +12,8 @@ extension PostgresConnection {
         do {
             return connect(
                 to: try address(),
-                tlsConfiguration: (env("POSTGRES_TLS") == "true") ? .forClient() : nil,
+                tlsConfiguration: (env("POSTGRES_TLS").flatMap { Bool($0) } == true)
+                        ? .forClient() : nil,
                 on: eventLoop
             )
         } catch {
