@@ -5,11 +5,7 @@ var testLogLevel: Logger.Level = .info
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
-        #if os(Linux)
-        return try .makeAddressResolvingHost("psql", port: 5432)
-        #else
-        return try .init(ipAddress: "127.0.0.1", port: 5432)
-        #endif
+        try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432)
     }
 
     static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
@@ -23,9 +19,9 @@ extension PostgresConnection {
     static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         return testUnauthenticated(on: eventLoop).flatMap { conn in
             return conn.authenticate(
-                username: "vapor_username",
-                database: "vapor_database",
-                password: "vapor_password"
+                username: env("POSTGRES_USERNAME") ?? "vapor_username",
+                database: env("POSTGRES_DATABASE") ?? "vapor_database",
+                password: env("POSTGRES_PASSWORD") ?? "vapor_password"
             ).map {
                 conn.logger.logLevel = testLogLevel
                 return conn
@@ -34,6 +30,9 @@ extension PostgresConnection {
     }
 }
 
+func env(_ name: String) -> String? {
+    getenv(name).flatMap { String(cString: $0) }
+}
 
 // 1247.typisdefined: 0x01 (BOOLEAN)
 // 1247.typbasetype: 0x00000000 (OID)
