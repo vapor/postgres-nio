@@ -26,7 +26,11 @@ extension PostgresConnection {
                 username: env("POSTGRES_USERNAME") ?? "vapor_username",
                 database: env("POSTGRES_DATABASE") ?? "vapor_database",
                 password: env("POSTGRES_PASSWORD") ?? "vapor_password"
-            ).map {
+            ).flatMapError { error in
+                return conn.close().flatMapThrowing {
+                    throw error
+                }
+            }.map {
                 conn.logger.logLevel = testLogLevel
                 return conn
             }
