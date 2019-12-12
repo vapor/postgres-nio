@@ -6,7 +6,8 @@ extension PostgresData {
     public init(jsonb jsonData: Data) {
         let jsonBDataBytes = [UInt8](jsonData)
         
-        var buffer = ByteBufferAllocator().buffer(capacity: jsonBVersionBytes.count + jsonBDataBytes.count)
+        var buffer = ByteBufferAllocator()
+            .buffer(capacity: jsonBVersionBytes.count + jsonBDataBytes.count)
         buffer.writeBytes(jsonBVersionBytes)
         buffer.writeBytes(jsonBDataBytes)
         

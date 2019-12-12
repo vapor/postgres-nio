@@ -50,10 +50,14 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
             description = self.date?.description
         case .text:
             description = self.string?.debugDescription
-        case .textArray:
-            description = self.array(of: String.self)?.description
         case .uuid:
             description = self.uuid?.description
+        case .json:
+            description = String(decoding: value.readableBytesView, as: UTF8.self)
+        case .jsonb:
+            var value = value
+            value.moveReaderIndex(forwardBy: 1)
+            description = String(decoding: value.readableBytesView, as: UTF8.self)
         case .uuidArray:
             description = self.array(of: UUID.self)?.description
         case .int8Array:
@@ -62,8 +66,10 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
             description = self.array(of: Double.self)?.description
         case .float4Array:
             description = self.array(of: Float.self)?.description
-        case .jsonb:
-            description = String(decoding: value.readableBytesView, as: UTF8.self)
+        case .textArray:
+            description = self.array(of: String.self)?.description
+        case .jsonbArray:
+            description = self.array?.description
         default:
             description = nil
         }

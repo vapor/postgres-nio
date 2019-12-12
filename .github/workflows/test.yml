@@ -34,3 +34,25 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: swift test --enable-test-discovery --sanitize=thread
+  fluent:
+    container: 
+      image: vapor/swift:5.1
+    services:
+      psql:
+        image: postgres
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
+    runs-on: ubuntu-latest
+    steps:
+    - run: git clone -b master https://github.com/vapor/fluent-postgres-driver.git
+      working-directory: ./
+    - run: swift package edit postgres-nio --revision ${{ github.sha }}
+      working-directory: ./fluent-postgres-driver
+    - run: swift test --enable-test-discovery --sanitize=thread
+      working-directory: ./fluent-postgres-driver
+      env:
+        POSTGRES_HOSTNAME: psql
