@@ -12,12 +12,30 @@ extension PostgresConnection {
     ) -> EventLoopFuture<PostgresConnection> {
         #if canImport(Network)
         if eventLoop is QoSEventLoop {
-            return self.connectNIOTS(to: socketAddress, on: eventLoop)
+            return self.connectNIOTS(
+                to: socketAddress,
+                tlsConfiguration: tlsConfiguration,
+                serverHostname: serverHostname,
+                logger: logger,
+                on: eventLoop
+            )
         } else {
-            return self.connectNIO(to: socketAddress, on: eventLoop)
+            return self.connectNIO(
+                to: socketAddress,
+                tlsConfiguration: tlsConfiguration,
+                serverHostname: serverHostname,
+                logger: logger,
+                on: eventLoop
+            )
         }
         #else
-        return self.connectNIO(to: socketAddress, on: eventLoop)
+        return self.connectNIO(
+            to: socketAddress,
+            tlsConfiguration: tlsConfiguration,
+            serverHostname: serverHostname,
+            logger: logger,
+            on: eventLoop
+        )
         #endif
     }
 
@@ -35,6 +53,7 @@ extension PostgresConnection {
             .channelInitializer { channel in
                 channel.configurePostgres(logger: logger)
             }
+            .connectTimeout(.seconds(10))
         if tlsConfiguration != nil {
             bootstrap = bootstrap.tlsOptions(.init())
         }
@@ -52,7 +71,11 @@ extension PostgresConnection {
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
         let bootstrap = ClientBootstrap(group: eventLoop)
-            .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
+            .channelOption(
+                ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR),
+                value: 1
+            )
+            .connectTimeout(.seconds(10))
         return bootstrap.connect(to: socketAddress).flatMap { channel in
             channel.configurePostgres(logger: logger).map { _ in
                 PostgresConnection(channel: channel, logger: logger)

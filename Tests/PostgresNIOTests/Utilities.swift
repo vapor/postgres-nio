@@ -13,7 +13,7 @@ extension PostgresConnection {
             return connect(
                 to: try address(),
                 tlsConfiguration: (env("POSTGRES_TLS").flatMap { Bool($0) } == true)
-                        ? .forClient() : nil,
+                    ? .forClient(certificateVerification: .none) : nil,
                 on: eventLoop
             )
         } catch {
