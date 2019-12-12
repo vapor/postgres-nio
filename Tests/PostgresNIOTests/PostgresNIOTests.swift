@@ -2,25 +2,9 @@ import Logging
 import PostgresNIO
 import XCTest
 import NIOTestUtils
+import NIOTransportServices
 
 final class PostgresNIOTests: XCTestCase {
-    private var group: EventLoopGroup!
-    private var eventLoop: EventLoop {
-        return self.group.next()
-    }
-    
-    override func setUp() {
-        testLogLevel = .info
-        self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-    }
-    
-    override func tearDown() {
-        XCTAssertNoThrow(try self.group.syncShutdownGracefully())
-        self.group = nil
-    }
-    
-    // MARK: Tests
-
     func testConnectAndClose() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         try conn.close().wait()
@@ -1027,6 +1011,34 @@ final class PostgresNIOTests: XCTestCase {
         } catch {
             XCTFail("\(error)")
         }
+    }
+
+    #if canImport(Network)
+    func testNIOTS() throws {
+        let elg = NIOTSEventLoopGroup()
+        defer { try! elg.syncShutdownGracefully() }
+        let conn = try PostgresConnection.test(on: elg.next()).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.simpleQuery("SELECT version()").wait()
+        XCTAssertEqual(rows.count, 1)
+        let version = rows[0].column("version")?.string
+        XCTAssertEqual(version?.contains("PostgreSQL"), true)
+    }
+    #endif
+
+    private var group: EventLoopGroup!
+    private var eventLoop: EventLoop {
+        return self.group.next()
+    }
+
+    override func setUp() {
+        testLogLevel = .info
+        self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    }
+
+    override func tearDown() {
+        XCTAssertNoThrow(try self.group.syncShutdownGracefully())
+        self.group = nil
     }
 }
 

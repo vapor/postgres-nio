@@ -56,3 +56,13 @@ jobs:
       working-directory: ./fluent-postgres-driver
       env:
         POSTGRES_HOSTNAME: psql
+  mojave:
+    runs-on: macOS-10.14
+    steps:
+    - uses: actions/checkout@v1
+    - run: swift test --sanitize=thread
+  ios:
+    runs-on: macOS-10.14
+    steps:
+    - uses: actions/checkout@v1
+    - run: xcodebuild test -destination 'name=iPhone 11' -scheme 'postgres-nio'

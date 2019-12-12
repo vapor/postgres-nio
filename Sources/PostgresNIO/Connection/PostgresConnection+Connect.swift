@@ -1,5 +1,6 @@
 import Logging
 import NIO
+import NIOTransportServices
 
 extension PostgresConnection {
     public static func connect(
@@ -9,16 +10,52 @@ extension PostgresConnection {
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
+        #if canImport(Network)
+        if eventLoop is QoSEventLoop {
+            return self.connectNIOTS(to: socketAddress, on: eventLoop)
+        } else {
+            return self.connectNIO(to: socketAddress, on: eventLoop)
+        }
+        #else
+        return self.connectNIO(to: socketAddress, on: eventLoop)
+        #endif
+    }
+
+    #if canImport(Network)
+    private static func connectNIOTS(
+        to socketAddress: SocketAddress,
+        tlsConfiguration: TLSConfiguration? = nil,
+        serverHostname: String? = nil,
+        logger: Logger = .init(label: "codes.vapor.postgres"),
+        on eventLoop: EventLoop
+    ) -> EventLoopFuture<PostgresConnection> {
+        var bootstrap = NIOTSConnectionBootstrap(group: eventLoop)
+            .connectTimeout(.hours(1))
+            .channelOption(ChannelOptions.socket(IPPROTO_TCP, TCP_NODELAY), value: 1)
+            .channelInitializer { channel in
+                channel.configurePostgres(logger: logger)
+            }
+        if tlsConfiguration != nil {
+            bootstrap = bootstrap.tlsOptions(.init())
+        }
+        return bootstrap.connect(to: socketAddress).map { channel in
+            PostgresConnection(channel: channel, logger: logger)
+        }
+    }
+    #endif
+    
+    private static func connectNIO(
+        to socketAddress: SocketAddress,
+        tlsConfiguration: TLSConfiguration? = nil,
+        serverHostname: String? = nil,
+        logger: Logger = .init(label: "codes.vapor.postgres"),
+        on eventLoop: EventLoop
+    ) -> EventLoopFuture<PostgresConnection> {
         let bootstrap = ClientBootstrap(group: eventLoop)
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
         return bootstrap.connect(to: socketAddress).flatMap { channel in
-            return channel.pipeline.addHandlers([
-                ByteToMessageHandler(PostgresMessageDecoder()),
-                MessageToByteHandler(PostgresMessageEncoder()),
-                PostgresRequestHandler(logger: logger),
-                PostgresErrorHandler(logger: logger)
-            ]).map {
-                return PostgresConnection(channel: channel, logger: logger)
+            channel.configurePostgres(logger: logger).map { _ in
+                PostgresConnection(channel: channel, logger: logger)
             }
         }.flatMap { (conn: PostgresConnection) in
             if let tlsConfiguration = tlsConfiguration {
@@ -34,6 +71,16 @@ extension PostgresConnection {
     }
 }
 
+extension Channel {
+    func configurePostgres(logger: Logger) -> EventLoopFuture<Void> {
+        self.pipeline.addHandlers([
+            ByteToMessageHandler(PostgresMessageDecoder()),
+            MessageToByteHandler(PostgresMessageEncoder()),
+            PostgresRequestHandler(logger: logger),
+            PostgresErrorHandler(logger: logger)
+        ])
+    }
+}
 
 private final class PostgresErrorHandler: ChannelInboundHandler {
     typealias InboundIn = Never
