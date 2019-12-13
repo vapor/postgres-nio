@@ -42,7 +42,12 @@ public struct PostgresRow: CustomStringConvertible {
         }
     }
 
-    let dataRow: PostgresMessage.DataRow
+    public let dataRow: PostgresMessage.DataRow
+
+    public var rowDescription: PostgresMessage.RowDescription {
+        self.lookupTable.rowDescription
+    }
+
     let lookupTable: LookupTable
 
     public func column(_ column: String) -> PostgresData? {
