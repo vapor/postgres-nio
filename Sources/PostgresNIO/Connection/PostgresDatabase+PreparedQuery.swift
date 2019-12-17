@@ -34,6 +34,10 @@ public class PreparedQuery {
         let handler = ExecutePreparedQuery(query: self, binds: binds, onRow: onRow)
         return database.send(handler, logger: database.logger)
     }
+
+    public func deallocate() -> EventLoopFuture<Void> {
+        return database.query("DEALLOCATE \"\(name)\"").map { _ in }
+    }
 }
 
 
