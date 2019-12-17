@@ -10,6 +10,16 @@ extension PostgresDatabase {
             return prepared
         }
     }
+
+    public func prepare(query: String, handler: @escaping (PreparedQuery)->EventLoopFuture<[[PostgresRow]]>)->EventLoopFuture<[[PostgresRow]]> {
+        prepare(query: query)
+        .flatMap { preparedQuery in
+            handler(preparedQuery)
+            .flatMap { results in
+                preparedQuery.deallocate().map { results }
+            }
+        }
+    }
 }
 
 

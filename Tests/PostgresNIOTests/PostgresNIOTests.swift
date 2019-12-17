@@ -1086,8 +1086,25 @@ final class PostgresNIOTests: XCTestCase {
          XCTAssertEqual(rows.count, 1)
          let value = rows[0].column("one")
          XCTAssertEqual(value?.int, 1)
-
      }
+
+    func testPrepareQueryClosure() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+
+        defer { try! conn.close().wait() }
+        let x = conn.prepare(query: "SELECT $1::text as foo;", handler: { query in
+            let a = query.execute(["a"])
+            let b = query.execute(["b"])
+            let c = query.execute(["c"])
+            return EventLoopFuture.whenAllSucceed([a, b, c], on: conn.eventLoop)
+
+        })
+        let rows = try x.wait()
+        XCTAssertEqual(rows.count, 3)
+        XCTAssertEqual(rows[0][0].column("foo")?.string, "a")
+        XCTAssertEqual(rows[1][0].column("foo")?.string, "b")
+        XCTAssertEqual(rows[2][0].column("foo")?.string, "c")
+    }
 }
 
     // https://github.com/vapor/postgres-nio/issues/71
