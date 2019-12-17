@@ -99,28 +99,23 @@ private final class PrepareQueryRequest: PostgresRequest {
 
     func log(to logger: Logger) {
         self.logger = logger
-        logger.debug("\(self.query)")
+        logger.debug("\(self.query) prepared as \(self.name)")
     }
 }
 
 
 private final class ExecutePreparedQuery: PostgresRequest {
-    func log(to logger: Logger) {
-
-    }
-
-
     let query: PreparedQuery
     let binds: [PostgresData]
     var onRow: (PostgresRow) throws -> ()
     var resultFormatCodes: [PostgresFormatCode]
+    var logger: Logger?
 
     init(query: PreparedQuery, binds: [PostgresData], onRow: @escaping (PostgresRow) throws -> ()) {
         self.query = query
         self.binds = binds
         self.onRow = onRow
         self.resultFormatCodes = [.binary]
-
     }
 
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
@@ -160,5 +155,9 @@ private final class ExecutePreparedQuery: PostgresRequest {
         return try [bind.message(), execute.message(), sync.message()]
     }
 
+    func log(to logger: Logger) {
+        self.logger = logger
+        logger.debug("Execute Prepared Query: \(query.name)")
+    }
 
 }
