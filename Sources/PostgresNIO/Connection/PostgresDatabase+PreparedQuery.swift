@@ -4,8 +4,8 @@ extension PostgresDatabase {
 
     public func prepare(query: String) -> EventLoopFuture<PreparedQuery> {
         let name = "nio-postgres-\(UUID().uuidString)"
-        let prepare = PrepareQueryHandler(query, as: name)
-        return self.send(prepare).map { () -> (PreparedQuery) in
+        let prepare = PrepareQueryRequest(query, as: name)
+        return self.send(prepare, logger: self.logger).map { () -> (PreparedQuery) in
             let prepared = PreparedQuery(database: self, name: name, rowDescription: prepare.rowLookupTable!)
             return prepared
         }
@@ -31,17 +31,18 @@ public class PreparedQuery {
     }
 
     public func execute(_ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        let handler = ExecutePreparedQueryHandler(query: self, binds: binds, onRow: onRow)
-        return database.send(handler)
+        let handler = ExecutePreparedQuery(query: self, binds: binds, onRow: onRow)
+        return database.send(handler, logger: database.logger)
     }
 }
 
 
-private final class PrepareQueryHandler: PostgresRequestHandler {
+private final class PrepareQueryRequest: PostgresRequest {
     let query: String
     let name: String
     var rowLookupTable: PostgresRow.LookupTable?
     var resultFormatCodes: [PostgresFormatCode]
+    var logger: Logger?
 
     init(_ query: String, as name: String) {
         self.query = query
@@ -81,10 +82,19 @@ private final class PrepareQueryHandler: PostgresRequestHandler {
         return try [parse.message(), describe.message(), PostgresMessage.Sync().message()]
     }
 
+
+    func log(to logger: Logger) {
+        self.logger = logger
+        logger.debug("\(self.query)")
+    }
 }
 
 
-private final class ExecutePreparedQueryHandler: PostgresRequestHandler {
+private final class ExecutePreparedQuery: PostgresRequest {
+    func log(to logger: Logger) {
+
+    }
+
 
     let query: PreparedQuery
     let binds: [PostgresData]

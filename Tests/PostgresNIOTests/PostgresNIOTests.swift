@@ -1075,6 +1075,21 @@ final class PostgresNIOTests: XCTestCase {
         }
     }
 
+    func testPreparedQuery() throws {
+         let conn = try PostgresConnection.test(on: eventLoop).wait()
+
+         defer { try! conn.close().wait() }
+         let prepared = try conn.prepare(query: "SELECT 1 as one;").wait()
+         let rows = try prepared.execute().wait()
+
+
+         XCTAssertEqual(rows.count, 1)
+         let value = rows[0].column("one")
+         XCTAssertEqual(value?.int, 1)
+
+     }
+}
+
     // https://github.com/vapor/postgres-nio/issues/71
     func testChar1Serialization() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
@@ -1163,6 +1178,7 @@ private func prepareTableToMeasureSelectPerformance(
         }
         _ = try conn.query(insertQuery, batchedFixtureData).wait()
     }
+    
 }
 
 
