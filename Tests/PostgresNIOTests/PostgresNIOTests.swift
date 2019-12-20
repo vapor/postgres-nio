@@ -1028,6 +1028,23 @@ final class PostgresNIOTests: XCTestCase {
             XCTFail("\(error)")
         }
     }
+
+    // https://github.com/vapor/postgres-nio/issues/71
+    func testChar1Serialization() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            '5'::char(1) as one,
+            '5'::char(2) as two
+        """).wait()
+        XCTAssertEqual(rows[0].column("one")?.uint8, 53)
+        XCTAssertEqual(rows[0].column("one")?.uint16, 53)
+        XCTAssertEqual(rows[0].column("one")?.string, "5")
+        XCTAssertEqual(rows[0].column("two")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("two")?.uint16, nil)
+        XCTAssertEqual(rows[0].column("two")?.string, "5 ")
+    }
 }
 
 private func performance(function: String = #function) -> Bool {

@@ -47,7 +47,7 @@ extension PostgresData {
             case .int2, .int4, .int8:
                 return self.int?.description
             case .bpchar:
-                return self.character?.description
+                return value.readString(length: value.readableBytes)
             default:
                 return nil
             }
