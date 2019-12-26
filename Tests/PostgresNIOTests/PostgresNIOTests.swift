@@ -986,7 +986,7 @@ final class PostgresNIOTests: XCTestCase {
         defer { try! conn.close().wait() }
         let rows = try conn.query("""
         select
-            $1::char as int
+            $1::"char" as int
         """, [
             .init(uint8: 5)
         ]).wait()
