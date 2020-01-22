@@ -12,7 +12,7 @@ extension Optional: PostgresDataConvertible where Wrapped: PostgresDataConvertib
         case .some(let wrapped):
             return wrapped.postgresData
         case .none:
-            return PostgresData.null
+            return .init(type: Wrapped.postgresDataType, value: nil)
         }
     }
 }

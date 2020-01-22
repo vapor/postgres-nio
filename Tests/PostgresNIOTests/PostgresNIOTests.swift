@@ -1028,6 +1028,27 @@ final class PostgresNIOTests: XCTestCase {
             XCTFail("\(error)")
         }
     }
+
+    func testUserDefinedType() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.query("DROP TYPE IF EXISTS foo").wait()
+        _ = try conn.query("CREATE TYPE foo AS ENUM ('bar', 'qux')").wait()
+        defer {
+            _ = try! conn.query("DROP TYPE foo").wait()
+        }
+        let res = try conn.query("SELECT 'qux'::foo as foo").wait()
+        XCTAssertEqual(res[0].column("foo")?.string, "qux")
+    }
+
+    func testNullBind() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let res = try conn.query("SELECT $1::text as foo", [String?.none.postgresData!]).wait()
+        XCTAssertEqual(res[0].column("foo")?.string, nil)
+    }
 }
 
 private func performance(function: String = #function) -> Bool {
