@@ -18,12 +18,17 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
     }
 
     public var debugDescription: String {
+        var copy = self.value
+        var values: [Int16] = []
+        while let value = copy.readInteger(endianness: .big, as: Int16.self) {
+            values.append(value)
+        }
         return """
         ndigits: \(self.ndigits)
         weight: \(self.weight)
         sign: \(self.sign)
         dscale: \(self.dscale)
-        value: \(self.value.debugDescription)
+        value: \(values)
         """
     }
 
@@ -125,34 +130,44 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
 
         var integer = ""
         var fractional = ""
-
         var value = self.value
         for offset in 0..<self.ndigits {
             /// extract current char and advance memory
             let char = value.readInteger(endianness: .big, as: Int16.self) ?? 0
 
-            /// convert the current char to its string form
-            let string: String
-            if char == 0 {
-                /// 0 means 4 zeros
-                string = "0000"
-            } else {
-                string = char.description
-            }
-
             /// depending on our offset, append the string to before or after the decimal point
-            if offset < self.weight + 1 {
-                // insert zeros (skip leading)
-                if offset > 0 {
-                    integer += String(repeating: "0", count: 4 - string.count)
+            if self.weight - offset >= 0 {
+                // insert zeros
+                if offset == 0 {
+                    integer += char.description
+                } else {
+                    integer += char.description + String(repeating: "0", count: 4 - char.description.count)
                 }
-                integer += string
             } else {
-                // leading zeros matter with fractional
-                fractional += String(repeating: "0", count: 4 - string.count) + string
+                // leading zeros always matter with fractional
+                fractional += String(repeating: "0", count: 4 - char.description.count)
+                    + char.description
             }
         }
 
+        // check for any remaining zeroes required on integer or fractional
+        let offset: Int16
+        if self.weight > 0 {
+            offset = (self.weight + 1) - self.ndigits
+        } else {
+            offset = abs(self.weight) - self.ndigits
+        }
+        if offset > 0 {
+            for _ in 0..<offset {
+                if self.weight > 0 {
+                    integer = integer + "0000"
+                } else {
+                    fractional = "0000" + fractional
+                }
+            }
+        }
+
+        // prevent . without leading "0"
         if integer.count == 0 {
             integer = "0"
         }
@@ -197,6 +212,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         }
         self.dscale = dscale
         self.value = buffer
+        print(self.debugDescription)
     }
 }
 
