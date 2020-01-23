@@ -212,7 +212,6 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         }
         self.dscale = dscale
         self.value = buffer
-        print(self.debugDescription)
     }
 }
 
