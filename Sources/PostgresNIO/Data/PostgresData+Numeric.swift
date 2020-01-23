@@ -127,6 +127,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         guard self.ndigits > 0 else {
             return "0"
         }
+        // print(self.debugDescription)
 
         // Digits before the decimal point.
         var integer = ""
@@ -145,7 +146,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
                     // First integer offset doesn't have trailing zeroes.
                     integer += char.description
                 } else {
-                    integer += char.description + String(repeating: "0", count: 4 - char.description.count)
+                    integer += String(repeating: "0", count: 4 - char.description.count) + char.description
                 }
             } else {
                 fractional += String(repeating: "0", count: 4 - char.description.count)

@@ -401,6 +401,38 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[0].column("l")?.string, "0.000000000123")
         XCTAssertEqual(rows[0].column("m")?.string, "0.5")
     }
+
+    func testSingleNumericParsing() throws {
+        // this seemingly duped test is useful for debugging numeric parsing
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let numeric = "790226039477542363.6032384900176272473"
+        let rows = try conn.query("""
+        select
+            '\(numeric)'::numeric as n
+        """).wait()
+        XCTAssertEqual(rows[0].column("n")?.string, numeric)
+    }
+
+    func testRandomlyGeneratedNumericParsing() throws {
+        // this test takes a long time to run
+        // return;
+
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        for _ in 0..<1_000_000 {
+            let integer = UInt.random(in: UInt.min..<UInt.max)
+            let fraction = UInt.random(in: UInt.min..<UInt.max)
+            let number = "\(integer).\(fraction)"
+                .trimmingCharacters(in: CharacterSet(["0"]))
+            let rows = try conn.query("""
+            select
+                '\(number)'::numeric as n
+            """).wait()
+            XCTAssertEqual(rows[0].column("n")?.string, number)
+        }
+    }
     
     func testNumericSerialization() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
