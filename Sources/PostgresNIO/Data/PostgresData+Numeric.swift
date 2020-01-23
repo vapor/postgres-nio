@@ -128,29 +128,32 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             return "0"
         }
 
+        // Digits before the decimal point.
         var integer = ""
+
+        // Digits after the decimal point.
         var fractional = ""
+
+        // Consume digits from the value buffer.
         var value = self.value
         for offset in 0..<self.ndigits {
-            /// extract current char and advance memory
             let char = value.readInteger(endianness: .big, as: Int16.self) ?? 0
 
-            /// depending on our offset, append the string to before or after the decimal point
+            // Depending on offset, append value before or after the decimal point.
             if self.weight - offset >= 0 {
-                // insert zeros
                 if offset == 0 {
+                    // First integer offset doesn't have trailing zeroes.
                     integer += char.description
                 } else {
                     integer += char.description + String(repeating: "0", count: 4 - char.description.count)
                 }
             } else {
-                // leading zeros always matter with fractional
                 fractional += String(repeating: "0", count: 4 - char.description.count)
                     + char.description
             }
         }
 
-        // check for any remaining zeroes required on integer or fractional
+        // Check for any remaining zeroes required before or after decimal point.
         let offset: Int16
         if self.weight > 0 {
             offset = (self.weight + 1) - self.ndigits
@@ -167,18 +170,21 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             }
         }
 
-        // prevent . without leading "0"
+        // Prevent fraction without leading "0"
         if integer.count == 0 {
             integer = "0"
         }
 
+        // Remove extraneous zeroes at the end of the fraction.
         if fractional.count > self.dscale {
-            /// use the dscale to remove extraneous zeroes at the end of the fractional part
-            let lastSignificantIndex = fractional.index(fractional.startIndex, offsetBy: Int(self.dscale))
-            fractional = String(fractional[..<lastSignificantIndex])
+            let lastSignificant = fractional.index(
+                fractional.startIndex,
+                offsetBy: Int(self.dscale)
+            )
+            fractional = String(fractional[..<lastSignificant])
         }
 
-        /// determine whether fraction is empty and dynamically add `.`
+        // Determine whether fraction is empty to add decimal point.
         let numeric: String
         if fractional != "" {
             numeric = integer + "." + fractional
@@ -186,7 +192,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             numeric = integer
         }
 
-        /// use sign to determine adding a leading `-`
+        // Indicate whether or not the value is negative.
         if (self.sign & 0x4000) != 0 {
             return "-" + numeric
         } else {
