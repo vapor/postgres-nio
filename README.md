@@ -72,7 +72,7 @@ This package has four dependencies:
 
 - [`apple/swift-nio`](https://github.com/apple/swift-nio) for IO
 - [`apple/swift-nio-ssl`](https://github.com/apple/swift-nio-ssl) for TLS
-- [`apple/swift-log`](https://github.com/apple/swift-logs) for logging
+- [`apple/swift-log`](https://github.com/apple/swift-log) for logging
 - [`apple/swift-metrics`](https://github.com/apple/swift-metrics) for metrics
 
 This package has no additional system dependencies.
