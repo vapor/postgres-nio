@@ -49,7 +49,12 @@ extension PostgresData {
             case .bpchar:
                 return value.readString(length: value.readableBytes)
             default:
-                return nil
+                if self.type.isUserDefined {
+                    // custom type
+                    return value.readString(length: value.readableBytes)
+                } else {
+                    return nil
+                }
             }
         case .text:
             guard let string = value.readString(length: value.readableBytes) else {

@@ -378,12 +378,60 @@ final class PostgresNIOTests: XCTestCase {
             '1234.5678'::numeric as a,
             '-123.456'::numeric as b,
             '123456.789123'::numeric as c,
-            '3.14159265358979'::numeric as d
+            '3.14159265358979'::numeric as d,
+            '10000'::numeric as e,
+            '0.00001'::numeric as f,
+            '100000000'::numeric as g,
+            '0.000000001'::numeric as h,
+            '100000000000'::numeric as i,
+            '0.000000000001'::numeric as j,
+            '123000000000'::numeric as k,
+            '0.000000000123'::numeric as l,
+            '0.5'::numeric as m
         """).wait()
         XCTAssertEqual(rows[0].column("a")?.string, "1234.5678")
         XCTAssertEqual(rows[0].column("b")?.string, "-123.456")
         XCTAssertEqual(rows[0].column("c")?.string, "123456.789123")
         XCTAssertEqual(rows[0].column("d")?.string, "3.14159265358979")
+        XCTAssertEqual(rows[0].column("e")?.string, "10000")
+        XCTAssertEqual(rows[0].column("f")?.string, "0.00001")
+        XCTAssertEqual(rows[0].column("g")?.string, "100000000")
+        XCTAssertEqual(rows[0].column("h")?.string, "0.000000001")
+        XCTAssertEqual(rows[0].column("k")?.string, "123000000000")
+        XCTAssertEqual(rows[0].column("l")?.string, "0.000000000123")
+        XCTAssertEqual(rows[0].column("m")?.string, "0.5")
+    }
+
+    func testSingleNumericParsing() throws {
+        // this seemingly duped test is useful for debugging numeric parsing
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let numeric = "790226039477542363.6032384900176272473"
+        let rows = try conn.query("""
+        select
+            '\(numeric)'::numeric as n
+        """).wait()
+        XCTAssertEqual(rows[0].column("n")?.string, numeric)
+    }
+
+    func testRandomlyGeneratedNumericParsing() throws {
+        // this test takes a long time to run
+        return
+
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        for _ in 0..<1_000_000 {
+            let integer = UInt.random(in: UInt.min..<UInt.max)
+            let fraction = UInt.random(in: UInt.min..<UInt.max)
+            let number = "\(integer).\(fraction)"
+                .trimmingCharacters(in: CharacterSet(["0"]))
+            let rows = try conn.query("""
+            select
+                '\(number)'::numeric as n
+            """).wait()
+            XCTAssertEqual(rows[0].column("n")?.string, number)
+        }
     }
     
     func testNumericSerialization() throws {
@@ -986,7 +1034,7 @@ final class PostgresNIOTests: XCTestCase {
         defer { try! conn.close().wait() }
         let rows = try conn.query("""
         select
-            $1::char as int
+            $1::"char" as int
         """, [
             .init(uint8: 5)
         ]).wait()
@@ -1044,6 +1092,27 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[0].column("two")?.uint8, nil)
         XCTAssertEqual(rows[0].column("two")?.uint16, nil)
         XCTAssertEqual(rows[0].column("two")?.string, "5 ")
+    }
+
+    func testUserDefinedType() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.query("DROP TYPE IF EXISTS foo").wait()
+        _ = try conn.query("CREATE TYPE foo AS ENUM ('bar', 'qux')").wait()
+        defer {
+            _ = try! conn.query("DROP TYPE foo").wait()
+        }
+        let res = try conn.query("SELECT 'qux'::foo as foo").wait()
+        XCTAssertEqual(res[0].column("foo")?.string, "qux")
+    }
+
+    func testNullBind() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let res = try conn.query("SELECT $1::text as foo", [String?.none.postgresData!]).wait()
+        XCTAssertEqual(res[0].column("foo")?.string, nil)
     }
 }
 

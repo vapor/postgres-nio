@@ -71,7 +71,12 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
         case .jsonbArray:
             description = self.array?.description
         default:
-            description = nil
+            if self.type.isUserDefined {
+                // custom type
+                description = value.readString(length: value.readableBytes)
+            } else {
+                description = nil
+            }
         }
 
         if let description = description {

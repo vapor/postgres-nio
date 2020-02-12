@@ -106,6 +106,13 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
 
     /// The raw data type code recognized by PostgreSQL.
     public var rawValue: UInt32
+
+    /// Returns `true` if the type's raw value is greater than `2^14`.
+    /// This _appears_ to be true for all user-defined types, but I don't
+    /// have any documentation to back this up.
+    public var isUserDefined: Bool {
+        self.rawValue >= 1 << 14
+    }
     
     /// See `ExpressibleByIntegerLiteral.init(integerLiteral:)`
     public init(integerLiteral value: UInt32) {
