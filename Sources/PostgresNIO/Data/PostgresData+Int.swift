@@ -115,8 +115,10 @@ private extension PostgresData {
         switch self.formatCode {
         case .binary:
             switch self.type {
-            case .char:
-                assert(value.readableBytes == 1)
+            case .char, .bpchar:
+                guard value.readableBytes == 1 else {
+                    return nil
+                }
                 guard let uint8 = value.getInteger(at: value.readerIndex, as: UInt8.self) else {
                     return nil
                 }
