@@ -36,7 +36,7 @@ jobs:
     - run: swift test --enable-test-discovery --sanitize=thread
   fluent:
     container: 
-      image: vapor/swift:5.1
+      image: vapor/swift:5.2
     services:
       psql:
         image: postgres
