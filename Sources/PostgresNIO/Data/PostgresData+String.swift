@@ -12,7 +12,7 @@ extension PostgresData {
         switch self.formatCode {
         case .binary:
             switch self.type {
-            case .varchar, .text:
+            case .varchar, .text, .name:
                 guard let string = value.readString(length: value.readableBytes) else {
                     return nil
                 }
