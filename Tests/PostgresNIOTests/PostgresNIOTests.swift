@@ -600,7 +600,7 @@ final class PostgresNIOTests: XCTestCase {
     }
     
     func testRemoteTLSServer() throws {
-        let url = "postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj"
+        // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
         let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { try! elg.syncShutdownGracefully() }
         
@@ -793,8 +793,6 @@ final class PostgresNIOTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
 
-        let now = Date()
-        let uuid = UUID()
         try prepareTableToMeasureSelectPerformance(
             rowCount: 300_000, batchSize: 5_000,
             schema:
