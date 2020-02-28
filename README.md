@@ -1,4 +1,4 @@
-<img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" alt="PostgresNIO">
+<img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
 <br>
 <a href="https://docs.vapor.codes/4.0/">
     <img src="http://img.shields.io/badge/read_the-docs-2196f3.svg" alt="Documentation">
