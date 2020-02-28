@@ -16,6 +16,7 @@
     <img src="http://img.shields.io/badge/swift-5-brightgreen.svg" alt="Swift 5">
 </a>
 <br>
+<br>
 
 🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO](https://github.com/apple/swift-nio).
 
