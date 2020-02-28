@@ -1,4 +1,4 @@
-import CMD5
+import Crypto
 import NIO
 import Logging
 
@@ -99,13 +99,8 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
     }
     
     private func md5(_ message: [UInt8]) -> [UInt8] {
-        var message = message
-        var ctx = CMD5_CTX()
-        CMD5_Init(&ctx)
-        CMD5_Update(&ctx, &message, numericCast(message.count))
-        var digest = [UInt8](repeating: 0, count: 16)
-        CMD5_Final(&digest, &ctx)
-        return digest
+        let digest = Insecure.MD5.hash(data: message)
+        return .init(digest)
     }
     
     func bytes(_ string: String) -> [UInt8] {
