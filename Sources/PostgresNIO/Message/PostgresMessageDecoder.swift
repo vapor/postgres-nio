@@ -9,10 +9,14 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
     
     /// If `true`, the server has asked for authentication.
     public var hasSeenFirstMessage: Bool
+
+    /// Logger to send debug messages to.
+    let logger: Logger?
     
     /// Creates a new `PostgresMessageDecoder`.
-    public init() {
+    public init(logger: Logger? = nil) {
         self.hasSeenFirstMessage = false
+        self.logger = logger
     }
     
     /// See `ByteToMessageDecoder`.
@@ -48,6 +52,7 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
         
         // there is sufficient data, use this buffer
         buffer = peekBuffer
+        self.logger?.trace("Decoded: PostgresMessage (\(message.identifier))")
         context.fireChannelRead(wrapInboundOut(message))
         return .continue
     }

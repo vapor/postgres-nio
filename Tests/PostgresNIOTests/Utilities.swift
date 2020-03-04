@@ -1,8 +1,6 @@
 import Logging
 import PostgresNIO
 
-var testLogLevel: Logger.Level = .info
-
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
         #if os(Linux)
@@ -27,7 +25,6 @@ extension PostgresConnection {
                 database: "vapor_database",
                 password: "vapor_password"
             ).map {
-                conn.logger.logLevel = testLogLevel
                 return conn
             }
         }

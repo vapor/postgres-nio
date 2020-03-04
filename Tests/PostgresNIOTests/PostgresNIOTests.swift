@@ -10,7 +10,7 @@ final class PostgresNIOTests: XCTestCase {
     }
     
     override func setUp() {
-        testLogLevel = .info
+        XCTAssertTrue(isLoggingConfigured)
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
     
@@ -1164,3 +1164,13 @@ private func prepareTableToMeasureSelectPerformance(
         _ = try conn.query(insertQuery, batchedFixtureData).wait()
     }
 }
+
+
+let isLoggingConfigured: Bool = {
+    LoggingSystem.bootstrap { label in
+        var handler = StreamLogHandler.standardOutput(label: label)
+        handler.logLevel = .debug
+        return handler
+    }
+    return true
+}()
