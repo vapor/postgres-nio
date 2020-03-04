@@ -31,17 +31,11 @@ public final class PostgresConnection {
             return self.eventLoop.makeSucceededFuture(())
         }
         self.didClose = true
-        
-        let promise = self.eventLoop.makePromise(of: Void.self)
-        self.eventLoop.submit {
-            switch self.channel.isActive {
-            case true:
-                promise.succeed(())
-            case false:
-                self.channel.close(mode: .all, promise: promise)
-            }
-        }.cascadeFailure(to: promise)
-        return promise.futureResult
+        if !self.isClosed {
+            return self.channel.close(mode: .all)
+        } else {
+            return self.eventLoop.makeSucceededFuture(())
+        }
     }
     
     deinit {

@@ -12,24 +12,17 @@ extension PostgresConnection: PostgresDatabase {
         self.channel.flush()
         return promise.futureResult
     }
-    
+
     public func withConnection<T>(_ closure: (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
         closure(self)
     }
-}
-
-public protocol PostgresRequest {
-    // return nil to end request
-    func respond(to message: PostgresMessage) throws -> [PostgresMessage]?
-    func start() throws -> [PostgresMessage]
-    func log(to logger: Logger)
 }
 
 final class PostgresRequestContext {
     let delegate: PostgresRequest
     let promise: EventLoopPromise<Void>
     var lastError: Error?
-    
+
     init(delegate: PostgresRequest, promise: EventLoopPromise<Void>) {
         self.delegate = delegate
         self.promise = promise
@@ -40,15 +33,15 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
     typealias InboundIn = PostgresMessage
     typealias OutboundIn = PostgresRequestContext
     typealias OutboundOut = PostgresMessage
-    
+
     private var queue: [PostgresRequestContext]
     let logger: Logger
-    
+
     public init(logger: Logger) {
         self.queue = []
         self.logger = logger
     }
-    
+
     private func _channelRead(context: ChannelHandlerContext, data: NIOAny) throws {
         let message = self.unwrapInboundIn(data)
         guard self.queue.count > 0 else {
@@ -56,7 +49,7 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
             return
         }
         let request = self.queue[0]
-        
+
         switch message.identifier {
         case .error:
             let error = try PostgresMessage.Error(message: message)
@@ -67,7 +60,7 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
             self.logger.notice("\(notice)")
         default: break
         }
-        
+
         if let responses = try request.delegate.respond(to: message) {
             for response in responses {
                 context.write(self.wrapOutboundOut(response), promise: nil)
@@ -82,7 +75,7 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
             }
         }
     }
-    
+
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
         do {
             try self._channelRead(context: context, data: data)
@@ -92,7 +85,7 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
         // Regardless of error, also pass the message downstream; this is necessary for PostgresNotificationHandler (which is appended at the end) to receive notifications
         context.fireChannelRead(data)
     }
-    
+
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
         let request = self.unwrapOutboundIn(data)
         self.queue.append(request)
@@ -105,13 +98,16 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
             self.errorCaught(context: context, error: error)
         }
     }
-    
+
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+        let terminate = try! PostgresMessage.Terminate().message()
+        context.write(self.wrapOutboundOut(terminate), promise: nil)
+        context.close(mode: mode, promise: promise)
+
         for current in self.queue {
             current.promise.fail(PostgresError.connectionClosed)
         }
         self.queue = []
-        context.close(mode: mode, promise: promise)
     }
 }
 

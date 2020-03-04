@@ -13,8 +13,8 @@ extension PostgresConnection {
             .channelOption(ChannelOptions.socket(SocketOptionLevel(SOL_SOCKET), SO_REUSEADDR), value: 1)
         return bootstrap.connect(to: socketAddress).flatMap { channel in
             return channel.pipeline.addHandlers([
-                ByteToMessageHandler(PostgresMessageDecoder()),
-                MessageToByteHandler(PostgresMessageEncoder()),
+                ByteToMessageHandler(PostgresMessageDecoder(logger: logger)),
+                MessageToByteHandler(PostgresMessageEncoder(logger: logger)),
                 PostgresRequestHandler(logger: logger),
                 PostgresErrorHandler(logger: logger)
             ]).map {

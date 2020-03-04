@@ -3,11 +3,17 @@ import NIO
 public final class PostgresMessageEncoder: MessageToByteEncoder {
     /// See `MessageToByteEncoder`.
     public typealias OutboundIn = PostgresMessage
+
+    /// Logger to send debug messages to.
+    let logger: Logger?
+
+    /// Creates a new `PostgresMessageEncoder`.
+    public init(logger: Logger? = nil) {
+        self.logger = logger
+    }
     
     /// See `MessageToByteEncoder`.
     public func encode(data message: PostgresMessage, out: inout ByteBuffer) throws {
-        // print("PostgresMessage.ChannelEncoder.encode(\(data))")
-        
         // serialize identifier
         var message = message
         switch message.identifier {
@@ -25,6 +31,7 @@ public final class PostgresMessageEncoder: MessageToByteEncoder {
         
         // set message size
         out.setInteger(Int32(out.writerIndex - messageSizeIndex), at: messageSizeIndex)
+        self.logger?.trace("Encoded Postgres message: \(message.identifier)")
     }
 }
 
