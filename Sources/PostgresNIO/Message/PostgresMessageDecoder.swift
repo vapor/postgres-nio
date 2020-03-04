@@ -52,7 +52,7 @@ public final class PostgresMessageDecoder: ByteToMessageDecoder {
         
         // there is sufficient data, use this buffer
         buffer = peekBuffer
-        self.logger?.trace("Decoded Postgres message: \(message.identifier)")
+        self.logger?.trace("Decoded: PostgresMessage (\(message.identifier))")
         context.fireChannelRead(wrapInboundOut(message))
         return .continue
     }

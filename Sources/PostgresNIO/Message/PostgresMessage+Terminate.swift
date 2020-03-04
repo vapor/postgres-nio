@@ -4,10 +4,6 @@ extension PostgresMessage {
             .terminate
         }
 
-        public var description: String {
-            "Terminate"
-        }
-
         public func serialize(into buffer: inout ByteBuffer) { }
     }
 }

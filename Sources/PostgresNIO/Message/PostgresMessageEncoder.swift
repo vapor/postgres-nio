@@ -31,7 +31,7 @@ public final class PostgresMessageEncoder: MessageToByteEncoder {
         
         // set message size
         out.setInteger(Int32(out.writerIndex - messageSizeIndex), at: messageSizeIndex)
-        self.logger?.trace("Encoded Postgres message: \(message.identifier)")
+        self.logger?.trace("Encoded: PostgresMessage (\(message.identifier))")
     }
 }
 
