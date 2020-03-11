@@ -23,6 +23,9 @@ extension PostgresConnection {
 private final class PostgresAuthenticationRequest: PostgresRequest {
     enum State {
         case ready
+        case saslInitialSent(SASLAuthenticationManager<SASLMechanism_SCRAM_SHA256>)
+        case saslChallengeResponse(SASLAuthenticationManager<SASLMechanism_SCRAM_SHA256>)
+        case saslWaitOkay
         case done
     }
     
@@ -60,11 +63,63 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
                     return try [PostgresMessage.Password(string: hash).message()]
                 case .plaintext:
                     return try [PostgresMessage.Password(string: self.password ?? "").message()]
+                case .saslMechanisms(let saslMechanisms):
+                    if saslMechanisms.contains("SCRAM-SHA-256") && self.password != nil {
+                        let saslManager = SASLAuthenticationManager(asClientSpeaking:
+                            SASLMechanism_SCRAM_SHA256(username: self.username, password: { self.password! }))
+                        var message: PostgresMessage?
+                        
+                        if (try saslManager.handle(message: nil, sender: { bytes in
+                            message = try PostgresMessage.SASLInitialResponse(mechanism: "SCRAM-SHA-256", initialData: bytes).message()
+                        })) {
+                            self.state = .saslWaitOkay
+                        } else {
+                            self.state = .saslInitialSent(saslManager)
+                        }
+                        return [message].compactMap { $0 }
+                    } else {
+                        throw PostgresError.protocol("Unable to authenticate with any available SASL mechanism: \(saslMechanisms)")
+                    }
+                case .saslContinue, .saslFinal:
+                    throw PostgresError.protocol("Unexpected SASL response to start message: \(message)")
                 case .ok:
                     self.state = .done
                     return []
                 }
             default: throw PostgresError.protocol("Unexpected response to start message: \(message)")
+            }
+        case .saslInitialSent(let manager),
+             .saslChallengeResponse(let manager):
+            switch message.identifier {
+            case .authentication:
+                let auth = try PostgresMessage.Authentication(message: message)
+                switch auth {
+                case .saslContinue(let data), .saslFinal(let data):
+                    print(auth)
+                    var message: PostgresMessage?
+                    if try manager.handle(message: data, sender: { bytes in
+                        message = try PostgresMessage.SASLResponse(responseData: bytes).message()
+                    }) {
+                        self.state = .saslWaitOkay
+                    } else {
+                        self.state = .saslChallengeResponse(manager)
+                    }
+                    return [message].compactMap { $0 }
+                default: throw PostgresError.protocol("Unexpected response during SASL negotiation: \(message)")
+                }
+            default: throw PostgresError.protocol("Unexpected response during SASL negotiation: \(message)")
+            }
+        case .saslWaitOkay:
+            switch message.identifier {
+            case .authentication:
+                let auth = try PostgresMessage.Authentication(message: message)
+                switch auth {
+                case .ok:
+                    self.state = .done
+                    return []
+                default: throw PostgresError.protocol("Unexpected response while waiting for post-SASL ok: \(message)")
+                }
+            default: throw PostgresError.protocol("Unexpected response while waiting for post-SASL ok: \(message)")
             }
         case .done:
             switch message.identifier {
