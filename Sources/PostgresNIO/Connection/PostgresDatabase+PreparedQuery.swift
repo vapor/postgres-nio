@@ -23,7 +23,7 @@ extension PostgresDatabase {
 }
 
 
-public class PreparedQuery {
+public struct PreparedQuery {
     let database: PostgresDatabase
     let name: String
     let rowLookupTable: PostgresRow.LookupTable
