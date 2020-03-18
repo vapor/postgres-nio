@@ -1105,7 +1105,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[1][0].column("foo")?.string, "b")
         XCTAssertEqual(rows[2][0].column("foo")?.string, "c")
     }
-}
+
 
     // https://github.com/vapor/postgres-nio/issues/71
     func testChar1Serialization() throws {

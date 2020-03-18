@@ -1,7 +1,6 @@
 import Foundation
 
 extension PostgresDatabase {
-
     public func prepare(query: String) -> EventLoopFuture<PreparedQuery> {
         let name = "nio-postgres-\(UUID().uuidString)"
         let prepare = PrepareQueryRequest(query, as: name)
@@ -11,7 +10,7 @@ extension PostgresDatabase {
         }
     }
 
-    public func prepare(query: String, handler: @escaping (PreparedQuery)->EventLoopFuture<[[PostgresRow]]>)->EventLoopFuture<[[PostgresRow]]> {
+    public func prepare(query: String, handler: @escaping (PreparedQuery) -> EventLoopFuture<[[PostgresRow]]>) -> EventLoopFuture<[[PostgresRow]]> {
         prepare(query: query)
         .flatMap { preparedQuery in
             handler(preparedQuery)
@@ -36,8 +35,7 @@ public struct PreparedQuery {
 
     public func execute(_ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
         var rows: [PostgresRow] = []
-        return execute(binds) { rows.append($0) }.map { rows }
-
+        return self.execute(binds) { rows.append($0) }.map { rows }
     }
 
     public func execute(_ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
