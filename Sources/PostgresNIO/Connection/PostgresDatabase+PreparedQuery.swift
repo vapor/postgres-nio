@@ -44,7 +44,10 @@ public struct PreparedQuery {
     }
 
     public func deallocate() -> EventLoopFuture<Void> {
-        return database.query("DEALLOCATE \"\(name)\"").map { _ in }
+        database.send(CloseRequest(name: self.name,
+                                   closeType: .preparedStatement),
+                                   logger:database.logger)
+
     }
 }
 
