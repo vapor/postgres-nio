@@ -1,5 +1,6 @@
 import Logging
 import PostgresNIO
+import XCTest
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
@@ -26,6 +27,10 @@ extension PostgresConnection {
                 password: "vapor_password"
             ).map {
                 return conn
+            }.flatMapError { error in
+                conn.close().flatMapThrowing {
+                    throw error
+                }
             }
         }
     }
