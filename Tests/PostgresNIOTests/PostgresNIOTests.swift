@@ -58,11 +58,11 @@ final class PostgresNIOTests: XCTestCase {
     func testSQLError() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
-        do {
-            _ = try conn.simpleQuery("SELECT &").wait()
-            XCTFail("An error should have been thrown")
-        } catch let error as PostgresError {
-            XCTAssertEqual(error.code, .syntaxError)
+        
+        XCTAssertThrowsError(_ = try conn.simpleQuery("SELECT &").wait()) { error in
+            guard let postgresError = try? XCTUnwrap(error as? PostgresError) else { return }
+            
+            XCTAssertEqual(postgresError.code, .syntaxError)
         }
     }
     
@@ -227,7 +227,7 @@ final class PostgresNIOTests: XCTestCase {
             XCTAssertEqual(results[0].column("typnamespace")?.int, 11)
             XCTAssertEqual(results[0].column("typowner")?.int, 10)
             XCTAssertEqual(results[0].column("typlen")?.int, 8)
-        default: XCTFail("Should be only one result")
+        default: XCTFail("Should be exactly one result, but got \(results.count)")
         }
     }
     
@@ -268,7 +268,7 @@ final class PostgresNIOTests: XCTestCase {
             XCTAssertEqual(results[0].column("bigint")?.int64, 1)
             XCTAssertEqual(results[0].column("bigint_min")?.int64, -9_223_372_036_854_775_807)
             XCTAssertEqual(results[0].column("bigint_max")?.int64, 9_223_372_036_854_775_807)
-        default: XCTFail("incorrect result count")
+        default: XCTFail("Should be exactly one result, but got \(results.count)")
         }
     }
 
@@ -292,14 +292,14 @@ final class PostgresNIOTests: XCTestCase {
         """).wait()
         switch results.count {
         case 1:
-            print(results[0])
+            //print(results[0])
             XCTAssertEqual(results[0].column("text")?.string?.hasPrefix("3.14159265"), true)
             XCTAssertEqual(results[0].column("numeric_string")?.string?.hasPrefix("3.14159265"), true)
             XCTAssertTrue(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358980) ?? false)
             XCTAssertFalse(results[0].column("numeric_decimal")?.decimal?.isLess(than: 3.14159265358978) ?? true)
             XCTAssertTrue(results[0].column("double")?.double?.description.hasPrefix("3.141592") ?? false)
             XCTAssertTrue(results[0].column("float")?.float?.description.hasPrefix("3.141592") ?? false)
-        default: XCTFail("incorrect result count")
+        default: XCTFail("Should be exactly one result, but got \(results.count)")
         }
     }
     
@@ -317,10 +317,10 @@ final class PostgresNIOTests: XCTestCase {
         """).wait()
         switch results.count {
         case 1:
-            print(results[0])
+            //print(results[0])
             XCTAssertEqual(results[0].column("id")?.uuid, UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
             XCTAssertEqual(UUID(uuidString: results[0].column("id")?.string ?? ""), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
-        default: XCTFail("incorrect result count")
+        default: XCTFail("Should be exactly one result, but got \(results.count)")
         }
     }
     
@@ -340,11 +340,11 @@ final class PostgresNIOTests: XCTestCase {
         """).wait()
         switch results.count {
         case 1:
-            print(results[0])
+            //print(results[0])
             XCTAssertEqual(results[0].column("date")?.date?.description, "2016-01-18 00:00:00 +0000")
             XCTAssertEqual(results[0].column("timestamp")?.date?.description, "2016-01-18 01:02:03 +0000")
             XCTAssertEqual(results[0].column("timestamptz")?.date?.description, "2016-01-18 00:20:03 +0000")
-        default: XCTFail("incorrect result count")
+        default: XCTFail("Should be exactly one result, but got \(results.count)")
         }
     }
     
@@ -364,10 +364,7 @@ final class PostgresNIOTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         let rows = try conn.query("select avg(length('foo')) as average_length").wait()
-        guard let length = rows[0].column("average_length")?.double else {
-            XCTFail("could not decode length")
-            return
-        }
+        let length = try XCTUnwrap(rows[0].column("average_length")?.double)
         XCTAssertEqual(length, 3.0)
     }
     
@@ -627,11 +624,10 @@ final class PostgresNIOTests: XCTestCase {
         let conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait()
         defer { try? conn.close().wait() }
         let auth = conn.authenticate(username: "invalid", database: "invalid", password: "bad")
-        do {
-            let _ = try auth.wait()
-            XCTFail("The authentication should fail")
-        } catch let error as PostgresError {
-            XCTAssertEqual(error.code, .invalidPassword)
+        XCTAssertThrowsError(_ = try auth.wait()) { error in
+            guard let postgresError = try? XCTUnwrap(error as? PostgresError) else { return }
+            
+            XCTAssertEqual(postgresError.code, .invalidPassword)
         }
     }
 
@@ -731,11 +727,13 @@ final class PostgresNIOTests: XCTestCase {
         """
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
-        do {
-            _ = try conn.query(query, [.init(date: date)]).wait()
-            XCTFail("should have failed")
-        } catch PostgresError.server(let error) {
-            XCTAssertEqual(error.fields[.routine], "transformTypeCast")
+        XCTAssertThrowsError(_ = try conn.query(query, [.init(date: date)]).wait()) { error in
+            guard let postgresError = try? XCTUnwrap(error as? PostgresError) else { return }
+            guard case let .server(serverError) = postgresError else {
+                XCTFail("Expected a .serverError but got \(postgresError)")
+                return
+            }
+            XCTAssertEqual(serverError.fields[.routine], "transformTypeCast")
         }
 
     }
@@ -812,16 +810,12 @@ final class PostgresNIOTests: XCTestCase {
                 0x01, 0x01, 0x01, 0x01,
             ])
         ]
-        do {
-            try ByteToMessageDecoderVerifier.verifyDecoder(
-                inputOutputPairs: [(input, output)],
-                decoderFactory: {
-                    PostgresMessageDecoder()
-                }
-            )
-        } catch {
-            XCTFail("\(error)")
-        }
+        try XCTUnwrap(ByteToMessageDecoderVerifier.verifyDecoder(
+            inputOutputPairs: [(input, output)],
+            decoderFactory: {
+                PostgresMessageDecoder()
+            }
+        ))
     }
 
     // https://github.com/vapor/postgres-nio/issues/71
