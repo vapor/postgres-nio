@@ -31,12 +31,12 @@ final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannel
     typealias InboundIn = PostgresMessage
     typealias InboundOut = PostgresMessage
 
-    let logger: Logger
+    let logger: Logger?
     let channel: String
     let notificationHandler: (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
     let listenContext: PostgresListenContext
 
-    init(logger: Logger, channel: String, notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void, listenContext: PostgresListenContext) {
+    init(logger: Logger?, channel: String, notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void, listenContext: PostgresListenContext) {
         self.logger = logger
         self.channel = channel
         self.notificationHandler = notificationHandler
@@ -55,7 +55,7 @@ final class PostgresNotificationHandler: ChannelInboundHandler, RemovableChannel
                     self.notificationHandler(self.listenContext, notification)
                 }
             } catch let error {
-                self.logger.error("\(error)")
+                self.logger?.error("\(error)")
             }
         }
     }

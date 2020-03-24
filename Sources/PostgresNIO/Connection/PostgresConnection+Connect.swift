@@ -6,7 +6,7 @@ extension PostgresConnection {
         to socketAddress: SocketAddress,
         tlsConfiguration: TLSConfiguration? = nil,
         serverHostname: String? = nil,
-        logger: Logger = .init(label: "codes.vapor.postgres"),
+        logger: Logger? = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
         let bootstrap = ClientBootstrap(group: eventLoop)
@@ -38,13 +38,13 @@ extension PostgresConnection {
 private final class PostgresErrorHandler: ChannelInboundHandler {
     typealias InboundIn = Never
     
-    let logger: Logger
-    init(logger: Logger) {
+    let logger: Logger?
+    init(logger: Logger?) {
         self.logger = logger
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        self.logger.error("Uncaught error: \(error)")
+        self.logger?.error("Uncaught error: \(error)")
         context.close(promise: nil)
         context.fireErrorCaught(error)
     }

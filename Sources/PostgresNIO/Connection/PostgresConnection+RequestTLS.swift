@@ -5,7 +5,7 @@ extension PostgresConnection {
     internal func requestTLS(
         using tlsConfig: TLSConfiguration,
         serverHostname: String?,
-        logger: Logger
+        logger: Logger?
     ) -> EventLoopFuture<Void> {
         let tls = RequestTLSQuery()
         return self.send(tls, logger: logger).flatMapThrowing { _ in
@@ -28,8 +28,8 @@ private final class RequestTLSQuery: PostgresRequest {
         self.isSupported = false
     }
     
-    func log(to logger: Logger) {
-        logger.debug("Requesting TLS")
+    func log(to logger: Logger?) {
+        logger?.debug("Requesting TLS")
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {

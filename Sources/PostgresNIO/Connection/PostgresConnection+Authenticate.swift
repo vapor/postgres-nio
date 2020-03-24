@@ -7,7 +7,7 @@ extension PostgresConnection {
         username: String,
         database: String? = nil,
         password: String? = nil,
-        logger: Logger = .init(label: "codes.vapor.postgres")
+        logger: Logger? = .init(label: "codes.vapor.postgres")
     ) -> EventLoopFuture<Void> {
         let auth = PostgresAuthenticationRequest(
             username: username,
@@ -38,8 +38,8 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
         self.password = password
     }
     
-    func log(to logger: Logger) {
-        logger.debug("Logging into Postgres db \(self.database ?? "nil") as \(self.username)")
+    func log(to logger: Logger?) {
+        logger?.debug("Logging into Postgres db \(self.database ?? "nil") as \(self.username)")
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {

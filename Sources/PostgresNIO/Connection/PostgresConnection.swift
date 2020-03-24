@@ -12,7 +12,7 @@ public final class PostgresConnection {
         return channel.closeFuture
     }
     
-    public var logger: Logger
+    public var logger: Logger?
 
     private var didClose: Bool
 
@@ -20,7 +20,7 @@ public final class PostgresConnection {
         return !self.channel.isActive
     }
     
-    init(channel: Channel, logger: Logger) {
+    init(channel: Channel, logger: Logger?) {
         self.channel = channel
         self.logger = logger
         self.didClose = false

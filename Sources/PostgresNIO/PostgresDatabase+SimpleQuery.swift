@@ -25,8 +25,8 @@ private final class PostgresSimpleQuery: PostgresRequest {
         self.onRow = onRow
     }
     
-    func log(to logger: Logger) {
-        logger.debug("\(self.query)")
+    func log(to logger: Logger?) {
+        logger?.debug("\(self.query)")
     }
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {

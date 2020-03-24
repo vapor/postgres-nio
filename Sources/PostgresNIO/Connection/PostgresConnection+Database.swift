@@ -3,7 +3,7 @@ import Logging
 extension PostgresConnection: PostgresDatabase {
     public func send(
         _ request: PostgresRequest,
-        logger: Logger
+        logger: Logger?
     ) -> EventLoopFuture<Void> {
         request.log(to: logger)
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
@@ -35,9 +35,9 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
     typealias OutboundOut = PostgresMessage
 
     private var queue: [PostgresRequestContext]
-    let logger: Logger
+    let logger: Logger?
 
-    public init(logger: Logger) {
+    public init(logger: Logger?) {
         self.queue = []
         self.logger = logger
     }
@@ -53,11 +53,11 @@ final class PostgresRequestHandler: ChannelDuplexHandler {
         switch message.identifier {
         case .error:
             let error = try PostgresMessage.Error(message: message)
-            self.logger.error("\(error)")
+            self.logger?.error("\(error)")
             request.lastError = PostgresError.server(error)
         case .notice:
             let notice = try PostgresMessage.Error(message: message)
-            self.logger.notice("\(notice)")
+            self.logger?.notice("\(notice)")
         default: break
         }
 
