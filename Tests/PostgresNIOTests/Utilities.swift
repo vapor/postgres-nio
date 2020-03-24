@@ -31,6 +31,21 @@ extension PostgresConnection {
     }
 }
 
+extension XCTestCase {
+    
+    public static var shouldRunPerformanceTests: Bool {
+        // Same semantics as above. Any present non-truthy value will explicitly disable performance
+        // tests even if they would've overwise run in the current configuration.
+        let defaultValue = !_isDebugAssertConfiguration() // default to not running in debug builds
+
+        guard let rawValue = ProcessInfo.processInfo.environment["POSTGRES_PERFORMANCE_TESTS"] else { return defaultValue }
+        if let boolValue = Bool(rawValue) { return boolValue }
+        if let intValue = Int(rawValue) { return intValue == 1 }
+        return rawValue.lowercased() == "yes"
+    }
+    
+}
+
 
 // 1247.typisdefined: 0x01 (BOOLEAN)
 // 1247.typbasetype: 0x00000000 (OID)
