@@ -414,7 +414,7 @@ final class PostgresNIOTests: XCTestCase {
 
     func testRandomlyGeneratedNumericParsing() throws {
         // this test takes a long time to run
-        return
+        try XCTSkipUnless(Self.shouldRunLongRunningTests)
 
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
