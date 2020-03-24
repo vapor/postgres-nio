@@ -3,7 +3,7 @@ import PostgresNIO
 import XCTest
 import NIOTestUtils
 
-final class PostgresNIOPerformanceTests: XCTestCase {
+final class PerformanceTests: XCTestCase {
     private var group: EventLoopGroup!
 
     private var eventLoop: EventLoop { self.group.next() }
