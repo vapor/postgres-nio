@@ -1,5 +1,6 @@
 import Logging
 import PostgresNIO
+import XCTest
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
@@ -26,9 +27,37 @@ extension PostgresConnection {
                 password: "vapor_password"
             ).map {
                 return conn
+            }.flatMapError { error in
+                conn.close().flatMapThrowing {
+                    throw error
+                }
             }
         }
     }
+}
+
+extension XCTestCase {
+    
+    public static var shouldRunLongRunningTests: Bool {
+        // The env var must be set and have the value `"true"`, `"1"`, or `"yes"` (case-insensitive).
+        // For the sake of sheer annoying pedantry, values like `"2"` are treated as false.
+        guard let rawValue = ProcessInfo.processInfo.environment["POSTGRES_LONG_RUNNING_TESTS"] else { return false }
+        if let boolValue = Bool(rawValue) { return boolValue }
+        if let intValue = Int(rawValue) { return intValue == 1 }
+        return rawValue.lowercased() == "yes"
+    }
+    
+    public static var shouldRunPerformanceTests: Bool {
+        // Same semantics as above. Any present non-truthy value will explicitly disable performance
+        // tests even if they would've overwise run in the current configuration.
+        let defaultValue = !_isDebugAssertConfiguration() // default to not running in debug builds
+
+        guard let rawValue = ProcessInfo.processInfo.environment["POSTGRES_PERFORMANCE_TESTS"] else { return defaultValue }
+        if let boolValue = Bool(rawValue) { return boolValue }
+        if let intValue = Int(rawValue) { return intValue == 1 }
+        return rawValue.lowercased() == "yes"
+    }
+    
 }
 
 
