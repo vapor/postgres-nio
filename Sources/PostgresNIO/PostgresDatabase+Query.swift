@@ -2,14 +2,96 @@ import NIO
 import Logging
 
 extension PostgresDatabase {
-    public func query(_ string: String, _ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
+    public func query(
+        _ string: String,
+        _ binds: [PostgresData] = []
+    ) -> EventLoopFuture<PostgresQueryResult> {
         var rows: [PostgresRow] = []
-        return query(string, binds) { rows.append($0) }.map { rows }
+        var metadata: PostgresQueryMetadata?
+        return self.query(string, binds, onMetadata: {
+            metadata = $0
+        }) {
+            rows.append($0)
+        }.map {
+            .init(metadata: metadata!, rows: rows)
+        }
     }
-    
-    public func query(_ string: String, _ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        let query = PostgresParameterizedQuery(query: string, binds: binds, onRow: onRow)
+
+    public func query(
+        _ string: String,
+        _ binds: [PostgresData] = [],
+        onMetadata: @escaping (PostgresQueryMetadata) -> () = { _ in },
+        onRow: @escaping (PostgresRow) throws -> ()
+    ) -> EventLoopFuture<Void> {
+        let query = PostgresParameterizedQuery(
+            query: string,
+            binds: binds,
+            onMetadata: onMetadata,
+            onRow: onRow
+        )
         return self.send(query, logger: self.logger)
+    }
+}
+
+public struct PostgresQueryResult {
+    public let metadata: PostgresQueryMetadata
+    public let rows: [PostgresRow]
+}
+
+extension PostgresQueryResult: Collection {
+    public typealias Index = Int
+    public typealias Element = PostgresRow
+
+    public var startIndex: Int {
+        self.rows.startIndex
+    }
+
+    public var endIndex: Int {
+        self.rows.endIndex
+    }
+
+    public subscript(position: Int) -> PostgresRow {
+        self.rows[position]
+    }
+
+    public func index(after i: Int) -> Int {
+        self.rows.index(after: i)
+    }
+}
+
+public struct PostgresQueryMetadata {
+    public let command: String
+    public var oid: Int?
+    public var rows: Int?
+
+    init?(string: String) {
+        let parts = string.split(separator: " ")
+        guard parts.count >= 1 else {
+            return nil
+        }
+        switch parts[0] {
+        case "INSERT":
+            // INSERT oid rows
+            guard parts.count == 3 else {
+                return nil
+            }
+            self.command = .init(parts[0])
+            self.oid = Int(parts[1])
+            self.rows = Int(parts[2])
+        case "DELETE", "UPDATE", "SELECT", "MOVE", "FETCH", "COPY":
+            // <cmd> rows
+            guard parts.count == 2 else {
+                return nil
+            }
+            self.command = .init(parts[0])
+            self.oid = nil
+            self.rows = Int(parts[1])
+        default:
+            // <cmd>
+            self.command = string
+            self.oid = nil
+            self.rows = nil
+        }
     }
 }
 
@@ -18,27 +100,30 @@ extension PostgresDatabase {
 private final class PostgresParameterizedQuery: PostgresRequest {
     let query: String
     let binds: [PostgresData]
+    var onMetadata: (PostgresQueryMetadata) -> ()
     var onRow: (PostgresRow) throws -> ()
     var rowLookupTable: PostgresRow.LookupTable?
     var resultFormatCodes: [PostgresFormatCode]
     var logger: Logger?
-    
+
     init(
         query: String,
         binds: [PostgresData],
+        onMetadata: @escaping (PostgresQueryMetadata) -> (),
         onRow: @escaping (PostgresRow) throws -> ()
     ) {
         self.query = query
         self.binds = binds
+        self.onMetadata = onMetadata
         self.onRow = onRow
         self.resultFormatCodes = [.binary]
     }
-    
+
     func log(to logger: Logger) {
         self.logger = logger
         logger.debug("\(self.query) \(self.binds)")
     }
-    
+
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
         if case .error = message.identifier {
             // we should continue after errors
@@ -77,6 +162,11 @@ private final class PostgresParameterizedQuery: PostgresRequest {
             }
             return []
         case .commandComplete:
+            let complete = try PostgresMessage.CommandComplete(message: message)
+            guard let metadata = PostgresQueryMetadata(string: complete.tag) else {
+                throw PostgresError.protocol("Unexpected query metadata: \(complete.tag)")
+            }
+            self.onMetadata(metadata)
             return []
         case .notice:
             return []
@@ -87,7 +177,7 @@ private final class PostgresParameterizedQuery: PostgresRequest {
         default: throw PostgresError.protocol("Unexpected message during query: \(message)")
         }
     }
-    
+
     func start() throws -> [PostgresMessage] {
         let parse = PostgresMessage.Parse(
             statementName: "",
@@ -109,7 +199,7 @@ private final class PostgresParameterizedQuery: PostgresRequest {
             portalName: "",
             maxRows: 0
         )
-        
+
         let sync = PostgresMessage.Sync()
         return try [parse.message(), describe.message(), bind.message(), execute.message(), sync.message()]
     }

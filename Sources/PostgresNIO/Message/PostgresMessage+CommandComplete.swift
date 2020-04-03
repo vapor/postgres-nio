@@ -2,7 +2,7 @@ import NIO
 
 extension PostgresMessage {
     /// Identifies the message as a Close command.
-    public struct CommandComplete {
+    public struct CommandComplete: PostgresMessageType {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> CommandComplete {
             guard let string = buffer.readNullTerminatedString() else {

@@ -855,6 +855,23 @@ final class PostgresNIOTests: XCTestCase {
         let res = try conn.query("SELECT $1::text as foo", [String?.none.postgresData!]).wait()
         XCTAssertEqual(res[0].column("foo")?.string, nil)
     }
+
+    func testUpdateMetadata() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        _ = try conn.simpleQuery("DROP TABLE IF EXISTS test_table").wait()
+        _ = try conn.simpleQuery("CREATE TABLE test_table(pk int PRIMARY KEY)").wait()
+        _ = try conn.simpleQuery("INSERT INTO test_table VALUES(1)").wait()
+        try conn.query("DELETE FROM test_table", onMetadata: { metadata in
+            XCTAssertEqual(metadata.command, "DELETE")
+            XCTAssertEqual(metadata.oid, nil)
+            XCTAssertEqual(metadata.rows, 1)
+        }, onRow: { _ in }).wait()
+        let rows = try conn.query("DELETE FROM test_table").wait()
+        XCTAssertEqual(rows.metadata.command, "DELETE")
+        XCTAssertEqual(rows.metadata.oid, nil)
+        XCTAssertEqual(rows.metadata.rows, 0)
+    }
 }
 
 let isLoggingConfigured: Bool = {
