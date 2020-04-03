@@ -760,6 +760,24 @@ final class PostgresNIOTests: XCTestCase {
         let rows = try conn.query(query, [.init(uint8: 42)]).wait()
         XCTAssertEqual(rows[0].column("char")?.string, "*")
     }
+
+    func testUpdateMetadata() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        _ = try conn.simpleQuery("DROP TABLE IF EXISTS test_table").wait()
+        _ = try conn.simpleQuery("CREATE TABLE test_table(pk int PRIMARY KEY)").wait()
+        _ = try conn.simpleQuery("INSERT INTO test_table VALUES(1)").wait()
+        try conn.query("DELETE FROM test_table", onMetadata: { metadata in
+            XCTAssertEqual(metadata.command, "DELETE")
+            XCTAssertEqual(metadata.oid, nil)
+            XCTAssertEqual(metadata.rows, 1)
+        }, onRow: { _ in }).wait()
+        try conn.query("DELETE FROM test_table", onMetadata: { metadata in
+            XCTAssertEqual(metadata.command, "DELETE")
+            XCTAssertEqual(metadata.oid, nil)
+            XCTAssertEqual(metadata.rows, 0)
+        }, onRow: { _ in }).wait()
+    }
     
     // MARK: Performance
     
@@ -852,7 +870,7 @@ final class PostgresNIOTests: XCTestCase {
                     _ = row.column("int")?.int
                     _ = row.column("date")?.date
                     _ = row.column("uuid")?.uuid
-                    }.wait()
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }
