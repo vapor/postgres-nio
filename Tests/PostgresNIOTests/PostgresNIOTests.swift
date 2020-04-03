@@ -772,11 +772,10 @@ final class PostgresNIOTests: XCTestCase {
             XCTAssertEqual(metadata.oid, nil)
             XCTAssertEqual(metadata.rows, 1)
         }, onRow: { _ in }).wait()
-        try conn.query("DELETE FROM test_table", onMetadata: { metadata in
-            XCTAssertEqual(metadata.command, "DELETE")
-            XCTAssertEqual(metadata.oid, nil)
-            XCTAssertEqual(metadata.rows, 0)
-        }, onRow: { _ in }).wait()
+        let rows = try conn.query("DELETE FROM test_table").wait()
+        XCTAssertEqual(rows.metadata.command, "DELETE")
+        XCTAssertEqual(rows.metadata.oid, nil)
+        XCTAssertEqual(rows.metadata.rows, 0)
     }
     
     // MARK: Performance
