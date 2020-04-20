@@ -32,7 +32,7 @@ extension PostgresMessage {
                     copy.writeBuffer(&slice)
                     return .init(value: copy)
                 } else {
-                    return .init(value: buffer.readNullableBytes())
+                    return .init(value: nil)
                 }
             }) else {
                 throw PostgresError.protocol("Could not parse data row columns")
