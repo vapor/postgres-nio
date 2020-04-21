@@ -9,11 +9,11 @@
 <a href="LICENSE">
     <img src="http://img.shields.io/badge/license-MIT-brightgreen.svg" alt="MIT License">
 </a>
-<a href="https://circleci.com/gh/vapor/postgres-nio">
-    <img src="https://circleci.com/gh/vapor/postgres-nio.svg?style=shield" alt="Continuous Integration">
+<a href="https://github.com/vapor/postgres-nio/actions">
+    <img src="https://github.com/vapor/postgres-nio/workflows/test/badge.svg" alt="Continuous Integration">
 </a>
 <a href="https://swift.org">
-    <img src="http://img.shields.io/badge/swift-5-brightgreen.svg" alt="Swift 5">
+    <img src="http://img.shields.io/badge/swift-5.2-brightgreen.svg" alt="Swift 5.2">
 </a>
 <br>
 <br>
