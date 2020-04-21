@@ -24,9 +24,9 @@
 
 The table below shows a list of PostgresNIO major releases alongside their compatible NIO and Swift versions. 
 
-Version | NIO | Swift | SPM
---- | --- | --- | ---
-1.0 (alpha) | 2.0+ | 5.0+ | `from: "1.0.0-alpha"`
+|Version|NIO|Swift|SPM|
+|-|-|-|-|
+|1.0|2.0+|5.2+|`from: "1.0.0"`|
 
 Use the SPM string to easily include the dependendency in your `Package.swift` file.
 
