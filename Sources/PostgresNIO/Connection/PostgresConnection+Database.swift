@@ -29,7 +29,7 @@ final class PostgresRequestContext {
     }
 }
 
-final class PostgresRequestHandler: ChannelDuplexHandler {
+class PostgresRequestHandler: ChannelDuplexHandler {
     typealias InboundIn = PostgresMessage
     typealias OutboundIn = PostgresRequestContext
     typealias OutboundOut = PostgresMessage
