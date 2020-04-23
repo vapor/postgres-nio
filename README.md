@@ -38,8 +38,8 @@ Use the SPM string to easily include the dependendency in your `Package.swift` f
 
 PostgresNIO supports the following platforms:
 
-- Ubuntu 14.04+
-- macOS 10.12+
+- Ubuntu 16.04+
+- macOS 10.15+
 
 ## Overview
 
