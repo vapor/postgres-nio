@@ -179,6 +179,9 @@ private final class PostgresParameterizedQuery: PostgresRequest {
     }
 
     func start() throws -> [PostgresMessage] {
+        guard self.binds.count <= Int16.max else {
+            throw PostgresError.protocol("Bind count must be <= \(Int16.max).")
+        }
         let parse = PostgresMessage.Parse(
             statementName: "",
             query: self.query,
