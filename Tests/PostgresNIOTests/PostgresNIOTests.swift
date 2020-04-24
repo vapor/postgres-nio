@@ -904,7 +904,16 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows.metadata.oid, nil)
         XCTAssertEqual(rows.metadata.rows, 0)
     }
-    
+
+    func testTooManyBinds() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let binds = [PostgresData].init(repeating: .null, count: Int(Int16.max) + 1)
+        do {
+            _ = try conn.query("SELECT version()", binds).wait()
+            XCTFail("Should have failed")
+        } catch PostgresError.connectionClosed { }
+    }
 }
 
 let isLoggingConfigured: Bool = {
