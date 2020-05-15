@@ -627,7 +627,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertThrowsError(_ = try auth.wait()) { error in
             guard let postgresError = try? XCTUnwrap(error as? PostgresError) else { return }
             
-            XCTAssertEqual(postgresError.code, .invalidPassword)
+            XCTAssert(postgresError.code == .invalidPassword || postgresError.code == .invalidAuthorizationSpecification)
         }
     }
 
@@ -916,10 +916,14 @@ final class PostgresNIOTests: XCTestCase {
     }
 }
 
+func env(_ name: String) -> String? {
+    getenv(name).flatMap { String(cString: $0) }
+}
+
 let isLoggingConfigured: Bool = {
     LoggingSystem.bootstrap { label in
         var handler = StreamLogHandler.standardOutput(label: label)
-        handler.logLevel = .debug
+        handler.logLevel = env("LOG_LEVEL").flatMap { Logger.Level(rawValue: $0) } ?? .debug
         return handler
     }
     return true
