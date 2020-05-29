@@ -23,8 +23,8 @@ extension PostgresConnection {
 private final class PostgresAuthenticationRequest: PostgresRequest {
     enum State {
         case ready
-        case saslInitialSent(SASLAuthenticationManager<SASLMechanism_SCRAM_SHA256>)
-        case saslChallengeResponse(SASLAuthenticationManager<SASLMechanism_SCRAM_SHA256>)
+        case saslInitialSent(SASLAuthenticationManager<SASLMechanism.SCRAM.SHA256>)
+        case saslChallengeResponse(SASLAuthenticationManager<SASLMechanism.SCRAM.SHA256>)
         case saslWaitOkay
         case done
     }
@@ -66,7 +66,7 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
                 case .saslMechanisms(let saslMechanisms):
                     if saslMechanisms.contains("SCRAM-SHA-256") && self.password != nil {
                         let saslManager = SASLAuthenticationManager(asClientSpeaking:
-                            SASLMechanism_SCRAM_SHA256(username: self.username, password: { self.password! }))
+                            SASLMechanism.SCRAM.SHA256(username: self.username, password: { self.password! }))
                         var message: PostgresMessage?
                         
                         if (try saslManager.handle(message: nil, sender: { bytes in
@@ -95,7 +95,6 @@ private final class PostgresAuthenticationRequest: PostgresRequest {
                 let auth = try PostgresMessage.Authentication(message: message)
                 switch auth {
                 case .saslContinue(let data), .saslFinal(let data):
-                    print(auth)
                     var message: PostgresMessage?
                     if try manager.handle(message: data, sender: { bytes in
                         message = try PostgresMessage.SASLResponse(responseData: bytes).message()

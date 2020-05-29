@@ -275,6 +275,8 @@ fileprivate struct SCRAMMessageParser {
     }
 }
 
+internal enum SASLMechanism {
+internal enum SCRAM {
 
 /// Implementation of `SCRAM-SHA-256` as a `SASLAuthenticationMechanism`
 ///
@@ -282,9 +284,9 @@ fileprivate struct SCRAMMessageParser {
 /// - [RFC 7677 (SCRAM-SHA-256 and SCRAM-SHA-256-PLUS SASL Mechanisms)](https://tools.ietf.org/html/rfc7677)
 /// - [RFC 5802 (SCRAM SASL and GSS-API Mechanisms)](https://tools.ietf.org/html/rfc5802)
 /// - [RFC 4422 (Simple Authentication and Security Layer)](https://tools.ietf.org/html/rfc4422)
-public struct SASLMechanism_SCRAM_SHA256: SASLAuthenticationMechanism {
+internal struct SHA256: SASLAuthenticationMechanism {
 
-    static public var name: String { return "SCRAM-SHA-256" }
+    static internal var name: String { return "SCRAM-SHA-256" }
     
     /// Set up a client-side `SCRAM-SHA-256` authentication.
     ///
@@ -293,7 +295,7 @@ public struct SASLMechanism_SCRAM_SHA256: SASLAuthenticationMechanism {
     ///   - password: A closure which returns the plaintext password for the
     ///               authenticating user. If the closure throws, authentication
     ///               immediately fails with the thrown error.
-    public init(username: String, password: @escaping () throws -> String) {
+    internal init(username: String, password: @escaping () throws -> String) {
         self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().data(using: .utf8)!), []) }, bindingInfo: .unsupported)
     }
     
@@ -307,11 +309,11 @@ public struct SASLMechanism_SCRAM_SHA256: SASLAuthenticationMechanism {
     ///                     salted password for that user, as well as the salt
     ///                     itself. If the closure throw, authentication
     ///                     immediately fails with the thrown error.
-    public init(serveWithIterations iterations: UInt32 = 4096, saltedPassword: @escaping (String) throws -> ([UInt8], [UInt8])) {
+    internal init(serveWithIterations iterations: UInt32 = 4096, saltedPassword: @escaping (String) throws -> ([UInt8], [UInt8])) {
         self._impl = .init(iterationCount: iterations, passwordGrabber: saltedPassword, requireBinding: false)
     }
     
-    public func step(message: [UInt8]?) -> SASLAuthenticationStepResult {
+    internal func step(message: [UInt8]?) -> SASLAuthenticationStepResult {
         return _impl.step(message: message)
     }
     
@@ -324,9 +326,9 @@ public struct SASLMechanism_SCRAM_SHA256: SASLAuthenticationMechanism {
 /// - [RFC 7677 (SCRAM-SHA-256 and SCRAM-SHA-256-PLUS SASL Mechanisms)](https://tools.ietf.org/html/rfc7677)
 /// - [RFC 5802 (SCRAM SASL and GSS-API Mechanisms)](https://tools.ietf.org/html/rfc5802)
 /// - [RFC 4422 (Simple Authentication and Security Layer)](https://tools.ietf.org/html/rfc4422)
-public struct SASLMechanism_SCRAM_SHA256_PLUS: SASLAuthenticationMechanism {
+internal struct SHA256_PLUS: SASLAuthenticationMechanism {
 
-    static public var name: String { return "SCRAM-SHA-256-PLUS" }
+    static internal var name: String { return "SCRAM-SHA-256-PLUS" }
     
     /// Set up a client-side `SCRAM-SHA-256-PLUS` authentication.
     ///
@@ -339,7 +341,7 @@ public struct SASLMechanism_SCRAM_SHA256_PLUS: SASLAuthenticationMechanism {
     ///                         authentication.
     ///   - channelBindingData: The appropriate data associated with the RFC5056
     ///                         channel binding specified.
-    public init(username: String, password: @escaping () throws -> String, channelBindingName: String, channelBindingData: [UInt8]) {
+    internal init(username: String, password: @escaping () throws -> String, channelBindingName: String, channelBindingData: [UInt8]) {
         self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().data(using: .utf8)!), []) }, bindingInfo: .bind(channelBindingName, channelBindingData))
     }
     
@@ -353,16 +355,19 @@ public struct SASLMechanism_SCRAM_SHA256_PLUS: SASLAuthenticationMechanism {
     ///                     salted password for that user, as well as the salt
     ///                     itself. If the closure throw, authentication
     ///                     immediately fails with the thrown error.
-    public init(serveWithIterations iterations: UInt32 = 4096, saltedPassword: @escaping (String) throws -> ([UInt8], [UInt8])) {
+    internal init(serveWithIterations iterations: UInt32 = 4096, saltedPassword: @escaping (String) throws -> ([UInt8], [UInt8])) {
         self._impl = .init(iterationCount: iterations, passwordGrabber: saltedPassword, requireBinding: true)
     }
     
-    public func step(message: [UInt8]?) -> SASLAuthenticationStepResult {
+    internal func step(message: [UInt8]?) -> SASLAuthenticationStepResult {
         return _impl.step(message: message)
     }
     
     private let _impl: SASLMechanism_SCRAM_SHA256_Common
 }
+
+} // enum SCRAM
+} // enum SASLMechanism
 
 /// Common impplementation of SCRAM-SHA-256 and SCRAM-SHA-256-PLUS
 fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
