@@ -14,4 +14,3 @@ public struct JSONConfiguration {
     
     public var decoder: JSONDecoder = JSONDecoder()
 }
-

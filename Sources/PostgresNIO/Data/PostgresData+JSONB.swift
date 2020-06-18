@@ -15,7 +15,7 @@ extension PostgresData {
     }
 
     public init<T>(jsonb value: T) throws where T: Encodable {
-        let jsonData = try JSONEncoder().encode(value)
+        let jsonData = try JSONConfiguration.global.encoder.encode(value)
         self.init(jsonb: jsonData)
     }
 
@@ -43,7 +43,7 @@ extension PostgresData {
             return nil
         }
 
-        return try JSONDecoder().decode(T.self, from: data)
+        return try JSONConfiguration.global.decoder.decode(T.self, from: data)
     }
 }
 
