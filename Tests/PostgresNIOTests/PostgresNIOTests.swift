@@ -1,5 +1,5 @@
 import Logging
-import PostgresNIO
+@testable import PostgresNIO
 import XCTest
 import NIOTestUtils
 
@@ -913,6 +913,11 @@ final class PostgresNIOTests: XCTestCase {
             _ = try conn.query("SELECT version()", binds).wait()
             XCTFail("Should have failed")
         } catch PostgresError.connectionClosed { }
+    }
+
+    func testRemoteClose() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        try conn.channel.close().wait()
     }
 }
 

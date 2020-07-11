@@ -44,10 +44,14 @@ jobs:
     container: 
       image: vapor/swift:5.2
     services:
-      psql:
+      postgres-a:
         image: postgres
-        ports:
-          - 5432:5432
+        env:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
+      postgres-b:
+        image: postgres
         env:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
@@ -61,4 +65,6 @@ jobs:
     - run: swift test --enable-test-discovery --sanitize=thread
       working-directory: ./fluent-postgres-driver
       env:
-        POSTGRES_HOSTNAME: psql
+        POSTGRES_HOSTNAME_A: postgres-a
+        POSTGRES_HOSTNAME_B: postgres-b
+
