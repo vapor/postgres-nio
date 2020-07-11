@@ -46,16 +46,12 @@ jobs:
     services:
       postgres-a:
         image: postgres
-        ports:
-          - 5432:5432
         env:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
           POSTGRES_PASSWORD: vapor_password
       postgres-b:
         image: postgres
-        ports:
-          - 5432:5432
         env:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
