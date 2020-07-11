@@ -4,11 +4,7 @@ import XCTest
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
-        #if os(Linux)
-        return try .makeAddressResolvingHost("psql", port: 5432)
-        #else
-        return try .init(ipAddress: "127.0.0.1", port: 5432)
-        #endif
+        try .makeAddressResolvingHost(hostname, port: 5432)
     }
 
     static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
@@ -33,6 +29,18 @@ extension PostgresConnection {
                 }
             }
         }
+    }
+}
+
+var hostname: String {
+    if let hostname = env("POSTGRES_HOSTNAME") {
+        return hostname
+    } else {
+        #if os(Linux)
+        return "psql"
+        #else
+        return "localhost"
+        #endif
     }
 }
 

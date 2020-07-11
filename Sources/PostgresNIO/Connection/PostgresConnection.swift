@@ -14,8 +14,6 @@ public final class PostgresConnection {
     
     public var logger: Logger
 
-    private var didClose: Bool
-
     public var isClosed: Bool {
         return !self.channel.isActive
     }
@@ -23,22 +21,16 @@ public final class PostgresConnection {
     init(channel: Channel, logger: Logger) {
         self.channel = channel
         self.logger = logger
-        self.didClose = false
     }
     
     public func close() -> EventLoopFuture<Void> {
-        guard !self.didClose else {
+        guard !self.isClosed else {
             return self.eventLoop.makeSucceededFuture(())
         }
-        self.didClose = true
-        if !self.isClosed {
-            return self.channel.close(mode: .all)
-        } else {
-            return self.eventLoop.makeSucceededFuture(())
-        }
+        return self.channel.close(mode: .all)
     }
     
     deinit {
-        assert(self.didClose, "PostgresConnection deinitialized before being closed.")
+        assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
     }
 }
