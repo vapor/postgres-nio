@@ -348,6 +348,32 @@ final class PostgresNIOTests: XCTestCase {
         }
     }
     
+    /// https://github.com/vapor/nio-postgres/issues/27
+    func testTextDates() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        struct Dates: Decodable {
+            var date: Date
+            var timestamp: Date
+            var timestamptz: Date
+        }
+        let results = try conn.simpleQuery("""
+        SELECT
+            '2016-01-18'             as date,
+            '2016-01-18 01:02:03'    as timestamp,
+            '2016-01-17 19:20:03-05' as timestamptz
+        """).wait()
+        switch results.count {
+        case 1:
+            //print(results[0])
+            XCTAssertEqual(results[0].column("date")?.date?.description, "2016-01-18 00:00:00 +0000")
+            XCTAssertEqual(results[0].column("timestamp")?.date?.description, "2016-01-18 01:02:03 +0000")
+            XCTAssertEqual(results[0].column("timestamptz")?.date?.description, "2016-01-18 00:20:03 +0000")
+        default: XCTFail("Should be exactly one result, but got \(results.count)")
+        }
+    }
+    
+    
     /// https://github.com/vapor/nio-postgres/issues/20
     func testBindInteger() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()

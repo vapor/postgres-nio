@@ -15,7 +15,21 @@ extension PostgresData {
         
         switch self.formatCode {
         case .text:
-            return nil
+            guard let string = value.readString(length: value.readableBytes) else {
+                return nil
+            }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            
+            if (string.count <= 10) {
+                formatter.dateFormat = "yyyy-MM-dd"
+            } else if (string.count <= 19) {
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            } else {
+                formatter.dateFormat = "yyyy-MM-dd HH:mm:ssX"
+            }
+            return formatter.date(from: string)
         case .binary:
             switch self.type {
             case .timestamp, .timestamptz:
