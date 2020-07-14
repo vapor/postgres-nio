@@ -920,7 +920,7 @@ final class PostgresNIOTests: XCTestCase {
         try conn.channel.close().wait()
     }
 
-    // https://github.com/vapor/fluent-postgres-driver/issues/160
+    // https://github.com/vapor/postgres-nio/issues/113
     func testVaryingCharArray() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
