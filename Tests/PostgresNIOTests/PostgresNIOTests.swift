@@ -919,6 +919,15 @@ final class PostgresNIOTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         try conn.channel.close().wait()
     }
+
+    // https://github.com/vapor/fluent-postgres-driver/issues/160
+    func testVaryingCharArray() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let res = try conn.query(#"SELECT '{"foo", "bar", "baz"}'::VARCHAR[] as foo"#).wait()
+        XCTAssertEqual(res[0].column("foo")?.array(of: String.self), ["foo", "bar", "baz"])
+    }
 }
 
 func env(_ name: String) -> String? {
