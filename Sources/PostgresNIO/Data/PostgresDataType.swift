@@ -65,6 +65,8 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let int4Array = PostgresDataType(1007)
     /// `1009` _text
     public static let textArray = PostgresDataType(1009)
+    /// `1015` _varchar
+    public static let varcharArray = PostgresDataType(1015)
     /// `1016` _int8
     public static let int8Array = PostgresDataType(1016)
     /// `1017` _point
@@ -154,6 +156,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .int2Array: return "SMALLINT[]"
         case .int4Array: return "INTEGER[]"
         case .textArray: return "TEXT[]"
+        case .varcharArray: return "VARCHAR[]"
         case .int8Array: return "BIGINT[]"
         case .pointArray: return "POINT[]"
         case .float4Array: return "REAL[]"
@@ -192,6 +195,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .uuid: return .uuidArray
         case .jsonb: return .jsonbArray
         case .text: return .textArray
+        case .varchar: return .varcharArray
         default: return nil
         }
     }
@@ -213,6 +217,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .uuidArray: return .uuid
         case .jsonbArray: return .jsonb
         case .textArray: return .text
+        case .varcharArray: return .varchar
         default: return nil
         }
     }
