@@ -928,6 +928,15 @@ final class PostgresNIOTests: XCTestCase {
         let res = try conn.query(#"SELECT '{"foo", "bar", "baz"}'::VARCHAR[] as foo"#).wait()
         XCTAssertEqual(res[0].column("foo")?.array(of: String.self), ["foo", "bar", "baz"])
     }
+
+    // https://github.com/vapor/postgres-nio/issues/115
+    func testSetTimeZone() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.simpleQuery("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait()
+        _ = try conn.query("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait()
+    }
 }
 
 func env(_ name: String) -> String? {
