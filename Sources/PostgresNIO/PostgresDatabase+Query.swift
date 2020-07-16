@@ -174,6 +174,8 @@ private final class PostgresParameterizedQuery: PostgresRequest {
             return []
         case .readyForQuery:
             return nil
+        case .parameterStatus:
+            return []
         default: throw PostgresError.protocol("Unexpected message during query: \(message)")
         }
     }
