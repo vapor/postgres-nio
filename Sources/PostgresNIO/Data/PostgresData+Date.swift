@@ -128,7 +128,8 @@ extension PostgresData {
             }
         
             let date = DateComponents(calendar: threadSpecificCalendar, timeZone: TimeZone(secondsFromGMT: 0), year: year, month: month, day: day, hour: hour, minute: minute, second: second, nanosecond: nano).date
-            return date?.advanced(by: TimeInterval(minutesFromGMT * -60))
+            
+            return date?.addingTimeInterval(TimeInterval(minutesFromGMT * -60))
         }
         
         return nil
