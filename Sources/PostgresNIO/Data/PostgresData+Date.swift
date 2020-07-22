@@ -60,8 +60,22 @@ extension PostgresData {
         return container.calendar
     }
     
+    /*
+     This regular expression is comprised of three sub-phrases
+     
+         Date: (?<year>[0-9]{4})-(?<month>[0-9]{2})-(?<day>[0-9]{2})
+         Time: (?<hour>[0-9]{2}):(?<min>[0-9]{2}):(?<sec>[0-9]{2})(?<micro>\\.[0-9]{1,6})?
+         TZ: (?<tzhr>[-+][0-9]{1,2})(?:[:](?<tzmin>[0-9]{2}))?
+
+     that enforce the format for each component. These are combined in the expression
+
+       ^Date(?: Time(?:TZ)?)?$
+
+     Here the incoming string must start with a date and can be followed by an optional time.
+     Only if the time is present can an optional timezone appear.
+     */
     private static let regex = try! NSRegularExpression(pattern:
-         "^(?<year>[0-9]{4})-(?<month>[0-9]{2})-(?<day>[0-9]{2})(?: (?<hour>[0-9]{2}):(?<min>[0-9]{2}):(?<sec>[0-9]{2})(?<micro>\\.[0-9]{1,6})?(?:(?<tzhr>[-+][0-9]{1,4})(?:[:](?<tzmin>[0-9]{2}))?)?)?")
+         "^(?<year>[0-9]{4})-(?<month>[0-9]{2})-(?<day>[0-9]{2})(?: (?<hour>[0-9]{2}):(?<min>[0-9]{2}):(?<sec>[0-9]{2})(?<micro>\\.[0-9]{1,6})?(?:(?<tzhr>[-+][0-9]{1,2})(?:[:](?<tzmin>[0-9]{2}))?)?)?$")
 
     private static func convertPostgresStringToDate(_ string:String) -> Date? {
         var year:Int?
