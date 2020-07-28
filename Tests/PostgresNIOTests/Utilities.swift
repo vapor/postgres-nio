@@ -4,7 +4,7 @@ import XCTest
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
-        try .makeAddressResolvingHost(hostname, port: 5432)
+        try .makeAddressResolvingHost( env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432)
     }
 
     static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
@@ -18,9 +18,9 @@ extension PostgresConnection {
     static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         return testUnauthenticated(on: eventLoop).flatMap { conn in
             return conn.authenticate(
-                username: "vapor_username",
-                database: "vapor_database",
-                password: "vapor_password"
+                username: env("POSTGRES_USERNAME") ?? "vapor_username",
+                database:  env("POSTGRES_DATABASE") ?? "vapor_database",
+                password: env("POSTGRES_PASSWORD") ?? "vapor_password"
             ).map {
                 return conn
             }.flatMapError { error in
@@ -29,18 +29,6 @@ extension PostgresConnection {
                 }
             }
         }
-    }
-}
-
-var hostname: String {
-    if let hostname = env("POSTGRES_HOSTNAME") {
-        return hostname
-    } else {
-        #if os(Linux)
-        return "psql"
-        #else
-        return "localhost"
-        #endif
     }
 }
 

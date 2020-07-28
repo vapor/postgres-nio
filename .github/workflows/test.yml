@@ -126,6 +126,7 @@ jobs:
       - name: Run tests with Thread Sanitizer
         run: swift test --enable-test-discovery --sanitize=thread
         env:
+          POSTGRES_DATABASE: vapor_database_a
           POSTGRES_DATABASE_A: vapor_database_a
           POSTGRES_DATABASE_B: vapor_database_b
           LOG_LEVEL: notice
