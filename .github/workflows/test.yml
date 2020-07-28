@@ -56,9 +56,8 @@ jobs:
       fail-fast: false
       matrix:
         dbimage:
-          - mysql:5.7
-          - mysql:8.0
-          - mariadb:latest
+          - postgres:12
+          - postgres:11
         runner:
           # 5.2 Stable
           - swift:5.2-xenial
@@ -75,9 +74,6 @@ jobs:
           - swiftlang/swift:nightly-master-focal
           - swiftlang/swift:nightly-master-centos8
           - swiftlang/swift:nightly-master-amazonlinux2
-        exclude:
-          - runner: swiftlang/swift:nightly-master-amazonlinux2
-            dbimage: mysql:8.0
     container: ${{ matrix.runner }}
     runs-on: ubuntu-latest
     services:
