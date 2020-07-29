@@ -1,70 +1,132 @@
 name: test
-on:
-- pull_request
+on: 
+  - pull_request
+defaults:
+  run:
+    shell: bash
 jobs:
-  postgres-nio:
-    container: 
-      image: vapor/swift:5.2
+  dependents:
+    runs-on: ubuntu-latest
+    services:
+      psql-a:
+        image: ${{ matrix.dbimage }}
+        env: 
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
+      psql-b:
+        image: ${{ matrix.dbimage }}
+        env: 
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
+    container: swift:5.2-bionic
+    strategy:
+      fail-fast: false
+      matrix:
+        dbimage:
+          - postgres:12
+          - postgres:11
+        dependent:
+          - postgres-kit
+          - fluent-postgres-driver
+    steps:
+      - name: Check out package
+        uses: actions/checkout@v2
+        with:
+          path: package
+      - name: Check out dependent
+        uses: actions/checkout@v2
+        with:
+          repository: vapor/${{ matrix.dependent }}
+          path: dependent
+      - name: Use local package
+        run: swift package edit postgres-nio --path ../package
+        working-directory: dependent
+      - name: Run tests with Thread Sanitizer
+        run: swift test --enable-test-discovery --sanitize=thread
+        working-directory: dependent
+        env:
+          POSTGRES_HOSTNAME: psql-a
+          POSTGRES_HOSTNAME_A: psql-a
+          POSTGRES_HOSTNAME_B: psql-b
+          LOG_LEVEL: notice
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        dbimage:
+          - postgres:12
+          - postgres:11
+        runner:
+          # 5.2 Stable
+          - swift:5.2-xenial
+          - swift:5.2-bionic
+          # 5.2 Unstable
+          - swiftlang/swift:nightly-5.2-xenial
+          - swiftlang/swift:nightly-5.2-bionic
+          # 5.3 Unstable
+          - swiftlang/swift:nightly-5.3-xenial
+          - swiftlang/swift:nightly-5.3-bionic
+          # Master Unsable
+          - swiftlang/swift:nightly-master-xenial
+          - swiftlang/swift:nightly-master-bionic
+          - swiftlang/swift:nightly-master-focal
+          - swiftlang/swift:nightly-master-centos8
+          - swiftlang/swift:nightly-master-amazonlinux2
+    container: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     services:
       psql:
-        image: postgres
-        ports:
-          - 5432:5432
-        env:
+        image: ${{ matrix.dbimage }}
+        env: 
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
           POSTGRES_PASSWORD: vapor_password
-    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - run: swift test --enable-test-discovery --sanitize=thread
-  postgres-kit:
-    container: 
-      image: vapor/swift:5.2
-    services:
-      psql:
-        image: postgres
-        ports:
-          - 5432:5432
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Run tests with Thread Sanitizer
+        run: swift test --enable-test-discovery --sanitize=thread
         env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-    runs-on: ubuntu-latest
+          POSTGRES_HOSTNAME: psql
+          LOG_LEVEL: notice
+  macOS:
+    strategy:
+      fail-fast: false
+      matrix:
+        include: 
+          - formula: postgresql@11
+            datadir: postgresql@11
+          - formula: postgresql@12
+            datadir: postgres
+    runs-on: macos-latest
     steps:
-    - run: git clone -b master https://github.com/vapor/postgres-kit.git
-      working-directory: ./
-    - run: swift package edit postgres-nio --revision ${{ github.sha }}
-      working-directory: ./postgres-kit
-    - run: swift test --enable-test-discovery --sanitize=thread
-      working-directory: ./postgres-kit
-      env:
-        POSTGRES_HOSTNAME: psql
-  fluent-postgres-driver:
-    container: 
-      image: vapor/swift:5.2
-    services:
-      postgres-a:
-        image: postgres
+      - name: Select latest available Xcode
+        uses: maxim-lobanov/setup-xcode@1.0
+        with:
+          xcode-version: latest
+      - name: Replace Postgres install and start server
+        run: |
+          brew uninstall --force postgresql php && rm -rf /usr/local/{etc,var}/{postgres,pg}*
+          brew install ${{ matrix.formula }} && brew link --force ${{ matrix.formula }}
+          initdb --locale=C -E UTF-8 $(brew --prefix)/var/${{ matrix.datadir }}
+          brew services start ${{ matrix.formula }}
+      - name: Wait for server to be ready
+        run: until pg_isready; do sleep 1; done
+        timeout-minutes: 2
+      - name: Setup users and databases for Postgres
+        run: |
+          createuser --createdb --login vapor_username
+          for db in vapor_database_{a,b}; do
+            createdb -Ovapor_username $db && psql $db <<<"ALTER SCHEMA public OWNER TO vapor_username;"
+          done
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Run tests with Thread Sanitizer
+        run: swift test --enable-test-discovery --sanitize=thread
         env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-      postgres-b:
-        image: postgres
-        env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-    runs-on: ubuntu-latest
-    steps:
-    - run: git clone -b master https://github.com/vapor/fluent-postgres-driver.git
-      working-directory: ./
-    - run: swift package edit postgres-nio --revision ${{ github.sha }}
-      working-directory: ./fluent-postgres-driver
-    - run: swift test --enable-test-discovery --sanitize=thread
-      working-directory: ./fluent-postgres-driver
-      env:
-        POSTGRES_HOSTNAME_A: postgres-a
-        POSTGRES_HOSTNAME_B: postgres-b
-
+          POSTGRES_DATABASE: vapor_database_a
+          POSTGRES_DATABASE_A: vapor_database_a
+          POSTGRES_DATABASE_B: vapor_database_b
+          LOG_LEVEL: notice
