@@ -78,7 +78,7 @@ This package has no additional system dependencies.
 
 ## API Docs
 
-Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/master/PostgresNIO/index.html) for a detailed look at all of the classes, structs, protocols, and more.
+Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/master/PostgresNIO/) for a detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting Started
 
