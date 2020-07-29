@@ -860,10 +860,10 @@ final class PostgresNIOTests: XCTestCase {
             '5'::char(2) as two
         """).wait()
         XCTAssertEqual(rows[0].column("one")?.uint8, 53)
-        XCTAssertEqual(rows[0].column("one")?.uint16, 53)
+        XCTAssertEqual(rows[0].column("one")?.int16, 53)
         XCTAssertEqual(rows[0].column("one")?.string, "5")
         XCTAssertEqual(rows[0].column("two")?.uint8, nil)
-        XCTAssertEqual(rows[0].column("two")?.uint16, nil)
+        XCTAssertEqual(rows[0].column("two")?.int16, nil)
         XCTAssertEqual(rows[0].column("two")?.string, "5 ")
     }
 
