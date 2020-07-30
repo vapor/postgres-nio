@@ -937,6 +937,55 @@ final class PostgresNIOTests: XCTestCase {
         _ = try conn.simpleQuery("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait()
         _ = try conn.query("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait()
     }
+
+    func testIntegerConversions() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            'a'::char as test8,
+
+            '-32768'::smallint as min16,
+            '32767'::smallint as max16,
+
+            '-2147483648'::integer as min32,
+            '2147483647'::integer as max32,
+
+            '-9223372036854775808'::bigint as min64,
+            '9223372036854775807'::bigint as max64
+        """).wait()
+        XCTAssertEqual(rows[0].column("test8")?.uint8, 97)
+        XCTAssertEqual(rows[0].column("test8")?.int16, 97)
+        XCTAssertEqual(rows[0].column("test8")?.int32, 97)
+        XCTAssertEqual(rows[0].column("test8")?.int64, 97)
+
+        XCTAssertEqual(rows[0].column("min16")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("max16")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("min16")?.int16, .min)
+        XCTAssertEqual(rows[0].column("max16")?.int16, .max)
+        XCTAssertEqual(rows[0].column("min16")?.int32, -32768)
+        XCTAssertEqual(rows[0].column("max16")?.int32, 32767)
+        XCTAssertEqual(rows[0].column("min16")?.int64,  -32768)
+        XCTAssertEqual(rows[0].column("max16")?.int64, 32767)
+
+        XCTAssertEqual(rows[0].column("min32")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("max32")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("min32")?.int16, nil)
+        XCTAssertEqual(rows[0].column("max32")?.int16, nil)
+        XCTAssertEqual(rows[0].column("min32")?.int32, .min)
+        XCTAssertEqual(rows[0].column("max32")?.int32, .max)
+        XCTAssertEqual(rows[0].column("min32")?.int64, -2147483648)
+        XCTAssertEqual(rows[0].column("max32")?.int64, 2147483647)
+
+        XCTAssertEqual(rows[0].column("min64")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("max64")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("min64")?.int16, nil)
+        XCTAssertEqual(rows[0].column("max64")?.int16, nil)
+        XCTAssertEqual(rows[0].column("min64")?.int32, nil)
+        XCTAssertEqual(rows[0].column("max64")?.int32, nil)
+        XCTAssertEqual(rows[0].column("min64")?.int64, .min)
+        XCTAssertEqual(rows[0].column("max64")?.int64, .max)
+    }
 }
 
 func env(_ name: String) -> String? {
