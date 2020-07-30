@@ -14,6 +14,8 @@ private func warn(
     but may cause overflow. To avoid overflow errors, update
     your code to use \(new) instead.
 
+    See https://github.com/vapor/postgres-nio/pull/120
+
     """, file: file, line: line)
 }
 
