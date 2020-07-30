@@ -198,17 +198,15 @@ let data: PostgresData= ...
 
 print(data.string) // String?
 
+// Postgres only supports signed Ints.
 print(data.int) // Int?
-print(data.int8) // Int8?
 print(data.int16) // Int16?
 print(data.int32) // Int32?
 print(data.int64) // Int64?
 
-print(data.uint) // UInt?
+// 'char' can be interpreted as a UInt8. 
+// It will show in db as a character though. 
 print(data.uint8) // UInt8?
-print(data.uint16) // UInt16?
-print(data.uint32) // UInt32?
-print(data.uint64) // UInt64?
 
 print(data.bool) // Bool?
 
