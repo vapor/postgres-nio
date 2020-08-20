@@ -849,6 +849,24 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[2][0].column("foo")?.string, "c")
     }
 
+    // https://github.com/vapor/postgres-nio/issues/122
+    func testPreparedQueryNoResults() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"table_no_results\"").wait()
+        _ = try conn.simpleQuery("""
+        CREATE TABLE table_no_results (
+            "id" int8 NOT NULL,
+            "stringValue" text,
+            PRIMARY KEY ("id")
+        );
+        """).wait()
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"table_no_results\"").wait() }
+
+        _ = try conn.prepare(query: "DELETE FROM \"table_no_results\" WHERE id = $1").wait()
+    }
+
 
     // https://github.com/vapor/postgres-nio/issues/71
     func testChar1Serialization() throws {
