@@ -11,7 +11,7 @@ extension PostgresData {
     }
 
     public init<T>(json value: T) throws where T: Encodable {
-        let jsonData = try JSONEncoder().encode(value)
+        let jsonData = try PostgresNIO._defaultJSONEncoder.encode(value)
         self.init(json: jsonData)
     }
 
@@ -32,7 +32,7 @@ extension PostgresData {
         guard let data = self.json else {
             return nil
         }
-        return try JSONDecoder().decode(T.self, from: data)
+        return try PostgresNIO._defaultJSONDecoder.decode(T.self, from: data)
     }
 }
 
