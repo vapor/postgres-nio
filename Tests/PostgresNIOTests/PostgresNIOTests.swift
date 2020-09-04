@@ -1004,6 +1004,62 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[0].column("min64")?.int64, .min)
         XCTAssertEqual(rows[0].column("max64")?.int64, .max)
     }
+    
+    // https://github.com/vapor/postgres-nio/issues/126
+    func testCustomJSONEncoder() throws {
+        let previousDefaultJSONEncoder = PostgresNIO._defaultJSONEncoder
+        defer {
+            PostgresNIO._defaultJSONEncoder = previousDefaultJSONEncoder
+        }
+        final class CustomJSONEncoder: PostgresJSONEncoder {
+            var didEncode = false
+            func encode<T>(_ value: T) throws -> Data where T : Encodable {
+                self.didEncode = true
+                return try JSONEncoder().encode(value)
+            }
+        }
+        struct Object: Codable {
+            var foo: Int
+            var bar: Int
+        }
+        let customJSONEncoder = CustomJSONEncoder()
+        PostgresNIO._defaultJSONEncoder = customJSONEncoder
+        let _ = try PostgresData(json: Object(foo: 1, bar: 2))
+        XCTAssert(customJSONEncoder.didEncode)
+        
+        let customJSONBEncoder = CustomJSONEncoder()
+        PostgresNIO._defaultJSONEncoder = customJSONBEncoder
+        let _ = try PostgresData(jsonb: Object(foo: 1, bar: 2))
+        XCTAssert(customJSONBEncoder.didEncode)
+    }
+    
+    // https://github.com/vapor/postgres-nio/issues/126
+    func testCustomJSONDecoder() throws {
+        let previousDefaultJSONDecoder = PostgresNIO._defaultJSONDecoder
+        defer {
+            PostgresNIO._defaultJSONDecoder = previousDefaultJSONDecoder
+        }
+        final class CustomJSONDecoder: PostgresJSONDecoder {
+            var didDecode = false
+            func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable {
+                self.didDecode = true
+                return try JSONDecoder().decode(type, from: data)
+            }
+        }
+        struct Object: Codable {
+            var foo: Int
+            var bar: Int
+        }
+        let customJSONDecoder = CustomJSONDecoder()
+        PostgresNIO._defaultJSONDecoder = customJSONDecoder
+        let _ = try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self)
+        XCTAssert(customJSONDecoder.didDecode)
+        
+        let customJSONBDecoder = CustomJSONDecoder()
+        PostgresNIO._defaultJSONDecoder = customJSONBDecoder
+        let _ = try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self)
+        XCTAssert(customJSONBDecoder.didDecode)
+    }
 }
 
 func env(_ name: String) -> String? {
