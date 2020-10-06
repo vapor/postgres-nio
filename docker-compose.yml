@@ -1,6 +1,14 @@
 version: '2'
 
 services:
+  psql-12:
+    image: postgres:12
+    environment:
+      POSTGRES_USER: vapor_username
+      POSTGRES_DB: vapor_database
+      POSTGRES_PASSWORD: vapor_password
+    ports:
+      - 5432:5432
   psql-11:
     image: postgres:11
     environment:

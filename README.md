@@ -78,7 +78,7 @@ This package has no additional system dependencies.
 
 ## API Docs
 
-Check out the [PostgresNIO API docs]((https://api.vapor.codes/postgres-nio/master/PostgresNIO/index.html)) for a detailed look at all of the classes, structs, protocols, and more.
+Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/master/PostgresNIO/) for a detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting Started
 
@@ -96,6 +96,7 @@ let conn = try PostgresConnection.connect(
     to: .makeAddressResolvingHost("my.psql.server", port: 5432),
     on: eventLoop
 ).wait()
+defer { try! conn.close().wait() }
 ```
 
 Note: These examples will make use of `wait()` for simplicity. This is appropriate if you are using PostgresNIO on the main thread, like for a CLI tool or in tests. However, you should never use `wait()` on an event loop.
@@ -111,18 +112,32 @@ There are also some additional arguments you can supply to `connect`.
 - `tlsConfiguration` An optional `TLSConfiguration` struct. If supplied, the PostgreSQL connection will be upgraded to use SSL.
 - `serverHostname` An optional `String` to use in conjunction with `tlsConfiguration` to specify the server's hostname. 
 
-`connect` will return a future `PostgresConnection`, or an error if it could not connect.
+`connect` will return a future `PostgresConnection`, or an error if it could not connect. Make sure you close the connection before it deinitializes.
 
-### Client Protocol
+### Authentication
 
-Interaction with a server revolves around the `PostgresClient` protocol. This protocol includes methods like `query(_:)` for executing SQL queries and reading the resulting rows. 
+Once you have a connection, you will need to authenticate with the server using the `authenticate` method.
 
-`PostgresConnection` is the default implementation of `PostgresClient` provided by this package. Assume the client here is the connection from the previous example.
+```swift
+try conn.authenticate(
+    username: "vapor_username",
+    database: "vapor_database",
+    password: "vapor_password"
+).wait()
+```
+
+This requires a username. You may supply a database name and password if needed. 
+
+### Database Protocol
+
+Interaction with a server revolves around the `PostgresDatabase` protocol. This protocol includes methods like `query(_:)` for executing SQL queries and reading the resulting rows. 
+
+`PostgresConnection` is the default implementation of `PostgresDatabase` provided by this package. Assume `db` here is the connection from the previous example.
 
 ```swift
 import PostgresNIO
 
-let client: PostgresClient = ...
+let db: PostgresDatabase = ...
 // now we can use client to do queries
 ```
 
@@ -135,11 +150,11 @@ These queries are most useful for schema or transactional queries, or simple sel
 `simpleQuery` has two overloads, one that returns an array of rows, and one that accepts a closure for handling each row as it is returned.
 
 ```swift
-let rows = try client.simpleQuery("SELECT version()").wait()
-print(rows) // [["version": "11.0.0"]]
+let rows = try db.simpleQuery("SELECT version()").wait()
+print(rows) // [["version": "12.x.x"]]
 
-try client.simpleQuery("SELECT version()") { row in
-    print(row) // ["version": "11.0.0"]
+try db.simpleQuery("SELECT version()") { row in
+    print(row) // ["version": "12.x.x"]
 }.wait()
 ```
 
@@ -152,10 +167,10 @@ These queries are most useful for selecting, inserting, and updating data. Data 
 Just like `simpleQuery`, `query` also offers two overloads. One that returns an array of rows, and one that accepts a closure for handling each row as it is returned.
 
 ```swift
-let rows = try client.query("SELECT * FROM planets WHERE name = $1", ["Earth"]).wait()
+let rows = try db.query("SELECT * FROM planets WHERE name = $1", ["Earth"]).wait()
 print(rows) // [["id": 42, "name": "Earth"]]
 
-try client.query("SELECT * FROM planets WHERE name = $1", ["Earth"]) { row in
+try db.query("SELECT * FROM planets WHERE name = $1", ["Earth"]) { row in
     print(row) // ["id": 42, "name": "Earth"]
 }.wait()
 ```
@@ -183,17 +198,15 @@ let data: PostgresData= ...
 
 print(data.string) // String?
 
+// Postgres only supports signed Ints.
 print(data.int) // Int?
-print(data.int8) // Int8?
 print(data.int16) // Int16?
 print(data.int32) // Int32?
 print(data.int64) // Int64?
 
-print(data.uint) // UInt?
+// 'char' can be interpreted as a UInt8. 
+// It will show in db as a character though. 
 print(data.uint8) // UInt8?
-print(data.uint16) // UInt16?
-print(data.uint32) // UInt32?
-print(data.uint64) // UInt64?
 
 print(data.bool) // Bool?
 
@@ -209,36 +222,3 @@ print(data.numeric) // PostgresNumeric?
 ```
 
 `PostgresData` is also used for sending data _to_ the server via parameterized values. To create `PostgresData` from a Swift type, use the available intializer methods. 
-
-## Library development
-
-If you want to contribute to the library development, here is how to get started.
-
-### Testing
-
-To run the test, you need to start a local PostgreSQL database using Docker.
-
-If you have Docker installed and running, you can use Docker Compose to start PostgreSQL:
-
-The following command will download the required containers to run the test and start them:
-
-```
-$ docker-compose up -d psql-11
-```
-
-You can choose to run one of the following PostgreSQL version: `psql-11`, `psql-10`, `psql-9`, `psql-ssl`.
-
-From another console or from Xcode, you can then run the test:
-
-```
-$ swift test
-```
-
-You can check that the test are passing, before adding your own to the test suite.
-
-Finally, you can shut down and clean up Docker test environment with:
-
-```
-$ docker-compose down --volumes
-```
-

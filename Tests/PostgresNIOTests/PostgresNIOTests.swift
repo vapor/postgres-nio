@@ -1,5 +1,5 @@
 import Logging
-import PostgresNIO
+@testable import PostgresNIO
 import XCTest
 import NIOTestUtils
 
@@ -849,6 +849,24 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[2][0].column("foo")?.string, "c")
     }
 
+    // https://github.com/vapor/postgres-nio/issues/122
+    func testPreparedQueryNoResults() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"table_no_results\"").wait()
+        _ = try conn.simpleQuery("""
+        CREATE TABLE table_no_results (
+            "id" int8 NOT NULL,
+            "stringValue" text,
+            PRIMARY KEY ("id")
+        );
+        """).wait()
+        defer { _ = try! conn.simpleQuery("DROP TABLE \"table_no_results\"").wait() }
+
+        _ = try conn.prepare(query: "DELETE FROM \"table_no_results\" WHERE id = $1").wait()
+    }
+
 
     // https://github.com/vapor/postgres-nio/issues/71
     func testChar1Serialization() throws {
@@ -860,10 +878,10 @@ final class PostgresNIOTests: XCTestCase {
             '5'::char(2) as two
         """).wait()
         XCTAssertEqual(rows[0].column("one")?.uint8, 53)
-        XCTAssertEqual(rows[0].column("one")?.uint16, 53)
+        XCTAssertEqual(rows[0].column("one")?.int16, 53)
         XCTAssertEqual(rows[0].column("one")?.string, "5")
         XCTAssertEqual(rows[0].column("two")?.uint8, nil)
-        XCTAssertEqual(rows[0].column("two")?.uint16, nil)
+        XCTAssertEqual(rows[0].column("two")?.int16, nil)
         XCTAssertEqual(rows[0].column("two")?.string, "5 ")
     }
 
@@ -913,6 +931,134 @@ final class PostgresNIOTests: XCTestCase {
             _ = try conn.query("SELECT version()", binds).wait()
             XCTFail("Should have failed")
         } catch PostgresError.connectionClosed { }
+    }
+
+    func testRemoteClose() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        try conn.channel.close().wait()
+    }
+
+    // https://github.com/vapor/postgres-nio/issues/113
+    func testVaryingCharArray() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        let res = try conn.query(#"SELECT '{"foo", "bar", "baz"}'::VARCHAR[] as foo"#).wait()
+        XCTAssertEqual(res[0].column("foo")?.array(of: String.self), ["foo", "bar", "baz"])
+    }
+
+    // https://github.com/vapor/postgres-nio/issues/115
+    func testSetTimeZone() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+
+        _ = try conn.simpleQuery("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait()
+        _ = try conn.query("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait()
+    }
+
+    func testIntegerConversions() throws {
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
+        defer { try! conn.close().wait() }
+        let rows = try conn.query("""
+        select
+            'a'::char as test8,
+
+            '-32768'::smallint as min16,
+            '32767'::smallint as max16,
+
+            '-2147483648'::integer as min32,
+            '2147483647'::integer as max32,
+
+            '-9223372036854775808'::bigint as min64,
+            '9223372036854775807'::bigint as max64
+        """).wait()
+        XCTAssertEqual(rows[0].column("test8")?.uint8, 97)
+        XCTAssertEqual(rows[0].column("test8")?.int16, 97)
+        XCTAssertEqual(rows[0].column("test8")?.int32, 97)
+        XCTAssertEqual(rows[0].column("test8")?.int64, 97)
+
+        XCTAssertEqual(rows[0].column("min16")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("max16")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("min16")?.int16, .min)
+        XCTAssertEqual(rows[0].column("max16")?.int16, .max)
+        XCTAssertEqual(rows[0].column("min16")?.int32, -32768)
+        XCTAssertEqual(rows[0].column("max16")?.int32, 32767)
+        XCTAssertEqual(rows[0].column("min16")?.int64,  -32768)
+        XCTAssertEqual(rows[0].column("max16")?.int64, 32767)
+
+        XCTAssertEqual(rows[0].column("min32")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("max32")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("min32")?.int16, nil)
+        XCTAssertEqual(rows[0].column("max32")?.int16, nil)
+        XCTAssertEqual(rows[0].column("min32")?.int32, .min)
+        XCTAssertEqual(rows[0].column("max32")?.int32, .max)
+        XCTAssertEqual(rows[0].column("min32")?.int64, -2147483648)
+        XCTAssertEqual(rows[0].column("max32")?.int64, 2147483647)
+
+        XCTAssertEqual(rows[0].column("min64")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("max64")?.uint8, nil)
+        XCTAssertEqual(rows[0].column("min64")?.int16, nil)
+        XCTAssertEqual(rows[0].column("max64")?.int16, nil)
+        XCTAssertEqual(rows[0].column("min64")?.int32, nil)
+        XCTAssertEqual(rows[0].column("max64")?.int32, nil)
+        XCTAssertEqual(rows[0].column("min64")?.int64, .min)
+        XCTAssertEqual(rows[0].column("max64")?.int64, .max)
+    }
+    
+    // https://github.com/vapor/postgres-nio/issues/126
+    func testCustomJSONEncoder() throws {
+        let previousDefaultJSONEncoder = PostgresNIO._defaultJSONEncoder
+        defer {
+            PostgresNIO._defaultJSONEncoder = previousDefaultJSONEncoder
+        }
+        final class CustomJSONEncoder: PostgresJSONEncoder {
+            var didEncode = false
+            func encode<T>(_ value: T) throws -> Data where T : Encodable {
+                self.didEncode = true
+                return try JSONEncoder().encode(value)
+            }
+        }
+        struct Object: Codable {
+            var foo: Int
+            var bar: Int
+        }
+        let customJSONEncoder = CustomJSONEncoder()
+        PostgresNIO._defaultJSONEncoder = customJSONEncoder
+        let _ = try PostgresData(json: Object(foo: 1, bar: 2))
+        XCTAssert(customJSONEncoder.didEncode)
+        
+        let customJSONBEncoder = CustomJSONEncoder()
+        PostgresNIO._defaultJSONEncoder = customJSONBEncoder
+        let _ = try PostgresData(jsonb: Object(foo: 1, bar: 2))
+        XCTAssert(customJSONBEncoder.didEncode)
+    }
+    
+    // https://github.com/vapor/postgres-nio/issues/126
+    func testCustomJSONDecoder() throws {
+        let previousDefaultJSONDecoder = PostgresNIO._defaultJSONDecoder
+        defer {
+            PostgresNIO._defaultJSONDecoder = previousDefaultJSONDecoder
+        }
+        final class CustomJSONDecoder: PostgresJSONDecoder {
+            var didDecode = false
+            func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable {
+                self.didDecode = true
+                return try JSONDecoder().decode(type, from: data)
+            }
+        }
+        struct Object: Codable {
+            var foo: Int
+            var bar: Int
+        }
+        let customJSONDecoder = CustomJSONDecoder()
+        PostgresNIO._defaultJSONDecoder = customJSONDecoder
+        let _ = try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self)
+        XCTAssert(customJSONDecoder.didDecode)
+        
+        let customJSONBDecoder = CustomJSONDecoder()
+        PostgresNIO._defaultJSONDecoder = customJSONBDecoder
+        let _ = try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self)
+        XCTAssert(customJSONBDecoder.didDecode)
     }
 }
 

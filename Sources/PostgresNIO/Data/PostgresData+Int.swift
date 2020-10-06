@@ -1,117 +1,30 @@
 extension PostgresData {
     public init(int value: Int) {
-        self.init(fwi: value)
+        assert(Int.bitWidth == 64)
+        self.init(type: .int8, value: .init(integer: value))
     }
-    
-    public init(int8 value: Int8) {
-        self.init(fwi: value)
+
+    public init(uint8 value: UInt8) {
+        self.init(type: .char, value: .init(integer: value))
     }
     
     public init(int16 value: Int16) {
-        self.init(fwi: value)
+        self.init(type: .int2, value: .init(integer: value))
     }
     
     public init(int32 value: Int32) {
-        self.init(fwi: value)
+        self.init(type: .int4, value: .init(integer: value))
     }
     
     public init(int64 value: Int64) {
-        self.init(fwi: value)
-    }
-    
-    public init(uint value: UInt) {
-        self.init(fwi: value)
-    }
-    
-    public init(uint8 value: UInt8) {
-        self.init(fwi: value)
-    }
-    
-    public init(uint16 value: UInt16) {
-        self.init(fwi: value)
-    }
-    
-    public init(uint32 value: UInt32) {
-        self.init(fwi: value)
-    }
-    
-    public init(uint64 value: UInt64) {
-        self.init(fwi: value)
+        self.init(type: .int8, value: .init(integer: value))
     }
     
     public var int: Int? {
-        return fwi()
-    }
-    
-    public var int8: Int8? {
-        return fwi()
-    }
-    
-    public var int16: Int16? {
-        return fwi()
-    }
-    
-    public var int32: Int32? {
-        return fwi()
-    }
-    
-    public var int64: Int64? {
-        return fwi()
-    }
-    
-    public var uint: UInt? {
-        return fwi()
-    }
-    
-    public var uint8: UInt8? {
-        return fwi()
-    }
-    
-    public var uint16: UInt16? {
-        return fwi()
-    }
-    
-    public var uint32: UInt32? {
-        return fwi()
-    }
-    
-    public var uint64: UInt64? {
-        return fwi()
-    }
-}
-
-private extension PostgresData {
-    init<I>(fwi: I) where I: FixedWidthInteger {
-        let capacity: Int
-        let type: PostgresDataType
-        switch I.bitWidth {
-        case 8:
-            capacity = 1
-            type = .char
-        case 16:
-            capacity = 2
-            type = .int2
-        case 32:
-            capacity = 3
-            type = .int4
-        case 64:
-            capacity = 4
-            type = .int8
-        default:
-            fatalError("Cannot encode \(I.self) to PostgresData")
-        }
-        var buffer = ByteBufferAllocator().buffer(capacity: capacity)
-        buffer.writeInteger(fwi)
-        self.init(type: type, formatCode: .binary, value: buffer)
-    }
-    
-    func fwi<I>(_ type: I.Type = I.self) -> I?
-        where I: FixedWidthInteger
-    {
         guard var value = self.value else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .binary:
             switch self.type {
@@ -119,34 +32,25 @@ private extension PostgresData {
                 guard value.readableBytes == 1 else {
                     return nil
                 }
-                guard let uint8 = value.getInteger(at: value.readerIndex, as: UInt8.self) else {
-                    return nil
-                }
-                return I(uint8)
+                return value.readInteger(as: UInt8.self)
+                    .flatMap(Int.init)
             case .int2:
                 assert(value.readableBytes == 2)
-                guard let int16 = value.readInteger(as: Int16.self) else {
-                    return nil
-                }
-                return I(int16)
+                return value.readInteger(as: Int16.self)
+                    .flatMap(Int.init)
             case .int4, .regproc:
                 assert(value.readableBytes == 4)
-                guard let int32 = value.getInteger(at: value.readerIndex, as: Int32.self) else {
-                    return nil
-                }
-                return I(int32)
+                return value.readInteger(as: Int32.self)
+                    .flatMap(Int.init)
             case .oid:
                 assert(value.readableBytes == 4)
-                guard let uint32 = value.getInteger(at: value.readerIndex, as: UInt32.self) else {
-                    return nil
-                }
-                return I(uint32)
+                assert(Int.bitWidth == 64) // or else overflow is possible
+                return value.readInteger(as: UInt32.self)
+                    .flatMap(Int.init)
             case .int8:
                 assert(value.readableBytes == 8)
-                guard let int64 = value.getInteger(at: value.readerIndex, as: Int64.self) else {
-                    return nil
-                }
-                return I(int64)
+                assert(Int.bitWidth == 64)
+                return value.readInteger(as: Int.self)
             default:
                 return nil
             }
@@ -154,52 +58,209 @@ private extension PostgresData {
             guard let string = self.string else {
                 return nil
             }
-            return I(string)
+            return Int(string)
+        }
+    }
+
+    public var uint8: UInt8? {
+        guard var value = self.value else {
+            return nil
+        }
+
+        switch self.formatCode {
+        case .binary:
+            switch self.type {
+            case .char, .bpchar:
+                guard value.readableBytes == 1 else {
+                    return nil
+                }
+                return value.readInteger(as: UInt8.self)
+            default:
+                return nil
+            }
+        case .text:
+            guard let string = self.string else {
+                return nil
+            }
+            return UInt8(string)
+        }
+    }
+    
+    public var int16: Int16? {
+        guard var value = self.value else {
+            return nil
+        }
+
+        switch self.formatCode {
+        case .binary:
+            switch self.type {
+            case .char, .bpchar:
+                guard value.readableBytes == 1 else {
+                    return nil
+                }
+                return value.readInteger(as: UInt8.self)
+                    .flatMap(Int16.init)
+            case .int2:
+                assert(value.readableBytes == 2)
+                return value.readInteger(as: Int16.self)
+            default:
+                return nil
+            }
+        case .text:
+            guard let string = self.string else {
+                return nil
+            }
+            return Int16(string)
+        }
+    }
+    
+    public var int32: Int32? {
+        guard var value = self.value else {
+            return nil
+        }
+
+        switch self.formatCode {
+        case .binary:
+            switch self.type {
+            case .char, .bpchar:
+                guard value.readableBytes == 1 else {
+                    return nil
+                }
+                return value.readInteger(as: UInt8.self)
+                    .flatMap(Int32.init)
+            case .int2:
+                assert(value.readableBytes == 2)
+                return value.readInteger(as: Int16.self)
+                    .flatMap(Int32.init)
+            case .int4, .regproc:
+                assert(value.readableBytes == 4)
+                return value.readInteger(as: Int32.self)
+                    .flatMap(Int32.init)
+            default:
+                return nil
+            }
+        case .text:
+            guard let string = self.string else {
+                return nil
+            }
+            return Int32(string)
+        }
+    }
+    
+    public var int64: Int64? {
+        guard var value = self.value else {
+            return nil
+        }
+
+        switch self.formatCode {
+        case .binary:
+            switch self.type {
+            case .char, .bpchar:
+                guard value.readableBytes == 1 else {
+                    return nil
+                }
+                return value.readInteger(as: UInt8.self)
+                    .flatMap(Int64.init)
+            case .int2:
+                assert(value.readableBytes == 2)
+                return value.readInteger(as: Int16.self)
+                    .flatMap(Int64.init)
+            case .int4, .regproc:
+                assert(value.readableBytes == 4)
+                return value.readInteger(as: Int32.self)
+                    .flatMap(Int64.init)
+            case .oid:
+                assert(value.readableBytes == 4)
+                assert(Int.bitWidth == 64) // or else overflow is possible
+                return value.readInteger(as: UInt32.self)
+                    .flatMap(Int64.init)
+            case .int8:
+                assert(value.readableBytes == 8)
+                assert(Int.bitWidth == 64)
+                return value.readInteger(as: Int64.self)
+            default:
+                return nil
+            }
+        case .text:
+            guard let string = self.string else {
+                return nil
+            }
+            return Int64(string)
         }
     }
 }
 
-extension FixedWidthInteger {
-    public static var postgresDataType: PostgresDataType {
-        switch self.bitWidth {
-        case 8:
-            return .char
-        case 16:
-            return .int2
-        case 32:
-            return .int4
-        case 64:
-            return .int8
-        default:
-            fatalError("\(self.bitWidth) not supported")
+extension Int: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType { .int8 }
+
+    public init?(postgresData: PostgresData) {
+        guard let int = postgresData.int else {
+            return nil
         }
+        self = int
     }
 
     public var postgresData: PostgresData? {
-        return .init(fwi: self)
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let fwi = postgresData.fwi(Self.self) else {
-            return nil
-        }
-        self = fwi
+        .init(int: self)
     }
 }
 
-extension Int: PostgresDataConvertible { }
-extension Int8: PostgresDataConvertible { }
-extension Int16: PostgresDataConvertible { }
-extension Int32: PostgresDataConvertible { }
-extension Int64: PostgresDataConvertible { }
-extension UInt: PostgresDataConvertible { }
-extension UInt8: PostgresDataConvertible { }
-extension UInt16: PostgresDataConvertible { }
-extension UInt32: PostgresDataConvertible { }
-extension UInt64: PostgresDataConvertible { }
+extension UInt8: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType { .char }
 
-extension PostgresData: ExpressibleByIntegerLiteral {
-    public init(integerLiteral value: Int) {
-        self.init(int: value)
+    public init?(postgresData: PostgresData) {
+        guard let uint8 = postgresData.uint8 else {
+            return nil
+        }
+        self = uint8
+    }
+
+    public var postgresData: PostgresData? {
+        .init(uint8: self)
+    }
+}
+
+extension Int16: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType { .int2 }
+
+    public init?(postgresData: PostgresData) {
+        guard let int16 = postgresData.int16 else {
+            return nil
+        }
+        self = int16
+    }
+
+    public var postgresData: PostgresData? {
+        .init(int16: self)
+    }
+}
+
+extension Int32: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType { .int4 }
+
+    public init?(postgresData: PostgresData) {
+        guard let int32 = postgresData.int32 else {
+            return nil
+        }
+        self = int32
+    }
+
+    public var postgresData: PostgresData? {
+        .init(int32: self)
+    }
+}
+
+extension Int64: PostgresDataConvertible {
+    public static var postgresDataType: PostgresDataType { .int8 }
+
+    public init?(postgresData: PostgresData) {
+        guard let int64 = postgresData.int64 else {
+            return nil
+        }
+        self = int64
+    }
+
+    public var postgresData: PostgresData? {
+        .init(int64: self)
     }
 }

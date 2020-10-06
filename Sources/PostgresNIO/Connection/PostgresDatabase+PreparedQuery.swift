@@ -5,7 +5,7 @@ extension PostgresDatabase {
         let name = "nio-postgres-\(UUID().uuidString)"
         let prepare = PrepareQueryRequest(query, as: name)
         return self.send(prepare, logger: self.logger).map { () -> (PreparedQuery) in
-            let prepared = PreparedQuery(database: self, name: name, rowDescription: prepare.rowLookupTable!)
+            let prepared = PreparedQuery(database: self, name: name, rowDescription: prepare.rowLookupTable)
             return prepared
         }
     }
@@ -25,9 +25,9 @@ extension PostgresDatabase {
 public struct PreparedQuery {
     let database: PostgresDatabase
     let name: String
-    let rowLookupTable: PostgresRow.LookupTable
+    let rowLookupTable: PostgresRow.LookupTable?
 
-    init(database: PostgresDatabase, name: String, rowDescription: PostgresRow.LookupTable) {
+    init(database: PostgresDatabase, name: String, rowDescription: PostgresRow.LookupTable?) {
         self.database = database
         self.name = name
         self.rowLookupTable = rowDescription
@@ -73,6 +73,8 @@ private final class PrepareQueryRequest: PostgresRequest {
                 rowDescription: row,
                 resultFormat: self.resultFormatCodes
             )
+            return []
+        case .noData:
             return []
         case .parseComplete, .parameterDescription:
             return []
@@ -125,7 +127,10 @@ private final class ExecutePreparedQuery: PostgresRequest {
             return []
         case .dataRow:
             let data = try PostgresMessage.DataRow(message: message)
-            let row = PostgresRow(dataRow: data, lookupTable: query.rowLookupTable)
+            guard let rowLookupTable = query.rowLookupTable else {
+                fatalError("row lookup was requested but never set")
+            }
+            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
             try onRow(row)
             return []
         case .noData:

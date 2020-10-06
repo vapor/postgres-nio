@@ -268,7 +268,7 @@ private func prepareTableToMeasureSelectPerformance(
     file: StaticString = #file,
     line: UInt = #line
 ) throws {
-    XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: file, line: line)
+    XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: (file), line: line)
     let conn = try PostgresConnection.test(on: eventLoop).wait()
     defer { try! conn.close().wait() }
     
