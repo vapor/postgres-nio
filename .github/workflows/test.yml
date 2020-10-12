@@ -1,35 +1,40 @@
 name: test
-on: 
-  - pull_request
-defaults:
-  run:
-    shell: bash
+on: [ 'pull_request' ]
+env:
+  LOG_LEVEL: notice
+
 jobs:
+
+  # Test that packages depending on us still work
   dependents:
-    runs-on: ubuntu-latest
-    services:
-      psql-a:
-        image: ${{ matrix.dbimage }}
-        env: 
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-      psql-b:
-        image: ${{ matrix.dbimage }}
-        env: 
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-    container: swift:5.2-bionic
     strategy:
       fail-fast: false
       matrix:
+        swiftver:
+          - 5.2
+          - 5.3
         dbimage:
+          - postgres:13
           - postgres:12
           - postgres:11
         dependent:
           - postgres-kit
           - fluent-postgres-driver
+    container: swift:${{ matrix.swiftver }}-focal
+    runs-on: ubuntu-latest
+    services:
+      psql-a:
+        image: ${{ matrix.dbimage }}
+        env:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
+      psql-b:
+        image: ${{ matrix.dbimage }}
+        env:
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
+          POSTGRES_PASSWORD: vapor_password
     steps:
       - name: Check out package
         uses: actions/checkout@v2
@@ -50,83 +55,81 @@ jobs:
           POSTGRES_HOSTNAME: psql-a
           POSTGRES_HOSTNAME_A: psql-a
           POSTGRES_HOSTNAME_B: psql-b
-          LOG_LEVEL: notice
+
+  # Run package tests on Linux Swift runners against supported PSQL versions
   linux:
     strategy:
       fail-fast: false
       matrix:
         dbimage:
+          - postgres:13
           - postgres:12
           - postgres:11
-        runner:
-          # 5.2 Stable
-          - swift:5.2-xenial
-          - swift:5.2-bionic
-          # 5.2 Unstable
-          - swiftlang/swift:nightly-5.2-xenial
-          - swiftlang/swift:nightly-5.2-bionic
-          # 5.3 Unstable
-          - swiftlang/swift:nightly-5.3-xenial
-          - swiftlang/swift:nightly-5.3-bionic
-          # Master Unsable
-          - swiftlang/swift:nightly-master-xenial
-          - swiftlang/swift:nightly-master-bionic
-          - swiftlang/swift:nightly-master-focal
-          - swiftlang/swift:nightly-master-centos8
-          - swiftlang/swift:nightly-master-amazonlinux2
-    container: ${{ matrix.runner }}
+        dbauth:
+          - trust
+          - md5
+          - scram-sha-256
+        swiftver:
+          #- swift:5.2
+          - swift:5.3
+          - swiftlang/swift:nightly-5.3
+          #- swiftlang/swift:nightly-master
+        swiftos:
+          #- xenial
+          - bionic
+          - focal
+          #- centos7
+          #- centos8
+          - amazonlinux2
+    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
     runs-on: ubuntu-latest
     services:
       psql:
         image: ${{ matrix.dbimage }}
-        env: 
+        env:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
           POSTGRES_PASSWORD: vapor_password
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.authtype }}
     steps:
+      #- name: SPM is incompatible with CentOS 7
+      #  if: ${{ matrix.swiftos == 'centos7' }}
+      #  run: |
+      #    yum install -y make libcurl-devel
+      #    git clone https://github.com/git/git -bv2.28.0 --depth 1 && cd git
+      #    make prefix=/usr -j all install NO_OPENSSL=1 NO_EXPAT=1 NO_TCLTK=1 NO_GETTEXT=1 NO_PERL=1
       - name: Check out code
         uses: actions/checkout@v2
       - name: Run tests with Thread Sanitizer
         run: swift test --enable-test-discovery --sanitize=thread
-        env:
-          POSTGRES_HOSTNAME: psql
-          LOG_LEVEL: notice
-  macOS:
+        env: { POSTGRES_HOSTNAME: 'psql' }
+
+  # Run package tests on macOS against supported PSQL versions
+  macos:
     strategy:
       fail-fast: false
       matrix:
-        include: 
-          - formula: postgresql@11
-            datadir: postgresql@11
-          - formula: postgresql@12
-            datadir: postgres
+        dbauth:
+          - trust
+          - md5
+          - scram-sha-256
+        formula:
+          - postgresql@11
+          - postgresql@12
     runs-on: macos-latest
     steps:
       - name: Select latest available Xcode
         uses: maxim-lobanov/setup-xcode@1.0
-        with:
-          xcode-version: latest
-      - name: Replace Postgres install and start server
+        with: { 'xcode-version': latest }
+      - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
-          brew uninstall --force postgresql php && rm -rf /usr/local/{etc,var}/{postgres,pg}*
-          brew install ${{ matrix.formula }} && brew link --force ${{ matrix.formula }}
-          initdb --locale=C -E UTF-8 $(brew --prefix)/var/${{ matrix.datadir }}
-          brew services start ${{ matrix.formula }}
-      - name: Wait for server to be ready
-        run: until pg_isready; do sleep 1; done
-        timeout-minutes: 2
-      - name: Setup users and databases for Postgres
-        run: |
-          createuser --createdb --login vapor_username
-          for db in vapor_database_{a,b}; do
-            createdb -Ovapor_username $db && psql $db <<<"ALTER SCHEMA public OWNER TO vapor_username;"
-          done
+          export PATH="/usr/local/opt/${{ matrix.formula }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
+          brew install ${{ matrix.formula }}
+          initdb --locale=C -A ${{ matrix.dbauth }} -U vapor_username --pwfile=<(echo vapor_password)
+          pg_ctl start --wait
+        timeout-minutes: 5
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run tests with Thread Sanitizer
         run: swift test --enable-test-discovery --sanitize=thread
-        env:
-          POSTGRES_DATABASE: vapor_database_a
-          POSTGRES_DATABASE_A: vapor_database_a
-          POSTGRES_DATABASE_B: vapor_database_b
-          LOG_LEVEL: notice
+        env: { POSTGRES_DATABASE: 'postgres' }
