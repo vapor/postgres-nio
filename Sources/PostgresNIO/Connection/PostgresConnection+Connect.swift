@@ -26,7 +26,11 @@ extension PostgresConnection {
                     using: tlsConfiguration,
                     serverHostname: serverHostname,
                     logger: logger
-                ).map { conn }
+                ).flatMapError { error in
+                    conn.close().flatMapThrowing {
+                        throw error
+                    }
+                }.map { conn }
             } else {
                 return eventLoop.makeSucceededFuture(conn)
             }
