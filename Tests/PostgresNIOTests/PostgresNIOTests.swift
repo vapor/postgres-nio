@@ -619,6 +619,29 @@ final class PostgresNIOTests: XCTestCase {
         let version = rows[0].column("version")?.string
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
     }
+
+    func testFailingTLSConnectionClosesConnection() throws {
+        // There was a bug (https://github.com/vapor/postgres-nio/issues/133) where we would hit
+        // an assert because we didn't close the connection. This test should succeed without hitting
+        // the assert
+
+        // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
+        let elg = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { try! elg.syncShutdownGracefully() }
+
+        // We should get an error because you can't use an IP address for SNI, but we shouldn't bomb out by
+        // hitting the assert
+        XCTAssertThrowsError(
+            try PostgresConnection.connect(
+                to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
+                tlsConfiguration: .forClient(certificateVerification: .fullVerification),
+                serverHostname: "34.228.73.168",
+                on: elg.next()
+            ).wait()
+        )
+        // If we hit this, we're all good
+        XCTAssertTrue(true)
+    }
     
     func testInvalidPassword() throws {
         let conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait()
