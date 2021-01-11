@@ -1,9 +1,21 @@
-version: '2'
+version: '3.7'
 
 services:
+  psql-13:
+    image: postgres:13
+    user: postgres:postgres
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
+      POSTGRES_USER: vapor_username
+      POSTGRES_DB: vapor_database
+      POSTGRES_PASSWORD: vapor_password
+    ports:
+      - 5432:5432
   psql-12:
     image: postgres:12
+    user: postgres:postgres
     environment:
+      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
       POSTGRES_USER: vapor_username
       POSTGRES_DB: vapor_database
       POSTGRES_PASSWORD: vapor_password
@@ -11,31 +23,9 @@ services:
       - 5432:5432
   psql-11:
     image: postgres:11
+    user: postgres:postgres
     environment:
-      POSTGRES_USER: vapor_username
-      POSTGRES_DB: vapor_database
-      POSTGRES_PASSWORD: vapor_password
-    ports:
-      - 5432:5432
-  psql-10:
-    image: postgres:10
-    environment:
-      POSTGRES_USER: vapor_username
-      POSTGRES_DB: vapor_database
-      POSTGRES_PASSWORD: vapor_password
-    ports:
-      - 5432:5432
-  psql-9:
-    image: postgres:9
-    environment:
-      POSTGRES_USER: vapor_username
-      POSTGRES_DB: vapor_database
-      POSTGRES_PASSWORD: vapor_password
-    ports:
-      - 5432:5432
-  psql-ssl:
-    image: scenecheck/postgres-ssl:latest
-    environment:
+      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
       POSTGRES_USER: vapor_username
       POSTGRES_DB: vapor_database
       POSTGRES_PASSWORD: vapor_password
