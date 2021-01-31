@@ -70,13 +70,13 @@ jobs:
           - md5
           - scram-sha-256
         swiftver:
-          #- swift:5.2
+          - swift:5.2
           - swift:5.3
-          - swiftlang/swift:nightly-5.3
+          #- swiftlang/swift:nightly-5.3
           #- swiftlang/swift:nightly-master
         swiftos:
           #- xenial
-          - bionic
+          #- bionic
           - focal
           #- centos7
           #- centos8
@@ -90,25 +90,27 @@ jobs:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
           POSTGRES_PASSWORD: vapor_password
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.authtype }}
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
     steps:
-      #- name: SPM is incompatible with CentOS 7
-      #  if: ${{ matrix.swiftos == 'centos7' }}
-      #  run: |
-      #    yum install -y make libcurl-devel
-      #    git clone https://github.com/git/git -bv2.28.0 --depth 1 && cd git
-      #    make prefix=/usr -j all install NO_OPENSSL=1 NO_EXPAT=1 NO_TCLTK=1 NO_GETTEXT=1 NO_PERL=1
       - name: Check out code
         uses: actions/checkout@v2
       - name: Run tests with Thread Sanitizer
         run: swift test --enable-test-discovery --sanitize=thread
-        env: { POSTGRES_HOSTNAME: 'psql' }
+        env:
+          POSTGRES_HOSTNAME: psql
+          POSTGRES_USERNAME: vapor_username
+          POSTGRES_PASSWORD: vapor_password
+          POSTGRES_DATABASE: vapor_database
 
   # Run package tests on macOS against supported PSQL versions
   macos:
     strategy:
       fail-fast: false
       matrix:
+        xcode:
+          - latest-stable
+          - latest
         dbauth:
           - trust
           - md5
@@ -116,20 +118,26 @@ jobs:
         formula:
           - postgresql@11
           - postgresql@12
+          - postgresql@13
     runs-on: macos-latest
     steps:
       - name: Select latest available Xcode
-        uses: maxim-lobanov/setup-xcode@1.0
-        with: { 'xcode-version': latest }
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ matrix.xcode }}
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
           export PATH="/usr/local/opt/${{ matrix.formula }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
           brew install ${{ matrix.formula }}
-          initdb --locale=C -A ${{ matrix.dbauth }} -U vapor_username --pwfile=<(echo vapor_password)
+          initdb --locale=C --auth-host ${{ matrix.dbauth }} -U vapor_username --pwfile=<(echo vapor_password)
           pg_ctl start --wait
         timeout-minutes: 5
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run tests with Thread Sanitizer
         run: swift test --enable-test-discovery --sanitize=thread
-        env: { POSTGRES_DATABASE: 'postgres' }
+        env:
+          POSTGRES_HOSTNAME: 127.0.0.1
+          POSTGRES_USERNAME: vapor_username
+          POSTGRES_PASSWORD: vapor_password
+          POSTGRES_DATABASE: postgres
