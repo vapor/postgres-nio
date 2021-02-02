@@ -14,7 +14,8 @@ public enum PostgresError: Error, LocalizedError, CustomStringConvertible {
     public var description: String {
         let description: String
         switch self {
-        case .protocol(let message): description = "protocol error: \(message)"
+        case .protocol(let message):
+            description = "protocol error: \(message)"
         case .server(let error):
             return "server: \(error.description)"
         case .connectionClosed:

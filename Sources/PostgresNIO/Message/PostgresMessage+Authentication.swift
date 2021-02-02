@@ -68,7 +68,7 @@ extension PostgresMessage {
             case .saslMechanisms(let mechanisms):
                 buffer.writeInteger(10, as: Int32.self)
                 mechanisms.forEach {
-                    buffer.write(nullTerminated: $0)
+                    buffer.writeNullTerminatedString($0)
                 }
             case .saslContinue(let challenge):
                 buffer.writeInteger(11, as: Int32.self)
