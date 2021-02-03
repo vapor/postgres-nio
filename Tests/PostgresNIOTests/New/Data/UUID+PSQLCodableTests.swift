@@ -15,7 +15,7 @@ class UUID_PSQLCodableTests: XCTestCase {
             let uuid = UUID()
             var buffer = ByteBuffer()
             
-            uuid.encode(into: &buffer, context: .forTests)
+            uuid.encode(into: &buffer, context: .forTests())
             
             XCTAssertEqual(uuid.psqlType, .uuid)
             XCTAssertEqual(buffer.readableBytes, 16)
@@ -77,7 +77,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         let uuid = UUID()
         var buffer = ByteBuffer()
         
-        uuid.encode(into: &buffer, context: .forTests)
+        uuid.encode(into: &buffer, context: .forTests())
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
         

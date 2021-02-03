@@ -32,6 +32,3 @@ extension String: PSQLCodable {
         }
     }
 }
-
-
-

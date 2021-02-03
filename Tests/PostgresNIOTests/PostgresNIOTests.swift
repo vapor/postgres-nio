@@ -4,6 +4,7 @@ import XCTest
 import NIOTestUtils
 
 final class PostgresNIOTests: XCTestCase {
+    
     private var group: EventLoopGroup!
 
     private var eventLoop: EventLoop { self.group.next() }
@@ -43,7 +44,6 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows.count, 1)
         let version = rows[0].column("version")?.string
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
-        
     }
     
     func testQuerySelectParameter() throws {
@@ -842,16 +842,16 @@ final class PostgresNIOTests: XCTestCase {
     }
 
     func testPreparedQuery() throws {
-         let conn = try PostgresConnection.test(on: eventLoop).wait()
+        let conn = try PostgresConnection.test(on: eventLoop).wait()
 
-         defer { try! conn.close().wait() }
-         let prepared = try conn.prepare(query: "SELECT 1 as one;").wait()
-         let rows = try prepared.execute().wait()
+        defer { try! conn.close().wait() }
+        let prepared = try conn.prepare(query: "SELECT 1 as one;").wait()
 
+        let rows = try prepared.execute().wait()
 
-         XCTAssertEqual(rows.count, 1)
-         let value = rows[0].column("one")
-         XCTAssertEqual(value?.int, 1)
+        XCTAssertEqual(rows.count, 1)
+        let value = rows[0].column("one")
+        XCTAssertEqual(value?.int, 1)
      }
 
     func testPrepareQueryClosure() throws {
@@ -950,15 +950,16 @@ final class PostgresNIOTests: XCTestCase {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         let binds = [PostgresData].init(repeating: .null, count: Int(Int16.max) + 1)
-        do {
-            _ = try conn.query("SELECT version()", binds).wait()
-            XCTFail("Should have failed")
-        } catch PostgresError.connectionClosed { }
+        XCTAssertThrowsError(try conn.query("SELECT version()", binds).wait()) { error in
+            guard let psqlError = error as? PSQLError, case .tooManyParameters = psqlError.underlying else {
+                return XCTFail("Unexpected error case")
+            }
+        }
     }
 
     func testRemoteClose() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
-        try conn.channel.close().wait()
+        try conn.close().wait()
     }
 
     // https://github.com/vapor/postgres-nio/issues/113

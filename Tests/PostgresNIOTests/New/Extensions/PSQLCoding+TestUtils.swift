@@ -21,7 +21,7 @@ extension PSQLDecodingContext {
 }
 
 extension PSQLEncodingContext {
-    static var forTests: Self {
-        Self(jsonEncoder: JSONEncoder())
+    static func forTests(jsonEncoder: PSQLJSONEncoder = JSONEncoder()) -> Self {
+        Self(jsonEncoder: jsonEncoder)
     }
 }

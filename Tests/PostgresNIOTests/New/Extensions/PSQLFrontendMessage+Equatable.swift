@@ -35,8 +35,8 @@ extension PSQLFrontendMessage.Bind: Equatable {
                 var lhsBuffer = ByteBuffer()
                 var rhsBuffer = ByteBuffer()
                 
-                try lhs.encode(into: &lhsBuffer, context: .forTests)
-                try rhs.encode(into: &rhsBuffer, context: .forTests)
+                try lhs.encode(into: &lhsBuffer, context: .forTests())
+                try rhs.encode(into: &rhsBuffer, context: .forTests())
                 
                 guard lhsBuffer == rhsBuffer else {
                     return false

@@ -17,5 +17,4 @@ extension PSQLFrontendMessage {
             buffer.writeInteger(self.secretKey)
         }
     }
-    
 }

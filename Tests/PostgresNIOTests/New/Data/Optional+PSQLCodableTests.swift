@@ -14,7 +14,7 @@ class Optional_PSQLCodableTests: XCTestCase {
         let value: String? = "Hello World"
         
         var buffer = ByteBuffer()
-        value?.encode(into: &buffer, context: .forTests)
+        value?.encode(into: &buffer, context: .forTests())
         XCTAssertEqual(value.psqlType, .text)
         let data = PSQLData(bytes: buffer, dataType: .text)
         
@@ -27,7 +27,7 @@ class Optional_PSQLCodableTests: XCTestCase {
         let value: Optional<String> = .none
         
         var buffer = ByteBuffer()
-        value?.encode(into: &buffer, context: .forTests)
+        value?.encode(into: &buffer, context: .forTests())
         XCTAssertEqual(buffer.readableBytes, 0)
         XCTAssertEqual(value.psqlType, .null)
         
@@ -44,7 +44,7 @@ class Optional_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         XCTAssertEqual(encodable.psqlType, .uuid)
-        XCTAssertNoThrow(try encodable.encode(into: &buffer, context: .forTests))
+        XCTAssertNoThrow(try encodable.encode(into: &buffer, context: .forTests()))
         XCTAssertEqual(buffer.readableBytes, 16)
         
         let data = PSQLData(bytes: buffer, dataType: .uuid)
@@ -60,7 +60,7 @@ class Optional_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         XCTAssertEqual(encodable.psqlType, .null)
-        XCTAssertNoThrow(try encodable.encode(into: &buffer, context: .forTests))
+        XCTAssertNoThrow(try encodable.encode(into: &buffer, context: .forTests()))
         XCTAssertEqual(buffer.readableBytes, 0)
         
         let data = PSQLData(bytes: nil, dataType: .uuid)

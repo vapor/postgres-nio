@@ -129,5 +129,48 @@ extension PSQLBackendMessage.PayloadDecodable where Self: PSQLMessageNotice {
         }
         return Self.init(fields: fields)
     }
+}
+
+extension PSQLBackendMessage.Field: CustomStringConvertible {
     
+    var description: String {
+        switch self {
+        case .localizedSeverity:
+            return "Localized Severity"
+        case .severity:
+            return "Severity"
+        case .sqlState:
+            return "Code"
+        case .message:
+            return "Message"
+        case .detail:
+            return "Detail"
+        case .hint:
+            return "Hint"
+        case .position:
+            return "Position"
+        case .internalPosition:
+            return "Internal position"
+        case .internalQuery:
+            return "Internal query"
+        case .locationContext:
+            return "Where"
+        case .schemaName:
+            return "Schema name"
+        case .tableName:
+            return "Table name"
+        case .columnName:
+            return "Column name"
+        case .dataTypeName:
+            return "Data type name"
+        case .constraintName:
+            return "Constraint name"
+        case .file:
+            return "File"
+        case .line:
+            return "Line"
+        case .routine:
+            return "Routine"
+        }
+    }
 }

@@ -39,7 +39,6 @@ extension UUID: PSQLCodable {
         default:
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
-
     }
 }
 

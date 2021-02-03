@@ -1,36 +1,42 @@
-import Foundation
+import NIO
 import Logging
+import struct Foundation.UUID
 
 public final class PostgresConnection {
-    let channel: Channel
+    let underlying: PSQLConnection
     
     public var eventLoop: EventLoop {
-        return self.channel.eventLoop
+        return self.underlying.eventLoop
     }
     
     public var closeFuture: EventLoopFuture<Void> {
-        return channel.closeFuture
+        return self.underlying.channel.closeFuture
     }
     
+    /// A logger to use in case 
     public var logger: Logger
+    
+    /// 
+    var notificationListeners: [String: [(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)]] = [:] {
+        didSet {
+            self.underlying.channel.eventLoop.assertInEventLoop()
+        }
+    }
 
     public var isClosed: Bool {
-        return !self.channel.isActive
+        return !self.underlying.channel.isActive
     }
     
-    init(channel: Channel, logger: Logger) {
-        self.channel = channel
+    init(underlying: PSQLConnection, logger: Logger) {
+        self.underlying = underlying
         self.logger = logger
+        
+        self.underlying.channel.pipeline.handler(type: PSQLChannelHandler.self).whenSuccess { handler in
+            handler.notificationDelegate = self
+        }
     }
     
     public func close() -> EventLoopFuture<Void> {
-        guard !self.isClosed else {
-            return self.eventLoop.makeSucceededFuture(())
-        }
-        return self.channel.close(mode: .all)
-    }
-    
-    deinit {
-        assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
+        return self.underlying.close()
     }
 }

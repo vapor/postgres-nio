@@ -1,0 +1,90 @@
+//
+//  File.swift
+//  
+//
+//  Created by Fabian Fett on 25.01.21.
+//
+
+enum PSQLTask {
+    case extendedQuery(ExecuteExtendedQueryContext)
+    case preparedStatement(CreatePreparedStatementContext)
+    case closeCommand(CloseCommandContext)
+}
+
+final class ExecuteExtendedQueryContext {
+    enum Query {
+        case unnamed(String)
+        case preparedStatement(name: String, rowDescription: PSQLBackendMessage.RowDescription?)
+    }
+    
+    let query: Query
+    let bind: [PSQLEncodable]
+    let logger: Logger
+    
+    let jsonDecoder: PSQLJSONDecoder
+    let promise: EventLoopPromise<PSQLRows>
+    
+    init(query: String,
+         bind: [PSQLEncodable],
+         logger: Logger,
+         jsonDecoder: PSQLJSONDecoder,
+         promise: EventLoopPromise<PSQLRows>)
+    {
+        self.query = .unnamed(query)
+        self.bind = bind
+        self.logger = logger
+        self.jsonDecoder = jsonDecoder
+        self.promise = promise
+    }
+    
+    init(preparedStatement: PSQLPreparedStatement,
+         bind: [PSQLEncodable],
+         logger: Logger,
+         jsonDecoder: PSQLJSONDecoder,
+         promise: EventLoopPromise<PSQLRows>)
+    {
+        self.query = .preparedStatement(
+            name: preparedStatement.name,
+            rowDescription: preparedStatement.rowDescription)
+        self.bind = bind
+        self.logger = logger
+        self.jsonDecoder = jsonDecoder
+        self.promise = promise
+    }
+
+}
+
+final class CreatePreparedStatementContext {
+    let name: String
+    let query: String
+    let logger: Logger
+    let promise: EventLoopPromise<PSQLBackendMessage.RowDescription?>
+    
+    init(name: String,
+         query: String,
+         logger: Logger,
+         promise: EventLoopPromise<PSQLBackendMessage.RowDescription?>)
+    {
+        self.name = name
+        self.query = query
+        self.logger = logger
+        self.promise = promise
+    }
+}
+
+final class CloseCommandContext {
+    
+    let target: CloseTarget
+    let logger: Logger
+    let promise: EventLoopPromise<Void>
+    
+    init(target: CloseTarget,
+         logger: Logger,
+         promise: EventLoopPromise<Void>)
+    {
+        self.target = target
+        self.logger = logger
+        self.promise = promise
+    }
+}
+

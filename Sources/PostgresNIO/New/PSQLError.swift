@@ -15,6 +15,7 @@ struct PSQLError: Error {
         case server(PSQLBackendMessage.ErrorResponse)
         case decoding(PSQLBackendMessage.DecodingError)
         case unexpectedBackendMessage(PSQLBackendMessage)
+        case unsupportedAuthMechanism(PSQLAuthScheme)
         
         case tooManyParameters
         case connectionQuiescing
@@ -48,6 +49,10 @@ struct PSQLError: Error {
     
     static func unexpectedBackendMessage(_ message: PSQLBackendMessage) -> PSQLError {
         Self.init(.unexpectedBackendMessage(message))
+    }
+    
+    static func unsupportedAuthMechanism(_ authScheme: PSQLAuthScheme) -> PSQLError {
+        Self.init(.unsupportedAuthMechanism(authScheme))
     }
     
     static var tooManyParameters: PSQLError {
@@ -121,4 +126,15 @@ struct PSQLCastingError: Error {
             underlying: underlying
         )
     }
+}
+
+enum PSQLAuthScheme {
+    case none
+    case kerberosV5
+    case md5
+    case plaintext
+    case scmCredential
+    case gss
+    case sspi
+    case sasl
 }
