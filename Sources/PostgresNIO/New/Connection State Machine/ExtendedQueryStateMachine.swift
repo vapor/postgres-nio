@@ -278,7 +278,7 @@ struct ExtendedQueryStateMachine {
     mutating func consumeNextRow(promise: EventLoopPromise<StateMachineStreamNextResult>) -> Action {
         switch self.state {
         case .waitingForNextRow:
-            preconditionFailure("A little to greedy, only call `consumeNextRow` once")
+            preconditionFailure("Too greedy. `consumeNextRow()` only needs to be called once.")
             
         case .bufferingRows(let columns, var buffer, let readOnEmpty):
             return self.avoidingStateMachineCoW { state -> Action in
@@ -298,10 +298,10 @@ struct ExtendedQueryStateMachine {
              .noDataMessageReceived,
              .rowDescriptionReceived,
              .bindCompleteReceived:
-            preconditionFailure("How can consume next row already be invoked?")
+            preconditionFailure("Requested to consume next row without anything going on.")
             
         case .commandComplete, .error:
-            preconditionFailure("The consumer is already aware, that the stream has ended. The consumer must not ask for more in this situation")
+            preconditionFailure("The stream is already closed or in a failure state; rows can not be consumed at this time.")
         case .modifying:
             preconditionFailure("Invalid state")
         }

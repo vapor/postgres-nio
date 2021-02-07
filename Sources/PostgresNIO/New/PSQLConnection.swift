@@ -76,7 +76,7 @@ final class PSQLConnection {
         }
     }
     
-    /// The connections underlying channel
+    /// The connection's underlying channel
     ///
     /// This should be private, but it is needed for `PostgresConnection` compatibility.
     internal let channel: Channel

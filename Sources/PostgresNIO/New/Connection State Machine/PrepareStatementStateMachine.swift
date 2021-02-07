@@ -107,7 +107,7 @@ struct PrepareStatementStateMachine {
              .noDataMessageReceived,
              .error:
             #warning("This must be implemented")
-            preconditionFailure("unimplementd")
+            preconditionFailure("Unimplemented")
         }
     }
     
@@ -130,7 +130,5 @@ struct PrepareStatementStateMachine {
             return false
         }
     }
-    
-    // MARK: Private Methods
     
 }
