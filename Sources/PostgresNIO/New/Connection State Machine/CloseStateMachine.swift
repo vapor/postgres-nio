@@ -53,7 +53,6 @@ struct CloseStateMachine {
             return self.setAndFireError(error)
             
         case .closeCompleteReceived:
-            assertionFailure("How is it possible to receive an error between close complete and ready for query?")
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
             
         case .error:

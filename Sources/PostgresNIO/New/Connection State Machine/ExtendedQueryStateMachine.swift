@@ -245,7 +245,6 @@ struct ExtendedQueryStateMachine {
             return self.setAndFireError(error)
             
         case .commandComplete:
-            assertionFailure("How is it possible to receive an error between command complete and ready for query?")
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
             
         case .error:

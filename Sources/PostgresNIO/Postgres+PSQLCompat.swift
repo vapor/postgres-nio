@@ -85,5 +85,15 @@ extension PSQLError {
             return castingError
         }
     }
+}
 
+extension PostgresFormatCode {
+    init(psqlFormatCode: PSQLFormatCode) {
+        switch psqlFormatCode {
+        case .binary:
+            self = .binary
+        case .text:
+            self = .text
+        }
+    }
 }

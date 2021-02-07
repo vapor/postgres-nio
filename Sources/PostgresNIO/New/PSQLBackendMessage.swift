@@ -15,6 +15,10 @@ protocol PSQLMessagePayloadDecodable {
     static func decode(from buffer: inout ByteBuffer) throws -> Self
 }
 
+/// A wire message that is created by a Postgres server to be consumed by Postgres client.
+///
+/// All messages are defined in the official Postgres Documentation in the section
+/// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
 enum PSQLBackendMessage {
     
     typealias PayloadDecodable = PSQLMessagePayloadDecodable

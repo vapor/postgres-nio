@@ -87,7 +87,6 @@ struct PrepareStatementStateMachine {
             
         case .rowDescriptionReceived,
              .noDataMessageReceived:
-            assertionFailure("How is it possible to receive an error between close complete and ready for query?")
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
             
         case .error:

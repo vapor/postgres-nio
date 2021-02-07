@@ -1,11 +1,19 @@
 extension PSQLFrontendMessage {
     
     struct Cancel: PayloadEncodable, Equatable {
+        /// The cancel request code. The value is chosen to contain 1234 in the most significant 16 bits,
+        /// and 5678 in the least significant 16 bits. (To avoid confusion, this code must not be the same
+        /// as any protocol version number.)
+        let cancelRequestCode: Int32 = 80877102
+        
+        /// The process ID of the target backend.
         let processID: Int32
+        
+        /// The secret key for the target backend.
         let secretKey: Int32
         
         func encode(into buffer: inout ByteBuffer) {
-            buffer.writeInteger(80877102, as: Int32.self)
+            buffer.writeInteger(self.cancelRequestCode)
             buffer.writeInteger(self.processID)
             buffer.writeInteger(self.secretKey)
         }

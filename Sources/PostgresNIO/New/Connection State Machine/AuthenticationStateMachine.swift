@@ -78,13 +78,16 @@ struct AuthenticationStateMachine {
             return .authenticated
         
         case .saslInitialResponseSent:
-            preconditionFailure("Unreachable state as of today!")
+            // TODO: SASL authentication must be added before merge
+            preconditionFailure("TODO: SASL authentication must be added before merge")
             
         case .saslChallengeResponseSent:
-            preconditionFailure("Unreachable state as of today!")
+            // TODO: SASL authentication must be added before merge
+            preconditionFailure("TODO: SASL authentication must be added before merge")
         
         case .saslFinalReceived:
-            preconditionFailure("Unreachable state as of today!")
+            // TODO: SASL authentication must be added before merge
+            preconditionFailure("TODO: SASL authentication must be added before merge")
             
         case .initialized:
             preconditionFailure("Invalid state")

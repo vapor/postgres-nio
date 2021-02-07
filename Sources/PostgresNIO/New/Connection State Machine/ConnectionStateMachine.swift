@@ -361,7 +361,8 @@ struct ConnectionStateMachine {
         switch self.state {
         case .authenticated(let backendKeyData, let parameters):
             guard let keyData = backendKeyData else {
-                preconditionFailure()
+                // `backendKeyData` must have been received, before receiving the first `readyForQuery`
+                return self.setAndFireError(.unexpectedBackendMessage(.readyForQuery(transactionState)))
             }
             
             let connectionContext = ConnectionContext(
@@ -374,7 +375,6 @@ struct ConnectionStateMachine {
             return self.executeNextQueryFromQueue()
         case .extendedQuery(let extendedQuery, var connectionContext):
             guard extendedQuery.isComplete else {
-                assertionFailure("A ready for query has been received, but our ExecuteQueryStateMachine has not reached a finish point. Something must be wrong")
                 return self.setAndFireError(.unexpectedBackendMessage(.readyForQuery(transactionState)))
             }
             
@@ -384,7 +384,6 @@ struct ConnectionStateMachine {
             return self.executeNextQueryFromQueue()
         case .prepareStatement(let preparedStateMachine, var connectionContext):
             guard preparedStateMachine.isComplete else {
-                assertionFailure("A ready for query has been received, but our PrepareStatementStateMachine has not reached a finish point. Something must be wrong")
                 return self.setAndFireError(.unexpectedBackendMessage(.readyForQuery(transactionState)))
             }
             
@@ -395,7 +394,6 @@ struct ConnectionStateMachine {
         
         case .closeCommand(let closeStateMachine, var connectionContext):
             guard closeStateMachine.isComplete else {
-                assertionFailure("A ready for query has been received, but our CloseCommandStateMachine has not reached a finish point. Something must be wrong")
                 return self.setAndFireError(.unexpectedBackendMessage(.readyForQuery(transactionState)))
             }
             
@@ -443,7 +441,7 @@ struct ConnectionStateMachine {
     mutating func readEventCatched() -> ConnectionAction {
         switch self.state {
         case .initialized:
-            preconditionFailure("How can we receive a read, if the connection isn't active.")
+            preconditionFailure("Received a read event on a connection that was never opened.")
         case .connected:
             return .read
         case .sslRequestSent:
@@ -740,6 +738,21 @@ struct ConnectionStateMachine {
 // MARK: CoW helpers
 
 extension ConnectionStateMachine {
+    /// So, uh...this function needs some explaining.
+    ///
+    /// While the state machine logic above is great, there is a downside to having all of the state machine data in
+    /// associated data on enumerations: any modification of that data will trigger copy on write for heap-allocated
+    /// data. That means that for _every operation on the state machine_ we will CoW our underlying state, which is
+    /// not good.
+    ///
+    /// The way we can avoid this is by using this helper function. It will temporarily set state to a value with no
+    /// associated data, before attempting the body of the function. It will also verify that the state machine never
+    /// remains in this bad state.
+    ///
+    /// A key note here is that all callers must ensure that they return to a good state before they exit.
+    ///
+    /// Sadly, because it's generic and has a closure, we need to force it to be inlined at all call sites, which is
+    /// not ideal.
     @inline(__always)
     private mutating func avoidingStateMachineCoW<ReturnType>(_ body: (inout State) -> ReturnType) -> ReturnType {
         self.state = .modifying

@@ -1,5 +1,9 @@
 import NIO
 
+/// A wire message that is created by a Postgres client to be consumed by Postgres server.
+///
+/// All messages are defined in the official Postgres Documentation in the section
+/// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
 enum PSQLFrontendMessage {
     typealias PayloadEncodable = PSQLFrontendMessagePayloadEncodable
     

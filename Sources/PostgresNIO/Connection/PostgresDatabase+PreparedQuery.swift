@@ -39,7 +39,7 @@ public struct PreparedQuery {
                     dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
                     dataTypeSize: column.dataTypeSize,
                     dataTypeModifier: column.dataTypeModifier,
-                    formatCode: PostgresFormatCode(rawValue: column.formatCode.rawValue) ?? .binary
+                    formatCode: .init(psqlFormatCode: column.formatCode)
                 )
             }
             

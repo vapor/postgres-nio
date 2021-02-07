@@ -24,7 +24,7 @@ extension PostgresConnection: PostgresDatabase {
                         dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
                         dataTypeSize: column.dataTypeSize,
                         dataTypeModifier: column.dataTypeModifier,
-                        formatCode: PostgresFormatCode(rawValue: column.formatCode.rawValue) ?? .binary
+                        formatCode: .init(psqlFormatCode: column.formatCode)
                     )
                 }
                 
@@ -72,9 +72,6 @@ extension PostgresConnection: PostgresDatabase {
                     }
                 }
             }
-
-        default:
-            preconditionFailure()
         }
         
         return resultFuture.flatMapErrorThrowing { error in
@@ -95,7 +92,6 @@ internal enum PostgresCommands: PostgresRequest {
                binds: [PostgresData],
                onMetadata: (PostgresQueryMetadata) -> () = { _ in },
                onRow: (PostgresRow) throws -> ())
-    case simpleQuery(query: String, onRow: (PostgresRow) throws -> ())
     case prepareQuery(request: PrepareQueryRequest)
     case executePreparedStatement(query: PreparedQuery, binds: [PostgresData], onRow: (PostgresRow) throws -> ())
     

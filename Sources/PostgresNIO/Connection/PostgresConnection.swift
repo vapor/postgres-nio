@@ -16,10 +16,13 @@ public final class PostgresConnection {
     /// A logger to use in case 
     public var logger: Logger
     
-    /// 
+    /// A dictionary to store notification callbacks in
+    ///
+    /// Those are used when `PostgresConnection.addListener` is invoked. This only lives here since properties
+    /// can not be added in extensions. All relevant code lives in `PostgresConnection+Notifications`
     var notificationListeners: [String: [(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)]] = [:] {
-        didSet {
-            self.underlying.channel.eventLoop.assertInEventLoop()
+        willSet {
+            self.underlying.channel.eventLoop.preconditionInEventLoop()
         }
     }
 
