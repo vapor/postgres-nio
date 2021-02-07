@@ -70,11 +70,9 @@ struct CloseStateMachine {
     
     var isComplete: Bool {
         switch self.state {
-        case .closeCompleteReceived,
-             .error:
+        case .closeCompleteReceived, .error:
             return true
-        case .initialized,
-             .closeSyncSent:
+        case .initialized, .closeSyncSent:
             return false
         }
     }
@@ -83,16 +81,11 @@ struct CloseStateMachine {
 
     private mutating func setAndFireError(_ error: PSQLError) -> Action {
         switch self.state {
-        case .initialized:
-            preconditionFailure("invalid state")
         case .closeSyncSent(let closeContext):
             self.state = .error(error)
             return .failClose(closeContext, with: error)
-        case .closeCompleteReceived:
-            preconditionFailure("invalid state")
-        case .error:
+        case .initialized, .closeCompleteReceived, .error:
             preconditionFailure("invalid state")
         }
     }
 }
-

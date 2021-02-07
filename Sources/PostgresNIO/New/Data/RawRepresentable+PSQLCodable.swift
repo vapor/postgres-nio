@@ -4,7 +4,6 @@ extension PSQLCodable where Self: RawRepresentable, RawValue: PSQLCodable {
     }
     
     static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, context: PSQLDecodingContext) throws -> Self {
-                
         guard let rawValue = try? RawValue.decode(from: &buffer, type: type, context: context),
               let selfValue = Self.init(rawValue: rawValue) else {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)

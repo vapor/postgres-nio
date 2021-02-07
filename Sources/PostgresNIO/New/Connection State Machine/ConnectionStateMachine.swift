@@ -60,8 +60,6 @@ struct ConnectionStateMachine {
         
         struct CleanUpContext {
             
-            ///
-            
             /// Tasks to fail with the error
             let tasks: [PSQLTask]
             
@@ -310,8 +308,6 @@ struct ConnectionStateMachine {
             preconditionFailure("We shouldn't receive messages if we are not connected")
         case .modifying:
             preconditionFailure("Invalid state")
-
-
         }
     }
     

@@ -7,7 +7,7 @@ extension PostgresConnection: PostgresDatabase {
         logger: Logger
     ) -> EventLoopFuture<Void> {
         guard let command = request as? PostgresCommands else {
-            preconditionFailure("We only support the internal type `PostgresCommands` going forward")
+            preconditionFailure("\(#function) requires an instance of PostgresCommands. This will be a compile-time error in the future.")
         }
         
         let eventLoop = self.underlying.eventLoop
@@ -38,7 +38,7 @@ extension PostgresConnection: PostgresDatabase {
                     
                     do {
                         try onRow(row)
-                        return eventLoop.makeSucceededFuture(Void())
+                        return eventLoop.makeSucceededFuture(())
                     } catch {
                         return eventLoop.makeFailedFuture(error)
                     }

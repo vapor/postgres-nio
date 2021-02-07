@@ -37,13 +37,13 @@ extension UUID: PSQLCodable {
 
 extension ByteBuffer {
     mutating func readUUID() -> UUID? {
-        guard self.readableBytes >= MemoryLayout<UUID>.size else {
+        guard self.readableBytes >= MemoryLayout<uuid_t>.size else {
             return nil
         }
         
         let value: UUID = self.getUUID(at: self.readerIndex)! /* must work as we have enough bytes */
         // should be MoveReaderIndex
-        self.moveReaderIndex(forwardBy: MemoryLayout<UUID>.size)
+        self.moveReaderIndex(forwardBy: MemoryLayout<uuid_t>.size)
         return value
     }
     

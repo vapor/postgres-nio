@@ -46,8 +46,7 @@ extension PSQLBackendMessage {
                 return .sspi
             case 10:
                 var names = [String]()
-                let startIndex = buffer.readerIndex
-                let endIndex = startIndex + buffer.readableBytes
+                let endIndex = buffer.readerIndex + buffer.readableBytes
                 while buffer.readerIndex < endIndex, let next = buffer.readNullTerminatedString() {
                     names.append(next)
                 }
@@ -126,4 +125,3 @@ extension PSQLBackendMessage.Authentication: CustomDebugStringConvertible {
         }
     }
 }
-

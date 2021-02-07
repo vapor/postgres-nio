@@ -4,7 +4,7 @@ extension PostgresDatabase {
     public func prepare(query: String) -> EventLoopFuture<PreparedQuery> {
         let name = "nio-postgres-\(UUID().uuidString)"
         let request = PrepareQueryRequest(query, as: name)
-        return self.send(PostgresCommands.prepareQuery(request: request), logger: self.logger).map { () in
+        return self.send(PostgresCommands.prepareQuery(request: request), logger: self.logger).map { _ in
             request.prepared!
         }
     }

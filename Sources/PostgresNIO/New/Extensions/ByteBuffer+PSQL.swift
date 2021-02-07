@@ -7,12 +7,12 @@ internal extension ByteBuffer {
     }
     
     mutating func readNullTerminatedString() -> String? {
-        if let nullIndex = readableBytesView.firstIndex(of: 0) {
-            defer { moveReaderIndex(forwardBy: 1) }
-            return readString(length: nullIndex - readerIndex)
+        guard let nullIndex = readableBytesView.firstIndex(of: 0) else {
+            return nil
         }
-            
-        return nil
+
+        defer { moveReaderIndex(forwardBy: 1) }
+        return readString(length: nullIndex - readerIndex)
     }
     
     mutating func writeBackendMessageID(_ messageID: PSQLBackendMessage.ID) {
