@@ -81,7 +81,7 @@ final class PSQLConnection {
     /// This should be private, but it is needed for `PostgresConnection` compatibility.
     internal let channel: Channel
 
-    /// The connections and its underlying `Channel`'s `EventLoop`.
+    /// The underlying `EventLoop` of both the connection and its channel.
     var eventLoop: EventLoop {
         return self.channel.eventLoop
     }
