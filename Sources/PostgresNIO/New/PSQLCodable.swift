@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 11.01.21.
-//
-
 /// A type that can encode itself to a postgres wire binary representation.
 protocol PSQLEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`

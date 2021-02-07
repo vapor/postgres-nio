@@ -1,9 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 25.01.21.
-//
 
 struct PrepareStatementStateMachine {
     

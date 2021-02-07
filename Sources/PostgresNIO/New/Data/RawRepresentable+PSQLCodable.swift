@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 13.01.21.
-//
-
 extension PSQLCodable where Self: RawRepresentable, RawValue: PSQLCodable {
     var psqlType: PSQLDataType {
         self.rawValue.psqlType

@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 13.01.21.
-//
-
 import struct Foundation.Data
 import NIOFoundationCompat
 

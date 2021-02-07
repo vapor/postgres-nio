@@ -1,10 +1,3 @@
-//
-//  File.swift
-//
-//
-//  Created by Fabian Fett on 15.01.21.
-//
-
 import NIO
 
 internal extension ByteBuffer {

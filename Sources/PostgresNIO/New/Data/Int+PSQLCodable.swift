@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 12.01.21.
-//
-
 extension UInt8: PSQLCodable {
     var psqlType: PSQLDataType {
         .char

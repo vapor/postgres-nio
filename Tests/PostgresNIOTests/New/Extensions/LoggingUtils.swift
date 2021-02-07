@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 07.01.21.
-//
-
 import Logging
 
 extension Logger {

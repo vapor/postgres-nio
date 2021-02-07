@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 07.01.21.
-//
-
 extension PSQLBackendMessage {
     enum TransactionState: PayloadDecodable, RawRepresentable {
         typealias RawValue = UInt8

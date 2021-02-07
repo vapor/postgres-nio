@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 11.01.21.
-//
-
 extension PSQLBackendMessage {
     
     struct RowDescription: PayloadDecodable, Equatable {

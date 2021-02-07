@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 03.02.21.
-//
-
 import struct Foundation.Date
 
 extension Date: PSQLCodable {

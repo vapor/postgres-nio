@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 06.01.21.
-//
-
 import struct Foundation.Data
 
 struct PSQLError: Error {

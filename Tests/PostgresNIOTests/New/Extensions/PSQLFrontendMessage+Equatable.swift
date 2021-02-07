@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 14.01.21.
-//
-
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 @testable import PostgresNIO

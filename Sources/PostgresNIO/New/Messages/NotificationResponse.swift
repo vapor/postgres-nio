@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 26.01.21.
-//
-
 import NIO
 
 extension PSQLBackendMessage {

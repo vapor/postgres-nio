@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 12.01.21.
-//
-
 extension Bool: PSQLCodable {
     var psqlType: PSQLDataType {
         .bool

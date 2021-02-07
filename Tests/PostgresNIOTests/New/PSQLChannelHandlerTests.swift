@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 06.01.21.
-//
-
 import XCTest
 import NIO
 @testable import PostgresNIO

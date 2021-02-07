@@ -1,10 +1,3 @@
-//
-//  File.swift
-//
-//
-//  Created by Fabian Fett on 08.01.21.
-//
-
 extension PSQLFrontendMessage {
     
     enum Describe: PayloadEncodable, Equatable {

@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 19.01.21.
-//
-
 import NIOTLS
 
 enum PSQLOutgoingEvent {    

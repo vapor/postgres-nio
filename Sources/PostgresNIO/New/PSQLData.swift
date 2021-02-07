@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 13.01.21.
-//
-
 /// The format code being used for the field.
 /// Currently will be zero (text) or one (binary).
 /// In a RowDescription returned from the statement variant of Describe,

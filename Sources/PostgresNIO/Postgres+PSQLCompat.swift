@@ -1,10 +1,3 @@
-//
-//  Postgres+PSQLCompat.swift
-//  
-//
-//  Created by Fabian Fett on 19.01.21.
-//
-
 struct PostgresJSONDecoderWrapper: PSQLJSONDecoder {
     let downstream: PostgresJSONDecoder
     

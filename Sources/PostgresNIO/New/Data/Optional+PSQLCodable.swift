@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 13.01.21.
-//
-
 extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
     static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, context: PSQLDecodingContext) throws -> Optional<Wrapped> {
         preconditionFailure("This code path should never be hit.")

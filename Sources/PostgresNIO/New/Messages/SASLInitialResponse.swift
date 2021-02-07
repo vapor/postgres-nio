@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 24.01.21.
-//
-
 extension PSQLFrontendMessage {
     
     struct SASLInitialResponse: PayloadEncodable, Equatable {

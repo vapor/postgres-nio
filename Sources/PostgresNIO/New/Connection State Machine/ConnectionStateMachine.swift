@@ -1,9 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 10.12.20.
-//
 
 struct ConnectionStateMachine {
     

@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 14.01.21.
-//
-
 import NIOFoundationCompat
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder

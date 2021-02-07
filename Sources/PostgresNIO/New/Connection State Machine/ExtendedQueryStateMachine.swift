@@ -1,9 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 23.01.21.
-//
 
 struct ExtendedQueryStateMachine {
     

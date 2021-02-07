@@ -1,10 +1,3 @@
-//
-//  File.swift
-//  
-//
-//  Created by Fabian Fett on 25.01.21.
-//
-
 enum PSQLTask {
     case extendedQuery(ExecuteExtendedQueryContext)
     case preparedStatement(CreatePreparedStatementContext)
