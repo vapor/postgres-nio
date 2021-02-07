@@ -49,10 +49,6 @@ extension PostgresData: PSQLDecodable {
 
 extension PostgresData: PSQLCodable {}
 
-public protocol Foo {
-    static var foo: Int { get }
-}
-
 extension PSQLError {
     func toPostgresError() -> Error {
         switch self.underlying {

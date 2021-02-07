@@ -160,7 +160,7 @@ struct ExtendedQueryStateMachine {
             
         case .waitingForNextRow(let columns, let buffer, let promise):
             return self.avoidingStateMachineCoW { state -> Action in
-                precondition(buffer.count == 0, "Expected the buffer to be empty")
+                precondition(buffer.isEmpty, "Expected the buffer to be empty")
                 let row = dataRow.columns.enumerated().map { (index, buffer) in
                     PSQLData(bytes: buffer, dataType: columns[index].dataType)
                 }
@@ -200,7 +200,7 @@ struct ExtendedQueryStateMachine {
             
         case .waitingForNextRow(_, let buffer, let promise):
             return self.avoidingStateMachineCoW { state -> Action in
-                precondition(buffer.count == 0, "Expected the buffer to be empty")
+                precondition(buffer.isEmpty, "Expected the buffer to be empty")
                 state = .commandComplete(commandTag: commandTag)
                 return .forwardCommandComplete(buffer, commandTag: commandTag, to: promise)
             }
