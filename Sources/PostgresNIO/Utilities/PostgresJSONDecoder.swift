@@ -1,6 +1,6 @@
 import Foundation
 
-/// A protocol that mimmicks the Foundation `JSONDecoder.decode(_:from:)` function.
+/// A protocol that mimicks the Foundation `JSONDecoder.decode(_:from:)` function.
 /// Conform a non-Foundation JSON decoder to this protocol if you want PostgresNIO to be
 /// able to use it when decoding JSON & JSONB values (see `PostgresNIO._defaultJSONDecoder`)
 public protocol PostgresJSONDecoder {

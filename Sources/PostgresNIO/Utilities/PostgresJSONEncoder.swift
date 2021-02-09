@@ -1,6 +1,6 @@
 import Foundation
 
-/// A protocol that mimmicks the Foundation `JSONEncoder.encode(_:)` function.
+/// A protocol that mimicks the Foundation `JSONEncoder.encode(_:)` function.
 /// Conform a non-Foundation JSON encoder to this protocol if you want PostgresNIO to be
 /// able to use it when encoding JSON & JSONB values (see `PostgresNIO._defaultJSONEncoder`)
 public protocol PostgresJSONEncoder {
