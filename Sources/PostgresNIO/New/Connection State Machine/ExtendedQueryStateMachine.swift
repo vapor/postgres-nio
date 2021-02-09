@@ -149,6 +149,12 @@ struct ExtendedQueryStateMachine {
     mutating func dataRowReceived(_ dataRow: PSQLBackendMessage.DataRow) -> Action {
         switch self.state {
         case .bufferingRows(let columns, var buffer, let readOnEmpty):
+            // When receiving a data row, we must ensure that the data row column count
+            // matches the previously received row description column count.
+            guard dataRow.columns.count == columns.count else {
+                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            }
+            
             return self.avoidingStateMachineCoW { state -> Action in
                 let row = dataRow.columns.enumerated().map { (index, buffer) in
                     PSQLData(bytes: buffer, dataType: columns[index].dataType)
@@ -159,6 +165,12 @@ struct ExtendedQueryStateMachine {
             }
             
         case .waitingForNextRow(let columns, let buffer, let promise):
+            // When receiving a data row, we must ensure that the data row column count
+            // matches the previously received row description column count.
+            guard dataRow.columns.count == columns.count else {
+                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            }
+            
             return self.avoidingStateMachineCoW { state -> Action in
                 precondition(buffer.isEmpty, "Expected the buffer to be empty")
                 let row = dataRow.columns.enumerated().map { (index, buffer) in

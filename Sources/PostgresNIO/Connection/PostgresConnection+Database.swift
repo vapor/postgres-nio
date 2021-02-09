@@ -10,7 +10,6 @@ extension PostgresConnection: PostgresDatabase {
             preconditionFailure("\(#function) requires an instance of PostgresCommands. This will be a compile-time error in the future.")
         }
         
-        let eventLoop = self.underlying.eventLoop
         let resultFuture: EventLoopFuture<Void>
         
         switch command {
@@ -29,20 +28,7 @@ extension PostgresConnection: PostgresDatabase {
                 }
                 
                 let lookupTable = PostgresRow.LookupTable(rowDescription: .init(fields: fields), resultFormat: [.binary])
-                return rows.onRow { psqlRow in
-                    let columns = psqlRow.data.map { psqlData in
-                        PostgresMessage.DataRow.Column(value: psqlData.bytes)
-                    }
-                    
-                    let row = PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)
-                    
-                    do {
-                        try onRow(row)
-                        return eventLoop.makeSucceededFuture(())
-                    } catch {
-                        return eventLoop.makeFailedFuture(error)
-                    }
-                }.map { _ in
+                return rows.iterateRowsWithoutBackpressureOption(lookupTable: lookupTable, onRow: onRow).map { _ in
                     onMetadata(PostgresQueryMetadata(string: rows.commandTag)!)
                 }
             }
@@ -51,26 +37,12 @@ extension PostgresConnection: PostgresDatabase {
                 request.prepared = PreparedQuery(underlying: $0, database: self)
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
-            let lookupTable = preparedQuery.lookupTable
             resultFuture = self.underlying.execute(preparedQuery.underlying, binds, logger: logger).flatMap { rows in
-                return rows.onRow { psqlRow in
-                    let columns = psqlRow.data.map { psqlData in
-                        PostgresMessage.DataRow.Column(value: psqlData.bytes)
-                    }
-                    
-                    guard let lookupTable = lookupTable else {
-                        preconditionFailure("Expected to have a lookup table, if rows are received.")
-                    }
-                    
-                    let row = PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)
-                    
-                    do {
-                        try onRow(row)
-                        return eventLoop.makeSucceededFuture(Void())
-                    } catch {
-                        return eventLoop.makeFailedFuture(error)
-                    }
-                }
+                // preparedQuery.lookupTable can be force unwrapped here, since the
+                // `ExtendedQueryStateMachine` ensures that `DataRow`s match the previously received
+                // `RowDescription`. For this reason: If we get a row callback here, we must have a
+                // `RowDescription` and therefore a lookupTable.
+                return rows.iterateRowsWithoutBackpressureOption(lookupTable: preparedQuery.lookupTable!, onRow: onRow)
             }
         }
         
@@ -106,4 +78,25 @@ internal enum PostgresCommands: PostgresRequest {
     func log(to logger: Logger) {
         preconditionFailure("This function must not be called")
     }
+}
+
+extension PSQLRows {
+    
+    func iterateRowsWithoutBackpressureOption(lookupTable: PostgresRow.LookupTable, onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+        self.onRow { psqlRow in
+            let columns = psqlRow.data.map { psqlData in
+                PostgresMessage.DataRow.Column(value: psqlData.bytes)
+            }
+            
+            let row = PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)
+            
+            do {
+                try onRow(row)
+                return self.eventLoop.makeSucceededFuture(Void())
+            } catch {
+                return self.eventLoop.makeFailedFuture(error)
+            }
+        }
+    }
+    
 }

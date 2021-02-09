@@ -109,6 +109,27 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(expected, 10001)
     }
     
+    func test1kRoundTrips() {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+        
+        var conn: PSQLConnection?
+        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        
+        for _ in 0..<1_000 {
+            var rows: PSQLRows?
+            XCTAssertNoThrow(rows = try conn?.query("SELECT version()", logger: .psqlTest).wait())
+            var row: PSQLRows.Row?
+            XCTAssertNoThrow(row = try rows?.next().wait())
+            var version: String?
+            XCTAssertNoThrow(version = try row?.decode(column: 0, as: String.self))
+            XCTAssertEqual(version?.contains("PostgreSQL"), true)
+            XCTAssertNil(try rows?.next().wait())
+        }
+    }
+    
     func testQuerySelectParameter() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
