@@ -102,6 +102,7 @@ jobs:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: vapor_database
           POSTGRES_PASSWORD: vapor_password
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
 
   # Run package tests on macOS against supported PSQL versions
   macos:
@@ -141,3 +142,4 @@ jobs:
           POSTGRES_USER: vapor_username
           POSTGRES_DB: postgres
           POSTGRES_PASSWORD: vapor_password
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}

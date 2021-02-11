@@ -78,6 +78,8 @@ struct ConnectionStateMachine {
         // Auth Actions
         case sendStartupMessage(AuthContext)
         case sendPasswordMessage(PasswordAuthencationMode, AuthContext)
+        case sendSaslInitialResponse(name: String, initialResponse: [UInt8])
+        case sendSaslResponse([UInt8])
         
         // Connection Actions
         
@@ -179,8 +181,10 @@ struct ConnectionStateMachine {
             self.quiescingState = .notQuiescing
             return .wait
             
+        case .initialized:
+            preconditionFailure("How can a connection be closed, if it was never connected.")
+            
         case .authenticated,
-             .initialized,
              .connected,
              .sslRequestSent,
              .sslNegotiated,
@@ -191,7 +195,8 @@ struct ConnectionStateMachine {
              .prepareStatement,
              .closeCommand,
              .closed:
-            preconditionFailure("The connection can only be closed, if we are ready for next request or failed")
+            // TODO: This must be implemented
+            preconditionFailure("// TODO: This must be implemented")
             
         case .modifying:
             preconditionFailure("Invalid state")
@@ -693,7 +698,7 @@ struct ConnectionStateMachine {
         
         // if we don't have anything left to do and we are quiescing, next we should close
         if case .quiescing(let promise) = self.quiescingState {
-            self.state = .closed
+            self.state = .closing
             return .closeConnection(promise)
         }
         
@@ -827,12 +832,14 @@ extension ConnectionStateMachine.State {
             return .sendStartupMessage(authContext)
         case .sendPassword(let mode, let authContext):
             return .sendPasswordMessage(mode, authContext)
-        case .sendSaslInitialResponse:
-            preconditionFailure("unimplemented")
-        case .sendSaslResponse:
-            preconditionFailure("unimplemented")
+        case .sendSaslInitialResponse(let name, let initialResponse):
+            return .sendSaslInitialResponse(name: name, initialResponse: initialResponse)
+        case .sendSaslResponse(let bytes):
+            return .sendSaslResponse(bytes)
         case .authenticated:
             self = .authenticated(nil, [:])
+            return .wait
+        case .wait:
             return .wait
         case .reportAuthenticationError(let error):
             self = .error(error)

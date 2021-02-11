@@ -20,6 +20,7 @@ struct AuthenticationStateMachine {
         case sendPassword(PasswordAuthencationMode, AuthContext)
         case sendSaslInitialResponse(name: String, initialResponse: [UInt8])
         case sendSaslResponse([UInt8])
+        case wait
         case authenticated
         
         case reportAuthenticationError(PSQLError)
@@ -62,14 +63,37 @@ struct AuthenticationStateMachine {
                 return self.setAndFireError(.unsupportedAuthMechanism(.gss))
             case .sspi:
                 return self.setAndFireError(.unsupportedAuthMechanism(.sspi))
-            case .sasl:
-                return self.setAndFireError(.unsupportedAuthMechanism(.sasl))
+            case .sasl(let mechanisms):
+                guard mechanisms.contains("SCRAM-SHA-256") else {
+                    return self.setAndFireError(.unsupportedAuthMechanism(.sasl))
+                }
+                
+                guard let password = self.authContext.password else {
+                    preconditionFailure("TODO: We need a new error type for this")
+                }
+                
+                let saslManager = SASLAuthenticationManager(asClientSpeaking:
+                    SASLMechanism.SCRAM.SHA256(username: self.authContext.username, password: { password }))
+                
+                do {
+                    var bytes: [UInt8]?
+                    let done = try saslManager.handle(message: nil, sender: { bytes = $0 })
+                    
+                    guard let output = bytes, done == false else {
+                        preconditionFailure("TODO: SASL auth is always a three step process in Postgres.")
+                    }
+                    
+                    self.state = .saslInitialResponseSent(saslManager)
+                    return .sendSaslInitialResponse(name: "SCRAM-SHA-256", initialResponse: output)
+                } catch {
+                    preconditionFailure("TODO: We need a new sasl error for this")
+                }
             case .gssContinue,
                  .saslContinue,
                  .saslFinal:
                 return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
             }
-        case .passwordAuthenticationSent:
+        case .passwordAuthenticationSent, .saslFinalReceived:
             guard case .ok = message else {
                 return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
             }
@@ -77,18 +101,48 @@ struct AuthenticationStateMachine {
             self.state = .authenticated
             return .authenticated
         
-        case .saslInitialResponseSent:
-            // TODO: SASL authentication must be added before merge
-            preconditionFailure("TODO: SASL authentication must be added before merge")
+        case .saslInitialResponseSent(let saslManager):
+            guard case .saslContinue(data: var data) = message else {
+                return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
+            }
             
-        case .saslChallengeResponseSent:
-            // TODO: SASL authentication must be added before merge
-            preconditionFailure("TODO: SASL authentication must be added before merge")
+            let input = data.readBytes(length: data.readableBytes)
+            
+            do {
+                var bytes: [UInt8]?
+                let done = try saslManager.handle(message: input, sender: { bytes = $0 })
+                
+                guard let output = bytes, done == false else {
+                    preconditionFailure("TODO: SASL auth is always a three step process in Postgres.")
+                }
+                
+                self.state = .saslChallengeResponseSent(saslManager)
+                return .sendSaslResponse(output)
+            } catch {
+                preconditionFailure("TODO: We need a new sasl error for this")
+            }
+            
+        case .saslChallengeResponseSent(let saslManager):
+            guard case .saslFinal(data: var data) = message else {
+                return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
+            }
+            
+            let input = data.readBytes(length: data.readableBytes)
+            
+            do {
+                var bytes: [UInt8]?
+                let done = try saslManager.handle(message: input, sender: { bytes = $0 })
+                
+                guard bytes == nil, done == true else {
+                    preconditionFailure("TODO: SASL auth is always a three step process in Postgres.")
+                }
+                
+                self.state = .saslFinalReceived
+                return .wait
+            } catch {
+                preconditionFailure("TODO: We need a new sasl error for this")
+            }
         
-        case .saslFinalReceived:
-            // TODO: SASL authentication must be added before merge
-            preconditionFailure("TODO: SASL authentication must be added before merge")
-            
         case .initialized:
             preconditionFailure("Invalid state")
             

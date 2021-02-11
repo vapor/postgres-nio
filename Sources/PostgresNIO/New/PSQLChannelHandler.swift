@@ -135,6 +135,10 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             context.writeAndFlush(.sslRequest(.init()), promise: nil)
         case .sendPasswordMessage(let mode, let authContext):
             self.sendPasswordMessage(mode: mode, authContext: authContext, context: context)
+        case .sendSaslInitialResponse(let name, let initialResponse):
+            context.writeAndFlush(.saslInitialResponse(.init(saslMechanism: name, initialData: initialResponse)))
+        case .sendSaslResponse(let bytes):
+            context.writeAndFlush(.saslResponse(.init(data: bytes)))
         case .fireErrorAndCloseConnetion(let error):
             context.fireErrorCaught(error)
             context.close(mode: .all, promise: nil)
@@ -191,6 +195,12 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         case .fireEventReadyForQuery:
             context.fireUserInboundEventTriggered(PSQLEvent.readyForQuery)
         case .closeConnection(let promise):
+            if context.channel.isActive {
+                // The normal, graceful termination procedure is that the frontend sends a Terminate
+                // message and immediately closes the connection. On receipt of this message, the
+                // backend closes the connection and terminates.
+                context.write(.terminate, promise: nil)
+            }
             context.close(mode: .all, promise: promise)
         case .succeedPreparedStatementCreation(let preparedContext, with: let rowDescription):
             preparedContext.promise.succeed(rowDescription)

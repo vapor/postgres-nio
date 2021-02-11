@@ -35,7 +35,11 @@ final class IntegrationTests: XCTestCase {
         }
     }
     
-    func testAuthenticationFailure() {
+    func testAuthenticationFailure() throws {
+        // If the postgres server trusts every connection, it is really hard to create an
+        // authentication failure.
+        try XCTSkipIf(env("POSTGRES_HOST_AUTH_METHOD") == "trust")
+        
         let config = PSQLConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: 5432,
@@ -50,9 +54,13 @@ final class IntegrationTests: XCTestCase {
         var logger = Logger.psqlTest
         logger.logLevel = .trace
         
-        XCTAssertThrowsError(try PSQLConnection.connect(configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
+        var connection: PSQLConnection?
+        XCTAssertThrowsError(connection = try PSQLConnection.connect(configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
             XCTAssertTrue($0 is PSQLError)
         }
+        
+        // In case of a test failure the created connection must be closed.
+        XCTAssertNoThrow(try connection?.close().wait())
     }
     
     func testQueryVersion() {
