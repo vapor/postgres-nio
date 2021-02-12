@@ -402,7 +402,6 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
     
     public func step(message: [UInt8]?) -> SASLAuthenticationStepResult {
         do {
-            print("State: \(state)")
             switch state {
                 case .clientInitial(let username, let nonce, let binding):
                     guard message == nil else { throw SASLAuthenticationError.initialRequestNotSent }
