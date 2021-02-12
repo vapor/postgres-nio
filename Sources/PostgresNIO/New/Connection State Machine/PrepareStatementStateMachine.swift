@@ -106,8 +106,9 @@ struct PrepareStatementStateMachine {
         case .rowDescriptionReceived,
              .noDataMessageReceived,
              .error:
-            #warning("This must be implemented")
-            preconditionFailure("Unimplemented")
+            // This state can be reached if a connection error occured while waiting for the next
+            // `.readyForQuery`. We don't need to forward an error in those cases.
+            return .wait
         }
     }
     

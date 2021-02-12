@@ -2,13 +2,15 @@ import struct Foundation.Data
 
 struct PSQLError: Error {
     
-    enum Underlying {
+    enum Base {
         case sslUnsupported
         case failedToAddSSLHandler(underlying: Error)
         case server(PSQLBackendMessage.ErrorResponse)
         case decoding(PSQLBackendMessage.DecodingError)
         case unexpectedBackendMessage(PSQLBackendMessage)
         case unsupportedAuthMechanism(PSQLAuthScheme)
+        case authMechanismRequiresPassword
+        case saslError(underlyingError: Error)
         
         case tooManyParameters
         case connectionQuiescing
@@ -18,10 +20,10 @@ struct PSQLError: Error {
         case casting(PSQLCastingError)
     }
     
-    internal var underlying: Underlying
+    internal var base: Base
     
-    private init(_ underlying: Underlying) {
-        self.underlying = underlying
+    private init(_ base: Base) {
+        self.base = base
     }
     
     static var sslUnsupported: PSQLError {
@@ -46,6 +48,14 @@ struct PSQLError: Error {
     
     static func unsupportedAuthMechanism(_ authScheme: PSQLAuthScheme) -> PSQLError {
         Self.init(.unsupportedAuthMechanism(authScheme))
+    }
+    
+    static var authMechanismRequiresPassword: PSQLError {
+        Self.init(.authMechanismRequiresPassword)
+    }
+    
+    static func sasl(underlying: Error) -> PSQLError {
+        Self.init(.saslError(underlyingError: underlying))
     }
     
     static var tooManyParameters: PSQLError {
@@ -129,5 +139,5 @@ enum PSQLAuthScheme {
     case scmCredential
     case gss
     case sspi
-    case sasl
+    case sasl(mechanisms: [String])
 }

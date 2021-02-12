@@ -324,16 +324,22 @@ struct ConnectionStateMachine {
                 state = .authenticating(authState)
                 return state.modify(with: action)
             }
+        case .closeCommand(var closeStateMachine, let connectionContext):
+            return self.avoidingStateMachineCoW { state -> ConnectionAction in
+                let action = closeStateMachine.errorReceived(errorMessage)
+                state = .closeCommand(closeStateMachine, connectionContext)
+                return state.modify(with: action)
+            }
         case .extendedQuery(var extendedQueryState, let connectionContext):
             return self.avoidingStateMachineCoW { state -> ConnectionAction in
                 let action = extendedQueryState.errorReceived(errorMessage)
                 state = .extendedQuery(extendedQueryState, connectionContext)
                 return state.modify(with: action)
             }
-        case .closeCommand(var closeStateMachine, let connectionContext):
+        case .prepareStatement(var preparedState, let connectionContext):
             return self.avoidingStateMachineCoW { state -> ConnectionAction in
-                let action = closeStateMachine.errorReceived(errorMessage)
-                state = .closeCommand(closeStateMachine, connectionContext)
+                let action = preparedState.errorReceived(errorMessage)
+                state = .prepareStatement(preparedState, connectionContext)
                 return state.modify(with: action)
             }
         default:

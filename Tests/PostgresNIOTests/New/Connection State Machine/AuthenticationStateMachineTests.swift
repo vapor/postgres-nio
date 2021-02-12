@@ -58,7 +58,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             (.scmCredential, .scmCredential),
             (.gss, .gss),
             (.sspi, .sspi),
-            (.sasl(names: ["haha"]), .sasl),
+            (.sasl(names: ["haha"]), .sasl(mechanisms: ["haha"])),
         ]
         
         for (message, mechanism) in unsupported {

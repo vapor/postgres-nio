@@ -50,8 +50,11 @@ struct AuthenticationStateMachine {
                 self.state = .authenticated
                 return .authenticated
             case .md5(let salt):
+                guard self.authContext.password != nil else {
+                    return self.setAndFireError(.authMechanismRequiresPassword)
+                }
                 self.state = .passwordAuthenticationSent
-                return .sendPassword(.md5(salt: salt), authContext)
+                return .sendPassword(.md5(salt: salt), self.authContext)
             case .plaintext:
                 self.state = .passwordAuthenticationSent
                 return .sendPassword(.cleartext, authContext)
@@ -65,11 +68,11 @@ struct AuthenticationStateMachine {
                 return self.setAndFireError(.unsupportedAuthMechanism(.sspi))
             case .sasl(let mechanisms):
                 guard mechanisms.contains("SCRAM-SHA-256") else {
-                    return self.setAndFireError(.unsupportedAuthMechanism(.sasl))
+                    return self.setAndFireError(.unsupportedAuthMechanism(.sasl(mechanisms: mechanisms)))
                 }
                 
                 guard let password = self.authContext.password else {
-                    preconditionFailure("TODO: We need a new error type for this")
+                    return self.setAndFireError(.authMechanismRequiresPassword)
                 }
                 
                 let saslManager = SASLAuthenticationManager(asClientSpeaking:
@@ -86,7 +89,7 @@ struct AuthenticationStateMachine {
                     self.state = .saslInitialResponseSent(saslManager)
                     return .sendSaslInitialResponse(name: "SCRAM-SHA-256", initialResponse: output)
                 } catch {
-                    preconditionFailure("TODO: We need a new sasl error for this")
+                    return self.setAndFireError(.sasl(underlying: error))
                 }
             case .gssContinue,
                  .saslContinue,
@@ -119,7 +122,7 @@ struct AuthenticationStateMachine {
                 self.state = .saslChallengeResponseSent(saslManager)
                 return .sendSaslResponse(output)
             } catch {
-                preconditionFailure("TODO: We need a new sasl error for this")
+                return self.setAndFireError(.sasl(underlying: error))
             }
             
         case .saslChallengeResponseSent(let saslManager):
@@ -140,7 +143,7 @@ struct AuthenticationStateMachine {
                 self.state = .saslFinalReceived
                 return .wait
             } catch {
-                preconditionFailure("TODO: We need a new sasl error for this")
+                return self.setAndFireError(.sasl(underlying: error))
             }
         
         case .initialized:
