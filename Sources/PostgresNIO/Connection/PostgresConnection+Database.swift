@@ -68,15 +68,15 @@ internal enum PostgresCommands: PostgresRequest {
     case executePreparedStatement(query: PreparedQuery, binds: [PostgresData], onRow: (PostgresRow) throws -> ())
     
     func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
-        preconditionFailure("This function must not be called")
+        fatalError("This function must not be called")
     }
     
     func start() throws -> [PostgresMessage] {
-        preconditionFailure("This function must not be called")
+        fatalError("This function must not be called")
     }
     
     func log(to logger: Logger) {
-        preconditionFailure("This function must not be called")
+        fatalError("This function must not be called")
     }
 }
 
