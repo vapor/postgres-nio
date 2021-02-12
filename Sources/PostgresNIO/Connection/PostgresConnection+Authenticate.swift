@@ -17,10 +17,7 @@ extension PostgresConnection {
         return self.underlying.channel.pipeline.handler(type: PSQLEventsHandler.self).flatMap { handler in
             handler.authenticateFuture
         }.flatMapErrorThrowing { error in
-            guard let psqlError = error as? PSQLError else {
-                throw error
-            }
-            throw psqlError.toPostgresError()
+            throw error.asAppropriatePostgresError
         }
     }
 }

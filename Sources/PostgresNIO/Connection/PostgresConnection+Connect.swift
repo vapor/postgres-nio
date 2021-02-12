@@ -27,10 +27,7 @@ extension PostgresConnection {
         ).map { connection in
             PostgresConnection(underlying: connection, logger: logger)
         }.flatMapErrorThrowing { error in
-            guard let psqlError = error as? PSQLError else {
-                throw error
-            }
-            throw psqlError.toPostgresError()
+            throw error.asAppropriatePostgresError
         }
     }
 }

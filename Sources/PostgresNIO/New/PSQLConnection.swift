@@ -188,7 +188,7 @@ final class PSQLConnection {
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PSQLConnection> {
         
-        let connectionID = "1"
+        let connectionID = UUID().uuidString
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(connectionID)"
         

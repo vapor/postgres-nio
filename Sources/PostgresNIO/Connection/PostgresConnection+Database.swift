@@ -47,10 +47,7 @@ extension PostgresConnection: PostgresDatabase {
         }
         
         return resultFuture.flatMapErrorThrowing { error in
-            guard let psqlError = error as? PSQLError else {
-                throw error
-            }
-            throw psqlError.toPostgresError()
+            throw error.asAppropriatePostgresError
         }
     }
 

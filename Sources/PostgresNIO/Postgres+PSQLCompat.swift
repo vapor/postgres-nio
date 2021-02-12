@@ -93,3 +93,13 @@ extension PostgresFormatCode {
         }
     }
 }
+
+extension Error {
+    internal var asAppropriatePostgresError: Error {
+        if let psqlError = self as? PSQLError {
+            return psqlError.toPostgresError()
+        } else {
+            return self
+        }
+    }
+}
