@@ -33,26 +33,16 @@ extension PostgresConnection {
             // triggered. listenContext must be weak to prevent a retain cycle
             
             self?.underlying.channel.eventLoop.execute {
-                guard let self = self else {
-                    // the connection is already gone
+                guard
+                    let self = self, // the connection is already gone
+                    var listeners = self.notificationListeners[channel] // we don't have the listeners for this topic ¯\_(ツ)_/¯
+                else {
                     return
                 }
                 
-                guard var listeners = self.notificationListeners[channel] else {
-                    // we don't have the listeners for this topic ¯\_(ツ)_/¯
-                    return
-                }
-                
-                guard let index = listeners.firstIndex(where: { $0.0 === listenContext }) else {
-                    return
-                }
-                
-                listeners.remove(at: index)
-                if listeners.count == 0 {
-                    self.notificationListeners.removeValue(forKey: channel)
-                } else {
-                    self.notificationListeners[channel] = listeners
-                }
+                assert(listeners.filter { $0.0 === listenContext }.count <= 1, "Listeners can not appear twice in a channel!")
+                listeners.removeAll(where: { $0.0 === listenContext }) // just in case a listener shows up more than once in a release build, remove all, not just first
+                self.notificationListeners[channel] = listeners.isEmpty ? nil : listeners
             }
         }
         
