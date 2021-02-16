@@ -1,6 +1,7 @@
 import NIO
 import NIOTLS
 import Crypto
+import Logging
 
 protocol PSQLChannelHandlerNotificationDelegate: AnyObject {
     func notificationReceived(_: PSQLBackendMessage.NotificationResponse)
@@ -67,9 +68,9 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        self.logger.error("Channel error received", metadata: [.error: "\(error)"])
-        
-        context.fireErrorCaught(error)
+        self.logger.error("Channel error caught", metadata: [.error: "\(error)"])
+        let action = self.state.errorHappened(.channel(underlying: error))
+        self.run(action, with: context)
     }
     
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
@@ -139,9 +140,10 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             context.writeAndFlush(.saslInitialResponse(.init(saslMechanism: name, initialData: initialResponse)))
         case .sendSaslResponse(let bytes):
             context.writeAndFlush(.saslResponse(.init(data: bytes)))
-        case .fireErrorAndCloseConnetion(let error):
-            context.fireErrorCaught(error)
-            context.close(mode: .all, promise: nil)
+        case .closeConnectionAndCleanup(let cleanupContext):
+            self.closeConnectionAndCleanup(cleanupContext, context: context)
+        case .fireChannelInactive:
+            context.fireChannelInactive()
         case .sendParseDescribeSync(let name, let query):
             self.sendParseDecribeAndSyncMessage(statementName: name, query: query, context: context)
         case .sendBindExecuteSync(let statementName, let binds):
@@ -152,17 +154,23 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             self.succeedQueryWithRowStream(queryContext, columns: columns, context: context)
         case .succeedQueryNoRowsComming(let queryContext, let commandTag):
             self.succeedQueryWithoutRowStream(queryContext, commandTag: commandTag, context: context)
-        case .failQuery(let queryContext, with: let error):
+        case .failQuery(let queryContext, with: let error, let cleanupContext):
             queryContext.promise.fail(error)
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
+            }
         case .forwardRow(let row, to: let promise):
             promise.succeed(.row(row))
         case .forwardCommandComplete(let buffer, let commandTag, to: let promise):
             promise.succeed(.complete(buffer, commandTag: commandTag))
             self.currentQuery = nil
-        case .forwardStreamError(let error, to: let promise):
+        case .forwardStreamError(let error, to: let promise, let cleanupContext):
             promise.fail(error)
             self.currentQuery = nil
-        case .forwardStreamErrorToCurrentQuery(let error, let read):
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
+            }
+        case .forwardStreamErrorToCurrentQuery(let error, let read, let cleanupContext):
             guard let query = self.currentQuery else {
                 preconditionFailure("Expected to have an open query at this point")
             }
@@ -170,6 +178,9 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             self.currentQuery = nil
             if read {
                 context.read()
+            }
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
         case .forwardStreamCompletedToCurrentQuery(let buffer, commandTag: let commandTag, let read):
             guard let query = self.currentQuery else {
@@ -204,14 +215,20 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             context.close(mode: .all, promise: promise)
         case .succeedPreparedStatementCreation(let preparedContext, with: let rowDescription):
             preparedContext.promise.succeed(rowDescription)
-        case .failPreparedStatementCreation(let preparedContext, with: let error):
+        case .failPreparedStatementCreation(let preparedContext, with: let error, let cleanupContext):
             preparedContext.promise.fail(error)
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
+            }
         case .sendCloseSync(let sendClose):
             self.sendCloseAndSyncMessage(sendClose, context: context)
         case .succeedClose(let closeContext):
             closeContext.promise.succeed(Void())
-        case .failClose(let closeContext, with: let error):
+        case .failClose(let closeContext, with: let error, let cleanupContext):
             closeContext.promise.fail(error)
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
+            }
         case .forwardNotificationToListeners(let notification):
             self.notificationDelegate?.notificationReceived(notification)
         }
@@ -439,6 +456,28 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
                 return eventLoop.makeSucceededFuture(.complete(emptyBuffer, commandTag: commandTag))
             })
         queryContext.promise.succeed(rows)
+    }
+    
+    private func closeConnectionAndCleanup(
+        _ cleanup: ConnectionStateMachine.ConnectionAction.CleanUpContext,
+        context: ChannelHandlerContext)
+    {
+        // 1. fail all tasks
+        cleanup.tasks.forEach { task in
+            task.failWithError(cleanup.error)
+        }
+        
+        // 2. fire an error
+        context.fireErrorCaught(cleanup.error)
+        
+        // 3. close the connection or fire channel inactive
+        switch cleanup.action {
+        case .close:
+            context.close(mode: .all, promise: cleanup.closePromise)
+        case .fireChannelInactive:
+            cleanup.closePromise?.succeed(())
+            context.fireChannelInactive()
+        }
     }
 }
 

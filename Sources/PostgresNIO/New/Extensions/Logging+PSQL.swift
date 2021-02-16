@@ -9,6 +9,7 @@ extension PSQLConnection {
         case error = "psql_error"
         case notice = "psql_notice"
         case binds = "psql_binds"
+        case commandTag = "psql_command_tag"
         
         case connectionState = "psql_connection_state"
         case message = "psql_message"
@@ -24,7 +25,7 @@ extension PSQLConnection {
 }
 
 @usableFromInline
-struct PostgresLoggingMetadata: ExpressibleByDictionaryLiteral {
+struct PSQLLoggingMetadata: ExpressibleByDictionaryLiteral {
     @usableFromInline
     typealias Key = PSQLConnection.LoggerMetaDataKey
     @usableFromInline
@@ -79,7 +80,7 @@ extension Logger {
     /// See `Logger.trace(_:metadata:source:file:function:line:)`
     @usableFromInline
     func trace(_ message: @autoclosure () -> Logger.Message,
-               metadata: @autoclosure () -> PostgresLoggingMetadata,
+               metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
                file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .trace, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
@@ -88,7 +89,7 @@ extension Logger {
     /// See `Logger.debug(_:metadata:source:file:function:line:)`
     @usableFromInline
     func debug(_ message: @autoclosure () -> Logger.Message,
-               metadata: @autoclosure () -> PostgresLoggingMetadata,
+               metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
                file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .debug, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
@@ -97,7 +98,7 @@ extension Logger {
     /// See `Logger.info(_:metadata:source:file:function:line:)`
     @usableFromInline
     func info(_ message: @autoclosure () -> Logger.Message,
-              metadata: @autoclosure () -> PostgresLoggingMetadata,
+              metadata: @autoclosure () -> PSQLLoggingMetadata,
               source: @autoclosure () -> String? = nil,
               file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .info, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
@@ -106,7 +107,7 @@ extension Logger {
     /// See `Logger.notice(_:metadata:source:file:function:line:)`
     @usableFromInline
     func notice(_ message: @autoclosure () -> Logger.Message,
-                metadata: @autoclosure () -> PostgresLoggingMetadata,
+                metadata: @autoclosure () -> PSQLLoggingMetadata,
                 source: @autoclosure () -> String? = nil,
                 file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .notice, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
@@ -115,7 +116,7 @@ extension Logger {
     /// See `Logger.warning(_:metadata:source:file:function:line:)`
     @usableFromInline
     func warning(_ message: @autoclosure () -> Logger.Message,
-                 metadata: @autoclosure () -> PostgresLoggingMetadata,
+                 metadata: @autoclosure () -> PSQLLoggingMetadata,
                  source: @autoclosure () -> String? = nil,
                  file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .warning, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
@@ -124,7 +125,7 @@ extension Logger {
     /// See `Logger.error(_:metadata:source:file:function:line:)`
     @usableFromInline
     func error(_ message: @autoclosure () -> Logger.Message,
-               metadata: @autoclosure () -> PostgresLoggingMetadata,
+               metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
                file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .error, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
@@ -133,7 +134,7 @@ extension Logger {
     /// See `Logger.critical(_:metadata:source:file:function:line:)`
     @usableFromInline
     func critical(_ message: @autoclosure () -> Logger.Message,
-                  metadata: @autoclosure () -> PostgresLoggingMetadata,
+                  metadata: @autoclosure () -> PSQLLoggingMetadata,
                   source: @autoclosure () -> String? = nil,
                   file: String = #file, function: String = #function, line: UInt = #line) {
         self.log(level: .critical, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)

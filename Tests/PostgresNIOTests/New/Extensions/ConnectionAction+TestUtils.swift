@@ -16,8 +16,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return true
         case (.establishSSLConnection, establishSSLConnection):
             return true
-        case (.fireErrorAndCloseConnetion, fireErrorAndCloseConnetion):
-            return true
+        case (.closeConnectionAndCleanup(let lhs), .closeConnectionAndCleanup(let rhs)):
+            return lhs == rhs
         case (.sendPasswordMessage(let lhsMethod, let lhsAuthContext), sendPasswordMessage(let rhsMethod, let rhsAuthContext)):
             return lhsMethod == rhsMethod && lhsAuthContext == rhsAuthContext
         case (.sendParseDescribeBindExecuteSync(let lquery, let lbinds), sendParseDescribeBindExecuteSync(let rquery, let rbinds)):
@@ -63,8 +63,25 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
     }
 }
 
+extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        guard lhs.closePromise?.futureResult === rhs.closePromise?.futureResult else {
+            return false
+        }
+        
+        guard lhs.error == rhs.error else {
+            return false
+        }
+        
+        guard lhs.tasks == rhs.tasks else {
+            return false
+        }
+        
+        return true
+    }
+}
+
 extension ConnectionStateMachine {
-    
     static func readyForQuery(transactionState: PSQLBackendMessage.TransactionState = .idle) -> Self {
         let paramaters = [
             "DateStyle": "ISO, MDY",
@@ -88,6 +105,25 @@ extension ConnectionStateMachine {
         
         return ConnectionStateMachine(.readyForQuery(connectionContext))
     }
-    
-    
+}
+
+extension PSQLError: Equatable {
+    public static func == (lhs: PSQLError, rhs: PSQLError) -> Bool {
+        return true
+    }
+}
+
+extension PSQLTask: Equatable {
+    public static func == (lhs: PSQLTask, rhs: PSQLTask) -> Bool {
+        switch (lhs, rhs) {
+        case (.extendedQuery(let lhs), .extendedQuery(let rhs)):
+            return lhs === rhs
+        case (.preparedStatement(let lhs), .preparedStatement(let rhs)):
+            return lhs === rhs
+        case (.closeCommand(let lhs), .closeCommand(let rhs)):
+            return lhs === rhs
+        default:
+            return false
+        }
+    }
 }

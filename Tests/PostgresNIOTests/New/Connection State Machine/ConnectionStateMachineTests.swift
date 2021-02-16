@@ -1,5 +1,6 @@
 import XCTest
 @testable import PostgresNIO
+@testable import NIO
 
 class ConnectionStateMachineTests: XCTestCase {
     
@@ -29,7 +30,7 @@ class ConnectionStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
         XCTAssertEqual(state.sslUnsupportedReceived(),
-                       .fireErrorAndCloseConnetion(.sslUnsupported))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .sslUnsupported, closePromise: nil)))
     }
         
     func testParameterStatusReceivedAndBackendKeyAfterAuthenticated() {
@@ -69,37 +70,42 @@ class ConnectionStateMachineTests: XCTestCase {
     }
     
     func testFailQueuedQueriesOnAuthenticationFailure() throws {
-        try XCTSkipUnless(false)
-//        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-//        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-//
-//        let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-//        let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
-//
-//        let jsonDecoder = JSONDecoder()
-//        let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRows.self)
-//
-//        var state = ConnectionStateMachine()
-//        let extendedQueryContext = ExecuteExtendedQueryContext(
-//            query: "Select version()",
-//            bind: [],
-//            logger: .psqlTest,
-//            jsonDecoder: jsonDecoder,
-//            promise: queryPromise)
-//
-//        XCTAssertEqual(state.enqueue(task: .extendedQuery(extendedQueryContext)), .wait)
-//        XCTAssertEqual(state.connected(requireTLS: false), .provideAuthenticationContext)
-//        XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
-//        XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
-//        let fields: [PSQLBackendMessage.Field: String] = [
-//            .message: "password authentication failed for user \"postgres\"",
-//            .severity: "FATAL",
-//            .sqlState: "28P01",
-//            .localizedSeverity: "FATAL",
-//            .routine: "auth_failed",
-//            .line: "334",
-//            .file: "auth.c"
-//        ]
-//        XCTAssertEqual(state.errorReceived(.init(fields: fields)), .fireErrorAndCloseConnetion(.server(.init(fields: fields))))
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+
+        let authContext = AuthContext(username: "test", password: "abc123", database: "test")
+        let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
+
+        let jsonDecoder = JSONDecoder()
+        let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRows.self)
+
+        var state = ConnectionStateMachine()
+        let extendedQueryContext = ExecuteExtendedQueryContext(
+            query: "Select version()",
+            bind: [],
+            logger: .psqlTest,
+            jsonDecoder: jsonDecoder,
+            promise: queryPromise)
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(extendedQueryContext)), .wait)
+        XCTAssertEqual(state.connected(requireTLS: false), .provideAuthenticationContext)
+        XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
+        XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
+        let fields: [PSQLBackendMessage.Field: String] = [
+            .message: "password authentication failed for user \"postgres\"",
+            .severity: "FATAL",
+            .sqlState: "28P01",
+            .localizedSeverity: "FATAL",
+            .routine: "auth_failed",
+            .line: "334",
+            .file: "auth.c"
+        ]
+        XCTAssertEqual(state.errorReceived(.init(fields: fields)),
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [.extendedQuery(extendedQueryContext)], error: .server(.init(fields: fields)), closePromise: nil)))
+        
+        XCTAssertNil(extendedQueryContext.promise.futureResult._value)
+        
+        // make sure we don't crash
+        extendedQueryContext.promise.fail(PSQLError.server(.init(fields: fields)))
     }
 }

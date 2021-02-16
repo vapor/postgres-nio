@@ -125,6 +125,8 @@ final class PSQLConnection {
     }
     
     func query(_ query: String, _ bind: [PSQLEncodable], logger: Logger) -> EventLoopFuture<PSQLRows> {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.connectionID)"
         guard bind.count <= Int(Int16.max) else {
             return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
         }
@@ -137,7 +139,15 @@ final class PSQLConnection {
             promise: promise)
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
-        return promise.futureResult
+        return promise.futureResult.always { result in
+            switch result {
+            case .failure(let error):
+                logger.error("Query failed", metadata: [.error: "\(error)"])
+            case .success:
+                // success is logged in PSQLQuery
+                break
+            }
+        }
     }
     
     // MARK: Prepared statements
@@ -256,7 +266,7 @@ final class PSQLConnection {
             case is PSQLError:
                 throw error
             default:
-                throw PSQLError.connection(underlying: error)
+                throw PSQLError.channel(underlying: error)
             }
         }
     }

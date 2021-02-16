@@ -16,6 +16,7 @@ struct PSQLError: Error {
         case connectionQuiescing
         case connectionClosed
         case connectionError(underlying: Error)
+        case uncleanShutdown
         
         case casting(PSQLCastingError)
     }
@@ -70,8 +71,12 @@ struct PSQLError: Error {
         Self.init(.connectionClosed)
     }
     
-    static func connection(underlying: Error) -> PSQLError {
+    static func channel(underlying: Error) -> PSQLError {
         Self.init(.connectionError(underlying: underlying))
+    }
+    
+    static var uncleanShutdown: PSQLError {
+        Self.init(.uncleanShutdown)
     }
 }
 

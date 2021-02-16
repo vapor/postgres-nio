@@ -157,8 +157,12 @@ struct AuthenticationStateMachine {
     mutating func errorReceived(_ message: PSQLBackendMessage.ErrorResponse) -> Action {
         return self.setAndFireError(.server(message))
     }
+    
+    mutating func errorHappened(_ error: PSQLError) -> Action {
+        return self.setAndFireError(error)
+    }
 
-    private mutating func setAndFireError(_ error: PSQLError) -> Action {
+    private mutating func setAndFireError(_ error: PSQLError) -> Action {        
         self.state = .error(error)
         return .reportAuthenticationError(error)
     }

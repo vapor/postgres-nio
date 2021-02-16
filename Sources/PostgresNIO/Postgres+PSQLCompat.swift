@@ -83,6 +83,8 @@ extension PSQLError {
             return underlying
         case .casting(let castingError):
             return castingError
+        case .uncleanShutdown:
+            return PostgresError.protocol("Unexpected connection close")
         }
     }
 }

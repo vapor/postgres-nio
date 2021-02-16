@@ -95,6 +95,10 @@ struct PrepareStatementStateMachine {
         }
     }
     
+    mutating func errorHappened(_ error: PSQLError) -> Action {
+        return self.setAndFireError(error)
+    }
+    
     private mutating func setAndFireError(_ error: PSQLError) -> Action {
         switch self.state {
         case .initialized(let context),

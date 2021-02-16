@@ -47,7 +47,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             .file: "auth.c"
         ]
         XCTAssertEqual(state.errorReceived(.init(fields: fields)),
-                       .fireErrorAndCloseConnetion(.server(.init(fields: fields))))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .server(.init(fields: fields)), closePromise: nil)))
     }
 
     // MARK: Test unsupported messages
@@ -66,7 +66,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             var state = ConnectionStateMachine(.waitingToStartAuthentication)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
-                           .fireErrorAndCloseConnetion(.unsupportedAuthMechanism(mechanism)))
+                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unsupportedAuthMechanism(mechanism), closePromise: nil)))
         }
     }
     
@@ -84,7 +84,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             var state = ConnectionStateMachine(.waitingToStartAuthentication)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
-                           .fireErrorAndCloseConnetion(.unexpectedBackendMessage(.authentication(message))))
+                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(message)), closePromise: nil)))
         }
     }
     
@@ -111,7 +111,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
-                           .fireErrorAndCloseConnetion(.unexpectedBackendMessage(.authentication(message))))
+                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(message)), closePromise: nil)))
         }
     }
 }

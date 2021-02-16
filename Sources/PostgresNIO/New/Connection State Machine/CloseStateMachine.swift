@@ -60,6 +60,10 @@ struct CloseStateMachine {
             return .wait
         }
     }
+    
+    mutating func errorHappened(_ error: PSQLError) -> Action {
+        return self.setAndFireError(error)
+    }
 
     // MARK: Channel actions
     

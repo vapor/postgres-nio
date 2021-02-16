@@ -2,6 +2,17 @@ enum PSQLTask {
     case extendedQuery(ExecuteExtendedQueryContext)
     case preparedStatement(CreatePreparedStatementContext)
     case closeCommand(CloseCommandContext)
+    
+    func failWithError(_ error: PSQLError) {
+        switch self {
+        case .extendedQuery(let extendedQueryContext):
+            extendedQueryContext.promise.fail(error)
+        case .preparedStatement(let createPreparedStatementContext):
+            createPreparedStatementContext.promise.fail(error)
+        case .closeCommand(let closeCommandContext):
+            closeCommandContext.promise.fail(error)
+        }
+    }
 }
 
 final class ExecuteExtendedQueryContext {

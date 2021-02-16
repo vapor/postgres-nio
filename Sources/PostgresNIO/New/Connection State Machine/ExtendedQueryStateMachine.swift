@@ -276,13 +276,8 @@ struct ExtendedQueryStateMachine {
         return .wait
     }
     
-    mutating func readyForQueryReceived() {
-        switch self.state {
-        case .commandComplete, .error:
-            return
-        default:
-            preconditionFailure("Invalid state")
-        }
+    mutating func errorHappened(_ error: PSQLError) -> Action {
+        return self.setAndFireError(error)
     }
             
     // MARK: Customer Actions
