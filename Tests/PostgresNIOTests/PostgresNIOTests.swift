@@ -885,9 +885,12 @@ final class PostgresNIOTests: XCTestCase {
             PRIMARY KEY ("id")
         );
         """).wait()
-        defer { _ = try! conn.simpleQuery("DROP TABLE \"table_no_results\"").wait() }
+        defer { XCTAssertNoThrow( try conn.simpleQuery("DROP TABLE \"table_no_results\"").wait() ) }
 
-        _ = try conn.prepare(query: "DELETE FROM \"table_no_results\" WHERE id = $1").wait()
+        let prepared = try conn.prepare(query: "DELETE FROM \"table_no_results\" WHERE id = $1").wait()
+        
+        XCTAssertNoThrow(try prepared.execute([.init(int: 1)]).wait())
+        XCTAssertNoThrow(try prepared.deallocate().wait())
     }
 
 

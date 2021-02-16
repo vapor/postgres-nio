@@ -38,11 +38,11 @@ extension PostgresConnection: PostgresDatabase {
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
             resultFuture = self.underlying.execute(preparedQuery.underlying, binds, logger: logger).flatMap { rows in
-                // preparedQuery.lookupTable can be force unwrapped here, since the
-                // `ExtendedQueryStateMachine` ensures that `DataRow`s match the previously received
-                // `RowDescription`. For this reason: If we get a row callback here, we must have a
-                // `RowDescription` and therefore a lookupTable.
-                return rows.iterateRowsWithoutBackpressureOption(lookupTable: preparedQuery.lookupTable!, onRow: onRow)
+                guard let lookupTable = preparedQuery.lookupTable else {
+                    return self.eventLoop.makeSucceededFuture(())
+                }
+                
+                return rows.iterateRowsWithoutBackpressureOption(lookupTable: lookupTable, onRow: onRow)
             }
         }
         
