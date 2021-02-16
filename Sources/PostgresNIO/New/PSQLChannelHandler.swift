@@ -92,9 +92,6 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             let action = self.state.provideAuthenticationContext(authContext)
             self.run(action, with: context)
         default:
-            self.logger.warning("Unexpected user outbound event triggered", metadata: [
-                .userEvent: "\(event)"
-            ])
             context.triggerUserOutboundEvent(event, promise: promise)
         }
     }
@@ -109,9 +106,6 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             let action = self.state.sslEstablished()
             self.run(action, with: context)
         default:
-            self.logger.warning("Unexpected user inbound event triggered", metadata: [
-                .userEvent: "\(event)"
-            ])
             context.fireUserInboundEventTriggered(event)
         }
     }
