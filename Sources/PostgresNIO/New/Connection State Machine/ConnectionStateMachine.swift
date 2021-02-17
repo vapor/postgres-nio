@@ -18,7 +18,6 @@ struct ConnectionStateMachine {
     
     enum State {
         case initialized
-        case connected
         case sslRequestSent
         case sslNegotiated
         case sslHandlerAdded
@@ -131,13 +130,14 @@ struct ConnectionStateMachine {
         guard case .initialized = self.state else {
             preconditionFailure("Unexpected state")
         }
-        self.state = .connected
+
         if requireTLS {
-            return self.sendSSLRequest()
-        } else {
-            self.state = .waitingToStartAuthentication
-            return .provideAuthenticationContext
+            self.state = .sslRequestSent
+            return .sendSSLRequest
         }
+            
+        self.state = .waitingToStartAuthentication
+        return .provideAuthenticationContext
     }
     
     mutating func provideAuthenticationContext(_ authContext: AuthContext) -> ConnectionAction {
@@ -146,7 +146,7 @@ struct ConnectionStateMachine {
     
     mutating func close(_ promise: EventLoopPromise<Void>?) -> ConnectionAction {
         switch self.state {
-        case .closing, .closed:
+        case .closing, .closed, .error:
             // we are already closed, but sometimes an upstream handler might want to close the
             // connection, though it has already been closed by the remote. Typical race condition.
             return .closeConnection(promise)
@@ -176,7 +176,6 @@ struct ConnectionStateMachine {
         case .closed:
             preconditionFailure("How can a connection be closed, if it is close.")
         case .authenticated,
-             .connected,
              .sslRequestSent,
              .sslNegotiated,
              .sslHandlerAdded,
@@ -260,8 +259,7 @@ struct ConnectionStateMachine {
     
     mutating func parameterStatusReceived(_ status: PSQLBackendMessage.ParameterStatus) -> ConnectionAction {
         switch self.state {
-        case .connected,
-             .sslRequestSent,
+        case .sslRequestSent,
              .sslNegotiated,
              .sslHandlerAdded,
              .waitingToStartAuthentication,
@@ -311,8 +309,7 @@ struct ConnectionStateMachine {
     
     mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> ConnectionAction {
         switch self.state {
-        case .connected,
-             .sslRequestSent,
+        case .sslRequestSent,
              .sslNegotiated,
              .sslHandlerAdded,
              .waitingToStartAuthentication,
@@ -364,7 +361,6 @@ struct ConnectionStateMachine {
     mutating func errorHappened(_ error: PSQLError) -> ConnectionAction {
         switch self.state {
         case .initialized,
-             .connected,
              .sslRequestSent,
              .sslNegotiated,
              .sslHandlerAdded,
@@ -509,8 +505,6 @@ struct ConnectionStateMachine {
         switch self.state {
         case .initialized:
             preconditionFailure("Received a read event on a connection that was never opened.")
-        case .connected:
-            return .read
         case .sslRequestSent:
             return .read
         case .sslNegotiated:
@@ -733,15 +727,6 @@ struct ConnectionStateMachine {
         }
     }
     
-    private mutating func sendSSLRequest() -> ConnectionAction {
-        guard case .connected = self.state else {
-            preconditionFailure("Can only send the SSL request directly after connect.")
-        }
-        
-        self.state = .sslRequestSent
-        return .sendSSLRequest
-    }
-    
     private mutating func setAndFireError(_ error: PSQLError) -> ConnectionAction {
         self.avoidingStateMachineCoW { machine -> ConnectionAction in
             let cleanupContext = machine.setErrorAndCreateCleanupContext(error)
@@ -953,7 +938,8 @@ extension ConnectionStateMachine {
         case .succeedPreparedStatementCreation(let prepareContext, with: let rowDescription):
             return .succeedPreparedStatementCreation(prepareContext, with: rowDescription)
         case .failPreparedStatementCreation(let prepareContext, with: let error):
-            return .failPreparedStatementCreation(prepareContext, with: error, cleanupContext: nil)
+            let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
+            return .failPreparedStatementCreation(prepareContext, with: error, cleanupContext: cleanupContext)
         case .read:
             return .read
         case .wait:
@@ -993,7 +979,8 @@ extension ConnectionStateMachine {
         case .succeedClose(let closeContext):
             return .succeedClose(closeContext)
         case .failClose(let closeContext, with: let error):
-            return .failClose(closeContext, with: error, cleanupContext: nil)
+            let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
+            return .failClose(closeContext, with: error, cleanupContext: cleanupContext)
         case .read:
             return .read
         case .wait:
@@ -1050,8 +1037,6 @@ extension ConnectionStateMachine.State: CustomDebugStringConvertible {
         switch self {
         case .initialized:
             return ".initialized"
-        case .connected:
-            return ".connected"
         case .sslRequestSent:
             return ".sslRequestSent"
         case .sslNegotiated:

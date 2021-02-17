@@ -209,7 +209,7 @@ final class PSQLConnection {
             case .unresolved(let host, let port):
                 return try SocketAddress.makeAddressResolvingHost(host, port: port)
             }
-        }.flatMap { address in
+        }.flatMap { address -> EventLoopFuture<Channel> in
             let bootstrap = ClientBootstrap(group: eventLoop)
                 .channelInitializer { channel in
                     let decoder = ByteToMessageHandler(PSQLBackendMessage.Decoder())
@@ -235,32 +235,33 @@ final class PSQLConnection {
                             authentification: configuration.authentication,
                             logger: logger,
                             enableSSLCallback: enableSSLCallback),
-                        PSQLEventsHandler(logger: logger, eventLoop: channel.eventLoop)
+                        
                     ])
                 }
+            
             return bootstrap.connect(to: address)
-        }.map { channel in
-            PSQLConnection(channel: channel, connectionID: connectionID, logger: logger, jsonDecoder: configuration.coders.jsonDecoder)
-        }.flatMap { connection -> EventLoopFuture<PSQLConnection> in
-            return connection.channel.pipeline.handler(type: PSQLEventsHandler.self).flatMap {
-                handler -> EventLoopFuture<PSQLConnection> in
-                
+        }.flatMap { channel -> EventLoopFuture<Channel> in
+            let eventHandler = PSQLEventsHandler(logger: logger, eventLoop: channel.eventLoop)
+
+            return channel.pipeline.addHandler(eventHandler, position: .last).flatMap { _ -> EventLoopFuture<Void> in
                 let startupFuture: EventLoopFuture<Void>
                 
                 if configuration.authentication == nil {
-                    startupFuture = handler.readyForStartupFuture
+                    startupFuture = eventHandler.readyForStartupFuture
                 } else {
-                    startupFuture = handler.authenticateFuture
+                    startupFuture = eventHandler.authenticateFuture
                 }
                 
-                return startupFuture.map { connection }.flatMapError { error in
+                return startupFuture.flatMapError { error in
                     // in case of an startup error, the connection must be closed and after that
                     // the originating error should be surfaced
-                    connection.close().map { connection }.flatMapThrowing { _ in
+                    channel.close().flatMapThrowing { _ in
                         throw error
                     }
                 }
-            }
+            }.map { _ in channel }
+        }.map { channel in
+            PSQLConnection(channel: channel, connectionID: connectionID, logger: logger, jsonDecoder: configuration.coders.jsonDecoder)
         }.flatMapErrorThrowing { error -> PSQLConnection in
             switch error {
             case is PSQLError:

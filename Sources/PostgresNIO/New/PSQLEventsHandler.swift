@@ -75,16 +75,10 @@ final class PSQLEventsHandler: ChannelInboundHandler {
     }
     
     func handlerAdded(context: ChannelHandlerContext) {
-        precondition(!context.channel.isActive)
-    }
-    
-    func channelActive(context: ChannelHandlerContext) {
-        guard case .initialized = self.state else {
-            preconditionFailure("Invalid state")
-        }
+        precondition(context.channel.isActive, "The connection must already be active when this handler is added.")
         
+        // ensured based on the precondition above
         self.state = .connected
-        context.fireChannelActive()
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
@@ -99,22 +93,8 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         case .authenticated:
             break
         }
-    }
-    
-    func handlerRemoved(context: ChannelHandlerContext) {
-        let error = PSQLError.sslUnsupported
-        switch self.state {
-        case .connected:
-            self.readyForStartupPromise.fail(error)
-            self.authenticatePromise.fail(error)
-        case .initialized:
-            self.readyForStartupPromise.fail(error)
-            self.authenticatePromise.fail(error)
-        case .readyForStartup:
-            self.authenticatePromise.fail(error)
-        case .authenticated:
-            break
-        }
+        
+        context.fireErrorCaught(error)
     }
 }
 

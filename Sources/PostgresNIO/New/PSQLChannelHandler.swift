@@ -62,9 +62,8 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     func channelInactive(context: ChannelHandlerContext) {
-        // connection closed
-        
-        context.fireChannelInactive()
+        let action = self.state.closed()
+        self.run(action, with: context)
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
