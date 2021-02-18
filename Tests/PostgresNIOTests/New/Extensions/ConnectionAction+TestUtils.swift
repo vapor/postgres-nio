@@ -70,6 +70,10 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsColumns == rhsColumns && lhsPromise.futureResult === rhsPromise.futureResult
         case (.forwardStreamCompletedToCurrentQuery(let lhsBuffer, let lhsCommandTag, let lhsRead), .forwardStreamCompletedToCurrentQuery(let rhsBuffer, let rhsCommandTag, let rhsRead)):
             return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag && lhsRead == rhsRead
+        case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
+            return lhsName == rhsName && lhsQuery == rhsQuery
+        case (.succeedPreparedStatementCreation(let lhsContext, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsContext, let rhsRowDescription)):
+            return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
         default:
             return false
         }
@@ -96,6 +100,11 @@ extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
 
 extension ConnectionStateMachine {
     static func readyForQuery(transactionState: PSQLBackendMessage.TransactionState = .idle) -> Self {
+        let connectionContext = Self.createConnectionContext(transactionState: transactionState)
+        return ConnectionStateMachine(.readyForQuery(connectionContext))
+    }
+    
+    static func createConnectionContext(transactionState: PSQLBackendMessage.TransactionState = .idle) -> ConnectionContext {
         let paramaters = [
             "DateStyle": "ISO, MDY",
             "application_name": "",
@@ -110,13 +119,11 @@ extension ConnectionStateMachine {
             "standard_conforming_strings": "on"
         ]
         
-        let connectionContext = ConnectionContext(
+        return ConnectionContext(
             processID: 2730,
             secretKey: 882037977,
             parameters: paramaters,
             transactionState: transactionState)
-        
-        return ConnectionStateMachine(.readyForQuery(connectionContext))
     }
 }
 

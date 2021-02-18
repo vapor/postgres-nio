@@ -28,6 +28,13 @@ struct PrepareStatementStateMachine {
         self.state = .initialized(createContext)
     }
     
+    #if DEBUG
+    /// for testing purposes only
+    init(_ state: State) {
+        self.state = state
+    }
+    #endif
+    
     mutating func start() -> Action {
         guard case .initialized(let createContext) = self.state else {
             preconditionFailure("Start must only be called after the query has been initialized")
