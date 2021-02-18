@@ -57,6 +57,17 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             }
             
             return true
+        case (.fireEventReadyForQuery, .fireEventReadyForQuery):
+            return true
+        
+        case (.succeedQueryNoRowsComming(let lhsContext, let lhsCommandTag), .succeedQueryNoRowsComming(let rhsContext, let rhsCommandTag)):
+            return lhsContext === rhsContext && lhsCommandTag == rhsCommandTag
+        case (.succeedQuery(let lhsContext, let lhsRowDescription), .succeedQuery(let rhsContext, let rhsRowDescription)):
+            return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
+        case (.forwardRow(let lhsColumns, let lhsPromise), .forwardRow(let rhsColumns, let rhsPromise)):
+            return lhsColumns == rhsColumns && lhsPromise.futureResult === rhsPromise.futureResult
+        case (.forwardStreamCompletedToCurrentQuery(let lhsBuffer, let lhsCommandTag, let lhsRead), .forwardStreamCompletedToCurrentQuery(let rhsBuffer, let rhsCommandTag, let rhsRead)):
+            return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag && lhsRead == rhsRead
         default:
             return false
         }
