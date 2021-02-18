@@ -555,27 +555,33 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows[0].column("bytes")?.bytes, [1, 2, 3])
     }
     
-    func testJSONBSerialize() throws {
+    func testJSONBSerialize() {
         struct Object: Codable {
             let foo: Int
             let bar: Int
         }
         
-        let conn = try PostgresConnection.test(on: eventLoop).wait()
-        defer { try! conn.close().wait() }
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         do {
-            let postgresData = try PostgresData(jsonb: Object(foo: 1, bar: 2))
-            let rows = try conn.query("select $1::jsonb as jsonb", [postgresData]).wait()
+            var postgresData: PostgresData?
+            XCTAssertNoThrow(postgresData = try PostgresData(jsonb: Object(foo: 1, bar: 2)))
+            var rows: PostgresQueryResult?
+            XCTAssertNoThrow(rows = try conn?.query("select $1::jsonb as jsonb", [XCTUnwrap(postgresData)]).wait())
             
-            let object = try rows[0].column("jsonb")?.jsonb(as: Object.self)
+            var object: Object?
+            XCTAssertNoThrow(object = try rows?.first?.column("jsonb")?.jsonb(as: Object.self))
             XCTAssertEqual(object?.foo, 1)
             XCTAssertEqual(object?.bar, 2)
         }
         
         do {
-            let rows = try conn.query("select jsonb_build_object('foo',1,'bar',2) as jsonb").wait()
+            var rows: PostgresQueryResult?
+            XCTAssertNoThrow(rows = try conn?.query("select jsonb_build_object('foo',1,'bar',2) as jsonb").wait())
             
-            let object = try rows[0].column("jsonb")?.jsonb(as: Object.self)
+            var object: Object?
+            XCTAssertNoThrow(object = try rows?.first?.column("jsonb")?.jsonb(as: Object.self))
             XCTAssertEqual(object?.foo, 1)
             XCTAssertEqual(object?.bar, 2)
         }
