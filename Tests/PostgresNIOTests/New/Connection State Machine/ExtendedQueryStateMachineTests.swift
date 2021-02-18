@@ -4,12 +4,7 @@ import XCTest
 class ExtendedQueryStateMachineTests: XCTestCase {
     
     func testExtendedQueryWithoutDataRowsHappyPath() {
-        let connectionContext = ConnectionStateMachine.ConnectionContext(
-            processID: 1234,
-            secretKey: 5678,
-            parameters: [:],
-            transactionState: .idle)
-        var state = ConnectionStateMachine(.readyForQuery(connectionContext))
+        var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
@@ -27,12 +22,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
     }
     
     func testExtendedQueryWithDataRowsHappyPath() {
-        let connectionContext = ConnectionStateMachine.ConnectionContext(
-            processID: 1234,
-            secretKey: 5678,
-            parameters: [:],
-            transactionState: .idle)
-        var state = ConnectionStateMachine(.readyForQuery(connectionContext))
+        var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
         let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
@@ -60,6 +50,24 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.commandCompletedReceived("SELECT 1"), .forwardStreamCompletedToCurrentQuery(CircularBuffer(), commandTag: "SELECT 1", read: true))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+    }
+    
+    func testReceiveTotallyUnexpectedMessageInQuery() {
+        var state = ConnectionStateMachine.readyForQuery()
+        
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query = "DELETE FROM table WHERE id=$0"
+        let queryContext = ExecuteExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
+        
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: [1]))
+        XCTAssertEqual(state.parseCompleteReceived(), .wait)
+        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+        
+        let psqlError = PSQLError.unexpectedBackendMessage(.authentication(.ok))
+        XCTAssertEqual(state.authenticationMessageReceived(.ok),
+                       .failQuery(queryContext, with: psqlError, cleanupContext: .init(action: .close, tasks: [], error: psqlError, closePromise: nil)))
     }
 
 }

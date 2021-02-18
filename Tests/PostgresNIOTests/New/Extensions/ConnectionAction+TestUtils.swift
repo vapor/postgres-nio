@@ -64,6 +64,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsContext === rhsContext && lhsCommandTag == rhsCommandTag
         case (.succeedQuery(let lhsContext, let lhsRowDescription), .succeedQuery(let rhsContext, let rhsRowDescription)):
             return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
+        case (.failQuery(let lhsContext, let lhsError, let lhsCleanupContext), .failQuery(let rhsContext, let rhsError, let rhsCleanupContext)):
+            return lhsContext === rhsContext && lhsError == rhsError && lhsCleanupContext == rhsCleanupContext
         case (.forwardRow(let lhsColumns, let lhsPromise), .forwardRow(let rhsColumns, let rhsPromise)):
             return lhsColumns == rhsColumns && lhsPromise.futureResult === rhsPromise.futureResult
         case (.forwardStreamCompletedToCurrentQuery(let lhsBuffer, let lhsCommandTag, let lhsRead), .forwardStreamCompletedToCurrentQuery(let rhsBuffer, let rhsCommandTag, let rhsRead)):

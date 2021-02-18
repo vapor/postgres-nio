@@ -52,7 +52,7 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         
         var logger = Logger.psqlTest
-        logger.logLevel = .trace
+        logger.logLevel = .info
         
         var connection: PSQLConnection?
         XCTAssertThrowsError(connection = try PSQLConnection.connect(configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {

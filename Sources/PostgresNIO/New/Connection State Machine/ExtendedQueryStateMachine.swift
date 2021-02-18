@@ -240,25 +240,19 @@ struct ExtendedQueryStateMachine {
         switch self.state {
         case .initialized:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
-            
         case .parseDescribeBindExecuteSyncSent,
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .bindCompleteReceived:
             return self.setAndFireError(error)
-
         case .rowDescriptionReceived, .noDataMessageReceived:
             return self.setAndFireError(error)
-            
         case .bufferingRows:
             return self.setAndFireError(error)
-            
         case .waitingForNextRow:
             return self.setAndFireError(error)
-            
         case .commandComplete:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
-            
         case .error:
             return self.avoidingStateMachineCoW { state -> Action in
                 // override the current error?
