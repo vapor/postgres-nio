@@ -69,7 +69,7 @@ final class IntegrationTests: XCTestCase {
         let eventLoop = eventLoopGroup.next()
         
         var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop, logLevel: .trace).wait())
+        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
         
         var rows: PSQLRows?

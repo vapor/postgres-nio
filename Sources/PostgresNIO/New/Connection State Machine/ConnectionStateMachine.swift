@@ -1161,3 +1161,15 @@ extension ConnectionStateMachine.ConnectionContext: CustomDebugStringConvertible
         """
     }
 }
+
+extension ConnectionStateMachine.QuiescingState: CustomDebugStringConvertible {
+    var debugDescription: String {
+        switch self {
+        case .notQuiescing:
+            return ".notQuiescing"
+        case .quiescing(let closePromise):
+            return ".quiescing(\(closePromise != nil ? "\(closePromise!)" : "nil"))"
+        }
+    }
+}
+

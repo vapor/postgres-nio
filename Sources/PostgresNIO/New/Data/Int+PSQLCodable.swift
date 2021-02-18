@@ -118,11 +118,14 @@ extension Int64: PSQLCodable {
 
 extension Int: PSQLCodable {
     var psqlType: PSQLDataType {
-        #if (arch(i386) || arch(arm))
-        return .int4
-        #else
-        return .int8
-        #endif
+        switch self.bitWidth {
+        case Int32.bitWidth:
+            return .int4
+        case Int64.bitWidth:
+            return .int8
+        default:
+            preconditionFailure("Int is expected to be an Int32 or Int64")
+        }
     }
     
     // decoding
@@ -140,14 +143,12 @@ extension Int: PSQLCodable {
             }
             
             return Int(value)
-        #if (arch(x86_64) || arch(arm64))
-        case .int8:
+        case .int8 where Int.bitWidth == 64:
             guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self) else {
                 throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             
             return value
-        #endif
         default:
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
