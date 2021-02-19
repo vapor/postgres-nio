@@ -49,30 +49,115 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     #endif
     
+    // MARK: Handler lifecycle
+    
     func handlerAdded(context: ChannelHandlerContext) {
         if context.channel.isActive {
-            self.runHandshake(context: context)
+            self.connected(context: context)
         }
     }
+    
+    // MARK: Channel handler incoming
     
     func channelActive(context: ChannelHandlerContext) {
         context.fireChannelActive()
         
-        self.runHandshake(context: context)
+        self.connected(context: context)
     }
     
     func channelInactive(context: ChannelHandlerContext) {
+        self.logger.trace("Channel inactive.")
         let action = self.state.closed()
         self.run(action, with: context)
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        self.logger.error("Channel error caught", metadata: [.error: "\(error)"])
+        self.logger.error("Channel error caught.", metadata: [.error: "\(error)"])
         let action = self.state.errorHappened(.channel(underlying: error))
         self.run(action, with: context)
     }
     
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        let incomingMessage = self.unwrapInboundIn(data)
+        
+        self.logger.trace("Backend message received", metadata: [.message: "\(incomingMessage)"])
+        
+        let action: ConnectionStateMachine.ConnectionAction
+        
+        switch incomingMessage {
+        case .authentication(let authentication):
+            action = self.state.authenticationMessageReceived(authentication)
+        case .backendKeyData(let keyData):
+            action = self.state.backendKeyDataReceived(keyData)
+        case .bindComplete:
+            action = self.state.bindCompleteReceived()
+        case .closeComplete:
+            action = self.state.closeCompletedReceived()
+        case .commandComplete(let commandTag):
+            action = self.state.commandCompletedReceived(commandTag)
+        case .dataRow(let dataRow):
+            action = self.state.dataRowReceived(dataRow)
+        case .emptyQueryResponse:
+            action = self.state.emptyQueryResponseReceived()
+        case .error(let errorResponse):
+            action = self.state.errorReceived(errorResponse)
+        case .noData:
+            action = self.state.noDataReceived()
+        case .notice(let noticeResponse):
+            action = self.state.noticeReceived(noticeResponse)
+        case .notification(let notification):
+            action = self.state.notificationReceived(notification)
+        case .parameterDescription(let parameterDescription):
+            action = self.state.parameterDescriptionReceived(parameterDescription)
+        case .parameterStatus(let parameterStatus):
+            action = self.state.parameterStatusReceived(parameterStatus)
+        case .parseComplete:
+            action = self.state.parseCompleteReceived()
+        case .portalSuspended:
+            action = self.state.portalSuspendedReceived()
+        case .readyForQuery(let transactionState):
+            action = self.state.readyForQueryReceived(transactionState)
+        case .rowDescription(let rowDescription):
+            action = self.state.rowDescriptionReceived(rowDescription)
+        case .sslSupported:
+            action = self.state.sslSupportedReceived()
+        case .sslUnsupported:
+            action = self.state.sslUnsupportedReceived()
+        }
+        
+        self.run(action, with: context)
+    }
+    
+    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
+        self.logger.trace("User inbound event received", metadata: [
+            .userEvent: "\(event)"
+        ])
+        
+        switch event {
+        case TLSUserEvent.handshakeCompleted:
+            let action = self.state.sslEstablished()
+            self.run(action, with: context)
+        default:
+            context.fireUserInboundEventTriggered(event)
+        }
+    }
+    
+    // MARK: Channel handler outgoing
+    
+    func read(context: ChannelHandlerContext) {
+        self.logger.trace("Channel read event received")
+        let action = self.state.readEventCatched()
+        self.run(action, with: context)
+    }
+    
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        let task = self.unwrapOutboundIn(data)
+        let action = self.state.enqueue(task: task)
+        self.run(action, with: context)
+    }
+    
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+        self.logger.trace("Close triggered by upstream.")
         guard mode == .all else {
             // TODO: Support also other modes ?
             promise?.fail(ChannelError.operationUnsupported)
@@ -94,28 +179,12 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             context.triggerUserOutboundEvent(event, promise: promise)
         }
     }
-    
-    func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
-        self.logger.trace("User inbound event received", metadata: [
-            .userEvent: "\(event)"
-        ])
-        
-        switch event {
-        case TLSUserEvent.handshakeCompleted:
-            let action = self.state.sslEstablished()
-            self.run(action, with: context)
-        default:
-            context.fireUserInboundEventTriggered(event)
-        }
-    }
-    
-    func runHandshake(context: ChannelHandlerContext) {
-        let action = self.state.connected(requireTLS: self.enableSSLCallback != nil)
-        
-        self.run(action, with: context)
-    }
+
+    // MARK: Channel handler actions
     
     func run(_ action: ConnectionStateMachine.ConnectionAction, with context: ChannelHandlerContext) {
+        self.logger.trace("Run action", metadata: [.connectionAction: "\(action)"])
+        
         switch action {
         case .establishSSLConnection:
             self.establishSSLConnection(context: context)
@@ -227,70 +296,13 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         }
     }
     
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let incomingMessage = self.unwrapInboundIn(data)
-        
-        self.logger.trace("Backend message received", metadata: [.message: "\(incomingMessage)"])
-        
-        let action: ConnectionStateMachine.ConnectionAction
-        
-        switch incomingMessage {
-        case .authentication(let authentication):
-            action = self.state.authenticationMessageReceived(authentication)
-        case .backendKeyData(let keyData):
-            action = self.state.backendKeyDataReceived(keyData)
-        case .bindComplete:
-            action = self.state.bindCompleteReceived()
-        case .closeComplete:
-            action = self.state.closeCompletedReceived()
-        case .commandComplete(let commandTag):
-            action = self.state.commandCompletedReceived(commandTag)
-        case .dataRow(let dataRow):
-            action = self.state.dataRowReceived(dataRow)
-        case .emptyQueryResponse:
-            action = self.state.emptyQueryResponseReceived()
-        case .error(let errorResponse):
-            action = self.state.errorReceived(errorResponse)
-        case .noData:
-            action = self.state.noDataReceived()
-        case .notice(let noticeResponse):
-            action = self.state.noticeReceived(noticeResponse)
-        case .notification(let notification):
-            action = self.state.notificationReceived(notification)
-        case .parameterDescription(let parameterDescription):
-            action = self.state.parameterDescriptionReceived(parameterDescription)
-        case .parameterStatus(let parameterStatus):
-            action = self.state.parameterStatusReceived(parameterStatus)
-        case .parseComplete:
-            action = self.state.parseCompleteReceived()
-        case .portalSuspended:
-            action = self.state.portalSuspendedReceived()
-        case .readyForQuery(let transactionState):
-            action = self.state.readyForQueryReceived(transactionState)
-        case .rowDescription(let rowDescription):
-            action = self.state.rowDescriptionReceived(rowDescription)
-        case .sslSupported:
-            action = self.state.sslSupportedReceived()
-        case .sslUnsupported:
-            action = self.state.sslUnsupportedReceived()
-        }
-        
-        self.run(action, with: context)
-    }
-    
-    func read(context: ChannelHandlerContext) {
-        self.logger.trace("Channel read event received")
-        let action = self.state.readEventCatched()
-        self.run(action, with: context)
-    }
-    
-    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        let task = self.unwrapOutboundIn(data)
-        let action = self.state.enqueue(task: task)
-        self.run(action, with: context)
-    }
-    
     // MARK: - Private Methods -
+    
+    private func connected(context: ChannelHandlerContext) {
+        let action = self.state.connected(requireTLS: self.enableSSLCallback != nil)
+        
+        self.run(action, with: context)
+    }
     
     private func establishSSLConnection(context: ChannelHandlerContext) {
         // This method must only be called, if we signalized the StateMachine before that we are
@@ -455,6 +467,8 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         _ cleanup: ConnectionStateMachine.ConnectionAction.CleanUpContext,
         context: ChannelHandlerContext)
     {
+        self.logger.error("Channel error caught. Closing connection.", metadata: [.error: "\(cleanup.error)"])
+        
         // 1. fail all tasks
         cleanup.tasks.forEach { task in
             task.failWithError(cleanup.error)

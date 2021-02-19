@@ -12,6 +12,7 @@ extension PSQLConnection {
         case commandTag = "psql_command_tag"
         
         case connectionState = "psql_connection_state"
+        case connectionAction = "psql_connection_action"
         case message = "psql_message"
         case messageID = "psql_message_id"
         case messagePayload = "psql_message_payload"
