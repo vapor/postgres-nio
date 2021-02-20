@@ -202,72 +202,74 @@ final class PSQLConnection {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(connectionID)"
         
-        return eventLoop.makeSucceededFuture(Void()).flatMapThrowing { _ -> SocketAddress in
-            switch configuration.connection {
-            case .resolved(let address, _):
-                return address
-            case .unresolved(let host, let port):
-                return try SocketAddress.makeAddressResolvingHost(host, port: port)
-            }
-        }.flatMap { address -> EventLoopFuture<Channel> in
-            let bootstrap = ClientBootstrap(group: eventLoop)
-                .channelInitializer { channel in
-                    let decoder = ByteToMessageHandler(PSQLBackendMessage.Decoder())
-                    
-                    var enableSSLCallback: ((Channel) -> EventLoopFuture<Void>)? = nil
-                    if let tlsConfiguration = configuration.tlsConfiguration {
-                        enableSSLCallback = { channel in
-                            channel.eventLoop.submit {
-                                let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-                                return try NIOSSLClientHandler(
-                                    context: sslContext,
-                                    serverHostname: configuration.sslServerHostname)
-                            }.flatMap { sslHandler in
-                                channel.pipeline.addHandler(sslHandler, position: .before(decoder))
+        return eventLoop.flatSubmit {
+            eventLoop.makeSucceededFuture(Void()).flatMapThrowing { _ -> SocketAddress in
+                switch configuration.connection {
+                case .resolved(let address, _):
+                    return address
+                case .unresolved(let host, let port):
+                    return try SocketAddress.makeAddressResolvingHost(host, port: port)
+                }
+            }.flatMap { address -> EventLoopFuture<Channel> in
+                let bootstrap = ClientBootstrap(group: eventLoop)
+                    .channelInitializer { channel in
+                        let decoder = ByteToMessageHandler(PSQLBackendMessage.Decoder())
+                        
+                        var enableSSLCallback: ((Channel) -> EventLoopFuture<Void>)? = nil
+                        if let tlsConfiguration = configuration.tlsConfiguration {
+                            enableSSLCallback = { channel in
+                                channel.eventLoop.submit {
+                                    let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+                                    return try NIOSSLClientHandler(
+                                        context: sslContext,
+                                        serverHostname: configuration.sslServerHostname)
+                                }.flatMap { sslHandler in
+                                    channel.pipeline.addHandler(sslHandler, position: .before(decoder))
+                                }
                             }
                         }
+                        
+                        return channel.pipeline.addHandlers([
+                            decoder,
+                            MessageToByteHandler(PSQLFrontendMessage.Encoder(jsonEncoder: configuration.coders.jsonEncoder)),
+                            PSQLChannelHandler(
+                                authentification: configuration.authentication,
+                                logger: logger,
+                                enableSSLCallback: enableSSLCallback),
+                            PSQLEventsHandler(logger: logger)
+                        ])
+                    }
+                
+                return bootstrap.connect(to: address)
+            }.flatMap { channel -> EventLoopFuture<Channel> in
+                channel.pipeline.handler(type: PSQLEventsHandler.self).flatMap {
+                    eventHandler -> EventLoopFuture<Void> in
+                    
+                    let startupFuture: EventLoopFuture<Void>
+                    if configuration.authentication == nil {
+                        startupFuture = eventHandler.readyForStartupFuture
+                    } else {
+                        startupFuture = eventHandler.authenticateFuture
                     }
                     
-                    return channel.pipeline.addHandlers([
-                        decoder,
-                        MessageToByteHandler(PSQLFrontendMessage.Encoder(jsonEncoder: configuration.coders.jsonEncoder)),
-                        PSQLChannelHandler(
-                            authentification: configuration.authentication,
-                            logger: logger,
-                            enableSSLCallback: enableSSLCallback),
+                    return startupFuture.flatMapError { error in
+                        // in case of an startup error, the connection must be closed and after that
+                        // the originating error should be surfaced
                         
-                    ])
-                }
-            
-            return bootstrap.connect(to: address)
-        }.flatMap { channel -> EventLoopFuture<Channel> in
-            let eventHandler = PSQLEventsHandler(logger: logger, eventLoop: channel.eventLoop)
-
-            return channel.pipeline.addHandler(eventHandler, position: .last).flatMap { _ -> EventLoopFuture<Void> in
-                let startupFuture: EventLoopFuture<Void>
-                
-                if configuration.authentication == nil {
-                    startupFuture = eventHandler.readyForStartupFuture
-                } else {
-                    startupFuture = eventHandler.authenticateFuture
-                }
-                
-                return startupFuture.flatMapError { error in
-                    // in case of an startup error, the connection must be closed and after that
-                    // the originating error should be surfaced
-                    channel.close().flatMapThrowing { _ in
-                        throw error
+                        channel.closeFuture.flatMapThrowing { _ in
+                            throw error
+                        }
                     }
+                }.map { _ in channel }
+            }.map { channel in
+                PSQLConnection(channel: channel, connectionID: connectionID, logger: logger, jsonDecoder: configuration.coders.jsonDecoder)
+            }.flatMapErrorThrowing { error -> PSQLConnection in
+                switch error {
+                case is PSQLError:
+                    throw error
+                default:
+                    throw PSQLError.channel(underlying: error)
                 }
-            }.map { _ in channel }
-        }.map { channel in
-            PSQLConnection(channel: channel, connectionID: connectionID, logger: logger, jsonDecoder: configuration.coders.jsonDecoder)
-        }.flatMapErrorThrowing { error -> PSQLConnection in
-            switch error {
-            case is PSQLError:
-                throw error
-            default:
-                throw PSQLError.channel(underlying: error)
             }
         }
     }

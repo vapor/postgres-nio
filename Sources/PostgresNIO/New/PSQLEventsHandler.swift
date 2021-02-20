@@ -21,11 +21,11 @@ final class PSQLEventsHandler: ChannelInboundHandler {
     typealias InboundIn = Never
     
     let logger: Logger
-    var readyForStartupFuture: EventLoopFuture<Void> {
-        self.readyForStartupPromise.futureResult
+    var readyForStartupFuture: EventLoopFuture<Void>! {
+        self.readyForStartupPromise!.futureResult
     }
-    var authenticateFuture: EventLoopFuture<Void> {
-        self.authenticatePromise.futureResult
+    var authenticateFuture: EventLoopFuture<Void>! {
+        self.authenticatePromise!.futureResult
     }
     
 
@@ -36,15 +36,12 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         case authenticated
     }
     
-    private var readyForStartupPromise: EventLoopPromise<Void>
-    private var authenticatePromise: EventLoopPromise<Void>
+    private var readyForStartupPromise: EventLoopPromise<Void>!
+    private var authenticatePromise: EventLoopPromise<Void>!
     private var state: State = .initialized
     
-    init(logger: Logger, eventLoop: EventLoop) {
+    init(logger: Logger) {
         self.logger = logger
-        
-        self.readyForStartupPromise = eventLoop.makePromise(of: Void.self)
-        self.authenticatePromise = eventLoop.makePromise(of: Void.self)
     }
     
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
@@ -75,10 +72,15 @@ final class PSQLEventsHandler: ChannelInboundHandler {
     }
     
     func handlerAdded(context: ChannelHandlerContext) {
-        precondition(context.channel.isActive, "The connection must already be active when this handler is added.")
+        precondition(!context.channel.isActive)
         
-        // ensured based on the precondition above
+        self.readyForStartupPromise = context.eventLoop.makePromise(of: Void.self)
+        self.authenticatePromise = context.eventLoop.makePromise(of: Void.self)
+    }
+    
+    func channelActive(context: ChannelHandlerContext) {
         self.state = .connected
+        context.fireChannelActive()
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
@@ -96,5 +98,13 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         
         context.fireErrorCaught(error)
     }
+    
+    func handlerRemoved(context: ChannelHandlerContext) {
+        struct HandlerRemovedConnectionError: Error {}
+        
+        if case .initialized = self.state {
+            self.readyForStartupPromise.fail(HandlerRemovedConnectionError())
+            self.authenticatePromise.fail(HandlerRemovedConnectionError())
+        }
+    }
 }
-

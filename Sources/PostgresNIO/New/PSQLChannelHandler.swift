@@ -60,6 +60,9 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     // MARK: Channel handler incoming
     
     func channelActive(context: ChannelHandlerContext) {
+        // `fireChannelActive` needs to be called BEFORE we set the state machine to connected,
+        // since we want to make sure that upstream handlers know about the active connection before
+        // it receives a 
         context.fireChannelActive()
         
         self.connected(context: context)

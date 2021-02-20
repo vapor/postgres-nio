@@ -16,6 +16,8 @@ final class IntegrationTests: XCTestCase {
     }
     
     func testConnectionFailure() {
+        // TODO: Create server with port 0 first
+        
         let config = PSQLConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: 1234, // wrong port number!
