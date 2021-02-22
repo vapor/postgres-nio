@@ -501,7 +501,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func readEventCatched() -> ConnectionAction {
+    mutating func readEventCaught() -> ConnectionAction {
         switch self.state {
         case .initialized:
             preconditionFailure("Received a read event on a connection that was never opened.")
@@ -521,19 +521,19 @@ struct ConnectionStateMachine {
             return .read
         case .extendedQuery(var extendedQuery, let connectionContext):
             return self.avoidingStateMachineCoW { machine in
-                let action = extendedQuery.readEventCatched()
+                let action = extendedQuery.readEventCaught()
                 machine.state = .extendedQuery(extendedQuery, connectionContext)
                 return machine.modify(with: action)
             }
         case .prepareStatement(var preparedStatement, let connectionContext):
             return self.avoidingStateMachineCoW { machine in
-                let action = preparedStatement.readEventCatched()
+                let action = preparedStatement.readEventCaught()
                 machine.state = .prepareStatement(preparedStatement, connectionContext)
                 return machine.modify(with: action)
             }
         case .closeCommand(var closeState, let connectionContext):
             return self.avoidingStateMachineCoW { machine in
-                let action = closeState.readEventCatched()
+                let action = closeState.readEventCaught()
                 machine.state = .closeCommand(closeState, connectionContext)
                 return machine.modify(with: action)
             }

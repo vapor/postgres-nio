@@ -55,7 +55,7 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         case PSQLEvent.readyForQuery:
             switch self.state {
             case .initialized, .connected:
-                preconditionFailure("how can that happen?")
+                preconditionFailure("Expected to get a `readyForStartUp` before we get a `readyForQuery` event")
             case .readyForStartup:
                 // for the first time, we are ready to query, this means startup/auth was
                 // successful

@@ -125,7 +125,7 @@ struct PrepareStatementStateMachine {
     
     // MARK: Channel actions
     
-    mutating func readEventCatched() -> Action {
+    mutating func readEventCaught() -> Action {
         return .read
     }
     

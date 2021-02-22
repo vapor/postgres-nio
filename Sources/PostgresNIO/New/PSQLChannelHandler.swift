@@ -149,7 +149,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     
     func read(context: ChannelHandlerContext) {
         self.logger.trace("Channel read event received")
-        let action = self.state.readEventCatched()
+        let action = self.state.readEventCaught()
         self.run(action, with: context)
     }
     

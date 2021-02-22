@@ -310,7 +310,7 @@ struct ExtendedQueryStateMachine {
     
     // MARK: Channel actions
     
-    mutating func readEventCatched() -> Action {
+    mutating func readEventCaught() -> Action {
         switch self.state {
         case .parseDescribeBindExecuteSyncSent:
             return .read
