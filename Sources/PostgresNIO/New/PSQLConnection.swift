@@ -199,6 +199,13 @@ final class PSQLConnection {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(connectionID)"
         
+        // Here we dispatch to the `eventLoop` first before we setup the EventLoopFuture chain, to
+        // ensure all `flatMap`s are executed on the EventLoop (this means the enqueuing of the
+        // callbacks).
+        //
+        // This saves us a number of context switches between the thread the Connection is created
+        // on and the EventLoop. In addition, it eliminates all potential races between the creating
+        // thread and the EventLoop.
         return eventLoop.flatSubmit {
             eventLoop.submit { () throws -> SocketAddress in
                 switch configuration.connection {
