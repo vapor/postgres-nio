@@ -183,9 +183,8 @@ struct AuthenticationStateMachine {
                 ConnectionStateMachine must not send any further events to the substate machine.
                 """)
         }
-        
     }
-    
+
     var isComplete: Bool {
         switch self.state {
         case .authenticated, .error:
