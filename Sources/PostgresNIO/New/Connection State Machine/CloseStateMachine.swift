@@ -56,8 +56,10 @@ struct CloseStateMachine {
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
             
         case .error:
-            // don't override the first error
-            return .wait
+            preconditionFailure("""
+                This state must not be reached. If the query `.isComplete`, the
+                ConnectionStateMachine must not send any further events to the substate machine.
+                """)
         }
     }
     
@@ -88,7 +90,10 @@ struct CloseStateMachine {
             self.state = .error(error)
             return .failClose(closeContext, with: error)
         case .initialized, .closeCompleteReceived, .error:
-            preconditionFailure("invalid state")
+            preconditionFailure("""
+                This state must not be reached. If the query `.isComplete`, the
+                ConnectionStateMachine must not send any further events to the substate machine.
+                """)
         }
     }
 }

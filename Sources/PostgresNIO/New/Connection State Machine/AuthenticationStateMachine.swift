@@ -67,7 +67,7 @@ struct AuthenticationStateMachine {
             case .sspi:
                 return self.setAndFireError(.unsupportedAuthMechanism(.sspi))
             case .sasl(let mechanisms):
-                guard mechanisms.contains("SCRAM-SHA-256") else {
+                guard mechanisms.contains(SASLMechanism.SCRAM.SHA256.name) else {
                     return self.setAndFireError(.unsupportedAuthMechanism(.sasl(mechanisms: mechanisms)))
                 }
                 
@@ -81,13 +81,15 @@ struct AuthenticationStateMachine {
                 do {
                     var bytes: [UInt8]?
                     let done = try saslManager.handle(message: nil, sender: { bytes = $0 })
+                    // TODO: Gwynne reminds herself to refactor `SASLAuthenticationManager` to
+                    //       be async instead of very badly done synchronous.
                     
                     guard let output = bytes, done == false else {
                         preconditionFailure("TODO: SASL auth is always a three step process in Postgres.")
                     }
                     
                     self.state = .saslInitialResponseSent(saslManager)
-                    return .sendSaslInitialResponse(name: "SCRAM-SHA-256", initialResponse: output)
+                    return .sendSaslInitialResponse(name: SASLMechanism.SCRAM.SHA256.name, initialResponse: output)
                 } catch {
                     return self.setAndFireError(.sasl(underlying: error))
                 }
@@ -162,9 +164,40 @@ struct AuthenticationStateMachine {
         return self.setAndFireError(error)
     }
 
-    private mutating func setAndFireError(_ error: PSQLError) -> Action {        
-        self.state = .error(error)
-        return .reportAuthenticationError(error)
+    private mutating func setAndFireError(_ error: PSQLError) -> Action {
+        switch self.state {
+        case .initialized:
+            preconditionFailure("""
+                The `AuthenticationStateMachine` must be immidiatly started after creation.
+                """)
+        case .startupMessageSent,
+             .passwordAuthenticationSent,
+             .saslInitialResponseSent,
+             .saslChallengeResponseSent,
+             .saslFinalReceived:
+            self.state = .error(error)
+            return .reportAuthenticationError(error)
+        case .authenticated, .error:
+            preconditionFailure("""
+                This state must not be reached. If the auth state `.isComplete`, the
+                ConnectionStateMachine must not send any further events to the substate machine.
+                """)
+        }
+        
+    }
+    
+    var isComplete: Bool {
+        switch self.state {
+        case .authenticated, .error:
+            return true
+        case .initialized,
+             .startupMessageSent,
+             .passwordAuthenticationSent,
+             .saslInitialResponseSent,
+             .saslChallengeResponseSent,
+             .saslFinalReceived:
+            return false
+        }
     }
 }
 

@@ -173,7 +173,7 @@ final class PSQLRows {
         
         func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
             guard let index = self.lookupTable[column] else {
-                preconditionFailure(#"A column '\#(column)' does not exist."#)
+                preconditionFailure("A column '\(column)' does not exist.")
             }
             
             return try self.decode(column: index, as: type, file: file, line: line)

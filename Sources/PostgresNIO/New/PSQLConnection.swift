@@ -139,15 +139,12 @@ final class PSQLConnection {
             promise: promise)
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
-        return promise.futureResult.always { result in
-            switch result {
-            case .failure(let error):
-                logger.error("Query failed", metadata: [.error: "\(error)"])
-            case .success:
-                // success is logged in PSQLQuery
-                break
-            }
+        
+        // success is logged in PSQLQuery
+        promise.futureResult.whenFailure { error in
+            logger.error("Query failed", metadata: [.error: "\(error)"])
         }
+        return promise.futureResult
     }
     
     // MARK: Prepared statements
@@ -203,7 +200,7 @@ final class PSQLConnection {
         logger[postgresMetadataKey: .connectionID] = "\(connectionID)"
         
         return eventLoop.flatSubmit {
-            eventLoop.makeSucceededFuture(Void()).flatMapThrowing { _ -> SocketAddress in
+            eventLoop.submit { () throws -> SocketAddress in
                 switch configuration.connection {
                 case .resolved(let address, _):
                     return address

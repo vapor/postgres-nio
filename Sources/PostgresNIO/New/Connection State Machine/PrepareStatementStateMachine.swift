@@ -93,12 +93,12 @@ struct PrepareStatementStateMachine {
             return self.setAndFireError(error)
             
         case .rowDescriptionReceived,
-             .noDataMessageReceived:
-            return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
-            
-        case .error:
-            // don't override the first error
-            return .wait
+             .noDataMessageReceived,
+             .error:
+            preconditionFailure("""
+                This state must not be reached. If the prepared statement `.isComplete`, the
+                ConnectionStateMachine must not send any further events to the substate machine.
+                """)
         }
     }
     
@@ -117,9 +117,10 @@ struct PrepareStatementStateMachine {
         case .rowDescriptionReceived,
              .noDataMessageReceived,
              .error:
-            // This state can be reached if a connection error occured while waiting for the next
-            // `.readyForQuery`. We don't need to forward an error in those cases.
-            return .wait
+            preconditionFailure("""
+                This state must not be reached. If the prepared statement `.isComplete`, the
+                ConnectionStateMachine must not send any further events to the substate machine.
+                """)
         }
     }
     
