@@ -57,7 +57,7 @@ extension PostgresMessage {
         }
         
         public func serialize(into buffer: inout ByteBuffer) throws {
-            buffer.write(nullTerminated: mechanism)
+            buffer.writeNullTerminatedString(mechanism)
             if initialData.count > 0 {
                 buffer.writeInteger(Int32(initialData.count), as: Int32.self) // write(array:) writes Int16, which is incorrect here
                 buffer.writeBytes(initialData)

@@ -7,19 +7,21 @@ extension PostgresConnection {
         try .makeAddressResolvingHost( env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432)
     }
 
-    static func testUnauthenticated(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+    static func testUnauthenticated(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = logLevel
         do {
-            return connect(to: try address(), on: eventLoop)
+            return connect(to: try address(), logger: logger, on: eventLoop)
         } catch {
             return eventLoop.makeFailedFuture(error)
         }
     }
 
-    static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
-        return testUnauthenticated(on: eventLoop).flatMap { conn in
+    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .trace) -> EventLoopFuture<PostgresConnection> {
+        return testUnauthenticated(on: eventLoop, logLevel: logLevel).flatMap { conn in
             return conn.authenticate(
-                username: env("POSTGRES_USERNAME") ?? "vapor_username",
-                database:  env("POSTGRES_DATABASE") ?? "vapor_database",
+                username: env("POSTGRES_USER") ?? "vapor_username",
+                database: env("POSTGRES_DB") ?? "vapor_database",
                 password: env("POSTGRES_PASSWORD") ?? "vapor_password"
             ).map {
                 return conn

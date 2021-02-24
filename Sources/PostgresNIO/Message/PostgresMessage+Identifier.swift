@@ -132,7 +132,7 @@ extension PostgresMessage {
         
         /// See `CustomStringConvertible`.
         public var description: String {
-            return String(Character(Unicode.Scalar(value)))
+            return String(Unicode.Scalar(self.value))
         }
         
         /// See `ExpressibleByIntegerLiteral`.

@@ -99,9 +99,10 @@ jobs:
         run: swift test --enable-test-discovery --sanitize=thread
         env:
           POSTGRES_HOSTNAME: psql
-          POSTGRES_USERNAME: vapor_username
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: vapor_database
           POSTGRES_PASSWORD: vapor_password
-          POSTGRES_DATABASE: vapor_database
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
 
   # Run package tests on macOS against supported PSQL versions
   macos:
@@ -138,6 +139,7 @@ jobs:
         run: swift test --enable-test-discovery --sanitize=thread
         env:
           POSTGRES_HOSTNAME: 127.0.0.1
-          POSTGRES_USERNAME: vapor_username
+          POSTGRES_USER: vapor_username
+          POSTGRES_DB: postgres
           POSTGRES_PASSWORD: vapor_password
-          POSTGRES_DATABASE: postgres
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}

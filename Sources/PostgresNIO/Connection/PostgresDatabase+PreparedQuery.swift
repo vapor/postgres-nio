@@ -3,10 +3,13 @@ import Foundation
 extension PostgresDatabase {
     public func prepare(query: String) -> EventLoopFuture<PreparedQuery> {
         let name = "nio-postgres-\(UUID().uuidString)"
-        let prepare = PrepareQueryRequest(query, as: name)
-        return self.send(prepare, logger: self.logger).map { () -> (PreparedQuery) in
-            let prepared = PreparedQuery(database: self, name: name, rowDescription: prepare.rowLookupTable)
-            return prepared
+        let request = PrepareQueryRequest(query, as: name)
+        return self.send(PostgresCommands.prepareQuery(request: request), logger: self.logger).map { _ in
+            // we can force unwrap the prepared here, since in a success case it must be set
+            // in the send method of `PostgresDatabase`. We do this dirty trick to work around
+            // the fact that the send method only returns an `EventLoopFuture<Void>`.
+            // Eventually we should move away from the `PostgresDatabase.send` API.
+            request.prepared!
         }
     }
 
@@ -23,14 +26,31 @@ extension PostgresDatabase {
 
 
 public struct PreparedQuery {
+    let underlying: PSQLPreparedStatement
+    let lookupTable: PostgresRow.LookupTable?
     let database: PostgresDatabase
-    let name: String
-    let rowLookupTable: PostgresRow.LookupTable?
 
-    init(database: PostgresDatabase, name: String, rowDescription: PostgresRow.LookupTable?) {
+    init(underlying: PSQLPreparedStatement, database: PostgresDatabase) {
+        self.underlying = underlying
+        self.lookupTable = underlying.rowDescription.flatMap {
+            rowDescription -> PostgresRow.LookupTable in
+            
+            let fields = rowDescription.columns.map { column in
+                PostgresMessage.RowDescription.Field(
+                    name: column.name,
+                    tableOID: UInt32(column.tableOID),
+                    columnAttributeNumber: column.columnAttributeNumber,
+                    dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
+                    dataTypeSize: column.dataTypeSize,
+                    dataTypeModifier: column.dataTypeModifier,
+                    formatCode: .init(psqlFormatCode: column.formatCode)
+                )
+            }
+            
+            return .init(rowDescription: .init(fields: fields), resultFormat: [.binary])
+        }
+        
         self.database = database
-        self.name = name
-        self.rowLookupTable = rowDescription
     }
 
     public func execute(_ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
@@ -39,131 +59,24 @@ public struct PreparedQuery {
     }
 
     public func execute(_ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        let handler = ExecutePreparedQuery(query: self, binds: binds, onRow: onRow)
-        return database.send(handler, logger: database.logger)
+        let command = PostgresCommands.executePreparedStatement(query: self, binds: binds, onRow: onRow)
+        return self.database.send(command, logger: self.database.logger)
     }
 
     public func deallocate() -> EventLoopFuture<Void> {
-        database.send(CloseRequest(name: self.name,
-                                   closeType: .preparedStatement),
-                                   logger:database.logger)
-
+        self.underlying.connection.close(.preparedStatement(self.underlying.name), logger: self.database.logger)
     }
 }
 
-
-private final class PrepareQueryRequest: PostgresRequest {
+final class PrepareQueryRequest {
     let query: String
     let name: String
-    var rowLookupTable: PostgresRow.LookupTable?
-    var resultFormatCodes: [PostgresFormatCode]
-    var logger: Logger?
-
+    var prepared: PreparedQuery? = nil
+    
+    
     init(_ query: String, as name: String) {
         self.query = query
         self.name = name
-        self.resultFormatCodes = [.binary]
-    }
-
-    func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
-        switch message.identifier {
-        case .rowDescription:
-            let row = try PostgresMessage.RowDescription(message: message)
-            self.rowLookupTable = PostgresRow.LookupTable(
-                rowDescription: row,
-                resultFormat: self.resultFormatCodes
-            )
-            return []
-        case .noData:
-            return []
-        case .parseComplete, .parameterDescription:
-            return []
-        case .readyForQuery:
-            return nil
-        default:
-            fatalError("Unexpected message: \(message)")
-        }
-
-    }
-
-    func start() throws -> [PostgresMessage] {
-        let parse = PostgresMessage.Parse(
-            statementName: self.name,
-            query: self.query,
-            parameterTypes: []
-        )
-        let describe = PostgresMessage.Describe(
-            command: .statement,
-            name: self.name
-        )
-        return try [parse.message(), describe.message(), PostgresMessage.Sync().message()]
-    }
-
-
-    func log(to logger: Logger) {
-        self.logger = logger
-        logger.debug("\(self.query) prepared as \(self.name)")
-    }
-}
-
-
-private final class ExecutePreparedQuery: PostgresRequest {
-    let query: PreparedQuery
-    let binds: [PostgresData]
-    var onRow: (PostgresRow) throws -> ()
-    var resultFormatCodes: [PostgresFormatCode]
-    var logger: Logger?
-
-    init(query: PreparedQuery, binds: [PostgresData], onRow: @escaping (PostgresRow) throws -> ()) {
-        self.query = query
-        self.binds = binds
-        self.onRow = onRow
-        self.resultFormatCodes = [.binary]
-    }
-
-    func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
-        switch message.identifier {
-        case .bindComplete:
-            return []
-        case .dataRow:
-            let data = try PostgresMessage.DataRow(message: message)
-            guard let rowLookupTable = query.rowLookupTable else {
-                fatalError("row lookup was requested but never set")
-            }
-            let row = PostgresRow(dataRow: data, lookupTable: rowLookupTable)
-            try onRow(row)
-            return []
-        case .noData:
-            return []
-        case .commandComplete:
-            return []
-        case .readyForQuery:
-            return nil
-        default: throw PostgresError.protocol("Unexpected message during query: \(message)")
-        }
-    }
-
-    func start() throws -> [PostgresMessage] {
-
-        let bind = PostgresMessage.Bind(
-            portalName: "",
-            statementName: query.name,
-            parameterFormatCodes: self.binds.map { $0.formatCode },
-            parameters: self.binds.map { .init(value: $0.value) },
-            resultFormatCodes: self.resultFormatCodes
-        )
-        let execute = PostgresMessage.Execute(
-            portalName: "",
-            maxRows: 0
-        )
-
-        let sync = PostgresMessage.Sync()
-        return try [bind.message(), execute.message(), sync.message()]
-    }
-
-    func log(to logger: Logger) {
-        self.logger = logger
-        logger.debug("Execute Prepared Query: \(query.name)")
     }
 
 }

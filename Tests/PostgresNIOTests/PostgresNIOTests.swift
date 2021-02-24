@@ -4,6 +4,7 @@ import XCTest
 import NIOTestUtils
 
 final class PostgresNIOTests: XCTestCase {
+    
     private var group: EventLoopGroup!
 
     private var eventLoop: EventLoop { self.group.next() }
@@ -1022,16 +1023,14 @@ final class PostgresNIOTests: XCTestCase {
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         let binds = [PostgresData].init(repeating: .null, count: Int(Int16.max) + 1)
         XCTAssertThrowsError(try conn?.query("SELECT version()", binds).wait()) { error in
-            guard case .connectionClosed = error as? PostgresError else {
-                return XCTFail("Unexpected error: \(error)")
-            }
+            XCTAssertEqual(error as? PSQLError, .tooManyParameters)
         }
     }
 
     func testRemoteClose() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        XCTAssertNoThrow( try conn?.channel.close().wait() )
+        XCTAssertNoThrow( try conn?.underlying.channel.close().wait() )
     }
 
     // https://github.com/vapor/postgres-nio/issues/113

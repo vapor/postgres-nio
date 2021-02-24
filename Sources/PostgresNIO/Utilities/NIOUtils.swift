@@ -2,20 +2,6 @@ import Foundation
 import NIO
 
 internal extension ByteBuffer {
-    mutating func readNullTerminatedString() -> String? {
-        if let nullIndex = readableBytesView.firstIndex(of: 0) {
-            defer { moveReaderIndex(forwardBy: 1) }
-            return readString(length: nullIndex - readerIndex)
-        } else {
-            return nil
-        }
-    }
-    
-    mutating func write(nullTerminated string: String) {
-        self.writeString(string)
-        self.writeInteger(0, as: UInt8.self)
-    }
-    
     mutating func readInteger<E>(endianness: Endianness = .big, as rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
         guard let rawValue = readInteger(endianness: endianness, as: E.RawValue.self) else {
             return nil
@@ -64,44 +50,6 @@ internal extension ByteBuffer {
             try array.append(closure(&self))
         }
         return array
-    }
-
-    mutating func readFloat() -> Float? {
-        return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }
-    }
-
-    mutating func readDouble() -> Double? {
-        return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
-    }
-
-    mutating func writeFloat(_ float: Float) {
-        self.writeInteger(float.bitPattern)
-    }
-
-    mutating func writeDouble(_ double: Double) {
-        self.writeInteger(double.bitPattern)
-    }
-
-    mutating func readUUID() -> UUID? {
-        guard self.readableBytes >= MemoryLayout<UUID>.size else {
-            return nil
-        }
-        
-        let value: UUID = self.getUUID(at: self.readerIndex)! /* must work as we have enough bytes */
-        // should be MoveReaderIndex
-        self.moveReaderIndex(forwardBy: MemoryLayout<UUID>.size)
-        return value
-    }
-    
-    func getUUID(at index: Int) -> UUID? {
-        var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        return self.viewBytes(at: index, length: MemoryLayout.size(ofValue: uuid)).map { bufferBytes in
-            withUnsafeMutableBytes(of: &uuid) { target in
-                precondition(target.count <= bufferBytes.count)
-                target.copyBytes(from: bufferBytes)
-            }
-            return UUID(uuid: uuid)
-        }
     }
 }
 

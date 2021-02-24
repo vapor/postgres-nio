@@ -1,6 +1,6 @@
 /// A frontend or backend Postgres message.
 public struct PostgresMessage: Equatable {
-    public var identifier: Identifier    
+    public var identifier: Identifier
     public var data: ByteBuffer
 
     public init<Data>(identifier: Identifier, bytes: Data)
