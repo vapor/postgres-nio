@@ -5,6 +5,10 @@ extension PostgresDatabase {
         let name = "nio-postgres-\(UUID().uuidString)"
         let request = PrepareQueryRequest(query, as: name)
         return self.send(PostgresCommands.prepareQuery(request: request), logger: self.logger).map { _ in
+            // we can force unwrap the prepared here, since in a success case it must be set
+            // in the send method of `PostgresDatabase`. We do this dirty trick to work around
+            // the fact that the send method only returns an `EventLoopFuture<Void>`.
+            // Eventually we should move away from the `PostgresDatabase.send` API.
             request.prepared!
         }
     }
