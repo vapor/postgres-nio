@@ -15,28 +15,6 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(try conn?.close().wait())
     }
     
-    func testConnectionFailure() {
-        // TODO: Create server with port 0 first
-        
-        let config = PSQLConnection.Configuration(
-            host: env("POSTGRES_HOSTNAME") ?? "localhost",
-            port: 1234, // wrong port number!
-            username: env("POSTGRES_USER") ?? "postgres",
-            database: env("POSTGRES_DB"),
-            password: env("POSTGRES_PASSWORD"),
-            tlsConfiguration: nil)
-        
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        
-        var logger = Logger.psqlTest
-        logger.logLevel = .trace
-        
-        XCTAssertThrowsError(try PSQLConnection.connect(configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
-            XCTAssertTrue($0 is PSQLError)
-        }
-    }
-    
     func testAuthenticationFailure() throws {
         // If the postgres server trusts every connection, it is really hard to create an
         // authentication failure.
