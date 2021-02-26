@@ -28,7 +28,7 @@ extension PSQLFrontendMessage {
             let context = PSQLEncodingContext(jsonEncoder: jsonEncoder)
             
             try self.parameters.forEach { parameter in
-                try parameter._encode(into: &buffer, context: context)
+                try parameter.encodeRaw(into: &buffer, context: context)
             }
 
             // The number of result-column format codes that follow (denoted R below). This can be

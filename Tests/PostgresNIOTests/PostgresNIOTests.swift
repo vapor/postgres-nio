@@ -560,6 +560,33 @@ final class PostgresNIOTests: XCTestCase {
         ]).wait())
         XCTAssertEqual(rows?.first?.column("array")?.array(of: Int.self), [])
     }
+    
+    // https://github.com/vapor/postgres-nio/issues/143
+    func testEmptyStringFromNonNullColumn() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        
+        XCTAssertNoThrow(_ = try conn?.simpleQuery(#"DROP TABLE IF EXISTS "non_null_empty_strings""#).wait())
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
+        CREATE TABLE non_null_empty_strings (
+            "id" SERIAL,
+            "nonNullString" text NOT NULL,
+            PRIMARY KEY ("id")
+        );
+        """).wait())
+        defer { XCTAssertNoThrow(_ = try conn?.simpleQuery(#"DROP TABLE "non_null_empty_strings""#).wait()) }
+        
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
+        INSERT INTO non_null_empty_strings ("nonNullString") VALUES ('')
+        """).wait())
+        
+        var rows: [PostgresRow]?
+        XCTAssertNoThrow(rows = try conn?.simpleQuery(#"SELECT * FROM "non_null_empty_strings""#).wait())
+        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(rows?.first?.column("nonNullString")?.string, "") // <--- this fails
+    }
+
 
     func testBoolSerialize() {
         var conn: PostgresConnection?

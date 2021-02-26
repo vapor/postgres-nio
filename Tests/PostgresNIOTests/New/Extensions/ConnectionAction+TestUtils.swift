@@ -45,8 +45,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
                 let encodingContext = PSQLEncodingContext(jsonEncoder: JSONEncoder())
                 
                 do {
-                    try lhs._encode(into: &lhsbuffer, context: encodingContext)
-                    try rhs._encode(into: &rhsbuffer, context: encodingContext)
+                    try lhs.encodeRaw(into: &lhsbuffer, context: encodingContext)
+                    try rhs.encodeRaw(into: &rhsbuffer, context: encodingContext)
                 } catch {
                     return false
                 }

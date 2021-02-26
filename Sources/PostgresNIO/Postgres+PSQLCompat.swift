@@ -30,12 +30,19 @@ extension PostgresData: PSQLEncodable {
         PSQLDataType(Int32(self.type.rawValue))
     }
     
-    // encoding
     func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
-        guard var selfBuffer = self.value else {
-            return
+        preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
+    }
+    
+    // encoding
+    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+        switch self.value {
+        case .none:
+            byteBuffer.writeInteger(-1, as: Int32.self)
+        case .some(var input):
+            byteBuffer.writeInteger(Int32(input.readableBytes))
+            byteBuffer.writeBuffer(&input)
         }
-        byteBuffer.writeBuffer(&selfBuffer)
     }
 }
 

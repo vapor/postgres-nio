@@ -91,7 +91,7 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
         buffer.writeInteger(1, as: Int32.self)
 
         try self.forEach { element in
-            try element._encode(into: &buffer, context: context)
+            try element.encodeRaw(into: &buffer, context: context)
         }
     }
 }

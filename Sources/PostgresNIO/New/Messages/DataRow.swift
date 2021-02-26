@@ -17,7 +17,7 @@ extension PSQLBackendMessage {
                 try PSQLBackendMessage.ensureAtLeastNBytesRemaining(2, in: buffer)
                 let bufferLength = Int(buffer.readInteger(as: Int32.self)!)
                 
-                guard bufferLength > 0 else {
+                guard bufferLength >= 0 else {
                     result.append(nil)
                     continue
                 }

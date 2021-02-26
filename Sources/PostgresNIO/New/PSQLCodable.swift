@@ -3,8 +3,14 @@ protocol PSQLEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     var psqlType: PSQLDataType { get }
     
-    /// encoding the entity into the `byteBuffer` in postgres binary format
+    /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
+    /// the byte count. This method is called from the default `encodeRaw` implementation.
     func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws
+    
+    /// Encode the entity into the `byteBuffer` in Postgres binary format including its
+    /// leading byte count. This method has a default implementation and may be overriden
+    /// only for special cases, like `Optional`s.
+    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
@@ -18,7 +24,7 @@ protocol PSQLDecodable {
 protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
 
 extension PSQLEncodable {
-    func _encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
         let lengthIndex = buffer.writerIndex

@@ -17,7 +17,7 @@ extension PostgresConnection {
         }
     }
 
-    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .trace) -> EventLoopFuture<PostgresConnection> {
+    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
         return testUnauthenticated(on: eventLoop, logLevel: logLevel).flatMap { conn in
             return conn.authenticate(
                 username: env("POSTGRES_USER") ?? "vapor_username",
