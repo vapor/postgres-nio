@@ -37,9 +37,9 @@ class Optional_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         XCTAssertEqual(encodable.psqlType, .uuid)
-        XCTAssertNoThrow(try encodable.encode(into: &buffer, context: .forTests()))
-        XCTAssertEqual(buffer.readableBytes, 16)
-        
+        XCTAssertNoThrow(try encodable.encodeRaw(into: &buffer, context: .forTests()))
+        XCTAssertEqual(buffer.readableBytes, 20)
+        XCTAssertEqual(buffer.readInteger(as: Int32.self), 16)
         let data = PSQLData(bytes: buffer, dataType: .uuid)
         
         var result: UUID?
@@ -53,8 +53,9 @@ class Optional_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         XCTAssertEqual(encodable.psqlType, .null)
-        XCTAssertNoThrow(try encodable.encode(into: &buffer, context: .forTests()))
-        XCTAssertEqual(buffer.readableBytes, 0)
+        XCTAssertNoThrow(try encodable.encodeRaw(into: &buffer, context: .forTests()))
+        XCTAssertEqual(buffer.readableBytes, 4)
+        XCTAssertEqual(buffer.readInteger(as: Int32.self), -1)
         
         let data = PSQLData(bytes: nil, dataType: .uuid)
         

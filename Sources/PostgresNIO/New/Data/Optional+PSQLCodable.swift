@@ -19,11 +19,15 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
     }
     
     func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+        preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
+    }
+    
+    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         switch self {
         case .none:
-            return
+            byteBuffer.writeInteger(-1, as: Int32.self)
         case .some(let value):
-            try value.encode(into: &byteBuffer, context: context)
+            try value.encodeRaw(into: &byteBuffer, context: context)
         }
     }
 }
