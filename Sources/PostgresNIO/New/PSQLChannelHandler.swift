@@ -417,7 +417,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     private func succeedQueryWithRowStream(
-        _ queryContext: ExecuteExtendedQueryContext,
+        _ queryContext: ExtendedQueryContext,
         columns: [PSQLBackendMessage.RowDescription.Column],
         context: ChannelHandlerContext)
     {
@@ -448,7 +448,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     private func succeedQueryWithoutRowStream(
-        _ queryContext: ExecuteExtendedQueryContext,
+        _ queryContext: ExtendedQueryContext,
         commandTag: String,
         context: ChannelHandlerContext)
     {

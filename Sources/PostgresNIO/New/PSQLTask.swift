@@ -1,6 +1,6 @@
 enum PSQLTask {
-    case extendedQuery(ExecuteExtendedQueryContext)
-    case preparedStatement(CreatePreparedStatementContext)
+    case extendedQuery(ExtendedQueryContext)
+    case preparedStatement(PrepareStatementContext)
     case closeCommand(CloseCommandContext)
     
     func failWithError(_ error: PSQLError) {
@@ -15,7 +15,7 @@ enum PSQLTask {
     }
 }
 
-final class ExecuteExtendedQueryContext {
+final class ExtendedQueryContext {
     enum Query {
         case unnamed(String)
         case preparedStatement(name: String, rowDescription: PSQLBackendMessage.RowDescription?)
@@ -58,7 +58,7 @@ final class ExecuteExtendedQueryContext {
 
 }
 
-final class CreatePreparedStatementContext {
+final class PrepareStatementContext {
     let name: String
     let query: String
     let logger: Logger

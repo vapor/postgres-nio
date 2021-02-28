@@ -103,7 +103,7 @@ class ConnectionStateMachineTests: XCTestCase {
         let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRows.self)
 
         var state = ConnectionStateMachine()
-        let extendedQueryContext = ExecuteExtendedQueryContext(
+        let extendedQueryContext = ExtendedQueryContext(
             query: "Select version()",
             bind: [],
             logger: .psqlTest,

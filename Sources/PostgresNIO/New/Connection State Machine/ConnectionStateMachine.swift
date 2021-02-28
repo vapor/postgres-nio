@@ -85,9 +85,9 @@ struct ConnectionStateMachine {
         // --- general actions
         case sendParseDescribeBindExecuteSync(query: String, binds: [PSQLEncodable])
         case sendBindExecuteSync(statementName: String, binds: [PSQLEncodable])
-        case failQuery(ExecuteExtendedQueryContext, with: PSQLError, cleanupContext: CleanUpContext?)
-        case succeedQuery(ExecuteExtendedQueryContext, columns: [PSQLBackendMessage.RowDescription.Column])
-        case succeedQueryNoRowsComming(ExecuteExtendedQueryContext, commandTag: String)
+        case failQuery(ExtendedQueryContext, with: PSQLError, cleanupContext: CleanUpContext?)
+        case succeedQuery(ExtendedQueryContext, columns: [PSQLBackendMessage.RowDescription.Column])
+        case succeedQueryNoRowsComming(ExtendedQueryContext, commandTag: String)
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
@@ -100,8 +100,8 @@ struct ConnectionStateMachine {
         
         // Prepare statement actions
         case sendParseDescribeSync(name: String, query: String)
-        case succeedPreparedStatementCreation(CreatePreparedStatementContext, with: PSQLBackendMessage.RowDescription?)
-        case failPreparedStatementCreation(CreatePreparedStatementContext, with: PSQLError, cleanupContext: CleanUpContext?)
+        case succeedPreparedStatementCreation(PrepareStatementContext, with: PSQLBackendMessage.RowDescription?)
+        case failPreparedStatementCreation(PrepareStatementContext, with: PSQLError, cleanupContext: CleanUpContext?)
         
         // Close actions
         case sendCloseSync(CloseTarget)
