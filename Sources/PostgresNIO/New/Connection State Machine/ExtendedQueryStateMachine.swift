@@ -2,17 +2,17 @@
 struct ExtendedQueryStateMachine {
     
     enum State {
-        case initialized(ExecuteExtendedQueryContext)
-        case parseDescribeBindExecuteSyncSent(ExecuteExtendedQueryContext)
+        case initialized(ExtendedQueryContext)
+        case parseDescribeBindExecuteSyncSent(ExtendedQueryContext)
         
-        case parseCompleteReceived(ExecuteExtendedQueryContext)
-        case parameterDescriptionReceived(ExecuteExtendedQueryContext)
-        case rowDescriptionReceived(ExecuteExtendedQueryContext, [PSQLBackendMessage.RowDescription.Column])
-        case noDataMessageReceived(ExecuteExtendedQueryContext)
+        case parseCompleteReceived(ExtendedQueryContext)
+        case parameterDescriptionReceived(ExtendedQueryContext)
+        case rowDescriptionReceived(ExtendedQueryContext, [PSQLBackendMessage.RowDescription.Column])
+        case noDataMessageReceived(ExtendedQueryContext)
         
         /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
         /// used after receiving a `bindComplete` message
-        case bindCompleteReceived(ExecuteExtendedQueryContext)
+        case bindCompleteReceived(ExtendedQueryContext)
         case bufferingRows([PSQLBackendMessage.RowDescription.Column], CircularBuffer<[PSQLData]>, readOnEmpty: Bool)
         case waitingForNextRow([PSQLBackendMessage.RowDescription.Column], CircularBuffer<[PSQLData]>, EventLoopPromise<StateMachineStreamNextResult>)
         
@@ -27,9 +27,9 @@ struct ExtendedQueryStateMachine {
         case sendBindExecuteSync(statementName: String, binds: [PSQLEncodable])
         
         // --- general actions
-        case failQuery(ExecuteExtendedQueryContext, with: PSQLError)
-        case succeedQuery(ExecuteExtendedQueryContext, columns: [PSQLBackendMessage.RowDescription.Column])
-        case succeedQueryNoRowsComming(ExecuteExtendedQueryContext, commandTag: String)
+        case failQuery(ExtendedQueryContext, with: PSQLError)
+        case succeedQuery(ExtendedQueryContext, columns: [PSQLBackendMessage.RowDescription.Column])
+        case succeedQueryNoRowsComming(ExtendedQueryContext, commandTag: String)
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
@@ -46,7 +46,7 @@ struct ExtendedQueryStateMachine {
     
     var state: State
     
-    init(queryContext: ExecuteExtendedQueryContext) {
+    init(queryContext: ExtendedQueryContext) {
         self.state = .initialized(queryContext)
     }
     

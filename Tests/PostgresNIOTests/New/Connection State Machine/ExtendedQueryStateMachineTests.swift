@@ -10,7 +10,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "DELETE FROM table WHERE id=$0"
-        let queryContext = ExecuteExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
+        let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
         
         XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: [1]))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
@@ -28,7 +28,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
         queryPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "SELECT version()"
-        let queryContext = ExecuteExtendedQueryContext(query: query, bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: queryPromise)
+        let queryContext = ExtendedQueryContext(query: query, bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: queryPromise)
         
         XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: []))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
@@ -59,7 +59,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "DELETE FROM table WHERE id=$0"
-        let queryContext = ExecuteExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
+        let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
         
         XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: [1]))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)

@@ -2,11 +2,11 @@
 struct PrepareStatementStateMachine {
     
     enum State {
-        case initialized(CreatePreparedStatementContext)
-        case parseDescribeSent(CreatePreparedStatementContext)
+        case initialized(PrepareStatementContext)
+        case parseDescribeSent(PrepareStatementContext)
     
-        case parseCompleteReceived(CreatePreparedStatementContext)
-        case parameterDescriptionReceived(CreatePreparedStatementContext)
+        case parseCompleteReceived(PrepareStatementContext)
+        case parameterDescriptionReceived(PrepareStatementContext)
         case rowDescriptionReceived
         case noDataMessageReceived
         
@@ -15,8 +15,8 @@ struct PrepareStatementStateMachine {
     
     enum Action {
         case sendParseDescribeSync(name: String, query: String)
-        case succeedPreparedStatementCreation(CreatePreparedStatementContext, with: PSQLBackendMessage.RowDescription?)
-        case failPreparedStatementCreation(CreatePreparedStatementContext, with: PSQLError)
+        case succeedPreparedStatementCreation(PrepareStatementContext, with: PSQLBackendMessage.RowDescription?)
+        case failPreparedStatementCreation(PrepareStatementContext, with: PSQLError)
 
         case read
         case wait
@@ -24,7 +24,7 @@ struct PrepareStatementStateMachine {
     
     var state: State
     
-    init(createContext: CreatePreparedStatementContext) {
+    init(createContext: PrepareStatementContext) {
         self.state = .initialized(createContext)
     }
     

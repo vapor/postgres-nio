@@ -11,7 +11,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         
         let name = "haha"
         let query = #"SELECT id FROM users WHERE id = $1 "#
-        let prepareStatementContext = CreatePreparedStatementContext(
+        let prepareStatementContext = PrepareStatementContext(
             name: name, query: query, logger: .psqlTest, promise: promise)
         
         XCTAssertEqual(state.enqueue(task: .preparedStatement(prepareStatementContext)),
@@ -36,7 +36,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
-        let prepareStatementContext = CreatePreparedStatementContext(
+        let prepareStatementContext = PrepareStatementContext(
             name: name, query: query, logger: .psqlTest, promise: promise)
         
         XCTAssertEqual(state.enqueue(task: .preparedStatement(prepareStatementContext)),

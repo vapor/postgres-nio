@@ -131,7 +131,7 @@ final class PSQLConnection {
             return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRows.self)
-        let context = ExecuteExtendedQueryContext(
+        let context = ExtendedQueryContext(
             query: query,
             bind: bind,
             logger: logger,
@@ -151,7 +151,7 @@ final class PSQLConnection {
     
     func prepareStatement(_ query: String, with name: String, logger: Logger) -> EventLoopFuture<PSQLPreparedStatement> {
         let promise = self.channel.eventLoop.makePromise(of: PSQLBackendMessage.RowDescription?.self)
-        let context = CreatePreparedStatementContext(
+        let context = PrepareStatementContext(
             name: name,
             query: query,
             logger: logger,
@@ -170,7 +170,7 @@ final class PSQLConnection {
             return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRows.self)
-        let context = ExecuteExtendedQueryContext(
+        let context = ExtendedQueryContext(
             preparedStatement: preparedStatement,
             bind: bind,
             logger: logger,

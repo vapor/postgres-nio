@@ -25,7 +25,7 @@ final class PSQLRows {
     private let jsonDecoder: PSQLJSONDecoder
     
     init(rowDescription: [PSQLBackendMessage.RowDescription.Column],
-         queryContext: ExecuteExtendedQueryContext,
+         queryContext: ExtendedQueryContext,
          eventLoop: EventLoop,
          cancel: @escaping () -> (),
          next: @escaping () -> EventLoopFuture<StateMachineStreamNextResult>)
