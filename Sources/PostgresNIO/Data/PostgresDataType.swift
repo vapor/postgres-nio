@@ -224,6 +224,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
         case .textArray: return .text
         case .varcharArray: return .varchar
         case .timestampArray: return .timestamp
+        case .timestamptzArray: return .timestamptz
         default: return nil
         }
     }
