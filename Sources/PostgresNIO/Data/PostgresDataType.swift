@@ -91,7 +91,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public static let timestampArray = PostgresDataType(1115)
     /// `1184`
     public static let timestamptz = PostgresDataType(1184)
-    /// `1115`
+    /// `1185`
     public static let timestamptzArray = PostgresDataType(1185)
     /// `1266`
     public static let timetz = PostgresDataType(1266)
