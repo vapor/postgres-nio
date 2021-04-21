@@ -313,8 +313,7 @@ struct ConnectionStateMachine {
              .waitingToStartAuthentication,
              .authenticated,
              .readyForQuery,
-             .error,
-             .closing:
+             .error:
             return self.closeConnectionAndCleanup(.server(errorMessage))
         case .authenticating(var authState):
             if authState.isComplete {
@@ -352,6 +351,13 @@ struct ConnectionStateMachine {
                 machine.state = .prepareStatement(preparedState, connectionContext)
                 return machine.modify(with: action)
             }
+        case .closing:
+            // If the state machine is in state `.closing`, the connection shutdown was initiated
+            // by the client. This means a `TERMINATE` message has already been sent and the
+            // connection close was passed on to the channel. Therefore we await a channelInactive
+            // as the next event.
+            // Since a connection close was already issued, we should keep cool and just wait.
+            return .wait
         case .initialized, .closed:
             preconditionFailure("We should not receive server errors if we are not connected")
         case .modifying:
@@ -367,8 +373,7 @@ struct ConnectionStateMachine {
              .sslHandlerAdded,
              .waitingToStartAuthentication,
              .authenticated,
-             .readyForQuery,
-             .closing:
+             .readyForQuery:
             return self.closeConnectionAndCleanup(error)
         case .authenticating(var authState):
             let action = authState.errorHappened(error)
@@ -395,6 +400,16 @@ struct ConnectionStateMachine {
                 return self.modify(with: action)
             }
         case .error:
+            return .wait
+        case .closing:
+            // If the state machine is in state `.closing`, the connection shutdown was initiated
+            // by the client. This means a `TERMINATE` message has already been sent and the
+            // connection close was passed on to the channel. Therefore we await a channelInactive
+            // as the next event.
+            // For some reason Azure Postgres does not end ssl cleanly when terminating the
+            // connection. More documentation can be found in the issue:
+            // https://github.com/vapor/postgres-nio/issues/150
+            // Since a connection close was already issued, we should keep cool and just wait.
             return .wait
         case .closed:
             return self.closeConnectionAndCleanup(error)
@@ -1108,8 +1123,8 @@ struct AuthContext: Equatable, CustomDebugStringConvertible {
     
     var debugDescription: String {
         """
-        (username: \(String(reflecting: self.username)), \
-        password: \(self.password != nil ? String(reflecting: self.password!) : "nil"), \
+        AuthContext(username: \(String(reflecting: self.username)), \
+        password: \(self.password != nil ? "********" : "nil"), \
         database: \(self.database != nil ? String(reflecting: self.database!) : "nil"))
         """
     }

@@ -74,6 +74,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsName == rhsName && lhsQuery == rhsQuery
         case (.succeedPreparedStatementCreation(let lhsContext, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsContext, let rhsRowDescription)):
             return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
+        case (.fireChannelInactive, .fireChannelInactive):
+            return true
         default:
             return false
         }

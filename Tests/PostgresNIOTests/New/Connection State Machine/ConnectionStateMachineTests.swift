@@ -91,6 +91,19 @@ class ConnectionStateMachineTests: XCTestCase {
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
     }
     
+    func testErrorIsIgnoredWhenClosingConnection() {
+        // test ignore unclean shutdown when closing connection
+        var stateIgnoreChannelError = ConnectionStateMachine(.closing)
+        
+        XCTAssertEqual(stateIgnoreChannelError.errorHappened(.channel(underlying: NIOSSLError.uncleanShutdown)), .wait)
+        XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
+        
+        // test ignore any other error when closing connection
+        
+        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing)
+        XCTAssertEqual(stateIgnoreErrorMessage.errorReceived(.init(fields: [:])), .wait)
+        XCTAssertEqual(stateIgnoreErrorMessage.closed(), .fireChannelInactive)
+    }
     
     func testFailQueuedQueriesOnAuthenticationFailure() throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
