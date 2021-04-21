@@ -75,7 +75,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        self.logger.error("Channel error caught.", metadata: [.error: "\(error)"])
+        self.logger.debug("Channel error caught.", metadata: [.error: "\(error)"])
         let action = self.state.errorHappened(.channel(underlying: error))
         self.run(action, with: context)
     }
@@ -470,7 +470,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         _ cleanup: ConnectionStateMachine.ConnectionAction.CleanUpContext,
         context: ChannelHandlerContext)
     {
-        self.logger.error("Channel error caught. Closing connection.", metadata: [.error: "\(cleanup.error)"])
+        self.logger.debug("Cleaning up and closing connection.", metadata: [.error: "\(cleanup.error)"])
         
         // 1. fail all tasks
         cleanup.tasks.forEach { task in

@@ -140,10 +140,6 @@ final class PSQLConnection {
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
         
-        // success is logged in PSQLQuery
-        promise.futureResult.whenFailure { error in
-            logger.error("Query failed", metadata: [.error: "\(error)"])
-        }
         return promise.futureResult
     }
     

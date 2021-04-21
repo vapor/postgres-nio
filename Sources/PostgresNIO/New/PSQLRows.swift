@@ -99,7 +99,9 @@ final class PSQLRows {
     }
     
     internal func noticeReceived(_ notice: PSQLBackendMessage.NoticeResponse) {
-        self.logger.notice("Notice Received \(notice)")
+        self.logger.debug("Notice Received", metadata: [
+            .notice: "\(notice)"
+        ])
     }
     
     internal func finalForward(_ finalForward: Result<(CircularBuffer<[PSQLData]>, commandTag: String), PSQLError>?) {
