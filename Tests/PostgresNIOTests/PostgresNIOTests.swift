@@ -677,15 +677,12 @@ final class PostgresNIOTests: XCTestCase {
         // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.connect(
-            to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
-            tlsConfiguration: .forClient(certificateVerification: .none),
-            serverHostname: "elmer.db.elephantsql.com",
-            on: eventLoop
-        ).wait())
-        XCTAssertNoThrow(try conn?.authenticate(
+            hostname: "elmer.db.elephantsql.com",
             username: "uymgphwj",
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
             database: "uymgphwj",
-            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
+            tlsConfiguration: .forClient(certificateVerification: .none),
+            on: eventLoop
         ).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         var rows: [PostgresRow]?
@@ -704,28 +701,76 @@ final class PostgresNIOTests: XCTestCase {
 
         // We should get an error because you can't use an IP address for SNI, but we shouldn't bomb out by
         // hitting the assert
-        XCTAssertThrowsError(
-            try PostgresConnection.connect(
-                to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
-                tlsConfiguration: .forClient(certificateVerification: .fullVerification),
-                serverHostname: "34.228.73.168",
-                on: eventLoop
-            ).wait()
-        )
-        // If we hit this, we're all good
-        XCTAssertTrue(true)
+        XCTAssertThrowsError(try PostgresConnection.connect(
+            hostname: "elmer.db.elephantsql.com",
+            username: "uymgphwj",
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
+            database: "uymgphwj",
+            tlsConfiguration: .forClient(certificateVerification: .fullVerification),
+            on: eventLoop
+        ).wait()) { error in
+            guard case NIOSSLError.handshakeFailed(.sslError) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+        }
     }
 
     func testInvalidPassword() {
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait())
-        let authFuture = conn?.authenticate(username: "invalid", database: "invalid", password: "bad")
-        XCTAssertThrowsError(_ = try authFuture?.wait()) { error in
+        XCTAssertThrowsError(try PostgresConnection.connect(
+            hostname: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: 5432,
+            username: "invalid_username",
+            password: "invalid_password",
+            database: "invalid_database",
+            tlsConfiguration: nil,
+            on: eventLoop
+        ).wait()) { error in
             XCTAssert((error as? PostgresError)?.code == .invalidPassword || (error as? PostgresError)?.code == .invalidAuthorizationSpecification)
         }
+    }
+    
+    @available(*, deprecated, message: "This test isn't deprecated, but the methods we test are")
+    func testConnectAndAuthenticateInSeparateStepsSuccess() {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = .info
         
-        // in this case the connection will be closed by the remote
-        XCTAssertNoThrow(try conn?.closeFuture.wait())
+        var connection: PostgresConnection?
+        XCTAssertNoThrow(connection = try PostgresConnection.connect(
+            to: try .makeAddressResolvingHost( env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432),
+            logger: logger,
+            on: eventLoop).wait())
+        XCTAssertNotNil(connection)
+        
+        XCTAssertNoThrow(try connection?.authenticate(
+            username: env("POSTGRES_USER") ?? "vapor_username",
+            database: env("POSTGRES_DB") ?? "vapor_database",
+            password: env("POSTGRES_PASSWORD") ?? "vapor_password").wait())
+        
+        XCTAssertNoThrow(try connection?.close().wait())
+        XCTAssertEqual(connection?.isClosed, true)
+    }
+    
+    @available(*, deprecated, message: "This test isn't deprecated, but the methods we test are")
+    func testConnectAndAuthenticateInSeparateStepsFailure() {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = .info
+        
+        var connection: PostgresConnection?
+        XCTAssertNoThrow(connection = try PostgresConnection.connect(
+            to: try .makeAddressResolvingHost( env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432),
+            logger: logger,
+            on: eventLoop).wait())
+        XCTAssertNotNil(connection)
+        
+        XCTAssertThrowsError(try connection?.authenticate(
+            username: "invalid_username",
+            database: "invalid_database",
+            password: "invalid_password"
+        ).wait()) { error in
+            XCTAssert((error as? PostgresError)?.code == .invalidPassword || (error as? PostgresError)?.code == .invalidAuthorizationSpecification)
+        }
+        // an auth failure should auto close the connection
+        XCTAssertNoThrow(try connection?.closeFuture.wait())
     }
 
     func testColumnsInJoin() {

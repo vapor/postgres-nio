@@ -3,34 +3,20 @@ import PostgresNIO
 import XCTest
 
 extension PostgresConnection {
-    static func address() throws -> SocketAddress {
-        try .makeAddressResolvingHost( env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432)
-    }
-
-    static func testUnauthenticated(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
+    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
         var logger = Logger(label: "postgres.connection.test")
         logger.logLevel = logLevel
-        do {
-            return connect(to: try address(), logger: logger, on: eventLoop)
-        } catch {
-            return eventLoop.makeFailedFuture(error)
-        }
-    }
-
-    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
-        return testUnauthenticated(on: eventLoop, logLevel: logLevel).flatMap { conn in
-            return conn.authenticate(
-                username: env("POSTGRES_USER") ?? "vapor_username",
-                database: env("POSTGRES_DB") ?? "vapor_database",
-                password: env("POSTGRES_PASSWORD") ?? "vapor_password"
-            ).map {
-                return conn
-            }.flatMapError { error in
-                conn.close().flatMapThrowing {
-                    throw error
-                }
-            }
-        }
+        
+        return PostgresConnection.connect(
+            hostname: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: 5432,
+            username: env("POSTGRES_USER") ?? "vapor_username",
+            password: env("POSTGRES_PASSWORD") ?? "vapor_password",
+            database: env("POSTGRES_DB") ?? "vapor_database",
+            tlsConfiguration: nil,
+            logger: logger,
+            on: eventLoop
+        )
     }
 }
 

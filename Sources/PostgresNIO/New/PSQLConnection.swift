@@ -94,7 +94,7 @@ final class PSQLConnection {
         return !self.channel.isActive
     }
     
-    /// A logger to use in case
+    /// A connection logger to use for debugging
     private var logger: Logger
     let connectionID: String
     let jsonDecoder: PSQLJSONDecoder

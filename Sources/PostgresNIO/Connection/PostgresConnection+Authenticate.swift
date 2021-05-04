@@ -1,6 +1,7 @@
 import NIO
 
 extension PostgresConnection {
+    @available(*, deprecated, message: "Use the new `PostgresConnection.connect()` that allows you to specify username, password and database directly when creating the connection.")
     public func authenticate(
         username: String,
         database: String? = nil,
