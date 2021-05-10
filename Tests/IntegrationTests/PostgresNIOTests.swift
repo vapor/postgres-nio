@@ -1050,7 +1050,9 @@ final class PostgresNIOTests: XCTestCase {
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         let binds = [PostgresData].init(repeating: .null, count: Int(Int16.max) + 1)
         XCTAssertThrowsError(try conn?.query("SELECT version()", binds).wait()) { error in
-            XCTAssertEqual(error as? PSQLError, .tooManyParameters)
+            guard case .tooManyParameters = (error as? PSQLError)?.base else {
+                return XCTFail("Unexpected error: \(error)")
+            }
         }
     }
 
@@ -1187,10 +1189,6 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
         XCTAssert(customJSONBDecoder.didDecode)
     }
-}
-
-func env(_ name: String) -> String? {
-    getenv(name).flatMap { String(cString: $0) }
 }
 
 let isLoggingConfigured: Bool = {

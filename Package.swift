@@ -33,5 +33,9 @@ let package = Package(
             .target(name: "PostgresNIO"),
             .product(name: "NIOTestUtils", package: "swift-nio"),
         ]),
+        .testTarget(name: "IntegrationTests", dependencies: [
+            .target(name: "PostgresNIO"),
+            .product(name: "NIOTestUtils", package: "swift-nio"),
+        ]),
     ]
 )
