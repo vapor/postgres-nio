@@ -215,17 +215,16 @@ final class PSQLConnection {
                     .channelInitializer { channel in
                         let decoder = ByteToMessageHandler(PSQLBackendMessage.Decoder())
                         
-                        var enableSSLCallback: ((Channel) -> EventLoopFuture<Void>)? = nil
+                        var configureSSLCallback: ((Channel) throws -> ())? = nil
                         if let tlsConfiguration = configuration.tlsConfiguration {
-                            enableSSLCallback = { channel in
-                                channel.eventLoop.submit {
-                                    let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
-                                    return try NIOSSLClientHandler(
-                                        context: sslContext,
-                                        serverHostname: configuration.sslServerHostname)
-                                }.flatMap { sslHandler in
-                                    channel.pipeline.addHandler(sslHandler, position: .before(decoder))
-                                }
+                            configureSSLCallback = { channel in
+                                channel.eventLoop.assertInEventLoop()
+                                
+                                let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+                                let sslHandler = try NIOSSLClientHandler(
+                                    context: sslContext,
+                                    serverHostname: configuration.sslServerHostname)
+                                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .before(decoder))
                             }
                         }
                         
@@ -235,7 +234,7 @@ final class PSQLConnection {
                             PSQLChannelHandler(
                                 authentification: configuration.authentication,
                                 logger: logger,
-                                enableSSLCallback: enableSSLCallback),
+                                configureSSLCallback: configureSSLCallback),
                             PSQLEventsHandler(logger: logger)
                         ])
                     }

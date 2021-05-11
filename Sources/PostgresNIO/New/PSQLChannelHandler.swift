@@ -20,18 +20,18 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     private var currentQuery: PSQLRows?
     private let authentificationConfiguration: PSQLConnection.Configuration.Authentication?
-    private let enableSSLCallback: ((Channel) -> EventLoopFuture<Void>)?
+    private let configureSSLCallback: ((Channel) throws -> Void)?
     
     /// this delegate should only be accessed on the connections `EventLoop`
     weak var notificationDelegate: PSQLChannelHandlerNotificationDelegate?
     
     init(authentification: PSQLConnection.Configuration.Authentication?,
          logger: Logger,
-         enableSSLCallback: ((Channel) -> EventLoopFuture<Void>)? = nil)
+         configureSSLCallback: ((Channel) throws -> Void)?)
     {
         self.state = ConnectionStateMachine()
         self.authentificationConfiguration = authentification
-        self.enableSSLCallback = enableSSLCallback
+        self.configureSSLCallback = configureSSLCallback
         self.logger = logger
     }
     
@@ -40,11 +40,11 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     init(authentification: PSQLConnection.Configuration.Authentication?,
          state: ConnectionStateMachine = .init(.initialized),
          logger: Logger = .psqlNoOpLogger,
-         enableSSLCallback: ((Channel) -> EventLoopFuture<Void>)? = nil)
+         configureSSLCallback: ((Channel) throws -> Void)?)
     {
         self.state = state
         self.authentificationConfiguration = authentification
-        self.enableSSLCallback = enableSSLCallback
+        self.configureSSLCallback = configureSSLCallback
         self.logger = logger
     }
     #endif
@@ -302,7 +302,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     // MARK: - Private Methods -
     
     private func connected(context: ChannelHandlerContext) {
-        let action = self.state.connected(requireTLS: self.enableSSLCallback != nil)
+        let action = self.state.connected(requireTLS: self.configureSSLCallback != nil)
         
         self.run(action, with: context)
     }
@@ -310,15 +310,13 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     private func establishSSLConnection(context: ChannelHandlerContext) {
         // This method must only be called, if we signalized the StateMachine before that we are
         // able to setup a SSL connection.
-        self.enableSSLCallback!(context.channel).whenComplete { result in
-            switch result {
-            case .success:
-                let action = self.state.sslHandlerAdded()
-                self.run(action, with: context)
-            case .failure(let error):
-                let action = self.state.errorHappened(.failedToAddSSLHandler(underlying: error))
-                self.run(action, with: context)
-            }
+        do {
+            try self.configureSSLCallback!(context.channel)
+            let action = self.state.sslHandlerAdded()
+            self.run(action, with: context)
+        } catch {
+            let action = self.state.errorHappened(.failedToAddSSLHandler(underlying: error))
+            self.run(action, with: context)
         }
     }
     

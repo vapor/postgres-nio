@@ -1,5 +1,6 @@
 import XCTest
 import NIO
+import NIOTLS
 @testable import PostgresNIO
 
 class PSQLChannelHandlerTests: XCTestCase {
@@ -8,7 +9,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testHandlerAddedWithoutSSL() {
         let config = self.testConnectionConfiguration()
-        let handler = PSQLChannelHandler(authentification: config.authentication)
+        let handler = PSQLChannelHandler(authentification: config.authentication, configureSSLCallback: nil)
         let embedded = EmbeddedChannel(handler: handler)
         defer { XCTAssertNoThrow(try embedded.finish()) }
         
@@ -35,7 +36,6 @@ class PSQLChannelHandlerTests: XCTestCase {
         var addSSLCallbackIsHit = false
         let handler = PSQLChannelHandler(authentification: config.authentication) { channel in
             addSSLCallbackIsHit = true
-            return channel.eventLoop.makeSucceededFuture(())
         }
         let embedded = EmbeddedChannel(handler: handler)
         
@@ -48,14 +48,24 @@ class PSQLChannelHandlerTests: XCTestCase {
         
         XCTAssertEqual(request.code, 80877103)
         
-        // first we need to add an encoder, because NIOSSLHandler can only
-        // operate on ByteBuffer
-        let future = embedded.pipeline.addHandlers(MessageToByteHandler(PSQLFrontendMessage.Encoder.forTests), position: .first)
-        XCTAssertNoThrow(try future.wait())
         XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.sslSupported))
         
         // a NIOSSLHandler has been added, after it SSL had been negotiated
         XCTAssertTrue(addSSLCallbackIsHit)
+        
+        // signal that the ssl connection has been established
+        embedded.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: ""))
+        
+        // startup message should be issued
+        var maybeStartupMessage: PSQLFrontendMessage?
+        XCTAssertNoThrow(maybeStartupMessage = try embedded.readOutbound(as: PSQLFrontendMessage.self))
+        guard case .startup(let startupMessage) = maybeStartupMessage else {
+            return XCTFail("Unexpected message")
+        }
+        
+        XCTAssertEqual(startupMessage.parameters.user, config.authentication?.username)
+        XCTAssertEqual(startupMessage.parameters.database, config.authentication?.database)
+        XCTAssertEqual(startupMessage.parameters.replication, .false)
     }
     
     func testSSLUnsupportedClosesConnection() {
@@ -64,7 +74,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         
         let handler = PSQLChannelHandler(authentification: config.authentication) { channel in
             XCTFail("This callback should never be exectuded")
-            return channel.eventLoop.makeFailedFuture(PSQLError.sslUnsupported)
+            throw PSQLError.sslUnsupported
         }
         let embedded = EmbeddedChannel(handler: handler)
         let eventHandler = TestEventHandler()
@@ -94,7 +104,7 @@ class PSQLChannelHandlerTests: XCTestCase {
             database: config.authentication?.database
         )
         let state = ConnectionStateMachine(.waitingToStartAuthentication)
-        let handler = PSQLChannelHandler(authentification: config.authentication, state: state)
+        let handler = PSQLChannelHandler(authentification: config.authentication, state: state, configureSSLCallback: nil)
         let embedded = EmbeddedChannel(handler: handler)
         
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
@@ -119,7 +129,7 @@ class PSQLChannelHandlerTests: XCTestCase {
             database: config.authentication?.database
         )
         let state = ConnectionStateMachine(.waitingToStartAuthentication)
-        let handler = PSQLChannelHandler(authentification: config.authentication, state: state)
+        let handler = PSQLChannelHandler(authentification: config.authentication, state: state, configureSSLCallback: nil)
         let embedded = EmbeddedChannel(handler: handler)
         
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
