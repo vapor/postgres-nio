@@ -22,6 +22,16 @@ class AuthenticationStateMachineTests: XCTestCase {
         XCTAssertEqual(state.authenticationMessageReceived(.ok), .wait)
     }
     
+    func testAuthenticateMD5WithoutPassword() {
+        let authContext = AuthContext(username: "test", password: nil, database: "test")
+        var state = ConnectionStateMachine(.waitingToStartAuthentication)
+        let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
+        
+        XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
+        XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)),
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .authMechanismRequiresPassword, closePromise: nil)))
+    }
+    
     func testAuthenticateOkAfterStartUpWithoutAuthChallenge() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         var state = ConnectionStateMachine(.waitingToStartAuthentication)

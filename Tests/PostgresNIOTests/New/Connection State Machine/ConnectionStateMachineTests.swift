@@ -25,6 +25,16 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
     }
     
+    func testSSLStartupFailHandler() {
+        struct SSLHandlerAddError: Error, Equatable {}
+        
+        var state = ConnectionStateMachine()
+        XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
+        XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
+        let failError: PSQLError = .failedToAddSSLHandler(underlying: SSLHandlerAddError())
+        XCTAssertEqual(state.errorHappened(failError), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
+    }
+    
     func testSSLStartupSSLUnsupported() {
         var state = ConnectionStateMachine()
         

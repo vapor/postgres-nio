@@ -269,6 +269,8 @@ class PSQLBackendMessageTests: XCTestCase {
         XCTAssertEqual("\(PSQLBackendMessage.authentication(.sspi))",
                        ".authentication(.sspi)")
         
+        XCTAssertEqual("\(PSQLBackendMessage.parameterStatus(.init(parameter: "foo", value: "bar")))",
+                       #".parameterStatus(parameter: "foo", value: "bar")"#)
         XCTAssertEqual("\(PSQLBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567)))",
                        ".backendKeyData(processID: 1234, secretKey: 4567)")
         
