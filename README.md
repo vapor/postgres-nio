@@ -41,6 +41,10 @@ PostgresNIO supports the following platforms:
 - Ubuntu 16.04+
 - macOS 10.15+
 
+### Secrurity
+
+Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
+
 ## Overview
 
 PostgresNIO is a client package for connecting to, authorizing, and querying a PostgreSQL server. At the heart of this module are NIO channel handlers for parsing and serializing messages in PostgreSQL's proprietary wire protocol. These channel handlers are combined in a request / response style connection type that provides a convenient, client-like interface for performing queries. 
