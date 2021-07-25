@@ -5,7 +5,8 @@ import XCTest
 class PSQLMetadataTests: XCTestCase {
     func testSelect() {
         XCTAssertEqual(100, PostgresQueryMetadata(string: "SELECT 100")?.rows)
-        XCTAssertEqual(0, PostgresQueryMetadata(string: "SELECT")?.rows)
+        XCTAssertNotNil(PostgresQueryMetadata(string: "SELECT"))
+        XCTAssertNil(PostgresQueryMetadata(string: "SELECT")?.rows)
         XCTAssertNil(PostgresQueryMetadata(string: "SELECT 100 100"))
     }
 
