@@ -15,10 +15,4 @@ class PSQLDataTests: XCTestCase {
         XCTAssertNoThrow(emptyResult = try data.decode(as: String?.self, context: .forTests()))
         XCTAssertNil(emptyResult)
     }
-    
-    func testMetadataParsing() {
-        XCTAssertEqual(100, PostgresQueryMetadata(string: "SELECT 100")?.rows)
-        XCTAssertEqual(0, PostgresQueryMetadata(string: "SELECT")?.rows)
-        XCTAssertNil(PostgresQueryMetadata(string: "SELECT 100 100"))
-    }
 }

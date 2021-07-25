@@ -74,7 +74,7 @@ public struct PostgresQueryMetadata {
             self.command = .init(parts[0])
             self.oid = Int(parts[1])
             self.rows = Int(parts[2])
-        case "DELETE", "UPDATE", "SELECT", "MOVE", "FETCH", "COPY":
+        case "SELECT":
             // <cmd> rows
             // Note, Redshift does not return the actual count as per the spec
             guard parts.count == 1 || parts.count == 2 else {
@@ -83,6 +83,14 @@ public struct PostgresQueryMetadata {
             self.command = .init(parts[0])
             self.oid = nil
             self.rows = parts.count == 2 ? Int(parts[1]) : 0
+        case "DELETE", "UPDATE", "MOVE", "FETCH", "COPY":
+            // <cmd> rows
+            guard parts.count == 2 else {
+                return nil
+            }
+            self.command = .init(parts[0])
+            self.oid = nil
+            self.rows = Int(parts[1])
         default:
             // <cmd>
             self.command = string
