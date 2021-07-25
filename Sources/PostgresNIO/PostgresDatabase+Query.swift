@@ -74,16 +74,13 @@ public struct PostgresQueryMetadata {
             self.command = .init(parts[0])
             self.oid = Int(parts[1])
             self.rows = Int(parts[2])
-        case "SELECT":
-            // AWS Redshift does not return the actual row count as defined in the postgres wire spec:
+        case "SELECT" where parts.count == 1:
+            // AWS Redshift does not return the actual row count as defined in the postgres wire spec for SELECT:
             // https://www.postgresql.org/docs/13/protocol-message-formats.html in section `CommandComplete`
-            guard parts.count == 1 || parts.count == 2 else {
-                return nil
-            }
-            self.command = .init(parts[0])
+            self.command = "SELECT"
             self.oid = nil
-            self.rows = parts.count == 2 ? Int(parts[1]) : 0
-        case "DELETE", "UPDATE", "MOVE", "FETCH", "COPY":
+            self.rows = nil
+        case "SELECT", "DELETE", "UPDATE", "MOVE", "FETCH", "COPY":
             // <cmd> rows
             guard parts.count == 2 else {
                 return nil
