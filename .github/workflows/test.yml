@@ -74,7 +74,7 @@ jobs:
           - focal
           #- centos7
           #- centos8
-          - amazonlinux2
+          #- amazonlinux2
     container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
     runs-on: ubuntu-latest
     steps:
@@ -104,7 +104,7 @@ jobs:
           - focal
           #- centos7
           #- centos8
-          - amazonlinux2
+          #- amazonlinux2
     container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
     runs-on: ubuntu-latest
     services:
