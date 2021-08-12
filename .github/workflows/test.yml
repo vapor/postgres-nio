@@ -13,6 +13,7 @@ jobs:
         swiftver:
           - 5.2
           - 5.3
+          - 5.4
         dbimage:
           - postgres:13
           - postgres:12
@@ -55,9 +56,35 @@ jobs:
           POSTGRES_HOSTNAME: psql-a
           POSTGRES_HOSTNAME_A: psql-a
           POSTGRES_HOSTNAME_B: psql-b
+          
+  # Run unit tests on Linux Swift runners on 
+  linux-unit-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        swiftver:
+          - swift:5.2
+          - swift:5.3
+          - swift:5.4
+          - swiftlang:swift/5.5-nightly
+          - swiftlang:swift/main-nightly
+        swiftos:
+          #- xenial
+          #- bionic
+          - focal
+          #- centos7
+          #- centos8
+          - amazonlinux2
+    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Run tests with Thread Sanitizer
+        run: swift test --enable-test-discovery --sanitize=thread --filter=^PostgresNIOTests
 
-  # Run package tests on Linux Swift runners against supported PSQL versions
-  linux:
+  # Run integration tests on Linux Swift runners against supported PSQL versions
+  linux-integration-tests:
     strategy:
       fail-fast: false
       matrix:
@@ -70,10 +97,7 @@ jobs:
           - md5
           - scram-sha-256
         swiftver:
-          - swift:5.2
-          - swift:5.3
-          #- swiftlang/swift:nightly-5.3
-          #- swiftlang/swift:nightly-master
+          - swift:5.4
         swiftos:
           #- xenial
           #- bionic
@@ -96,7 +120,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
       - name: Run tests with Thread Sanitizer
-        run: swift test --enable-test-discovery --sanitize=thread
+        run: swift test --enable-test-discovery --sanitize=thread --filter=^IntegrationTests
         env:
           POSTGRES_HOSTNAME: psql
           POSTGRES_USER: vapor_username
