@@ -66,8 +66,8 @@ jobs:
           - swift:5.2
           - swift:5.3
           - swift:5.4
-          - swiftlang:swift/5.5-nightly
-          - swiftlang:swift/main-nightly
+          - swiftlang:swift/nightly-5.5
+          - swiftlang:swift/nightly-main
         swiftos:
           #- xenial
           #- bionic
