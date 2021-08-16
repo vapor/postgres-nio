@@ -32,7 +32,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
         var config = self.testConnectionConfiguration()
-        config.tlsConfiguration = .forClient(certificateVerification: .none)
+        config.tlsConfiguration = .makeClientConfiguration()
         var addSSLCallbackIsHit = false
         let handler = PSQLChannelHandler(authentification: config.authentication) { channel in
             addSSLCallbackIsHit = true
@@ -70,7 +70,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testSSLUnsupportedClosesConnection() {
         var config = self.testConnectionConfiguration()
-        config.tlsConfiguration = .forClient()
+        config.tlsConfiguration = .makeClientConfiguration()
         
         let handler = PSQLChannelHandler(authentification: config.authentication) { channel in
             XCTFail("This callback should never be exectuded")
