@@ -680,7 +680,7 @@ final class PostgresNIOTests: XCTestCase {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.connect(
             to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
-            tlsConfiguration: .forClient(certificateVerification: .none),
+            tlsConfiguration: .makeClientConfiguration(),
             serverHostname: "elmer.db.elephantsql.com",
             on: eventLoop
         ).wait())
@@ -709,7 +709,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertThrowsError(
             try PostgresConnection.connect(
                 to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
-                tlsConfiguration: .forClient(certificateVerification: .fullVerification),
+                tlsConfiguration: .makeClientConfiguration(),
                 serverHostname: "34.228.73.168",
                 on: eventLoop
             ).wait()
