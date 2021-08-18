@@ -1,4 +1,5 @@
 import struct Foundation.Data
+import NIOCore
 
 extension PostgresData {
     public init<Bytes>(bytes: Bytes)

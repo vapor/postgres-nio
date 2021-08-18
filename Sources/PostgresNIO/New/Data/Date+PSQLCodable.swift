@@ -1,3 +1,4 @@
+import NIOCore
 import struct Foundation.Date
 
 extension Date: PSQLCodable {

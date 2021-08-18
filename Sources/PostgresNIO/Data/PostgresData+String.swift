@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PostgresData {
     public init(string: String) {
         var buffer = ByteBufferAllocator().buffer(capacity: string.utf8.count)

@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 @testable import PostgresNIO
 
 extension ByteBuffer {

@@ -1,4 +1,5 @@
-import Foundation
+import struct Foundation.Data
+import NIOCore
 
 extension PostgresData {
     public init(json jsonData: Data) {

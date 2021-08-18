@@ -1,4 +1,5 @@
 import XCTest
+import NIOCore
 @testable import PostgresNIO
 
 class Bytes_PSQLCodableTests: XCTestCase {

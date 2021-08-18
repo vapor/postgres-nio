@@ -1,4 +1,5 @@
-import Foundation
+import NIOCore
+import struct Foundation.Data
 
 fileprivate let jsonBVersionBytes: [UInt8] = [0x01]
 

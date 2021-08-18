@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// First message sent from the frontend during startup.

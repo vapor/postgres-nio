@@ -1,6 +1,8 @@
 import XCTest
 @testable import PostgresNIO
-@testable import NIO
+@testable import NIOCore
+import NIOPosix
+import NIOSSL
 
 class ConnectionStateMachineTests: XCTestCase {
     

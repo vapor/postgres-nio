@@ -1,6 +1,8 @@
-import Logging
-import PostgresNIO
 import XCTest
+import Logging
+import NIOCore
+import NIOPosix
+import PostgresNIO
 import NIOTestUtils
 
 final class PerformanceTests: XCTestCase {

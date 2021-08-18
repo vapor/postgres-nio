@@ -1,4 +1,5 @@
-import NIO
+import NIOCore
+import NIOEmbedded
 import NIOTestUtils
 import XCTest
 @testable import PostgresNIO

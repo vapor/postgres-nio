@@ -1,3 +1,6 @@
+import Logging
+import NIOCore
+
 enum PSQLTask {
     case extendedQuery(ExtendedQueryContext)
     case preparedStatement(PrepareStatementContext)

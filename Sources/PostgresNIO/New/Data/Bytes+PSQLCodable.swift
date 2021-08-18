@@ -1,4 +1,5 @@
 import struct Foundation.Data
+import NIOCore
 import NIOFoundationCompat
 
 extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {

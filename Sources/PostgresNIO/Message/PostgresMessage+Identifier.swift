@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// Identifies an incoming or outgoing postgres message. Sent as the first byte, before the message size.

@@ -1,6 +1,7 @@
+import NIOCore
+@testable import PostgresNIO
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
-@testable import PostgresNIO
 
 extension PSQLFrontendMessage.Bind: Equatable {
     public static func ==(lhs: Self, rhs: Self) -> Bool {

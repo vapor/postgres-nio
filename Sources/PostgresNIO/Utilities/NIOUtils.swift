@@ -1,5 +1,5 @@
 import Foundation
-import NIO
+import NIOCore
 
 internal extension ByteBuffer {
     mutating func readInteger<E>(endianness: Endianness = .big, as rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {

@@ -1,3 +1,5 @@
+import NIOCore
+
 extension Float: PSQLCodable {
     var psqlType: PSQLDataType {
         .float4

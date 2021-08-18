@@ -1,4 +1,5 @@
-import Foundation
+import struct Foundation.Date
+import NIOCore
 
 extension PostgresData {
     public init(date: Date) {

@@ -1,3 +1,5 @@
+import NIOCore
+
 /// The format the postgres types are encoded in on the wire.
 ///
 /// Currently there a two wire formats supported:

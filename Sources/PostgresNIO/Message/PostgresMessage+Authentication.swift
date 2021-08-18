@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// Authentication request returned by the server.

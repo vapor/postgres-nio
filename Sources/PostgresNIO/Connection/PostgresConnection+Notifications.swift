@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 import Logging
 
 /// Context for receiving NotificationResponse messages on a connection, used for PostgreSQL's `LISTEN`/`NOTIFY` support.

@@ -1,3 +1,5 @@
+import NIOCore
+
 struct PostgresJSONDecoderWrapper: PSQLJSONDecoder {
     let downstream: PostgresJSONDecoder
     

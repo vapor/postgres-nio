@@ -1,3 +1,4 @@
+import NIOCore
 import struct Foundation.UUID
 import typealias Foundation.uuid_t
 
