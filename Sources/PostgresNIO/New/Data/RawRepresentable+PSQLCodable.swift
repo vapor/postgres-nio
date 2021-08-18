@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PSQLCodable where Self: RawRepresentable, RawValue: PSQLCodable {
     var psqlType: PSQLDataType {
         self.rawValue.psqlType

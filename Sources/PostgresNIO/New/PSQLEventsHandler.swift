@@ -1,4 +1,6 @@
+import NIOCore
 import NIOTLS
+import Logging
 
 enum PSQLOutgoingEvent {    
     /// the event we send down the channel to inform the `PSQLChannelHandler` to authenticate

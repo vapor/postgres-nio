@@ -1,4 +1,5 @@
-import NIO
+import NIOCore
+import Logging
 
 public final class PostgresMessageEncoder: MessageToByteEncoder {
     /// See `MessageToByteEncoder`.

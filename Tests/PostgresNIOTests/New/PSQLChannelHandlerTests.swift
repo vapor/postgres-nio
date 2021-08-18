@@ -1,6 +1,8 @@
 import XCTest
-import NIO
+import NIOCore
 import NIOTLS
+import NIOSSL
+import NIOEmbedded
 @testable import PostgresNIO
 
 class PSQLChannelHandlerTests: XCTestCase {

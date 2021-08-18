@@ -1,3 +1,5 @@
+import NIOCore
+
 extension UInt8: PSQLCodable {
     var psqlType: PSQLDataType {
         .char

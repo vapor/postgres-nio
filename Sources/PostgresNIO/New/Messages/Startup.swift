@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PSQLFrontendMessage {
     struct Startup: PayloadEncodable, Equatable {

@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 import Foundation
 
 public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertible {

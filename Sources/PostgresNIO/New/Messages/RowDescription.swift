@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PSQLBackendMessage {
     
     struct RowDescription: PayloadDecodable, Equatable {

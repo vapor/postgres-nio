@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message as a password response. Note that this is also used for

@@ -1,5 +1,6 @@
-import PostgresNIO
 import XCTest
+import PostgresNIO
+import NIOCore
 import Logging
 #if canImport(Darwin)
 import Darwin.C

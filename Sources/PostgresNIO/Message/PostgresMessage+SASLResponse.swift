@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// SASL ongoing challenge response message sent by the client.

@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PSQLFrontendMessage {
     
     struct Cancel: PayloadEncodable, Equatable {

@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 import struct Foundation.UUID
 
 /// A type, of which arrays can be encoded into and decoded from a postgres binary format

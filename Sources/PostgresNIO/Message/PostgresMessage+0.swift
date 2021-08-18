@@ -1,3 +1,5 @@
+import NIOCore
+
 /// A frontend or backend Postgres message.
 public struct PostgresMessage: Equatable {
     public var identifier: Identifier

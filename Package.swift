@@ -13,8 +13,8 @@ let package = Package(
         .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.28.0"),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.14.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.0"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.14.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0"),
@@ -25,12 +25,15 @@ let package = Package(
             .product(name: "Logging", package: "swift-log"),
             .product(name: "Metrics", package: "swift-metrics"),
             .product(name: "NIO", package: "swift-nio"),
+            .product(name: "NIOCore", package: "swift-nio"),
+            .product(name: "NIOPosix", package: "swift-nio"),
             .product(name: "NIOTLS", package: "swift-nio"),
-            .product(name: "NIOFoundationCompat", package: "swift-nio"),
             .product(name: "NIOSSL", package: "swift-nio-ssl"),
+            .product(name: "NIOFoundationCompat", package: "swift-nio"),
         ]),
         .testTarget(name: "PostgresNIOTests", dependencies: [
             .target(name: "PostgresNIO"),
+            .product(name: "NIOEmbedded", package: "swift-nio"),
             .product(name: "NIOTestUtils", package: "swift-nio"),
         ]),
         .testTarget(name: "IntegrationTests", dependencies: [

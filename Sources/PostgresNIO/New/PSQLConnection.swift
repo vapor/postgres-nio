@@ -1,4 +1,5 @@
-import NIO
+import NIOCore
+import NIOPosix
 import NIOFoundationCompat
 import NIOSSL
 import class Foundation.JSONEncoder

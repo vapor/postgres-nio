@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message type. ReadyForQuery is sent whenever the backend is ready for a new query cycle.

@@ -1,4 +1,5 @@
 import Foundation
+import NIOCore
 
 extension PostgresData {
     public init(uuid: UUID) {

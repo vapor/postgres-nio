@@ -1,4 +1,6 @@
-import NIO
+import NIOCore
+import NIOSSL
+import Logging
 
 extension PostgresConnection {
     public static func connect(

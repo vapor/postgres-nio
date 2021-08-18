@@ -1,6 +1,5 @@
-import NIO
-import NIOTestUtils
 import XCTest
+import NIOCore
 @testable import PostgresNIO
 
 class ParseTests: XCTestCase {

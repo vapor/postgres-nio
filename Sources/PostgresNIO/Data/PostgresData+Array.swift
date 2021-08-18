@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PostgresData {
     public init<T>(array: [T])
         where T: PostgresDataConvertible

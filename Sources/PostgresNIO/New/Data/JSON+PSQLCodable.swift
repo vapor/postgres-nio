@@ -1,3 +1,4 @@
+import NIOCore
 import NIOFoundationCompat
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder

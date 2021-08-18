@@ -1,6 +1,8 @@
+import XCTest
 import Logging
 @testable import PostgresNIO
-import XCTest
+import NIOCore
+import NIOPosix
 import NIOTestUtils
 
 final class IntegrationTests: XCTestCase {

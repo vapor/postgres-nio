@@ -1,3 +1,4 @@
+import NIOCore
 import struct Foundation.Decimal
 
 public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible, ExpressibleByStringLiteral {

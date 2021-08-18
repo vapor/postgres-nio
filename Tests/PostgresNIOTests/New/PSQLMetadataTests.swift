@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 import XCTest
 @testable import PostgresNIO
 

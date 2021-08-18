@@ -1,6 +1,6 @@
-import NIO
-import NIOTestUtils
 import XCTest
+import NIOCore
+import NIOTestUtils
 @testable import PostgresNIO
 
 class ErrorResponseTests: XCTestCase {

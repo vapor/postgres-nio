@@ -1,3 +1,5 @@
+import NIOCore
+
 extension Bool: PSQLCodable {
     var psqlType: PSQLDataType {
         .bool
