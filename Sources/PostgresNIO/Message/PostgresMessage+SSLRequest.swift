@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PostgresMessage {
     /// A message asking the PostgreSQL server if SSL is supported

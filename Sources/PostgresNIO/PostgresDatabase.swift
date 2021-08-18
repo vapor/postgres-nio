@@ -1,3 +1,6 @@
+import NIOCore
+import Logging
+
 public protocol PostgresDatabase {
     var logger: Logger { get }
     var eventLoop: EventLoop { get }

@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 extension PSQLFrontendMessage {
     /// A message asking the PostgreSQL server if TLS is supported

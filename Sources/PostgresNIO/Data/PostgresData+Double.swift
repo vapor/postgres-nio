@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PostgresData {
     public init(double: Double) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)

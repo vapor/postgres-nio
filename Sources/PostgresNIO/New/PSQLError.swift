@@ -1,4 +1,4 @@
-import struct Foundation.Data
+import NIOCore
 
 struct PSQLError: Error {
     

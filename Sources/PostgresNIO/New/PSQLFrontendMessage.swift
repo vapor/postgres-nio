@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 /// A wire message that is created by a Postgres client to be consumed by Postgres server.
 ///

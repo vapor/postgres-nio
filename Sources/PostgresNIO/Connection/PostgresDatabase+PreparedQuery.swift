@@ -1,4 +1,5 @@
-import Foundation
+import NIOCore
+import struct Foundation.UUID
 
 extension PostgresDatabase {
     public func prepare(query: String) -> EventLoopFuture<PreparedQuery> {

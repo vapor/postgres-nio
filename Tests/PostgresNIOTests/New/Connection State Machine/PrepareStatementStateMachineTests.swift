@@ -1,4 +1,5 @@
 import XCTest
+import NIOEmbedded
 @testable import PostgresNIO
 
 class PrepareStatementStateMachineTests: XCTestCase {

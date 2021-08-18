@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 
 internal extension ByteBuffer {
     mutating func writeNullTerminatedString(_ string: String) {

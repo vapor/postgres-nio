@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PSQLBackendMessage {
     
     enum Field: UInt8, Hashable {

@@ -1,4 +1,5 @@
 import class Foundation.JSONEncoder
+import NIOCore
 @testable import PostgresNIO
 
 extension ConnectionStateMachine.ConnectionAction: Equatable {

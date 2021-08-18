@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PSQLBackendMessage {
     enum TransactionState: PayloadDecodable, RawRepresentable {
         typealias RawValue = UInt8

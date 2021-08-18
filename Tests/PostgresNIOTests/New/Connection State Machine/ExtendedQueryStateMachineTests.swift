@@ -1,4 +1,7 @@
 import XCTest
+import NIOCore
+import NIOEmbedded
+import Logging
 @testable import PostgresNIO
 
 class ExtendedQueryStateMachineTests: XCTestCase {

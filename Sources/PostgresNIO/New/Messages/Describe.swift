@@ -1,3 +1,5 @@
+import NIOCore
+
 extension PSQLFrontendMessage {
     
     enum Describe: PayloadEncodable, Equatable {

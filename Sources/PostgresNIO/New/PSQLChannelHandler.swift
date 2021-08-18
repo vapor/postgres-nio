@@ -1,4 +1,4 @@
-import NIO
+import NIOCore
 import NIOTLS
 import Crypto
 import Logging
