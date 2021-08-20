@@ -102,9 +102,9 @@ class PSQLBackendMessageTests: XCTestCase {
         XCTAssertNoThrow(try embedded.writeInbound(buffer))
         
         for expected in expectedMessages {
-            var message: PSQLBackendMessage?
-            XCTAssertNoThrow(message = try embedded.readInbound(as: PSQLBackendMessage.self))
-            XCTAssertEqual(message, expected)
+            var message: PSQLOptimizedBackendMessage?
+            XCTAssertNoThrow(message = try embedded.readInbound(as: PSQLOptimizedBackendMessage.self))
+            XCTAssertEqual(message, PSQLOptimizedBackendMessage.pure(expected))
         }
     }
 
@@ -142,9 +142,9 @@ class PSQLBackendMessageTests: XCTestCase {
         XCTAssertNoThrow(try embedded.writeInbound(buffer))
         
         for expected in expectedMessages {
-            var message: PSQLBackendMessage?
-            XCTAssertNoThrow(message = try embedded.readInbound(as: PSQLBackendMessage.self))
-            XCTAssertEqual(message, expected)
+            var message: PSQLOptimizedBackendMessage?
+            XCTAssertNoThrow(message = try embedded.readInbound(as: PSQLOptimizedBackendMessage.self))
+            XCTAssertEqual(message, PSQLOptimizedBackendMessage.pure(expected) )
         }
     }
 
@@ -173,7 +173,7 @@ class PSQLBackendMessageTests: XCTestCase {
         ]
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, expected)],
+            inputOutputPairs: [(buffer, expected.map { .pure($0) })],
             decoderFactory: { PSQLBackendMessage.Decoder(hasAlreadyReceivedBytes: false) }))
     }
     
@@ -221,7 +221,7 @@ class PSQLBackendMessageTests: XCTestCase {
         }
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(okBuffer, expected)],
+            inputOutputPairs: [(okBuffer, expected.map { .pure($0) })],
             decoderFactory: { PSQLBackendMessage.Decoder(hasAlreadyReceivedBytes: false) }))
         
         // test commandTag is not null terminated

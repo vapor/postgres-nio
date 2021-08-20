@@ -3,7 +3,6 @@ import NIOCore
 extension PSQLBackendMessage {
     
     struct DataRow: PayloadDecodable, Equatable {
-        
         var columns: [ByteBuffer?]
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
@@ -30,5 +29,13 @@ extension PSQLBackendMessage {
             
             return DataRow(columns: result)
         }
+    }
+}
+
+extension PSQLBackendMessage.DataRow: ExpressibleByArrayLiteral {
+    typealias ArrayLiteralElement = ByteBuffer
+
+    init(arrayLiteral elements: ByteBuffer...) {
+        self.columns = elements
     }
 }

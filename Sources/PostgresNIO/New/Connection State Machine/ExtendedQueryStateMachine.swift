@@ -14,8 +14,7 @@ struct ExtendedQueryStateMachine {
         /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
         /// used after receiving a `bindComplete` message
         case bindCompleteReceived(ExtendedQueryContext)
-        case bufferingRows([PSQLBackendMessage.RowDescription.Column], CircularBuffer<[PSQLData]>, readOnEmpty: Bool)
-        case waitingForNextRow([PSQLBackendMessage.RowDescription.Column], CircularBuffer<[PSQLData]>, EventLoopPromise<StateMachineStreamNextResult>)
+        case streaming([PSQLBackendMessage.RowDescription.Column], RowStreamStateMachine)
         
         case commandComplete(commandTag: String)
         case error(PSQLError)
@@ -34,12 +33,9 @@ struct ExtendedQueryStateMachine {
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
-        case forwardRow([PSQLData], to: EventLoopPromise<StateMachineStreamNextResult>)
-        case forwardCommandComplete(CircularBuffer<[PSQLData]>, commandTag: String, to: EventLoopPromise<StateMachineStreamNextResult>)
-        case forwardStreamError(PSQLError, to: EventLoopPromise<StateMachineStreamNextResult>)
-        // actions if query has not asked for next row but are pushing the final bytes to it
-        case forwardStreamErrorToCurrentQuery(PSQLError, read: Bool)
-        case forwardStreamCompletedToCurrentQuery(CircularBuffer<[PSQLData]>, commandTag: String, read: Bool)
+        case forwardRows(CircularBuffer<PSQLBackendMessage.DataRow>)
+        case forwardStreamComplete(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
+        case forwardStreamError(PSQLError, read: Bool)
 
         case read
         case wait
@@ -137,7 +133,7 @@ struct ExtendedQueryStateMachine {
         switch self.state {
         case .rowDescriptionReceived(let context, let columns):
             return self.avoidingStateMachineCoW { state -> Action in
-                state = .bufferingRows(columns, CircularBuffer(), readOnEmpty: false)
+                state = .streaming(columns, .init())
                 return .succeedQuery(context, columns: columns)
             }
         case .noDataMessageReceived(let queryContext):
@@ -150,8 +146,7 @@ struct ExtendedQueryStateMachine {
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .bindCompleteReceived,
-             .bufferingRows,
-             .waitingForNextRow,
+             .streaming,
              .commandComplete,
              .error:
             return self.setAndFireError(.unexpectedBackendMessage(.bindComplete))
@@ -160,39 +155,21 @@ struct ExtendedQueryStateMachine {
         }
     }
     
-    mutating func dataRowReceived(_ dataRow: PSQLBackendMessage.DataRow) -> Action {
+    mutating func dataRowsReceived(_ dataRows: [PSQLBackendMessage.DataRow]) -> Action {
         switch self.state {
-        case .bufferingRows(let columns, var buffer, let readOnEmpty):
+        case .streaming(let columns, var demandStateMachine):
             // When receiving a data row, we must ensure that the data row column count
             // matches the previously received row description column count.
-            guard dataRow.columns.count == columns.count else {
-                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            for dataRow in dataRows {
+                guard dataRow.columns.count == columns.count else {
+                    return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+                }
             }
             
             return self.avoidingStateMachineCoW { state -> Action in
-                let row = dataRow.columns.enumerated().map { (index, buffer) in
-                    PSQLData(bytes: buffer, dataType: columns[index].dataType, format: columns[index].format)
-                }
-                buffer.append(row)
-                state = .bufferingRows(columns, buffer, readOnEmpty: readOnEmpty)
+                demandStateMachine.receivedRows(dataRows)
+                state = .streaming(columns, demandStateMachine)
                 return .wait
-            }
-            
-        case .waitingForNextRow(let columns, let buffer, let promise):
-            // When receiving a data row, we must ensure that the data row column count
-            // matches the previously received row description column count.
-            guard dataRow.columns.count == columns.count else {
-                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
-            }
-            
-            return self.avoidingStateMachineCoW { state -> Action in
-                precondition(buffer.isEmpty, "Expected the buffer to be empty")
-                let row = dataRow.columns.enumerated().map { (index, buffer) in
-                    PSQLData(bytes: buffer, dataType: columns[index].dataType, format: columns[index].format)
-                }
-                
-                state = .bufferingRows(columns, buffer, readOnEmpty: false)
-                return .forwardRow(row, to: promise)
             }
             
         case .initialized,
@@ -204,7 +181,7 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived,
              .commandComplete,
              .error:
-            return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRows.first!)))
         case .modifying:
             preconditionFailure("Invalid state")
         }
@@ -218,17 +195,10 @@ struct ExtendedQueryStateMachine {
                 return .succeedQueryNoRowsComming(context, commandTag: commandTag)
             }
             
-        case .bufferingRows(_, let buffer, let readOnEmpty):
+        case .streaming(_, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .commandComplete(commandTag: commandTag)
-                return .forwardStreamCompletedToCurrentQuery(buffer, commandTag: commandTag, read: readOnEmpty)
-            }
-            
-        case .waitingForNextRow(_, let buffer, let promise):
-            return self.avoidingStateMachineCoW { state -> Action in
-                precondition(buffer.isEmpty, "Expected the buffer to be empty")
-                state = .commandComplete(commandTag: commandTag)
-                return .forwardCommandComplete(buffer, commandTag: commandTag, to: promise)
+                return .forwardStreamComplete(demandStateMachine.end(), commandTag: commandTag)
             }
         
         case .initialized,
@@ -261,9 +231,7 @@ struct ExtendedQueryStateMachine {
             return self.setAndFireError(error)
         case .rowDescriptionReceived, .noDataMessageReceived:
             return self.setAndFireError(error)
-        case .bufferingRows:
-            return self.setAndFireError(error)
-        case .waitingForNextRow:
+        case .streaming:
             return self.setAndFireError(error)
         case .commandComplete:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
@@ -289,20 +257,18 @@ struct ExtendedQueryStateMachine {
             
     // MARK: Customer Actions
     
-    mutating func consumeNextRow(promise: EventLoopPromise<StateMachineStreamNextResult>) -> Action {
+    mutating func requestQueryRows() -> Action {
         switch self.state {
-        case .waitingForNextRow:
-            preconditionFailure("Too greedy. `consumeNextRow()` only needs to be called once.")
-            
-        case .bufferingRows(let columns, var buffer, let readOnEmpty):
+        case .streaming(let columns, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
-                guard let row = buffer.popFirst() else {
-                    state = .waitingForNextRow(columns, buffer, promise)
-                    return readOnEmpty ? .read : .wait
+                let action = demandStateMachine.demandMoreResponseBodyParts()
+                state = .streaming(columns, demandStateMachine)
+                switch action {
+                case .read:
+                    return .read
+                case .wait:
+                    return .wait
                 }
-                
-                state = .bufferingRows(columns, buffer, readOnEmpty: readOnEmpty)
-                return .forwardRow(row, to: promise)
             }
 
         case .initialized,
@@ -323,29 +289,56 @@ struct ExtendedQueryStateMachine {
     
     // MARK: Channel actions
     
+    mutating func channelReadComplete() -> Action {
+        switch self.state {
+        case .initialized,
+             .commandComplete,
+             .error,
+             .parseDescribeBindExecuteSyncSent,
+             .parseCompleteReceived,
+             .parameterDescriptionReceived,
+             .noDataMessageReceived,
+             .rowDescriptionReceived,
+             .bindCompleteReceived:
+            return .wait
+            
+        case .streaming(let columns, var demandStateMachine):
+            return self.avoidingStateMachineCoW { state -> Action in
+                let rows = demandStateMachine.channelReadComplete()
+                state = .streaming(columns, demandStateMachine)
+                switch rows {
+                case .some(let rows):
+                    return .forwardRows(rows)
+                case .none:
+                    return .wait
+                }
+            }
+
+        case .modifying:
+            preconditionFailure("Invalid state")
+        }
+    }
+    
     mutating func readEventCaught() -> Action {
         switch self.state {
-        case .parseDescribeBindExecuteSyncSent:
+        case .parseDescribeBindExecuteSyncSent,
+             .parseCompleteReceived,
+             .parameterDescriptionReceived,
+             .noDataMessageReceived,
+             .rowDescriptionReceived,
+             .bindCompleteReceived:
             return .read
-        case .parseCompleteReceived:
-            return .read
-        case .parameterDescriptionReceived:
-            return .read
-        case .noDataMessageReceived:
-            return .read
-        case .rowDescriptionReceived:
-            return .read
-        case .bindCompleteReceived:
-            return .read
-        case .bufferingRows(let columns, let buffer, _):
+        case .streaming(let columns, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
-                state = .bufferingRows(columns, buffer, readOnEmpty: true)
-                return .wait
+                let action = demandStateMachine.read()
+                state = .streaming(columns, demandStateMachine)
+                switch action {
+                case .wait:
+                    return .wait
+                case .read:
+                    return .read
+                }
             }
-        case .waitingForNextRow:
-            // we are in the stream and the consumer has already asked us for more rows,
-            // therefore we need to read!
-            return .read
         case .initialized,
              .commandComplete,
              .error:
@@ -370,12 +363,11 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived(let context):
             self.state = .error(error)
             return .failQuery(context, with: error)
-        case .bufferingRows(_, _, readOnEmpty: let readOnEmpty):
+            
+        case .streaming:
             self.state = .error(error)
-            return .forwardStreamErrorToCurrentQuery(error, read: readOnEmpty)
-        case .waitingForNextRow(_, _, let promise):
-            self.state = .error(error)
-            return .forwardStreamError(error, to: promise)
+            return .forwardStreamError(error, read: false)
+            
         case .commandComplete, .error:
             preconditionFailure("""
                 This state must not be reached. If the query `.isComplete`, the

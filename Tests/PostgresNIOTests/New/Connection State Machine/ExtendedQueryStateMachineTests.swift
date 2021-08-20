@@ -10,7 +10,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "DELETE FROM table WHERE id=$0"
         let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
@@ -28,7 +28,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         queryPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: queryPromise)
@@ -50,15 +50,30 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
-        let rowContent = ByteBuffer(string: "test")
-        XCTAssertEqual(state.dataRowReceived(.init(columns: [rowContent])), .wait)
+        let row1: PSQLBackendMessage.DataRow = ["test1"]
+        XCTAssertEqual(state.dataRowsReceived([row1]), .wait)
+        XCTAssertEqual(state.channelReadComplete(), .forwardRows([row1]))
         XCTAssertEqual(state.readEventCaught(), .wait)
+        XCTAssertEqual(state.requestQueryRows(), .read)
         
-        let rowPromise = EmbeddedEventLoop().makePromise(of: StateMachineStreamNextResult.self)
-        rowPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
-        XCTAssertEqual(state.consumeNextQueryRow(promise: rowPromise), .forwardRow([.init(bytes: rowContent, dataType: .text, format: .binary)], to: rowPromise))
+        let row2: PSQLBackendMessage.DataRow = ["test2"]
+        let row3: PSQLBackendMessage.DataRow = ["test3"]
+        let row4: PSQLBackendMessage.DataRow = ["test4"]
+        XCTAssertEqual(state.dataRowsReceived([row2, row3]), .wait)
+        XCTAssertEqual(state.dataRowsReceived([row4]), .wait)
+        XCTAssertEqual(state.channelReadComplete(), .forwardRows([row2, row3, row4]))
+        XCTAssertEqual(state.requestQueryRows(), .wait)
+        XCTAssertEqual(state.readEventCaught(), .read)
         
-        XCTAssertEqual(state.commandCompletedReceived("SELECT 1"), .forwardStreamCompletedToCurrentQuery(CircularBuffer(), commandTag: "SELECT 1", read: true))
+        XCTAssertEqual(state.channelReadComplete(), .wait)
+        XCTAssertEqual(state.readEventCaught(), .read)
+        
+        let row5: PSQLBackendMessage.DataRow = ["test5"]
+        let row6: PSQLBackendMessage.DataRow = ["test6"]
+        XCTAssertEqual(state.dataRowsReceived([row5]), .wait)
+        XCTAssertEqual(state.dataRowsReceived([row6]), .wait)
+        
+        XCTAssertEqual(state.commandCompletedReceived("SELECT 2"), .forwardStreamComplete([row5, row6], commandTag: "SELECT 2"))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
@@ -66,7 +81,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "DELETE FROM table WHERE id=$0"
         let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
