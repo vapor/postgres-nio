@@ -27,9 +27,9 @@ class PSQLChannelHandlerTests: XCTestCase {
         XCTAssertEqual(startup.parameters.options, nil)
         XCTAssertEqual(startup.parameters.replication, .false)
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.authentication(.ok)))
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678))))
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.readyForQuery(.idle)))
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.authentication(.ok))))
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.backendKeyData(.init(processID: 1234, secretKey: 5678)))))
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.readyForQuery(.idle))))
     }
     
     func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
@@ -49,13 +49,15 @@ class PSQLChannelHandlerTests: XCTestCase {
         }
         
         XCTAssertEqual(request.code, 80877103)
+        XCTAssertFalse(addSSLCallbackIsHit)
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.sslSupported))
+        // the server responds with ssl is supported
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.sslSupported)))
         
-        // a NIOSSLHandler has been added, after it SSL had been negotiated
+        // now, the PSQLChannelHandler must invoke the add SSL callback.
         XCTAssertTrue(addSSLCallbackIsHit)
         
-        // signal that the ssl connection has been established
+        // a added NIOSSLHandler would issue an event reporting the ssl connection was established
         embedded.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: ""))
         
         // startup message should be issued
@@ -87,7 +89,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         
         // read the ssl request message
         XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .sslRequest(.init()))
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.sslUnsupported))
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.sslUnsupported)))
         
         // the event handler should have seen an error
         XCTAssertEqual(eventHandler.errors.count, 1)
@@ -112,7 +114,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.authentication(.md5(salt: (0,1,2,3)))))
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.authentication(.md5(salt: (0,1,2,3))))))
         
         var message: PSQLFrontendMessage?
         XCTAssertNoThrow(message = try embedded.readOutbound(as: PSQLFrontendMessage.self))
@@ -137,7 +139,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.authentication(.plaintext)))
+        XCTAssertNoThrow(try embedded.writeInbound(PSQLOptimizedBackendMessage.pure(.authentication(.plaintext))))
         
         var message: PSQLFrontendMessage?
         XCTAssertNoThrow(message = try embedded.readOutbound(as: PSQLFrontendMessage.self))
