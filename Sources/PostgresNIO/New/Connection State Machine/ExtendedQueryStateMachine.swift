@@ -290,7 +290,7 @@ struct ExtendedQueryStateMachine {
             
         case .bufferingRows(let columns, let buffer, let readOnEmpty):
             return self.avoidingStateMachineCoW { state -> Action in
-                guard buffer.count > 0 else {
+                guard !buffer.isEmpty else {
                     state = .waitingForNextRow(columns, buffer)
                     return readOnEmpty ? .read : .wait
                 }
