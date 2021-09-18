@@ -1,7 +1,7 @@
 import NIOCore
 import Logging
 
-final class PSQLRows {
+final class PSQLRowStream {
     
     let eventLoop: EventLoop
     let logger: Logger

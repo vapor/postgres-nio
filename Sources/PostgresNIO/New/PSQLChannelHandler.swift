@@ -18,7 +18,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             self.logger.trace("Connection state changed", metadata: [.connectionState: "\(self.state)"])
         }
     }
-    private var currentQuery: PSQLRows?
+    private var currentQuery: PSQLRowStream?
     private let authentificationConfiguration: PSQLConnection.Configuration.Authentication?
     private let configureSSLCallback: ((Channel) throws -> Void)?
     
@@ -426,7 +426,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             self.run(action, with: context)
             return promise.futureResult
         }
-        let rows = PSQLRows(
+        let rows = PSQLRowStream(
             rowDescription: columns,
             queryContext: queryContext,
             eventLoop: context.channel.eventLoop,
@@ -451,7 +451,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext)
     {
         let eventLoop = context.channel.eventLoop
-        let rows = PSQLRows(
+        let rows = PSQLRowStream(
             rowDescription: [],
             queryContext: queryContext,
             eventLoop: context.channel.eventLoop,

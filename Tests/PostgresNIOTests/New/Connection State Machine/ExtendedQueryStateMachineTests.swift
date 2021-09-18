@@ -10,7 +10,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "DELETE FROM table WHERE id=$0"
         let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
@@ -28,7 +28,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         queryPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: queryPromise)
@@ -66,7 +66,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let promise = EmbeddedEventLoop().makePromise(of: PSQLRows.self)
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         let query = "DELETE FROM table WHERE id=$0"
         let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)

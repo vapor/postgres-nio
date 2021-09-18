@@ -78,7 +78,7 @@ internal enum PostgresCommands: PostgresRequest {
     }
 }
 
-extension PSQLRows {
+extension PSQLRowStream {
     
     func iterateRowsWithoutBackpressureOption(lookupTable: PostgresRow.LookupTable, onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         self.onRow { psqlRow in
