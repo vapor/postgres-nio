@@ -2,7 +2,7 @@ import NIOCore
 
 extension PSQLFrontendMessage {
     
-    struct Cancel: PayloadEncodable, Equatable {
+    struct Cancel: PSQLMessagePayloadEncodable, Equatable {
         /// The cancel request code. The value is chosen to contain 1234 in the most significant 16 bits,
         /// and 5678 in the least significant 16 bits. (To avoid confusion, this code must not be the same
         /// as any protocol version number.)

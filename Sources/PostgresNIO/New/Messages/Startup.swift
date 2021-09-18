@@ -1,7 +1,7 @@
 import NIOCore
 
 extension PSQLFrontendMessage {
-    struct Startup: PayloadEncodable, Equatable {
+    struct Startup: PSQLMessagePayloadEncodable, Equatable {
 
         /// Creates a `Startup` with "3.0" as the protocol version.
         static func versionThree(parameters: Parameters) -> Startup {

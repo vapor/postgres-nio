@@ -2,7 +2,7 @@ import NIOCore
 
 extension PSQLFrontendMessage {
     
-    struct SASLInitialResponse: PayloadEncodable, Equatable {
+    struct SASLInitialResponse: PSQLMessagePayloadEncodable, Equatable {
         
         let saslMechanism: String
         let initialData: [UInt8]

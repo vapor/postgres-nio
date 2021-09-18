@@ -2,7 +2,7 @@ import NIOCore
 
 extension PSQLFrontendMessage {
     
-    struct Password: PayloadEncodable, Equatable {
+    struct Password: PSQLMessagePayloadEncodable, Equatable {
         let value: String
         
         func encode(into buffer: inout ByteBuffer) {

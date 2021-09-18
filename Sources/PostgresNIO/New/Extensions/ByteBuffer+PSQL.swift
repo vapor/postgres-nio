@@ -20,7 +20,7 @@ internal extension ByteBuffer {
     }
     
     mutating func writeFrontendMessageID(_ messageID: PSQLFrontendMessage.ID) {
-        self.writeInteger(messageID.byte)
+        self.writeInteger(messageID.rawValue)
     }
 
     mutating func readFloat() -> Float? {

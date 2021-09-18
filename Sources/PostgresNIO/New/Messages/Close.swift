@@ -2,7 +2,7 @@ import NIOCore
 
 extension PSQLFrontendMessage {
     
-    enum Close: PayloadEncodable, Equatable {
+    enum Close: PSQLMessagePayloadEncodable, Equatable {
         case preparedStatement(String)
         case portal(String)
         

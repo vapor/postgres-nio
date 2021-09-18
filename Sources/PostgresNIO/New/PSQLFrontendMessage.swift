@@ -5,8 +5,6 @@ import NIOCore
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
 enum PSQLFrontendMessage {
-    typealias PayloadEncodable = PSQLFrontendMessagePayloadEncodable
-    
     case bind(Bind)
     case cancel(Cancel)
     case close(Close)
@@ -22,7 +20,8 @@ enum PSQLFrontendMessage {
     case startup(Startup)
     case terminate
     
-    enum ID {
+    enum ID: UInt8, Equatable {
+        
         case bind
         case close
         case describe
@@ -35,7 +34,36 @@ enum PSQLFrontendMessage {
         case sync
         case terminate
         
-        var byte: UInt8 {
+        init?(rawValue: UInt8) {
+            switch rawValue {
+            case UInt8(ascii: "B"):
+                self = .bind
+            case UInt8(ascii: "C"):
+                self = .close
+            case UInt8(ascii: "D"):
+                self = .describe
+            case UInt8(ascii: "E"):
+                self = .execute
+            case UInt8(ascii: "H"):
+                self = .flush
+            case UInt8(ascii: "P"):
+                self = .parse
+            case UInt8(ascii: "p"):
+                self = .password
+            case UInt8(ascii: "p"):
+                self = .saslInitialResponse
+            case UInt8(ascii: "p"):
+                self = .saslResponse
+            case UInt8(ascii: "S"):
+                self = .sync
+            case UInt8(ascii: "X"):
+                self = .terminate
+            default:
+                return nil
+            }
+        }
+
+        var rawValue: UInt8 {
             switch self {
             case .bind:
                 return UInt8(ascii: "B")
@@ -112,11 +140,11 @@ extension PSQLFrontendMessage {
         }
         
         func encode(data message: PSQLFrontendMessage, out buffer: inout ByteBuffer) throws {
-            struct EmptyPayload: PayloadEncodable {
+            struct EmptyPayload: PSQLMessagePayloadEncodable {
                 func encode(into buffer: inout ByteBuffer) {}
             }
             
-            func encode<Payload: PayloadEncodable>(_ payload: Payload, into buffer: inout ByteBuffer) {
+            func encode<Payload: PSQLMessagePayloadEncodable>(_ payload: Payload, into buffer: inout ByteBuffer) {
                 let startIndex = buffer.writerIndex
                 buffer.writeInteger(Int32(0)) // placeholder for length
                 payload.encode(into: &buffer)
@@ -126,7 +154,7 @@ extension PSQLFrontendMessage {
             
             switch message {
             case .bind(let bind):
-                buffer.writeInteger(message.id.byte)
+                buffer.writeInteger(message.id.rawValue)
                 let startIndex = buffer.writerIndex
                 buffer.writeInteger(Int32(0)) // placeholder for length
                 try bind.encode(into: &buffer, using: self.jsonEncoder)
@@ -177,6 +205,6 @@ extension PSQLFrontendMessage {
     }
 }
 
-protocol PSQLFrontendMessagePayloadEncodable {
+protocol PSQLMessagePayloadEncodable {
     func encode(into buffer: inout ByteBuffer)
 }

@@ -11,7 +11,7 @@ class DescribeTests: XCTestCase {
         XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
         
         XCTAssertEqual(byteBuffer.readableBytes, 12)
-        XCTAssertEqual(PSQLFrontendMessage.ID.describe.byte, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PSQLFrontendMessage.ID.describe.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(11, byteBuffer.readInteger(as: Int32.self))
         XCTAssertEqual(UInt8(ascii: "P"), byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual("Hello", byteBuffer.readNullTerminatedString())
@@ -25,7 +25,7 @@ class DescribeTests: XCTestCase {
         XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
         
         XCTAssertEqual(byteBuffer.readableBytes, 7)
-        XCTAssertEqual(PSQLFrontendMessage.ID.describe.byte, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PSQLFrontendMessage.ID.describe.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(6, byteBuffer.readInteger(as: Int32.self))
         XCTAssertEqual(UInt8(ascii: "S"), byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual("", byteBuffer.readNullTerminatedString())

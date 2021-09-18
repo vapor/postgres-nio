@@ -7,17 +7,17 @@ class PSQLFrontendMessageTests: XCTestCase {
     // MARK: ID
     
     func testMessageIDs() {
-        XCTAssertEqual(PSQLFrontendMessage.ID.bind.byte, UInt8(ascii: "B"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.close.byte, UInt8(ascii: "C"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.describe.byte, UInt8(ascii: "D"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.execute.byte, UInt8(ascii: "E"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.flush.byte, UInt8(ascii: "H"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.parse.byte, UInt8(ascii: "P"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.password.byte, UInt8(ascii: "p"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.saslInitialResponse.byte, UInt8(ascii: "p"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.saslResponse.byte, UInt8(ascii: "p"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.sync.byte, UInt8(ascii: "S"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.terminate.byte, UInt8(ascii: "X"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.bind.rawValue, UInt8(ascii: "B"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.close.rawValue, UInt8(ascii: "C"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.describe.rawValue, UInt8(ascii: "D"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.execute.rawValue, UInt8(ascii: "E"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.flush.rawValue, UInt8(ascii: "H"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.parse.rawValue, UInt8(ascii: "P"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.password.rawValue, UInt8(ascii: "p"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.saslInitialResponse.rawValue, UInt8(ascii: "p"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.saslResponse.rawValue, UInt8(ascii: "p"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.sync.rawValue, UInt8(ascii: "S"))
+        XCTAssertEqual(PSQLFrontendMessage.ID.terminate.rawValue, UInt8(ascii: "X"))
     }
     
     // MARK: Encoder
@@ -28,7 +28,7 @@ class PSQLFrontendMessageTests: XCTestCase {
         XCTAssertNoThrow(try encoder.encode(data: .flush, out: &byteBuffer))
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PSQLFrontendMessage.ID.flush.byte, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PSQLFrontendMessage.ID.flush.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
     
@@ -38,7 +38,7 @@ class PSQLFrontendMessageTests: XCTestCase {
         XCTAssertNoThrow(try encoder.encode(data: .sync, out: &byteBuffer))
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PSQLFrontendMessage.ID.sync.byte, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PSQLFrontendMessage.ID.sync.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
     
@@ -48,7 +48,7 @@ class PSQLFrontendMessageTests: XCTestCase {
         XCTAssertNoThrow(try encoder.encode(data: .terminate, out: &byteBuffer))
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PSQLFrontendMessage.ID.terminate.byte, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PSQLFrontendMessage.ID.terminate.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
 
