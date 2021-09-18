@@ -14,8 +14,8 @@ struct ExtendedQueryStateMachine {
         /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
         /// used after receiving a `bindComplete` message
         case bindCompleteReceived(ExtendedQueryContext)
-        case bufferingRows([PSQLBackendMessage.RowDescription.Column], CircularBuffer<[PSQLData]>, readOnEmpty: Bool)
-        case waitingForNextRow([PSQLBackendMessage.RowDescription.Column], CircularBuffer<[PSQLData]>, EventLoopPromise<StateMachineStreamNextResult>)
+        case bufferingRows([PSQLBackendMessage.RowDescription.Column], CircularBuffer<PSQLBackendMessage.DataRow>, readOnEmpty: Bool)
+        case waitingForNextRow([PSQLBackendMessage.RowDescription.Column], CircularBuffer<PSQLBackendMessage.DataRow>, EventLoopPromise<StateMachineStreamNextResult>)
         
         case commandComplete(commandTag: String)
         case error(PSQLError)
@@ -34,12 +34,12 @@ struct ExtendedQueryStateMachine {
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
-        case forwardRow([PSQLData], to: EventLoopPromise<StateMachineStreamNextResult>)
-        case forwardCommandComplete(CircularBuffer<[PSQLData]>, commandTag: String, to: EventLoopPromise<StateMachineStreamNextResult>)
+        case forwardRow(PSQLBackendMessage.DataRow, to: EventLoopPromise<StateMachineStreamNextResult>)
+        case forwardCommandComplete(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String, to: EventLoopPromise<StateMachineStreamNextResult>)
         case forwardStreamError(PSQLError, to: EventLoopPromise<StateMachineStreamNextResult>)
         // actions if query has not asked for next row but are pushing the final bytes to it
         case forwardStreamErrorToCurrentQuery(PSQLError, read: Bool)
-        case forwardStreamCompletedToCurrentQuery(CircularBuffer<[PSQLData]>, commandTag: String, read: Bool)
+        case forwardStreamCompletedToCurrentQuery(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String, read: Bool)
 
         case read
         case wait
@@ -170,10 +170,7 @@ struct ExtendedQueryStateMachine {
             }
             
             return self.avoidingStateMachineCoW { state -> Action in
-                let row = dataRow.columns.enumerated().map { (index, buffer) in
-                    PSQLData(bytes: buffer, dataType: columns[index].dataType, format: columns[index].format)
-                }
-                buffer.append(row)
+                buffer.append(dataRow)
                 state = .bufferingRows(columns, buffer, readOnEmpty: readOnEmpty)
                 return .wait
             }
@@ -187,12 +184,8 @@ struct ExtendedQueryStateMachine {
             
             return self.avoidingStateMachineCoW { state -> Action in
                 precondition(buffer.isEmpty, "Expected the buffer to be empty")
-                let row = dataRow.columns.enumerated().map { (index, buffer) in
-                    PSQLData(bytes: buffer, dataType: columns[index].dataType, format: columns[index].format)
-                }
-                
                 state = .bufferingRows(columns, buffer, readOnEmpty: false)
-                return .forwardRow(row, to: promise)
+                return .forwardRow(dataRow, to: promise)
             }
             
         case .initialized,
