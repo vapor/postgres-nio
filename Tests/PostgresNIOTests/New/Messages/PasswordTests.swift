@@ -14,7 +14,7 @@ class PasswordTests: XCTestCase {
         let expectedLength = 41 // 1 (id) + 4 (length) + 35 (string) + 1 (null termination)
         
         XCTAssertEqual(byteBuffer.readableBytes, expectedLength)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.password.byte)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.password.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(expectedLength - 1)) // length
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), "md522d085ed8dc3377968dc1c1a40519a2a")
     }

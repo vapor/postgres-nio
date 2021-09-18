@@ -22,7 +22,7 @@ class ParseTests: XCTestCase {
         // + 1 query ()
         
         XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.parse.byte)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.parse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.preparedStatementName)
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.query)

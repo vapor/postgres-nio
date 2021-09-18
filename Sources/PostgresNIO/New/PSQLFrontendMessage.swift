@@ -20,7 +20,9 @@ enum PSQLFrontendMessage {
     case startup(Startup)
     case terminate
     
-    enum ID {
+    enum ID: RawRepresentable, Equatable {
+        typealias RawValue = UInt8
+        
         case bind
         case close
         case describe
@@ -33,7 +35,36 @@ enum PSQLFrontendMessage {
         case sync
         case terminate
         
-        var byte: UInt8 {
+        init?(rawValue: UInt8) {
+            switch rawValue {
+            case UInt8(ascii: "B"):
+                self = .bind
+            case UInt8(ascii: "C"):
+                self = .close
+            case UInt8(ascii: "D"):
+                self = .describe
+            case UInt8(ascii: "E"):
+                self = .execute
+            case UInt8(ascii: "H"):
+                self = .flush
+            case UInt8(ascii: "P"):
+                self = .parse
+            case UInt8(ascii: "p"):
+                self = .password
+            case UInt8(ascii: "p"):
+                self = .saslInitialResponse
+            case UInt8(ascii: "p"):
+                self = .saslResponse
+            case UInt8(ascii: "S"):
+                self = .sync
+            case UInt8(ascii: "X"):
+                self = .terminate
+            default:
+                return nil
+            }
+        }
+
+        var rawValue: UInt8 {
             switch self {
             case .bind:
                 return UInt8(ascii: "B")
@@ -124,7 +155,7 @@ extension PSQLFrontendMessage {
             
             switch message {
             case .bind(let bind):
-                buffer.writeInteger(message.id.byte)
+                buffer.writeInteger(message.id.rawValue)
                 let startIndex = buffer.writerIndex
                 buffer.writeInteger(Int32(0)) // placeholder for length
                 try bind.encode(into: &buffer, using: self.jsonEncoder)

@@ -12,7 +12,7 @@ class BindTests: XCTestCase {
         XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
         
         XCTAssertEqual(byteBuffer.readableBytes, 37)
-        XCTAssertEqual(PSQLFrontendMessage.ID.bind.byte, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PSQLFrontendMessage.ID.bind.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 36)
         XCTAssertEqual("", byteBuffer.readNullTerminatedString())
         XCTAssertEqual("", byteBuffer.readNullTerminatedString())
