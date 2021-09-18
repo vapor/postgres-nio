@@ -12,12 +12,10 @@ struct PSQLBackendMessageEncoder: MessageToByteEncoder {
     func encode(data message: PSQLBackendMessage, out buffer: inout ByteBuffer) throws {
         switch message {
         case .authentication(let authentication):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(authentication, into: &buffer)
+            self.encode(messageID: message.id, payload: authentication, into: &buffer)
             
         case .backendKeyData(let keyData):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(keyData, into: &buffer)
+            self.encode(messageID: message.id, payload: keyData, into: &buffer)
             
         case .bindComplete,
              .closeComplete,
@@ -25,44 +23,34 @@ struct PSQLBackendMessageEncoder: MessageToByteEncoder {
              .noData,
              .parseComplete,
              .portalSuspended:
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(EmptyPayload(), into: &buffer)
+            self.encode(messageID: message.id, payload: EmptyPayload(), into: &buffer)
             
         case .commandComplete(let string):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(StringPayload(string), into: &buffer)
+            self.encode(messageID: message.id, payload: StringPayload(string), into: &buffer)
             
         case .dataRow(let row):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(row, into: &buffer)
+            self.encode(messageID: message.id, payload: row, into: &buffer)
             
         case .error(let errorResponse):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(errorResponse, into: &buffer)
+            self.encode(messageID: message.id, payload: errorResponse, into: &buffer)
             
         case .notice(let noticeResponse):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(noticeResponse, into: &buffer)
+            self.encode(messageID: message.id, payload: noticeResponse, into: &buffer)
             
         case .notification(let notificationResponse):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(notificationResponse, into: &buffer)
+            self.encode(messageID: message.id, payload: notificationResponse, into: &buffer)
             
         case .parameterDescription(let description):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(description, into: &buffer)
+            self.encode(messageID: message.id, payload: description, into: &buffer)
             
         case .parameterStatus(let status):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(status, into: &buffer)
+            self.encode(messageID: message.id, payload: status, into: &buffer)
             
         case .readyForQuery(let transactionState):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(transactionState, into: &buffer)
+            self.encode(messageID: message.id, payload: transactionState, into: &buffer)
             
         case .rowDescription(let description):
-            buffer.writeBackendMessageID(message.id)
-            self.encodePayload(description, into: &buffer)
+            self.encode(messageID: message.id, payload: description, into: &buffer)
             
         case .sslSupported:
             buffer.writeInteger(UInt8(ascii: "S"))
@@ -84,7 +72,12 @@ struct PSQLBackendMessageEncoder: MessageToByteEncoder {
         }
     }
 
-    private func encodePayload<Payload: PSQLMessagePayloadEncodable>(_ payload: Payload, into buffer: inout ByteBuffer) {
+    private func encode<Payload: PSQLMessagePayloadEncodable>(
+        messageID: PSQLBackendMessage.ID,
+        payload: Payload,
+        into buffer: inout ByteBuffer)
+    {
+        buffer.writeBackendMessageID(messageID)
         let startIndex = buffer.writerIndex
         buffer.writeInteger(Int32(0)) // placeholder for length
         payload.encode(into: &buffer)
