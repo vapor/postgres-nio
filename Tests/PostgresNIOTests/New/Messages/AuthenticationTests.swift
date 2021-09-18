@@ -58,6 +58,6 @@ class AuthenticationTests: XCTestCase {
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PSQLBackendMessage.Decoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
     }
 }

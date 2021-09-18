@@ -31,11 +31,11 @@ extension PSQLBackendMessage {
         }
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
-            try PSQLBackendMessage.ensureAtLeastNBytesRemaining(2, in: buffer)
+            try buffer.ensureAtLeastNBytesRemaining(2)
             let columnCount = buffer.readInteger(as: Int16.self)!
             
             guard columnCount >= 0 else {
-                throw PartialDecodingError.integerMustBePositiveOrNull(columnCount)
+                throw PSQLPartialDecodingError.integerMustBePositiveOrNull(columnCount)
             }
             
             var result = [Column]()
@@ -43,10 +43,10 @@ extension PSQLBackendMessage {
             
             for _ in 0..<columnCount {
                 guard let name = buffer.readNullTerminatedString() else {
-                    throw PartialDecodingError.fieldNotDecodable(type: String.self)
+                    throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
                 }
                 
-                try PSQLBackendMessage.ensureAtLeastNBytesRemaining(18, in: buffer)
+                try buffer.ensureAtLeastNBytesRemaining(18)
                 
                 let tableOID = buffer.readInteger(as: Int32.self)!
                 let columnAttributeNumber = buffer.readInteger(as: Int16.self)!
@@ -56,7 +56,7 @@ extension PSQLBackendMessage {
                 let formatCodeInt16 = buffer.readInteger(as: Int16.self)!
                 
                 guard let format = PSQLFormat(rawValue: formatCodeInt16) else {
-                    throw PartialDecodingError.valueNotRawRepresentable(value: formatCodeInt16, asType: PSQLFormat.self)
+                    throw PSQLPartialDecodingError.valueNotRawRepresentable(value: formatCodeInt16, asType: PSQLFormat.self)
                 }
                 
                 let field = Column(

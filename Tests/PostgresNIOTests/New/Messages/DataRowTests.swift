@@ -32,6 +32,6 @@ class DataRowTests: XCTestCase {
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: expectedInOuts,
-            decoderFactory: { PSQLBackendMessage.Decoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
     }
 }
