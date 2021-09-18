@@ -5,7 +5,7 @@ import NIOCore
 class SASLResponseTests: XCTestCase {
 
     func testEncodeWithData() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let sasl = PSQLFrontendMessage.SASLResponse(data: [0, 1, 2, 3, 4, 5, 6, 7])
         let message = PSQLFrontendMessage.saslResponse(sasl)
@@ -21,7 +21,7 @@ class SASLResponseTests: XCTestCase {
     }
     
     func testEncodeWithoutData() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let sasl = PSQLFrontendMessage.SASLResponse(data: [])
         let message = PSQLFrontendMessage.saslResponse(sasl)

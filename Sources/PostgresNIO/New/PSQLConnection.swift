@@ -231,7 +231,7 @@ final class PSQLConnection {
                         
                         return channel.pipeline.addHandlers([
                             decoder,
-                            MessageToByteHandler(PSQLFrontendMessage.Encoder(jsonEncoder: configuration.coders.jsonEncoder)),
+                            MessageToByteHandler(PSQLFrontendMessageEncoder(jsonEncoder: configuration.coders.jsonEncoder)),
                             PSQLChannelHandler(
                                 authentification: configuration.authentication,
                                 logger: logger,

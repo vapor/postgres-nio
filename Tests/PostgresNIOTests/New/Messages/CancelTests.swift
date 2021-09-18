@@ -5,7 +5,7 @@ import NIOCore
 class CancelTests: XCTestCase {
     
     func testEncodeCancel() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let cancel = PSQLFrontendMessage.Cancel(processID: 1234, secretKey: 4567)
         let message = PSQLFrontendMessage.cancel(cancel)
