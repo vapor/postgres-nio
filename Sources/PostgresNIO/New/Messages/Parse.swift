@@ -2,7 +2,7 @@ import NIOCore
 
 extension PSQLFrontendMessage {
     
-    struct Parse: PayloadEncodable, Equatable {
+    struct Parse: PSQLMessagePayloadEncodable, Equatable {
         /// The name of the destination prepared statement (an empty string selects the unnamed prepared statement).
         let preparedStatementName: String
         

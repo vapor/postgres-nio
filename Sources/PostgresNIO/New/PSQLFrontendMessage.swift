@@ -5,8 +5,6 @@ import NIOCore
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
 enum PSQLFrontendMessage {
-    typealias PayloadEncodable = PSQLFrontendMessagePayloadEncodable
-    
     case bind(Bind)
     case cancel(Cancel)
     case close(Close)
@@ -112,11 +110,11 @@ extension PSQLFrontendMessage {
         }
         
         func encode(data message: PSQLFrontendMessage, out buffer: inout ByteBuffer) throws {
-            struct EmptyPayload: PayloadEncodable {
+            struct EmptyPayload: PSQLMessagePayloadEncodable {
                 func encode(into buffer: inout ByteBuffer) {}
             }
             
-            func encode<Payload: PayloadEncodable>(_ payload: Payload, into buffer: inout ByteBuffer) {
+            func encode<Payload: PSQLMessagePayloadEncodable>(_ payload: Payload, into buffer: inout ByteBuffer) {
                 let startIndex = buffer.writerIndex
                 buffer.writeInteger(Int32(0)) // placeholder for length
                 payload.encode(into: &buffer)
@@ -177,6 +175,6 @@ extension PSQLFrontendMessage {
     }
 }
 
-protocol PSQLFrontendMessagePayloadEncodable {
+protocol PSQLMessagePayloadEncodable {
     func encode(into buffer: inout ByteBuffer)
 }

@@ -2,7 +2,7 @@ import NIOCore
 
 extension PSQLFrontendMessage {
     
-    struct Execute: PayloadEncodable, Equatable {
+    struct Execute: PSQLMessagePayloadEncodable, Equatable {
         /// The name of the portal to execute (an empty string selects the unnamed portal).
         let portalName: String
         
