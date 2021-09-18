@@ -20,8 +20,7 @@ enum PSQLFrontendMessage {
     case startup(Startup)
     case terminate
     
-    enum ID: RawRepresentable, Equatable {
-        typealias RawValue = UInt8
+    enum ID: UInt8, Equatable {
         
         case bind
         case close
