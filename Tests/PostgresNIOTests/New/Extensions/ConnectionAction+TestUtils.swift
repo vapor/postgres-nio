@@ -67,10 +67,10 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
         case (.failQuery(let lhsContext, let lhsError, let lhsCleanupContext), .failQuery(let rhsContext, let rhsError, let rhsCleanupContext)):
             return lhsContext === rhsContext && lhsError == rhsError && lhsCleanupContext == rhsCleanupContext
-        case (.forwardRow(let lhsColumns, let lhsPromise), .forwardRow(let rhsColumns, let rhsPromise)):
-            return lhsColumns == rhsColumns && lhsPromise.futureResult === rhsPromise.futureResult
-        case (.forwardStreamCompletedToCurrentQuery(let lhsBuffer, let lhsCommandTag, let lhsRead), .forwardStreamCompletedToCurrentQuery(let rhsBuffer, let rhsCommandTag, let rhsRead)):
-            return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag && lhsRead == rhsRead
+        case (.forwardRows(let lhsRows), .forwardRows(let rhsRows)):
+            return lhsRows == rhsRows
+        case (.forwardStreamComplete(let lhsBuffer, let lhsCommandTag), .forwardStreamComplete(let rhsBuffer, let rhsCommandTag)):
+            return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag
         case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
             return lhsName == rhsName && lhsQuery == rhsQuery
         case (.succeedPreparedStatementCreation(let lhsContext, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsContext, let rhsRowDescription)):

@@ -50,15 +50,31 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
-        let rowContent = ByteBuffer(string: "test")
-        XCTAssertEqual(state.dataRowReceived(.init(columns: [rowContent])), .wait)
+        let row1: PSQLBackendMessage.DataRow = [ByteBuffer(string: "test1")]
+        XCTAssertEqual(state.dataRowReceived(row1), .wait)
+        XCTAssertEqual(state.channelReadComplete(), .forwardRows([row1]))
         XCTAssertEqual(state.readEventCaught(), .wait)
+        XCTAssertEqual(state.requestQueryRows(), .read)
         
-        let rowPromise = EmbeddedEventLoop().makePromise(of: StateMachineStreamNextResult.self)
-        rowPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
-        XCTAssertEqual(state.consumeNextQueryRow(promise: rowPromise), .forwardRow(.init(columns: [rowContent]), to: rowPromise))
+        let row2: PSQLBackendMessage.DataRow = [ByteBuffer(string: "test2")]
+        let row3: PSQLBackendMessage.DataRow = [ByteBuffer(string: "test3")]
+        let row4: PSQLBackendMessage.DataRow = [ByteBuffer(string: "test4")]
+        XCTAssertEqual(state.dataRowReceived(row2), .wait)
+        XCTAssertEqual(state.dataRowReceived(row3), .wait)
+        XCTAssertEqual(state.dataRowReceived(row4), .wait)
+        XCTAssertEqual(state.channelReadComplete(), .forwardRows([row2, row3, row4]))
+        XCTAssertEqual(state.requestQueryRows(), .wait)
+        XCTAssertEqual(state.readEventCaught(), .read)
         
-        XCTAssertEqual(state.commandCompletedReceived("SELECT 1"), .forwardStreamCompletedToCurrentQuery(CircularBuffer(), commandTag: "SELECT 1", read: true))
+        XCTAssertEqual(state.channelReadComplete(), .wait)
+        XCTAssertEqual(state.readEventCaught(), .read)
+        
+        let row5: PSQLBackendMessage.DataRow = [ByteBuffer(string: "test5")]
+        let row6: PSQLBackendMessage.DataRow = [ByteBuffer(string: "test6")]
+        XCTAssertEqual(state.dataRowReceived(row5), .wait)
+        XCTAssertEqual(state.dataRowReceived(row6), .wait)
+        
+        XCTAssertEqual(state.commandCompletedReceived("SELECT 2"), .forwardStreamComplete([row5, row6], commandTag: "SELECT 2"))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     

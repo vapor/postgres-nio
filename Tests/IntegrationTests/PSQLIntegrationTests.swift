@@ -56,12 +56,11 @@ final class IntegrationTests: XCTestCase {
         
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var version: String?
-        XCTAssertNoThrow(version = try row?.decode(column: 0, as: String.self))
+        XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
-        XCTAssertNil(try stream?.next().wait())
     }
     
     func testQuery10kItems() {
@@ -76,27 +75,20 @@ final class IntegrationTests: XCTestCase {
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT generate_series(1, 10000);", logger: .psqlTest).wait())
         
-        var expected: Int64 = 1
+        var received: Int64 = 0
         
         XCTAssertNoThrow(try stream?.onRow { row in
-            let promise = eventLoop.makePromise(of: Void.self)
-            
             func workaround() {
                 var number: Int64?
                 XCTAssertNoThrow(number = try row.decode(column: 0, as: Int64.self))
-                XCTAssertEqual(number, expected)
-                expected += 1
+                received += 1
+                XCTAssertEqual(number, received)
             }
             
-            eventLoop.execute {
-                workaround()
-                promise.succeed(())
-            }
-            
-            return promise.futureResult
+            workaround()
         }.wait())
         
-        XCTAssertEqual(expected, 10001)
+        XCTAssertEqual(received, 10000)
     }
     
     func test1kRoundTrips() {
@@ -111,12 +103,11 @@ final class IntegrationTests: XCTestCase {
         for _ in 0..<1_000 {
             var stream: PSQLRowStream?
             XCTAssertNoThrow(stream = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-            var row: PSQLRow?
-            XCTAssertNoThrow(row = try stream?.next().wait())
+            var rows: [PSQLRow]?
+            XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
             var version: String?
-            XCTAssertNoThrow(version = try row?.decode(column: 0, as: String.self))
+            XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
             XCTAssertEqual(version?.contains("PostgreSQL"), true)
-            XCTAssertNil(try stream?.next().wait())
         }
     }
     
@@ -131,12 +122,11 @@ final class IntegrationTests: XCTestCase {
         
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT $1::TEXT as foo", ["hello"], logger: .psqlTest).wait())
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var foo: String?
-        XCTAssertNoThrow(foo = try row?.decode(column: 0, as: String.self))
+        XCTAssertNoThrow(foo = try rows?.first?.decode(column: 0, as: String.self))
         XCTAssertEqual(foo, "hello")
-        XCTAssertNil(try stream?.next().wait())
     }
     
     func testDecodeIntegers() {
@@ -162,8 +152,10 @@ final class IntegrationTests: XCTestCase {
             9223372036854775807::BIGINT   as bigint_max
         """, logger: .psqlTest).wait())
         
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
+        let row = rows?.first
         
         XCTAssertEqual(try row?.decode(column: "smallint", as: Int16.self), 1)
         XCTAssertEqual(try row?.decode(column: "smallint_min", as: Int16.self), -32_767)
@@ -174,8 +166,6 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(try row?.decode(column: "bigint", as: Int64.self), 1)
         XCTAssertEqual(try row?.decode(column: "bigint_min", as: Int64.self), -9_223_372_036_854_775_807)
         XCTAssertEqual(try row?.decode(column: "bigint_max", as: Int64.self), 9_223_372_036_854_775_807)
-        
-        XCTAssertNil(try stream?.next().wait())
     }
     
     func testEncodeAndDecodeIntArray() {
@@ -191,11 +181,10 @@ final class IntegrationTests: XCTestCase {
         let array: [Int64] = [1, 2, 3]
         XCTAssertNoThrow(stream = try conn?.query("SELECT $1::int8[] as array", [array], logger: .psqlTest).wait())
         
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
-        
-        XCTAssertEqual(try row?.decode(column: "array", as: [Int64].self), array)
-        XCTAssertNil(try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(try rows?.first?.decode(column: "array", as: [Int64].self), array)
     }
     
     func testDecodeEmptyIntegerArray() {
@@ -210,11 +199,10 @@ final class IntegrationTests: XCTestCase {
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT '{}'::int[] as array", logger: .psqlTest).wait())
         
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
-        
-        XCTAssertEqual(try row?.decode(column: "array", as: [Int64].self), [])
-        XCTAssertNil(try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(try rows?.first?.decode(column: "array", as: [Int64].self), [])
     }
     
     func testDoubleArraySerialization() {
@@ -230,11 +218,10 @@ final class IntegrationTests: XCTestCase {
         let doubles: [Double] = [3.14, 42]
         XCTAssertNoThrow(stream = try conn?.query("SELECT $1::double precision[] as doubles", [doubles], logger: .psqlTest).wait())
         
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
-        
-        XCTAssertEqual(try row?.decode(column: "doubles", as: [Double].self), doubles)
-        XCTAssertNil(try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(try rows?.first?.decode(column: "doubles", as: [Double].self), doubles)
     }
     
     func testDecodeDates() {
@@ -254,14 +241,14 @@ final class IntegrationTests: XCTestCase {
                 '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
             """, logger: .psqlTest).wait())
         
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
+        let row = rows?.first
         
         XCTAssertEqual(try row?.decode(column: "date", as: Date.self).description, "2016-01-18 00:00:00 +0000")
         XCTAssertEqual(try row?.decode(column: "timestamp", as: Date.self).description, "2016-01-18 01:02:03 +0000")
         XCTAssertEqual(try row?.decode(column: "timestamptz", as: Date.self).description, "2016-01-18 00:20:03 +0000")
-        
-        XCTAssertNil(try stream?.next().wait())
     }
     
     func testDecodeUUID() {
@@ -278,12 +265,11 @@ final class IntegrationTests: XCTestCase {
             SELECT '2c68f645-9ca6-468b-b193-ee97f241c2f8'::UUID as uuid
             """, logger: .psqlTest).wait())
         
-        var row: PSQLRow?
-        XCTAssertNoThrow(row = try stream?.next().wait())
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
         
-        XCTAssertEqual(try row?.decode(column: "uuid", as: UUID.self), UUID(uuidString: "2c68f645-9ca6-468b-b193-ee97f241c2f8"))
-        
-        XCTAssertNil(try stream?.next().wait())
+        XCTAssertEqual(try rows?.first?.decode(column: "uuid", as: UUID.self), UUID(uuidString: "2c68f645-9ca6-468b-b193-ee97f241c2f8"))
     }
     
     func testRoundTripJSONB() {
@@ -306,14 +292,13 @@ final class IntegrationTests: XCTestCase {
                 select $1::jsonb as jsonb
                 """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
             
-            var row: PSQLRow?
-            XCTAssertNoThrow(row = try stream?.next().wait())
+            var rows: [PSQLRow]?
+            XCTAssertNoThrow(rows = try stream?.all().wait())
+            XCTAssertEqual(rows?.count, 1)
             var result: Object?
-            XCTAssertNoThrow(result = try row?.decode(column: "jsonb", as: Object.self))
+            XCTAssertNoThrow(result = try rows?.first?.decode(column: "jsonb", as: Object.self))
             XCTAssertEqual(result?.foo, 1)
             XCTAssertEqual(result?.bar, 2)
-            
-            XCTAssertNil(try stream?.next().wait())
         }
         
         do {
@@ -322,14 +307,13 @@ final class IntegrationTests: XCTestCase {
                 select $1::json as json
                 """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
             
-            var row: PSQLRow?
-            XCTAssertNoThrow(row = try stream?.next().wait())
+            var rows: [PSQLRow]?
+            XCTAssertNoThrow(rows = try stream?.all().wait())
+            XCTAssertEqual(rows?.count, 1)
             var result: Object?
-            XCTAssertNoThrow(result = try row?.decode(column: "json", as: Object.self))
+            XCTAssertNoThrow(result = try rows?.first?.decode(column: "json", as: Object.self))
             XCTAssertEqual(result?.foo, 1)
             XCTAssertEqual(result?.bar, 2)
-            
-            XCTAssertNil(try stream?.next().wait())
         }
     }
 }
