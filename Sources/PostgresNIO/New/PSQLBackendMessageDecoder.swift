@@ -69,7 +69,7 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
             
             return try PSQLBackendMessage.decode(from: &slice, for: messageID)
         } catch let error as PSQLPartialDecodingError {
-            throw PSQLDecodingError.withPartialError(error, messageID: messageID, messageBytes: completeMessageBuffer)
+            throw PSQLDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessageBuffer)
         } catch {
             preconditionFailure("Expected to only see `PartialDecodingError`s here.")
         }
@@ -106,14 +106,14 @@ struct PSQLDecodingError: Error {
     
     static func withPartialError(
         _ partialError: PSQLPartialDecodingError,
-        messageID: PSQLBackendMessage.ID,
+        messageID: UInt8,
         messageBytes: ByteBuffer) -> Self
     {
         var byteBuffer = messageBytes
         let data = byteBuffer.readData(length: byteBuffer.readableBytes)!
         
         return PSQLDecodingError(
-            messageID: messageID.rawValue,
+            messageID: messageID,
             payload: data.base64EncodedString(),
             description: partialError.description,
             file: partialError.file,
