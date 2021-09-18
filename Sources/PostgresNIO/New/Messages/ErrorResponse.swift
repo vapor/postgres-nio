@@ -112,13 +112,13 @@ extension PSQLBackendMessage.PayloadDecodable where Self: PSQLMessageNotice {
                 break
             }
             guard let field = PSQLBackendMessage.Field(rawValue: id) else {
-                throw PSQLBackendMessage.PartialDecodingError.valueNotRawRepresentable(
+                throw PSQLPartialDecodingError.valueNotRawRepresentable(
                     value: id,
                     asType: PSQLBackendMessage.Field.self)
             }
             
             guard let string = buffer.readNullTerminatedString() else {
-                throw PSQLBackendMessage.PartialDecodingError.fieldNotDecodable(type: String.self)
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             fields[field] = string
         }

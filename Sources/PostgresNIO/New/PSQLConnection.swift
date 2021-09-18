@@ -214,7 +214,7 @@ final class PSQLConnection {
             }.flatMap { address -> EventLoopFuture<Channel> in
                 let bootstrap = ClientBootstrap(group: eventLoop)
                     .channelInitializer { channel in
-                        let decoder = ByteToMessageHandler(PSQLBackendMessage.Decoder())
+                        let decoder = ByteToMessageHandler(PSQLBackendMessageDecoder())
                         
                         var configureSSLCallback: ((Channel) throws -> ())? = nil
                         if let tlsConfiguration = configuration.tlsConfiguration {

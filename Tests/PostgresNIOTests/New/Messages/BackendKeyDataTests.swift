@@ -16,7 +16,7 @@ class BackendKeyDataTests: XCTestCase {
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: expectedInOuts,
-            decoderFactory: { PSQLBackendMessage.Decoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
     }
     
     func testDecodeInvalidLength() {
@@ -32,8 +32,8 @@ class BackendKeyDataTests: XCTestCase {
         
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: expected,
-            decoderFactory: { PSQLBackendMessage.Decoder(hasAlreadyReceivedBytes: false) })) {
-            XCTAssert($0 is PSQLBackendMessage.DecodingError)
+            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
+            XCTAssert($0 is PSQLDecodingError)
         }
     }
 }

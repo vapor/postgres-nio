@@ -33,14 +33,12 @@ extension PSQLBackendMessage {
         }
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
-            guard buffer.readableBytes == 1 else {
-                throw PartialDecodingError.expectedExactlyNRemainingBytes(1, actual: buffer.readableBytes)
-            }
+            try buffer.ensureExactNBytesRemaining(1)
             
             // Exactly one byte is readable. For this reason, we can force unwrap the UInt8 below
             let value = buffer.readInteger(as: UInt8.self)!
             guard let state = Self.init(rawValue: value) else {
-                throw PartialDecodingError.valueNotRawRepresentable(value: value, asType: TransactionState.self)
+                throw PSQLPartialDecodingError.valueNotRawRepresentable(value: value, asType: TransactionState.self)
             }
             
             return state

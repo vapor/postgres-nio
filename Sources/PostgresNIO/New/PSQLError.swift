@@ -6,7 +6,7 @@ struct PSQLError: Error {
         case sslUnsupported
         case failedToAddSSLHandler(underlying: Error)
         case server(PSQLBackendMessage.ErrorResponse)
-        case decoding(PSQLBackendMessage.DecodingError)
+        case decoding(PSQLDecodingError)
         case unexpectedBackendMessage(PSQLBackendMessage)
         case unsupportedAuthMechanism(PSQLAuthScheme)
         case authMechanismRequiresPassword
@@ -39,7 +39,7 @@ struct PSQLError: Error {
         Self.init(.server(message))
     }
     
-    static func decoding(_ error: PSQLBackendMessage.DecodingError) -> PSQLError {
+    static func decoding(_ error: PSQLDecodingError) -> PSQLError {
         Self.init(.decoding(error))
     }
     

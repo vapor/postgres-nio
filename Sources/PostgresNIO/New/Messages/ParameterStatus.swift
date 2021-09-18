@@ -11,11 +11,11 @@ extension PSQLBackendMessage {
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {            
             guard let name = buffer.readNullTerminatedString() else {
-                throw PartialDecodingError.fieldNotDecodable(type: String.self)
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             
             guard let value = buffer.readNullTerminatedString() else {
-                throw PartialDecodingError.fieldNotDecodable(type: String.self)
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             
             return ParameterStatus(parameter: name, value: value)
