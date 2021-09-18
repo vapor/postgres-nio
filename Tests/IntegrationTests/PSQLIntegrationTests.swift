@@ -56,7 +56,7 @@ final class IntegrationTests: XCTestCase {
         
         var rows: PSQLRows?
         XCTAssertNoThrow(rows = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         var version: String?
         XCTAssertNoThrow(version = try row?.decode(column: 0, as: String.self))
@@ -111,7 +111,7 @@ final class IntegrationTests: XCTestCase {
         for _ in 0..<1_000 {
             var rows: PSQLRows?
             XCTAssertNoThrow(rows = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-            var row: PSQLRows.Row?
+            var row: PSQLRow?
             XCTAssertNoThrow(row = try rows?.next().wait())
             var version: String?
             XCTAssertNoThrow(version = try row?.decode(column: 0, as: String.self))
@@ -131,7 +131,7 @@ final class IntegrationTests: XCTestCase {
         
         var rows: PSQLRows?
         XCTAssertNoThrow(rows = try conn?.query("SELECT $1::TEXT as foo", ["hello"], logger: .psqlTest).wait())
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         var foo: String?
         XCTAssertNoThrow(foo = try row?.decode(column: 0, as: String.self))
@@ -162,7 +162,7 @@ final class IntegrationTests: XCTestCase {
             9223372036854775807::BIGINT   as bigint_max
         """, logger: .psqlTest).wait())
         
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         
         XCTAssertEqual(try row?.decode(column: "smallint", as: Int16.self), 1)
@@ -191,7 +191,7 @@ final class IntegrationTests: XCTestCase {
         let array: [Int64] = [1, 2, 3]
         XCTAssertNoThrow(rows = try conn?.query("SELECT $1::int8[] as array", [array], logger: .psqlTest).wait())
         
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         
         XCTAssertEqual(try row?.decode(column: "array", as: [Int64].self), array)
@@ -210,7 +210,7 @@ final class IntegrationTests: XCTestCase {
         var rows: PSQLRows?
         XCTAssertNoThrow(rows = try conn?.query("SELECT '{}'::int[] as array", logger: .psqlTest).wait())
         
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         
         XCTAssertEqual(try row?.decode(column: "array", as: [Int64].self), [])
@@ -230,7 +230,7 @@ final class IntegrationTests: XCTestCase {
         let doubles: [Double] = [3.14, 42]
         XCTAssertNoThrow(rows = try conn?.query("SELECT $1::double precision[] as doubles", [doubles], logger: .psqlTest).wait())
         
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         
         XCTAssertEqual(try row?.decode(column: "doubles", as: [Double].self), doubles)
@@ -254,7 +254,7 @@ final class IntegrationTests: XCTestCase {
                 '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
             """, logger: .psqlTest).wait())
         
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         
         XCTAssertEqual(try row?.decode(column: "date", as: Date.self).description, "2016-01-18 00:00:00 +0000")
@@ -278,7 +278,7 @@ final class IntegrationTests: XCTestCase {
             SELECT '2c68f645-9ca6-468b-b193-ee97f241c2f8'::UUID as uuid
             """, logger: .psqlTest).wait())
         
-        var row: PSQLRows.Row?
+        var row: PSQLRow?
         XCTAssertNoThrow(row = try rows?.next().wait())
         
         XCTAssertEqual(try row?.decode(column: "uuid", as: UUID.self), UUID(uuidString: "2c68f645-9ca6-468b-b193-ee97f241c2f8"))
@@ -306,7 +306,7 @@ final class IntegrationTests: XCTestCase {
                 select $1::jsonb as jsonb
                 """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
             
-            var row: PSQLRows.Row?
+            var row: PSQLRow?
             XCTAssertNoThrow(row = try rows?.next().wait())
             var result: Object?
             XCTAssertNoThrow(result = try row?.decode(column: "jsonb", as: Object.self))
@@ -322,7 +322,7 @@ final class IntegrationTests: XCTestCase {
                 select $1::json as json
                 """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
             
-            var row: PSQLRows.Row?
+            var row: PSQLRow?
             XCTAssertNoThrow(row = try rows?.next().wait())
             var result: Object?
             XCTAssertNoThrow(result = try row?.decode(column: "json", as: Object.self))

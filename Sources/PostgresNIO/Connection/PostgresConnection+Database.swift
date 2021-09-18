@@ -82,8 +82,8 @@ extension PSQLRows {
     
     func iterateRowsWithoutBackpressureOption(lookupTable: PostgresRow.LookupTable, onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         self.onRow { psqlRow in
-            let columns = psqlRow.data.map { psqlData in
-                PostgresMessage.DataRow.Column(value: psqlData.bytes)
+            let columns = psqlRow.data.columns.map { bytes in
+                PostgresMessage.DataRow.Column(value: bytes)
             }
             
             let row = PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)

@@ -92,12 +92,12 @@ struct ConnectionStateMachine {
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
-        case forwardRow([PSQLData], to: EventLoopPromise<StateMachineStreamNextResult>)
-        case forwardCommandComplete(CircularBuffer<[PSQLData]>, commandTag: String, to: EventLoopPromise<StateMachineStreamNextResult>)
+        case forwardRow(PSQLBackendMessage.DataRow, to: EventLoopPromise<StateMachineStreamNextResult>)
+        case forwardCommandComplete(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String, to: EventLoopPromise<StateMachineStreamNextResult>)
         case forwardStreamError(PSQLError, to: EventLoopPromise<StateMachineStreamNextResult>, cleanupContext: CleanUpContext?)
         // actions if query has not asked for next row but are pushing the final bytes to it
         case forwardStreamErrorToCurrentQuery(PSQLError, read: Bool, cleanupContext: CleanUpContext?)
-        case forwardStreamCompletedToCurrentQuery(CircularBuffer<[PSQLData]>, commandTag: String, read: Bool)
+        case forwardStreamCompletedToCurrentQuery(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String, read: Bool)
         
         // Prepare statement actions
         case sendParseDescribeSync(name: String, query: String)
@@ -1106,10 +1106,10 @@ extension ConnectionStateMachine {
 
 enum StateMachineStreamNextResult {
     /// the next row
-    case row([PSQLData])
+    case row(PSQLBackendMessage.DataRow)
     
     /// the query has completed, all remaining rows and the command completion tag
-    case complete(CircularBuffer<[PSQLData]>, commandTag: String)
+    case complete(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
 }
 
 struct SendPrepareStatement {

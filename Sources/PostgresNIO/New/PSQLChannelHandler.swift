@@ -458,7 +458,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             cancel: {
                 // ignore...
             }, next: {
-                let emptyBuffer = CircularBuffer<[PSQLData]>(initialCapacity: 0)
+                let emptyBuffer = CircularBuffer<PSQLBackendMessage.DataRow>(initialCapacity: 0)
                 return eventLoop.makeSucceededFuture(.complete(emptyBuffer, commandTag: commandTag))
             })
         queryContext.promise.succeed(rows)

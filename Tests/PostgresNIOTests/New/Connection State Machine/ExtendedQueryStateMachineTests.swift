@@ -56,7 +56,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         let rowPromise = EmbeddedEventLoop().makePromise(of: StateMachineStreamNextResult.self)
         rowPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
-        XCTAssertEqual(state.consumeNextQueryRow(promise: rowPromise), .forwardRow([.init(bytes: rowContent, dataType: .text, format: .binary)], to: rowPromise))
+        XCTAssertEqual(state.consumeNextQueryRow(promise: rowPromise), .forwardRow(.init(columns: [rowContent]), to: rowPromise))
         
         XCTAssertEqual(state.commandCompletedReceived("SELECT 1"), .forwardStreamCompletedToCurrentQuery(CircularBuffer(), commandTag: "SELECT 1", read: true))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)

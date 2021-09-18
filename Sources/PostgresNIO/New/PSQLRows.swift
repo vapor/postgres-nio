@@ -8,7 +8,7 @@ final class PSQLRows {
     
     private enum UpstreamState {
         case streaming(next: () -> EventLoopFuture<StateMachineStreamNextResult>, cancel: () -> ())
-        case finished(remaining: CircularBuffer<[PSQLData]>, commandTag: String)
+        case finished(remaining: CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
         case failure(Error)
         case consumed(Result<String, Error>)
     }
@@ -46,7 +46,7 @@ final class PSQLRows {
         self.lookupTable = lookup
     }
     
-    func next() -> EventLoopFuture<Row?> {
+    func next() -> EventLoopFuture<PSQLRow?> {
         guard self.eventLoop.inEventLoop else {
             return self.eventLoop.flatSubmit {
                 self.next()
@@ -57,15 +57,15 @@ final class PSQLRows {
         
         switch self.upstreamState {
         case .streaming(let upstreamNext, _):
-            return upstreamNext().map { payload -> Row? in
+            return upstreamNext().map { payload -> PSQLRow? in
                 self.downstreamState = .consuming
                 switch payload {
                 case .row(let data):
-                    return Row(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                    return PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
                 case .complete(var buffer, let commandTag):
                     if let data = buffer.popFirst() {
                         self.upstreamState = .finished(remaining: buffer, commandTag: commandTag)
-                        return Row(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                        return PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
                     }
                     
                     self.upstreamState = .consumed(.success(commandTag))
@@ -82,7 +82,7 @@ final class PSQLRows {
             self.downstreamState = .consuming
             if let data = buffer.popFirst() {
                 self.upstreamState = .finished(remaining: buffer, commandTag: commandTag)
-                let row = Row(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                let row = PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
                 return self.eventLoop.makeSucceededFuture(row)
             }
             
@@ -104,7 +104,7 @@ final class PSQLRows {
         ])
     }
     
-    internal func finalForward(_ finalForward: Result<(CircularBuffer<[PSQLData]>, commandTag: String), PSQLError>?) {
+    internal func finalForward(_ finalForward: Result<(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String), PSQLError>?) {
         switch finalForward {
         case .some(.success((let buffer, commandTag: let commandTag))):
             guard case .streaming = self.upstreamState else {
@@ -146,56 +146,8 @@ final class PSQLRows {
         }
         return commandTag
     }
-    
-    struct Row {
-        let lookupTable: [String: Int]
-        let data: [PSQLData]
-        let columns: [PSQLBackendMessage.RowDescription.Column]
-        let jsonDecoder: PSQLJSONDecoder
         
-        init(data: [PSQLData], lookupTable: [String: Int], columns: [PSQLBackendMessage.RowDescription.Column], jsonDecoder: PSQLJSONDecoder) {
-            self.data = data
-            self.lookupTable = lookupTable
-            self.columns = columns
-            self.jsonDecoder = jsonDecoder
-        }
-        
-        subscript(index: Int) -> PSQLData {
-            self.data[index]
-        }
-        
-        // TBD: Should this be optional?
-        subscript(column columnName: String) -> PSQLData? {
-            guard let index = self.lookupTable[columnName] else {
-                return nil
-            }
-            
-            return self[index]
-        }
-        
-        func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
-            guard let index = self.lookupTable[column] else {
-                preconditionFailure("A column '\(column)' does not exist.")
-            }
-            
-            return try self.decode(column: index, as: type, file: file, line: line)
-        }
-        
-        func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
-            let column = self.columns[index]
-            
-            let decodingContext = PSQLDecodingContext(
-                jsonDecoder: jsonDecoder,
-                columnName: column.name,
-                columnIndex: index,
-                file: file,
-                line: line)
-            
-            return try self[index].decode(as: T.self, context: decodingContext)
-        }
-    }
-    
-    func onRow(_ onRow: @escaping (Row) -> EventLoopFuture<Void>) -> EventLoopFuture<Void> {
+    func onRow(_ onRow: @escaping (PSQLRow) -> EventLoopFuture<Void>) -> EventLoopFuture<Void> {
         let promise = self.eventLoop.makePromise(of: Void.self)
         
         func consumeNext(promise: EventLoopPromise<Void>) {
