@@ -5,7 +5,7 @@ import NIOCore
 class SSLRequestTests: XCTestCase {
     
     func testSSLRequest() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let request = PSQLFrontendMessage.SSLRequest()
         let message = PSQLFrontendMessage.sslRequest(request)

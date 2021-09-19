@@ -23,7 +23,7 @@ class PSQLFrontendMessageTests: XCTestCase {
     // MARK: Encoder
     
     func testEncodeFlush() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         XCTAssertNoThrow(try encoder.encode(data: .flush, out: &byteBuffer))
         
@@ -33,7 +33,7 @@ class PSQLFrontendMessageTests: XCTestCase {
     }
     
     func testEncodeSync() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         XCTAssertNoThrow(try encoder.encode(data: .sync, out: &byteBuffer))
         
@@ -43,7 +43,7 @@ class PSQLFrontendMessageTests: XCTestCase {
     }
     
     func testEncodeTerminate() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         XCTAssertNoThrow(try encoder.encode(data: .terminate, out: &byteBuffer))
         

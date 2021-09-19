@@ -1,7 +1,7 @@
 @testable import PostgresNIO
 import Foundation
 
-extension PSQLFrontendMessage.Encoder {
+extension PSQLFrontendMessageEncoder {
     static var forTests: Self {
         Self(jsonEncoder: JSONEncoder())
     }

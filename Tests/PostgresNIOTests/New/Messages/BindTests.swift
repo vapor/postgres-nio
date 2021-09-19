@@ -5,7 +5,7 @@ import NIOCore
 class BindTests: XCTestCase {
     
     func testEncodeBind() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let bind = PSQLFrontendMessage.Bind(portalName: "", preparedStatementName: "", parameters: ["Hello", "World"])
         let message = PSQLFrontendMessage.bind(bind)

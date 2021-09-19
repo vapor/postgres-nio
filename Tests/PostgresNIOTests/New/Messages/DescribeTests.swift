@@ -5,7 +5,7 @@ import NIOCore
 class DescribeTests: XCTestCase {
     
     func testEncodeDescribePortal() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let message = PSQLFrontendMessage.describe(.portal("Hello"))
         XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
@@ -19,7 +19,7 @@ class DescribeTests: XCTestCase {
     }
     
     func testEncodeDescribeUnnamedStatement() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let message = PSQLFrontendMessage.describe(.preparedStatement(""))
         XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))

@@ -5,7 +5,7 @@ import NIOCore
 class ParseTests: XCTestCase {
 
     func testEncode() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let parse = PSQLFrontendMessage.Parse(
             preparedStatementName: "test",

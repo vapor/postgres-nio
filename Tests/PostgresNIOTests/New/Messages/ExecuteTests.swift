@@ -5,7 +5,7 @@ import NIOCore
 class ExecuteTests: XCTestCase {
     
     func testEncodeExecute() {
-        let encoder = PSQLFrontendMessage.Encoder.forTests
+        let encoder = PSQLFrontendMessageEncoder.forTests
         var byteBuffer = ByteBuffer()
         let message = PSQLFrontendMessage.execute(.init(portalName: "", maxNumberOfRows: 0))
         XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
