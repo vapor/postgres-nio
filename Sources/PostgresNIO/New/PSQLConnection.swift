@@ -214,8 +214,6 @@ final class PSQLConnection {
             }.flatMap { address -> EventLoopFuture<Channel> in
                 let bootstrap = ClientBootstrap(group: eventLoop)
                     .channelInitializer { channel in
-                        let decoder = ByteToMessageHandler(PSQLBackendMessageDecoder())
-                        
                         var configureSSLCallback: ((Channel) throws -> ())? = nil
                         if let tlsConfiguration = configuration.tlsConfiguration {
                             configureSSLCallback = { channel in
@@ -225,12 +223,11 @@ final class PSQLConnection {
                                 let sslHandler = try NIOSSLClientHandler(
                                     context: sslContext,
                                     serverHostname: configuration.sslServerHostname)
-                                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .before(decoder))
+                                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
                             }
                         }
                         
                         return channel.pipeline.addHandlers([
-                            decoder,
                             MessageToByteHandler(PSQLFrontendMessageEncoder(jsonEncoder: configuration.coders.jsonEncoder)),
                             PSQLChannelHandler(
                                 authentification: configuration.authentication,

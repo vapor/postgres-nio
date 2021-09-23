@@ -11,8 +11,10 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testHandlerAddedWithoutSSL() {
         let config = self.testConnectionConfiguration()
-        let handler = PSQLChannelHandler(authentification: config.authentication, configureSSLCallback: nil)
-        let embedded = EmbeddedChannel(handler: handler)
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+            PSQLChannelHandler(authentification: config.authentication, configureSSLCallback: nil)
+        ])
         defer { XCTAssertNoThrow(try embedded.finish()) }
         
         var maybeMessage: PSQLFrontendMessage?
@@ -39,7 +41,10 @@ class PSQLChannelHandlerTests: XCTestCase {
         let handler = PSQLChannelHandler(authentification: config.authentication) { channel in
             addSSLCallbackIsHit = true
         }
-        let embedded = EmbeddedChannel(handler: handler)
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+            handler
+        ])
         
         var maybeMessage: PSQLFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
@@ -78,7 +83,10 @@ class PSQLChannelHandlerTests: XCTestCase {
             XCTFail("This callback should never be exectuded")
             throw PSQLError.sslUnsupported
         }
-        let embedded = EmbeddedChannel(handler: handler)
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+            handler
+        ])
         let eventHandler = TestEventHandler()
         XCTAssertNoThrow(try embedded.pipeline.addHandler(eventHandler, position: .last).wait())
         
@@ -107,7 +115,10 @@ class PSQLChannelHandlerTests: XCTestCase {
         )
         let state = ConnectionStateMachine(.waitingToStartAuthentication)
         let handler = PSQLChannelHandler(authentification: config.authentication, state: state, configureSSLCallback: nil)
-        let embedded = EmbeddedChannel(handler: handler)
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+            handler
+        ])
         
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
@@ -132,7 +143,10 @@ class PSQLChannelHandlerTests: XCTestCase {
         )
         let state = ConnectionStateMachine(.waitingToStartAuthentication)
         let handler = PSQLChannelHandler(authentification: config.authentication, state: state, configureSSLCallback: nil)
-        let embedded = EmbeddedChannel(handler: handler)
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+            handler
+        ])
         
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
