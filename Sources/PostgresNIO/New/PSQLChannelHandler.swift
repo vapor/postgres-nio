@@ -8,8 +8,8 @@ protocol PSQLChannelHandlerNotificationDelegate: AnyObject {
 }
 
 final class PSQLChannelHandler: ChannelDuplexHandler {
-    typealias InboundIn = PSQLBackendMessage
     typealias OutboundIn = PSQLTask
+    typealias InboundIn = ByteBuffer
     typealias OutboundOut = PSQLFrontendMessage
 
     private let logger: Logger
@@ -24,6 +24,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     /// The context is captured in `handlerAdded` and released` in `handlerRemoved`
     private var handlerContext: ChannelHandlerContext!
     private var rowStream: PSQLRowStream?
+    private var decoder: NIOSingleStepByteToMessageProcessor<PSQLBackendMessageDecoder>
     private let authentificationConfiguration: PSQLConnection.Configuration.Authentication?
     private let configureSSLCallback: ((Channel) throws -> Void)?
     
@@ -38,6 +39,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.authentificationConfiguration = authentification
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
+        self.decoder = NIOSingleStepByteToMessageProcessor(PSQLBackendMessageDecoder())
     }
     
     #if DEBUG
@@ -51,6 +53,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.authentificationConfiguration = authentification
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
+        self.decoder = NIOSingleStepByteToMessageProcessor(PSQLBackendMessageDecoder())
     }
     #endif
     
@@ -91,54 +94,62 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let incomingMessage = self.unwrapInboundIn(data)
+        let buffer = self.unwrapInboundIn(data)
         
-        self.logger.trace("Backend message received", metadata: [.message: "\(incomingMessage)"])
-        
-        let action: ConnectionStateMachine.ConnectionAction
-        
-        switch incomingMessage {
-        case .authentication(let authentication):
-            action = self.state.authenticationMessageReceived(authentication)
-        case .backendKeyData(let keyData):
-            action = self.state.backendKeyDataReceived(keyData)
-        case .bindComplete:
-            action = self.state.bindCompleteReceived()
-        case .closeComplete:
-            action = self.state.closeCompletedReceived()
-        case .commandComplete(let commandTag):
-            action = self.state.commandCompletedReceived(commandTag)
-        case .dataRow(let dataRow):
-            action = self.state.dataRowReceived(dataRow)
-        case .emptyQueryResponse:
-            action = self.state.emptyQueryResponseReceived()
-        case .error(let errorResponse):
-            action = self.state.errorReceived(errorResponse)
-        case .noData:
-            action = self.state.noDataReceived()
-        case .notice(let noticeResponse):
-            action = self.state.noticeReceived(noticeResponse)
-        case .notification(let notification):
-            action = self.state.notificationReceived(notification)
-        case .parameterDescription(let parameterDescription):
-            action = self.state.parameterDescriptionReceived(parameterDescription)
-        case .parameterStatus(let parameterStatus):
-            action = self.state.parameterStatusReceived(parameterStatus)
-        case .parseComplete:
-            action = self.state.parseCompleteReceived()
-        case .portalSuspended:
-            action = self.state.portalSuspendedReceived()
-        case .readyForQuery(let transactionState):
-            action = self.state.readyForQueryReceived(transactionState)
-        case .rowDescription(let rowDescription):
-            action = self.state.rowDescriptionReceived(rowDescription)
-        case .sslSupported:
-            action = self.state.sslSupportedReceived()
-        case .sslUnsupported:
-            action = self.state.sslUnsupportedReceived()
+        do {
+            try self.decoder.process(buffer: buffer) { message in
+                self.logger.trace("Backend message received", metadata: [.message: "\(message)"])
+                let action: ConnectionStateMachine.ConnectionAction
+                
+                switch message {
+                case .authentication(let authentication):
+                    action = self.state.authenticationMessageReceived(authentication)
+                case .backendKeyData(let keyData):
+                    action = self.state.backendKeyDataReceived(keyData)
+                case .bindComplete:
+                    action = self.state.bindCompleteReceived()
+                case .closeComplete:
+                    action = self.state.closeCompletedReceived()
+                case .commandComplete(let commandTag):
+                    action = self.state.commandCompletedReceived(commandTag)
+                case .dataRow(let dataRow):
+                    action = self.state.dataRowReceived(dataRow)
+                case .emptyQueryResponse:
+                    action = self.state.emptyQueryResponseReceived()
+                case .error(let errorResponse):
+                    action = self.state.errorReceived(errorResponse)
+                case .noData:
+                    action = self.state.noDataReceived()
+                case .notice(let noticeResponse):
+                    action = self.state.noticeReceived(noticeResponse)
+                case .notification(let notification):
+                    action = self.state.notificationReceived(notification)
+                case .parameterDescription(let parameterDescription):
+                    action = self.state.parameterDescriptionReceived(parameterDescription)
+                case .parameterStatus(let parameterStatus):
+                    action = self.state.parameterStatusReceived(parameterStatus)
+                case .parseComplete:
+                    action = self.state.parseCompleteReceived()
+                case .portalSuspended:
+                    action = self.state.portalSuspendedReceived()
+                case .readyForQuery(let transactionState):
+                    action = self.state.readyForQueryReceived(transactionState)
+                case .rowDescription(let rowDescription):
+                    action = self.state.rowDescriptionReceived(rowDescription)
+                case .sslSupported:
+                    action = self.state.sslSupportedReceived()
+                case .sslUnsupported:
+                    action = self.state.sslUnsupportedReceived()
+                }
+                
+                self.run(action, with: context)
+            }
+        } catch let error as PSQLDecodingError {
+            let action = self.state.errorHappened(.decoding(error))
+            self.run(action, with: context)
+        } catch {
+            preconditionFailure("Expected to only get PSQLDecodingErrors from the PSQLBackendMessageDecoder.")
         }
-        
-        self.run(action, with: context)
     }
     
     func channelReadComplete(context: ChannelHandlerContext) {
