@@ -20,13 +20,13 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
                 return nil
             }
             
-            guard var messageSlice = buffer.getSlice(at: buffer.readerIndex &+ 4, length: Int(length)) else {
+            guard var messageSlice = buffer.getSlice(at: buffer.readerIndex + 4, length: Int(length) - 4) else {
                 return nil
             }
-            buffer.moveReaderIndex(forwardBy: 4 &+ Int(length))
+            buffer.moveReaderIndex(to: Int(length))
             let finalIndex = buffer.readerIndex
             
-            guard let code = buffer.readInteger(as: UInt32.self) else {
+            guard let code = messageSlice.readInteger(as: UInt32.self) else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: UInt32.self)
             }
             
