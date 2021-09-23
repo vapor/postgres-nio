@@ -3,18 +3,25 @@ import Logging
 
 final class PSQLRowStream {
     
+    enum RowSource {
+        case stream(PSQLRowsDataSource)
+        case noRows(Result<String, Error>)
+    }
+    
     let eventLoop: EventLoop
     let logger: Logger
     
     private enum UpstreamState {
-        case streaming(next: () -> EventLoopFuture<StateMachineStreamNextResult>, cancel: () -> ())
-        case finished(remaining: CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
+        case streaming(buffer: CircularBuffer<PSQLBackendMessage.DataRow>, dataSource: PSQLRowsDataSource)
+        case finished(buffer: CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
         case failure(Error)
         case consumed(Result<String, Error>)
+        case modifying
     }
     
     private enum DownstreamState {
-        case waitingForNext
+        case iteratingRows(onRow: (PSQLRow) throws -> (), EventLoopPromise<Void>)
+        case waitingForAll(EventLoopPromise<[PSQLRow]>)
         case consuming
     }
     
@@ -27,11 +34,19 @@ final class PSQLRowStream {
     init(rowDescription: [PSQLBackendMessage.RowDescription.Column],
          queryContext: ExtendedQueryContext,
          eventLoop: EventLoop,
-         cancel: @escaping () -> (),
-         next: @escaping () -> EventLoopFuture<StateMachineStreamNextResult>)
+         rowSource: RowSource)
     {
-        self.upstreamState = .streaming(next: next, cancel: cancel)
+        let buffer = CircularBuffer<PSQLBackendMessage.DataRow>()
+        
         self.downstreamState = .consuming
+        switch rowSource {
+        case .stream(let dataSource):
+            self.upstreamState = .streaming(buffer: buffer, dataSource: dataSource)
+        case .noRows(.success(let commandTag)):
+            self.upstreamState = .finished(buffer: .init(), commandTag: commandTag)
+        case .noRows(.failure(let error)):
+            self.upstreamState = .failure(error)
+        }
         
         self.eventLoop = eventLoop
         self.logger = queryContext.logger
@@ -45,56 +60,123 @@ final class PSQLRowStream {
         }
         self.lookupTable = lookup
     }
-    
-    func next() -> EventLoopFuture<PSQLRow?> {
-        guard self.eventLoop.inEventLoop else {
+        
+    func all() -> EventLoopFuture<[PSQLRow]> {
+        if self.eventLoop.inEventLoop {
+            return self.all0()
+        } else {
             return self.eventLoop.flatSubmit {
-                self.next()
+                self.all0()
             }
         }
+    }
+    
+    private func all0() -> EventLoopFuture<[PSQLRow]> {
+        self.eventLoop.preconditionInEventLoop()
         
-        assert(self.downstreamState == .consuming)
+        guard case .consuming = self.downstreamState else {
+            preconditionFailure("Invalid state")
+        }
         
         switch self.upstreamState {
-        case .streaming(let upstreamNext, _):
-            return upstreamNext().map { payload -> PSQLRow? in
-                self.downstreamState = .consuming
-                switch payload {
-                case .row(let data):
-                    return PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
-                case .complete(var buffer, let commandTag):
-                    if let data = buffer.popFirst() {
-                        self.upstreamState = .finished(remaining: buffer, commandTag: commandTag)
-                        return PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
-                    }
-                    
-                    self.upstreamState = .consumed(.success(commandTag))
-                    return nil
-                }
-            }.flatMapErrorThrowing { error in
-                // if we have an error upstream that, we pass through here, we need to set
-                // our internal state
-                self.upstreamState = .consumed(.failure(error))
-                throw error
+        case .streaming(_, let dataSource):
+            dataSource.request(for: self)
+            let promise = self.eventLoop.makePromise(of: [PSQLRow].self)
+            self.downstreamState = .waitingForAll(promise)
+            return promise.futureResult
+            
+        case .finished(let buffer, let commandTag):
+            self.upstreamState = .modifying
+            
+            let rows = buffer.map {
+                PSQLRow(data: $0, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
             }
             
-        case .finished(remaining: var buffer, commandTag: let commandTag):
             self.downstreamState = .consuming
-            if let data = buffer.popFirst() {
-                self.upstreamState = .finished(remaining: buffer, commandTag: commandTag)
-                let row = PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
-                return self.eventLoop.makeSucceededFuture(row)
-            }
-            
             self.upstreamState = .consumed(.success(commandTag))
-            return self.eventLoop.makeSucceededFuture(nil)
+            return self.eventLoop.makeSucceededFuture(rows)
+            
+        case .consumed:
+            preconditionFailure("We already signaled, that the stream has completed, why are we asked again?")
+            
+        case .modifying:
+            preconditionFailure("Invalid state")
             
         case .failure(let error):
             self.upstreamState = .consumed(.failure(error))
             return self.eventLoop.makeFailedFuture(error)
+        }
+    }
+    
+    func onRow(_ onRow: @escaping (PSQLRow) throws -> ()) -> EventLoopFuture<Void> {
+        if self.eventLoop.inEventLoop {
+            return self.onRow0(onRow)
+        } else {
+            return self.eventLoop.flatSubmit {
+                self.onRow0(onRow)
+            }
+        }
+    }
+    
+    private func onRow0(_ onRow: @escaping (PSQLRow) throws -> ()) -> EventLoopFuture<Void> {
+        self.eventLoop.preconditionInEventLoop()
+        
+        switch self.upstreamState {
+        case .streaming(var buffer, let dataSource):
+            let promise = self.eventLoop.makePromise(of: Void.self)
+            do {
+                for data in buffer {
+                    let row = PSQLRow(
+                        data: data,
+                        lookupTable: self.lookupTable,
+                        columns: self.rowDescription,
+                        jsonDecoder: self.jsonDecoder
+                    )
+                    try onRow(row)
+                }
+                
+                buffer.removeAll()
+                self.upstreamState = .streaming(buffer: buffer, dataSource: dataSource)
+                self.downstreamState = .iteratingRows(onRow: onRow, promise)
+                // immediately request more
+                dataSource.request(for: self)
+            } catch {
+                self.upstreamState = .failure(error)
+                dataSource.cancel(for: self)
+                promise.fail(error)
+            }
+            
+            return promise.futureResult
+            
+        case .finished(let buffer, let commandTag):
+            do {
+                for data in buffer {
+                    let row = PSQLRow(
+                        data: data,
+                        lookupTable: self.lookupTable,
+                        columns: self.rowDescription,
+                        jsonDecoder: self.jsonDecoder
+                    )
+                    try onRow(row)
+                }
+                
+                self.upstreamState = .consumed(.success(commandTag))
+                self.downstreamState = .consuming
+                return self.eventLoop.makeSucceededVoidFuture()
+            } catch {
+                self.upstreamState = .consumed(.failure(error))
+                return self.eventLoop.makeFailedFuture(error)
+            }
             
         case .consumed:
             preconditionFailure("We already signaled, that the stream has completed, why are we asked again?")
+            
+        case .modifying:
+            preconditionFailure("Invalid state")
+            
+        case .failure(let error):
+            self.upstreamState = .consumed(.failure(error))
+            return self.eventLoop.makeFailedFuture(error)
         }
     }
     
@@ -104,40 +186,106 @@ final class PSQLRowStream {
         ])
     }
     
-    internal func finalForward(_ finalForward: Result<(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String), PSQLError>?) {
-        switch finalForward {
-        case .some(.success((let buffer, commandTag: let commandTag))):
-            guard case .streaming = self.upstreamState else {
-                preconditionFailure("Expected to be streaming up until now")
+    internal func receive(_ newRows: CircularBuffer<PSQLBackendMessage.DataRow>) {
+        precondition(!newRows.isEmpty, "Expected to get rows!")
+        self.eventLoop.preconditionInEventLoop()
+        self.logger.trace("Row stream received rows", metadata: [
+            "row_count": "\(newRows.count)"
+        ])
+        
+        guard case .streaming(var buffer, let dataSource) = self.upstreamState else {
+            preconditionFailure("Invalid state")
+        }
+        
+        switch self.downstreamState {
+        case .iteratingRows(let onRow, let promise):
+            precondition(buffer.isEmpty)
+            do {
+                for data in newRows {
+                    let row = PSQLRow(
+                        data: data,
+                        lookupTable: self.lookupTable,
+                        columns: self.rowDescription,
+                        jsonDecoder: self.jsonDecoder
+                    )
+                    try onRow(row)
+                }
+                // immediately request more
+                dataSource.request(for: self)
+            } catch {
+                dataSource.cancel(for: self)
+                self.upstreamState = .failure(error)
+                promise.fail(error)
+                return
             }
-            self.upstreamState = .finished(remaining: buffer, commandTag: commandTag)
-        case .some(.failure(let error)):
-            guard case .streaming = self.upstreamState else {
-                preconditionFailure("Expected to be streaming up until now")
+        case .waitingForAll:
+            self.upstreamState = .modifying
+            buffer.append(contentsOf: newRows)
+            self.upstreamState = .streaming(buffer: buffer, dataSource: dataSource)
+            
+            // immediately request more
+            dataSource.request(for: self)
+            
+        case .consuming:
+            // this might happen, if the query has finished while the user is consuming data
+            // we don't need to ask for more since the user is consuming anyway
+            self.upstreamState = .modifying
+            buffer.append(contentsOf: newRows)
+            self.upstreamState = .streaming(buffer: buffer, dataSource: dataSource)
+        }
+    }
+    
+    internal func receive(completion result: Result<String, Error>) {
+        self.eventLoop.preconditionInEventLoop()
+        
+        guard case .streaming(let oldBuffer, _) = self.upstreamState else {
+            preconditionFailure("Invalid state")
+        }
+        
+        switch self.downstreamState {
+        case .iteratingRows(_, let promise):
+            precondition(oldBuffer.isEmpty)
+            self.downstreamState = .consuming
+            self.upstreamState = .consumed(result)
+            switch result {
+            case .success:
+                promise.succeed(())
+            case .failure(let error):
+                promise.fail(error)
             }
-            self.upstreamState = .failure(error)
-        case .none:
-            switch self.upstreamState {
-            case .consumed:
-                break
-            case .finished:
-                break
-            case .failure:
-                preconditionFailure("Invalid state")
-            case .streaming:
-                preconditionFailure("Invalid state")
+            
+            
+        case .consuming:
+            switch result {
+            case .success(let commandTag):
+                self.upstreamState = .finished(buffer: oldBuffer, commandTag: commandTag)
+            case .failure(let error):
+                self.upstreamState = .failure(error)
+            }
+
+        case .waitingForAll(let promise):
+            switch result {
+            case .failure(let error):
+                self.upstreamState = .consumed(.failure(error))
+                promise.fail(error)
+            case .success(let commandTag):
+                let rows = oldBuffer.map {
+                    PSQLRow(data: $0, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                }
+                self.upstreamState = .consumed(.success(commandTag))
+                promise.succeed(rows)
             }
         }
     }
     
     func cancel() {
-        guard case .streaming(_, let cancel) = self.upstreamState else {
+        guard case .streaming(_, let dataSource) = self.upstreamState else {
             // We don't need to cancel any upstream resource. All needed data is already
-            // included in this 
+            // included in this
             return
         }
         
-        cancel()
+        dataSource.cancel(for: self)
     }
     
     var commandTag: String {
@@ -146,32 +294,11 @@ final class PSQLRowStream {
         }
         return commandTag
     }
-        
-    func onRow(_ onRow: @escaping (PSQLRow) -> EventLoopFuture<Void>) -> EventLoopFuture<Void> {
-        let promise = self.eventLoop.makePromise(of: Void.self)
-        
-        func consumeNext(promise: EventLoopPromise<Void>) {
-            self.next().whenComplete { result in
-                switch result {
-                case .success(.some(let row)):
-                    onRow(row).whenComplete { result in
-                        switch result {
-                        case .success:
-                            consumeNext(promise: promise)
-                        case .failure(let error):
-                            promise.fail(error)
-                        }
-                    }
-                case .success(.none):
-                    promise.succeed(Void())
-                case .failure(let error):
-                    promise.fail(error)
-                }
-            }
-        }
-        
-        consumeNext(promise: promise)
-        
-        return promise.futureResult
-    }
+}
+
+protocol PSQLRowsDataSource {
+    
+    func request(for stream: PSQLRowStream)
+    func cancel(for stream: PSQLRowStream)
+    
 }
