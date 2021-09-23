@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.32.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.33.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.14.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "3.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.0.0"),
