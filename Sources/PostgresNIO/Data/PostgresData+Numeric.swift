@@ -268,16 +268,13 @@ private extension Collection {
     // splits the collection into chunks of the supplied size
     // if the collection is not evenly divisible, the first chunk will be smaller
     func reverseChunked(by maxSize: Int) -> [SubSequence] {
-        var lastDistance = 0
+        let firstChunkSize = self.count % maxSize
+        if firstChunkSize == 0 {
+            return self.chunked(by: maxSize)
+        }
         var chunkStartIndex = self.startIndex
-        return stride(from: 0, to: self.count, by: maxSize).reversed().map { current in
-            let distance = (self.count - current) - lastDistance
-            lastDistance = distance
-            let chunkEndOffset = Swift.min(
-                self.distance(from: chunkStartIndex, to: self.endIndex),
-                distance
-            )
-            let chunkEndIndex = self.index(chunkStartIndex, offsetBy: chunkEndOffset)
+        return stride(from: firstChunkSize, through: self.count, by: maxSize).map { current in
+            let chunkEndIndex = self.index(self.startIndex, offsetBy: current)
             defer { chunkStartIndex = chunkEndIndex }
             return self[chunkStartIndex..<chunkEndIndex]
         }
