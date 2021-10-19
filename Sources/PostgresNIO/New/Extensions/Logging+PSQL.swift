@@ -79,7 +79,7 @@ extension Logger {
 extension Logger {
     
     /// See `Logger.trace(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func trace(_ message: @autoclosure () -> Logger.Message,
                metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
@@ -88,7 +88,7 @@ extension Logger {
     }
 
     /// See `Logger.debug(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func debug(_ message: @autoclosure () -> Logger.Message,
                metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
@@ -97,7 +97,7 @@ extension Logger {
     }
 
     /// See `Logger.info(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func info(_ message: @autoclosure () -> Logger.Message,
               metadata: @autoclosure () -> PSQLLoggingMetadata,
               source: @autoclosure () -> String? = nil,
@@ -106,7 +106,7 @@ extension Logger {
     }
 
     /// See `Logger.notice(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func notice(_ message: @autoclosure () -> Logger.Message,
                 metadata: @autoclosure () -> PSQLLoggingMetadata,
                 source: @autoclosure () -> String? = nil,
@@ -115,7 +115,7 @@ extension Logger {
     }
 
     /// See `Logger.warning(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func warning(_ message: @autoclosure () -> Logger.Message,
                  metadata: @autoclosure () -> PSQLLoggingMetadata,
                  source: @autoclosure () -> String? = nil,
@@ -124,7 +124,7 @@ extension Logger {
     }
 
     /// See `Logger.error(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func error(_ message: @autoclosure () -> Logger.Message,
                metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
@@ -133,7 +133,7 @@ extension Logger {
     }
 
     /// See `Logger.critical(_:metadata:source:file:function:line:)`
-    @usableFromInline
+    @inlinable
     func critical(_ message: @autoclosure () -> Logger.Message,
                   metadata: @autoclosure () -> PSQLLoggingMetadata,
                   source: @autoclosure () -> String? = nil,

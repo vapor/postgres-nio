@@ -80,6 +80,7 @@ struct PSQLError: Error {
     }
 }
 
+@usableFromInline
 struct PSQLCastingError: Error {
     
     let columnName: String
@@ -90,11 +91,34 @@ struct PSQLCastingError: Error {
     
     let targetType: PSQLDecodable.Type
     let postgresType: PSQLDataType
-    let postgresData: ByteBuffer?
+    let cellData: ByteBuffer?
     
     let description: String
     let underlying: Error?
     
+    init(
+        columnName: String,
+        columnIndex: Int,
+        file: String,
+        line: Int,
+        targetType: PSQLDecodable.Type,
+        postgresType: PSQLDataType,
+        cellData: ByteBuffer?,
+        description: String,
+        underlying: Error?
+    ) {
+        self.columnName = columnName
+        self.columnIndex = columnIndex
+        self.file = file
+        self.line = line
+        self.targetType = targetType
+        self.postgresType = postgresType
+        self.cellData = cellData
+        self.description = description
+        self.underlying = underlying
+    }
+    
+    @usableFromInline
     static func missingData(targetType: PSQLDecodable.Type, type: PSQLDataType, context: PSQLDecodingContext) -> Self {
         PSQLCastingError(
             columnName: context.columnName,
@@ -103,7 +127,7 @@ struct PSQLCastingError: Error {
             line: context.line,
             targetType: targetType,
             postgresType: type,
-            postgresData: nil,
+            cellData: nil,
             description: """
                 Failed to cast Postgres data type \(type.description) to Swift type \(targetType) \
                 because of missing data in \(context.file) line \(context.line).
@@ -112,6 +136,7 @@ struct PSQLCastingError: Error {
         )
     }
     
+    @usableFromInline
     static func failure(targetType: PSQLDecodable.Type,
                         type: PSQLDataType,
                         postgresData: ByteBuffer,
@@ -126,7 +151,7 @@ struct PSQLCastingError: Error {
             line: context.line,
             targetType: targetType,
             postgresType: type,
-            postgresData: postgresData,
+            cellData: postgresData,
             description: description ?? """
                 Failed to cast Postgres data type \(type.description) to Swift type \(targetType) \
                 in \(context.file) line \(context.line)."

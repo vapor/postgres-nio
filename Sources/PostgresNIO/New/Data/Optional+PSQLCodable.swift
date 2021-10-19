@@ -1,17 +1,24 @@
 import NIOCore
 
 extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Optional<Wrapped> {
-        preconditionFailure("This code path should never be hit.")
-        // The code path for decoding an optional should be:
-        //  -> PSQLData.decode(as: String?.self)
-        //       -> PSQLData.decodeIfPresent(String.self)
-        //            -> String.decode(from: type:)
+    typealias ActualType = Wrapped
+    
+    public static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Optional<Wrapped> {
+        preconditionFailure("This should not be called")
+    }
+    
+    public static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+        switch byteBuffer {
+        case .some(var buffer):
+            return try ActualType.decode(from: &buffer, type: type, format: format, context: context)
+        case .none:
+            return nil
+        }
     }
 }
 
 extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         switch self {
         case .some(let value):
             return value.psqlType
@@ -20,7 +27,7 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         switch self {
         case .some(let value):
             return value.psqlFormat
@@ -29,11 +36,11 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         switch self {
         case .none:
             byteBuffer.writeInteger(-1, as: Int32.self)

@@ -1,16 +1,17 @@
 import NIOCore
 
 extension UInt8: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .char
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    @inlinable
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
         switch type {
         case .bpchar, .char:
             guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
@@ -24,23 +25,25 @@ extension UInt8: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    @inlinable
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: UInt8.self)
     }
 }
 
 extension Int16: PSQLCodable {
     
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .int2
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    @inlinable
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -58,22 +61,24 @@ extension Int16: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    @inlinable
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int16.self)
     }
 }
 
 extension Int32: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .int4
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    @inlinable
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -96,22 +101,24 @@ extension Int32: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    @inlinable
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int32.self)
     }
 }
 
 extension Int64: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .int8
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    @inlinable
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -139,13 +146,14 @@ extension Int64: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    @inlinable
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int64.self)
     }
 }
 
 extension Int: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         switch self.bitWidth {
         case Int32.bitWidth:
             return .int4
@@ -156,12 +164,13 @@ extension Int: PSQLCodable {
         }
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    @inlinable
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -189,7 +198,8 @@ extension Int: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    @inlinable
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int.self)
     }
 }

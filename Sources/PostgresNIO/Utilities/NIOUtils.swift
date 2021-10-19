@@ -2,7 +2,7 @@ import Foundation
 import NIOCore
 
 internal extension ByteBuffer {
-    mutating func readInteger<E>(endianness: Endianness = .big, as rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
+    mutating func readRawRepresentableInteger<E>(endianness: Endianness = .big, as rawRepresentable: E.Type) -> E? where E: RawRepresentable, E.RawValue: FixedWidthInteger {
         guard let rawValue = readInteger(endianness: endianness, as: E.RawValue.self) else {
             return nil
         }

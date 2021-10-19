@@ -188,19 +188,10 @@ extension PSQLBackendMessage.BackendKeyData: PSQLMessagePayloadEncodable {
     }
 }
 
-extension PSQLBackendMessage.DataRow: PSQLMessagePayloadEncodable {
+extension DataRow: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
-        buffer.writeInteger(Int16(self.columns.count))
-        
-        for column in self.columns {
-            switch column {
-            case .none:
-                buffer.writeInteger(-1, as: Int32.self)
-            case .some(var writable):
-                buffer.writeInteger(Int32(writable.readableBytes))
-                buffer.writeBuffer(&writable)
-            }
-        }
+        buffer.writeInteger(Int16(self.columnCount))
+        buffer.writeBytes(self.bytes.readableBytesView)
     }
 }
 
@@ -255,7 +246,7 @@ extension PSQLBackendMessage.TransactionState: PSQLMessagePayloadEncodable {
     }
 }
 
-extension PSQLBackendMessage.RowDescription: PSQLMessagePayloadEncodable {
+extension RowDescription: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
         buffer.writeInteger(Int16(self.columns.count))
         

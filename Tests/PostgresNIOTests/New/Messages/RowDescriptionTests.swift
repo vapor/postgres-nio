@@ -6,7 +6,7 @@ import NIOTestUtils
 class RowDescriptionTests: XCTestCase {
     
     func testDecode() {
-        let columns: [PSQLBackendMessage.RowDescription.Column] = [
+        let columns: [RowDescription.Column] = [
             .init(name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary),
             .init(name: "Second", tableOID: 123, columnAttributeNumber: 456, dataType: .uuidArray, dataTypeSize: 567, dataTypeModifier: 123, format: .text),
         ]
@@ -42,7 +42,7 @@ class RowDescriptionTests: XCTestCase {
     }
     
     func testDecodeFailureBecauseOfMissingNullTerminationInColumnName() {
-        let column = PSQLBackendMessage.RowDescription.Column(
+        let column = RowDescription.Column(
             name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
         
         var buffer = ByteBuffer()
@@ -65,7 +65,7 @@ class RowDescriptionTests: XCTestCase {
     }
     
     func testDecodeFailureBecauseOfMissingColumnCount() {
-        let column = PSQLBackendMessage.RowDescription.Column(
+        let column = RowDescription.Column(
             name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
         
         var buffer = ByteBuffer()
@@ -87,7 +87,7 @@ class RowDescriptionTests: XCTestCase {
     }
     
     func testDecodeFailureBecauseInvalidFormatCode() {
-        let column = PSQLBackendMessage.RowDescription.Column(
+        let column = RowDescription.Column(
             name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
         
         var buffer = ByteBuffer()
@@ -110,7 +110,7 @@ class RowDescriptionTests: XCTestCase {
     }
     
     func testDecodeFailureBecauseNegativeColumnCount() {
-        let column = PSQLBackendMessage.RowDescription.Column(
+        let column = RowDescription.Column(
             name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
         
         var buffer = ByteBuffer()

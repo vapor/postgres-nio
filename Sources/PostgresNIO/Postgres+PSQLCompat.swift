@@ -28,20 +28,20 @@ struct PostgresJSONEncoderWrapper: PSQLJSONEncoder {
 }
 
 extension PostgresData: PSQLEncodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         PSQLDataType(Int32(self.type.rawValue))
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
     // encoding
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         switch self.value {
         case .none:
             byteBuffer.writeInteger(-1, as: Int32.self)
@@ -53,7 +53,7 @@ extension PostgresData: PSQLEncodable {
 }
 
 extension PostgresData: PSQLDecodable {
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> PostgresData {
+    public static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> PostgresData {
         let myBuffer = byteBuffer.readSlice(length: byteBuffer.readableBytes)!
         
         return PostgresData(type: PostgresDataType(UInt32(type.rawValue)), typeModifier: nil, formatCode: .binary, value: myBuffer)

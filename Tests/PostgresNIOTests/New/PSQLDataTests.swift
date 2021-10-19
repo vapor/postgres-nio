@@ -9,9 +9,6 @@ class PSQLDataTests: XCTestCase {
         let data = PSQLData(bytes: emptyBuffer, dataType: .text, format: .binary)
         
         var emptyResult: String?
-        XCTAssertNoThrow(emptyResult = try data.decodeIfPresent(as: String.self, context: .forTests()))
-        XCTAssertNil(emptyResult)
-        
         XCTAssertNoThrow(emptyResult = try data.decode(as: String?.self, context: .forTests()))
         XCTAssertNil(emptyResult)
     }

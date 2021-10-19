@@ -106,7 +106,7 @@ final class IntegrationTests: XCTestCase {
             var rows: [PSQLRow]?
             XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
             var version: String?
-            XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
+            XCTAssertNoThrow(version = try rows?.first?.decode(String.self))
             XCTAssertEqual(version?.contains("PostgreSQL"), true)
         }
     }
@@ -125,7 +125,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var foo: String?
-        XCTAssertNoThrow(foo = try rows?.first?.decode(column: 0, as: String.self))
+        XCTAssertNoThrow(foo = try rows?.first?.decode(String.self))
         XCTAssertEqual(foo, "hello")
     }
     

@@ -23,18 +23,28 @@ internal extension ByteBuffer {
         self.writeInteger(messageID.rawValue)
     }
 
+    @inlinable
     mutating func readFloat() -> Float? {
-        return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }
+        guard let uint32 = self.readInteger(as: UInt32.self) else {
+            return nil
+        }
+        return Float(bitPattern: uint32)
     }
 
+    @inlinable
     mutating func readDouble() -> Double? {
-        return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
+        guard let uint64 = self.readInteger(as: UInt64.self) else {
+            return nil
+        }
+        return Double(bitPattern: uint64)
     }
 
+    @inlinable
     mutating func writeFloat(_ float: Float) {
         self.writeInteger(float.bitPattern)
     }
 
+    @inlinable
     mutating func writeDouble(_ double: Double) {
         self.writeInteger(double.bitPattern)
     }

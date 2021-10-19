@@ -2,15 +2,15 @@ import NIOCore
 import struct Foundation.Date
 
 extension Date: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .timestamptz
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
         switch type {
         case .timestamp, .timestamptz:
             guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
@@ -29,7 +29,7 @@ extension Date: PSQLCodable {
         }
     }
     
-    func encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) {
         let seconds = self.timeIntervalSince(Self._psqlDateStart) * Double(Self._microsecondsPerSecond)
         buffer.writeInteger(Int64(seconds))
     }

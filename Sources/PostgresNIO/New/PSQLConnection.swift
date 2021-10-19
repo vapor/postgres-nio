@@ -6,58 +6,58 @@ import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 import struct Foundation.UUID
 import Logging
+import Foundation
 
-@usableFromInline
-final class PSQLConnection {
+public final class PSQLConnection {
     
-    struct Configuration {
+    public struct Configuration {
         
-        struct Coders {
-            var jsonEncoder: PSQLJSONEncoder
-            var jsonDecoder: PSQLJSONDecoder
+        public struct Coders {
+            public var jsonEncoder: PSQLJSONEncoder
+            public var jsonDecoder: PSQLJSONDecoder
             
-            init(jsonEncoder: PSQLJSONEncoder, jsonDecoder: PSQLJSONDecoder) {
+            public init(jsonEncoder: PSQLJSONEncoder, jsonDecoder: PSQLJSONDecoder) {
                 self.jsonEncoder = jsonEncoder
                 self.jsonDecoder = jsonDecoder
             }
             
-            static var foundation: Coders {
+            public static var foundation: Coders {
                 Coders(jsonEncoder: JSONEncoder(), jsonDecoder: JSONDecoder())
             }
         }
         
-        struct Authentication {
-            var username: String
-            var database: String? = nil
-            var password: String? = nil
+        public struct Authentication {
+            public var username: String
+            public var database: String? = nil
+            public var password: String? = nil
             
-            init(username: String, password: String?, database: String?) {
+            public init(username: String, password: String?, database: String?) {
                 self.username = username
                 self.database = database
                 self.password = password
             }
         }
         
-        enum Connection {
+        public enum Connection {
             case unresolved(host: String, port: Int)
             case resolved(address: SocketAddress, serverName: String?)
         }
         
-        var connection: Connection
+        public var connection: Connection
         
         /// The authentication properties to send to the Postgres server during startup auth handshake
-        var authentication: Authentication?
+        public var authentication: Authentication?
         
-        var tlsConfiguration: TLSConfiguration?
-        var coders: Coders
+        public var tlsConfiguration: TLSConfiguration?
+        public var coders: Coders
         
-        init(host: String,
-             port: Int = 5432,
-             username: String,
-             database: String? = nil,
-             password: String? = nil,
-             tlsConfiguration: TLSConfiguration? = nil,
-             coders: Coders = .foundation)
+        public init(host: String,
+                    port: Int = 5432,
+                    username: String,
+                    database: String? = nil,
+                    password: String? = nil,
+                    tlsConfiguration: TLSConfiguration? = nil,
+                    coders: Coders = .foundation)
         {
             self.connection = .unresolved(host: host, port: port)
             self.authentication = Authentication(username: username, password: password, database: database)
@@ -107,7 +107,7 @@ final class PSQLConnection {
         self.jsonDecoder = jsonDecoder
     }
     deinit {
-        assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
+        precondition(self.isClosed, "PSQLConnection deinitialized before being closed.")
     }
     
     func close() -> EventLoopFuture<Void> {
@@ -147,7 +147,7 @@ final class PSQLConnection {
     // MARK: Prepared statements
     
     func prepareStatement(_ query: String, with name: String, logger: Logger) -> EventLoopFuture<PSQLPreparedStatement> {
-        let promise = self.channel.eventLoop.makePromise(of: PSQLBackendMessage.RowDescription?.self)
+        let promise = self.channel.eventLoop.makePromise(of: RowDescription?.self)
         let context = PrepareStatementContext(
             name: name,
             query: query,
@@ -289,6 +289,47 @@ extension PSQLConnection.Configuration {
         }
     }
 }
+
+#if swift(>=5.5) && canImport(_Concurrency)
+@available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
+extension PSQLConnection {
+    
+    public static func connect(
+        configuration: PSQLConnection.Configuration,
+        logger: Logger,
+        on eventLoop: EventLoop
+    ) async throws -> PSQLConnection {
+        try await Self.connect(configuration: configuration, logger: logger, on: eventLoop).get()
+    }
+    
+    public func close() async throws {
+        try await self.close().get()
+    }
+    
+    public func query(_ query: String, logger: Logger) async throws -> PSQLRowSequence {
+        try await self.query(query, [], logger: logger)
+    }
+    
+    public func query(_ query: String, _ bind: [PSQLEncodable], logger: Logger) async throws -> PSQLRowSequence {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.connectionID)"
+        guard bind.count <= Int(Int16.max) else {
+            throw PSQLError.tooManyParameters
+        }
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let context = ExtendedQueryContext(
+            query: query,
+            bind: bind,
+            logger: logger,
+            jsonDecoder: self.jsonDecoder,
+            promise: promise)
+        
+        self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
+        
+        return try await promise.futureResult.map({ $0.asyncSequence() }).get()
+    }
+}
+#endif
 
 // copy and pasted from NIOSSL:
 private extension String {

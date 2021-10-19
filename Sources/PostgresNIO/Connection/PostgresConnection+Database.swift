@@ -50,7 +50,7 @@ extension PostgresConnection: PostgresDatabase {
                 let lookupTable = PostgresRow.LookupTable(rowDescription: .init(fields: fields), resultFormat: [.binary])
                 return rows.all().map { allrows in
                     let r = allrows.map { psqlRow -> PostgresRow in
-                        let columns = psqlRow.data.columns.map {
+                        let columns = psqlRow.data.map {
                             PostgresMessage.DataRow.Column(value: $0)
                         }
                         return PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)
@@ -112,7 +112,7 @@ extension PSQLRowStream {
     
     func iterateRowsWithoutBackpressureOption(lookupTable: PostgresRow.LookupTable, onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         self.onRow { psqlRow in
-            let columns = psqlRow.data.columns.map {
+            let columns = psqlRow.data.map {
                 PostgresMessage.DataRow.Column(value: $0)
             }
             

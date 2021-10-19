@@ -1,15 +1,22 @@
 import NIOCore
 
-extension Bool: PSQLCodable {
-    var psqlType: PSQLDataType {
+extension Bool: PSQLEncodable {
+    public var psqlType: PSQLDataType {
         .bool
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Bool {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+        byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
+    }
+}
+
+extension Bool: PSQLDecodable {
+    
+    public static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Bool {
         guard type == .bool else {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
@@ -42,9 +49,5 @@ extension Bool: PSQLCodable {
                 throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
         }
-    }
-    
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }
 }

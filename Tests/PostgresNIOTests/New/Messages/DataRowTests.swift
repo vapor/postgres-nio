@@ -20,16 +20,12 @@ class DataRowTests: XCTestCase {
             buffer.writeBytes([UInt8](repeating: 5, count: 10))
         }
 
-        let expectedColumns: [ByteBuffer?] = [
-            nil,
-            ByteBuffer(),
-            ByteBuffer(bytes: [UInt8](repeating: 5, count: 10))
-        ]
-        
+        let rowSlice = buffer.getSlice(at: 7, length: buffer.readableBytes - 7)!
+
         let expectedInOuts = [
-            (buffer, [PSQLBackendMessage.dataRow(.init(columns: expectedColumns))]),
+            (buffer, [PSQLBackendMessage.dataRow(.init(columnCount: 3, bytes: rowSlice))]),
         ]
-        
+
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: expectedInOuts,
             decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))

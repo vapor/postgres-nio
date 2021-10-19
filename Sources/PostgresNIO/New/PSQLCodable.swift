@@ -1,7 +1,7 @@
 import NIOCore
 
 /// A type that can encode itself to a postgres wire binary representation.
-protocol PSQLEncodable {
+public protocol PSQLEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     var psqlType: PSQLDataType { get }
     
@@ -19,7 +19,8 @@ protocol PSQLEncodable {
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
-protocol PSQLDecodable {
+public protocol PSQLDecodable {
+    typealias ActualType = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -33,13 +34,32 @@ protocol PSQLDecodable {
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
     static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self
+    
+    /// Decode an entity from the `byteBuffer` in postgres wire format.
+    /// This method has a default implementation and may be overriden
+    /// only for special cases, like `Optional`s.
+    static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self
+}
+
+extension PSQLDecodable {
+    
+    @inlinable
+    public static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+        switch byteBuffer {
+        case .some(var buffer):
+            return try self.decode(from: &buffer, type: type, format: format, context: context)
+        case .none:
+            throw PSQLCastingError.missingData(targetType: Self.self, type: type, context: context)
+        }
+    }
+    
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
+public protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
 
 extension PSQLEncodable {
-    func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
         let lengthIndex = buffer.writerIndex
@@ -54,20 +74,21 @@ extension PSQLEncodable {
     }
 }
 
-struct PSQLEncodingContext {
-    let jsonEncoder: PSQLJSONEncoder
+public struct PSQLEncodingContext {
+    public let jsonEncoder: PSQLJSONEncoder
 }
 
-struct PSQLDecodingContext {
+public struct PSQLDecodingContext {
     
-    let jsonDecoder: PSQLJSONDecoder
+    public let jsonDecoder: PSQLJSONDecoder
     
-    let columnIndex: Int
-    let columnName: String
+    public let columnIndex: Int
+    public let columnName: String
     
-    let file: String
-    let line: Int
+    public let file: String
+    public let line: Int
     
+    @inlinable
     init(jsonDecoder: PSQLJSONDecoder, columnName: String, columnIndex: Int, file: String, line: Int) {
         self.jsonDecoder = jsonDecoder
         self.columnName = columnName

@@ -3,11 +3,11 @@ import NIOFoundationCompat
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 
-protocol PSQLJSONEncoder {
+public protocol PSQLJSONEncoder {
     func encode<T: Encodable>(_ value: T, into buffer: inout ByteBuffer) throws
 }
 
-protocol PSQLJSONDecoder {
+public protocol PSQLJSONDecoder {
     func decode<T: Decodable>(_ type: T.Type, from buffer: ByteBuffer) throws -> T
 }
 

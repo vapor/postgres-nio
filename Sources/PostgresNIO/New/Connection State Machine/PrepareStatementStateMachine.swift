@@ -15,7 +15,7 @@ struct PrepareStatementStateMachine {
     
     enum Action {
         case sendParseDescribeSync(name: String, query: String)
-        case succeedPreparedStatementCreation(PrepareStatementContext, with: PSQLBackendMessage.RowDescription?)
+        case succeedPreparedStatementCreation(PrepareStatementContext, with: RowDescription?)
         case failPreparedStatementCreation(PrepareStatementContext, with: PSQLError)
 
         case read
@@ -72,7 +72,7 @@ struct PrepareStatementStateMachine {
         return .succeedPreparedStatementCreation(queryContext, with: nil)
     }
     
-    mutating func rowDescriptionReceived(_ rowDescription: PSQLBackendMessage.RowDescription) -> Action {
+    mutating func rowDescriptionReceived(_ rowDescription: RowDescription) -> Action {
         guard case .parameterDescriptionReceived(let queryContext) = self.state else {
             return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
         }

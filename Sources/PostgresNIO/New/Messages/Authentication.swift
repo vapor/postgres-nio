@@ -1,7 +1,6 @@
 import NIOCore
 
 extension PSQLBackendMessage {
-    
     enum Authentication: PayloadDecodable {
         case ok
         case kerberosV5

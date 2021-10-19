@@ -87,7 +87,7 @@ class UUID_PSQLCodableTests: XCTestCase {
             XCTAssertEqual((error as? PSQLCastingError)?.file, #file)
             
             XCTAssertEqual((error as? PSQLCastingError)?.columnIndex, 0)
-            XCTAssertEqual((error as? PSQLCastingError)?.postgresData, buffer)
+            XCTAssertEqual((error as? PSQLCastingError)?.cellData, buffer)
         }
     }
     
@@ -107,7 +107,7 @@ class UUID_PSQLCodableTests: XCTestCase {
                 XCTAssertEqual((error as? PSQLCastingError)?.file, #file)
                 
                 XCTAssertEqual((error as? PSQLCastingError)?.columnIndex, 0)
-                XCTAssertEqual((error as? PSQLCastingError)?.postgresData, loopBuffer)
+                XCTAssertEqual((error as? PSQLCastingError)?.cellData, loopBuffer)
             }
         }
     }
@@ -127,7 +127,7 @@ class UUID_PSQLCodableTests: XCTestCase {
                 XCTAssertEqual((error as? PSQLCastingError)?.file, #file)
                 
                 XCTAssertEqual((error as? PSQLCastingError)?.columnIndex, 0)
-                XCTAssertEqual((error as? PSQLCastingError)?.postgresData, data.bytes)
+                XCTAssertEqual((error as? PSQLCastingError)?.cellData, data.bytes)
             }
         }
     }

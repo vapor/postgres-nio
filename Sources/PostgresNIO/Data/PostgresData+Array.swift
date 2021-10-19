@@ -81,7 +81,7 @@ extension PostgresData {
             return nil
         }
         assert(b == 0, "Array b field did not equal zero")
-        guard let type = value.readInteger(as: PostgresDataType.self) else {
+        guard let type = value.readRawRepresentableInteger(as: PostgresDataType.self) else {
             return nil
         }
         guard isNotEmpty == 1 else {

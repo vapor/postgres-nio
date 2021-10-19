@@ -1,4 +1,5 @@
 @testable import PostgresNIO
+import class Foundation.JSONEncoder
 
 extension PSQLBackendMessage: Equatable {
     
@@ -48,10 +49,17 @@ extension PSQLBackendMessage: Equatable {
     }
 }
 
-extension PSQLBackendMessage.DataRow: ExpressibleByArrayLiteral {
-    public typealias ArrayLiteralElement = ByteBuffer
+extension DataRow: ExpressibleByArrayLiteral {
+    public typealias ArrayLiteralElement = PSQLEncodable
 
-    public init(arrayLiteral elements: ByteBuffer...) {
-        self.init(columns: elements)
+    public init(arrayLiteral elements: PSQLEncodable...) {
+        
+        var buffer = ByteBuffer()
+        let encodingContext = PSQLEncodingContext(jsonEncoder: JSONEncoder())
+        elements.forEach { element in
+            try! element.encodeRaw(into: &buffer, context: encodingContext)
+        }
+        
+        self.init(columnCount: Int16(elements.count), bytes: buffer)
     }
 }
