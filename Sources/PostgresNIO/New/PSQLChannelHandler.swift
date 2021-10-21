@@ -357,16 +357,16 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         switch mode {
         case .md5(let salt):
             let hash1 = (authContext.password ?? "") + authContext.username
-            let pwdhash = Insecure.MD5.hash(data: [UInt8](hash1.utf8)).hexdigest()
-            
+            let pwdhash = Insecure.MD5.hash(data: [UInt8](hash1.utf8)).asciiHexDigest()
+
             var hash2 = [UInt8]()
             hash2.reserveCapacity(pwdhash.count + 4)
-            hash2.append(contentsOf: pwdhash.utf8)
+            hash2.append(contentsOf: pwdhash)
             hash2.append(salt.0)
             hash2.append(salt.1)
             hash2.append(salt.2)
             hash2.append(salt.3)
-            let hash = "md5" + Insecure.MD5.hash(data: hash2).hexdigest()
+            let hash = Insecure.MD5.hash(data: hash2).md5PrefixHexdigest()
             
             try! self.encoder.encode(.password(.init(value: hash)))
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
@@ -550,5 +550,42 @@ extension AuthContext {
             database: self.database,
             options: nil,
             replication: .false)
+    }
+}
+
+private extension Insecure.MD5.Digest {
+    
+    private static let lowercaseLookup: [UInt8] = [
+        UInt8(ascii: "0"), UInt8(ascii: "1"), UInt8(ascii: "2"), UInt8(ascii: "3"),
+        UInt8(ascii: "4"), UInt8(ascii: "5"), UInt8(ascii: "6"), UInt8(ascii: "7"),
+        UInt8(ascii: "8"), UInt8(ascii: "9"), UInt8(ascii: "a"), UInt8(ascii: "b"),
+        UInt8(ascii: "c"), UInt8(ascii: "d"), UInt8(ascii: "e"), UInt8(ascii: "f"),
+    ]
+    
+    func asciiHexDigest() -> [UInt8] {
+        var result = [UInt8]()
+        result.reserveCapacity(2 * Insecure.MD5Digest.byteCount)
+        for byte in self {
+            result.append(Self.lowercaseLookup[Int(byte >> 4)])
+            result.append(Self.lowercaseLookup[Int(byte & 0x0F)])
+        }
+        return result
+    }
+    
+    func md5PrefixHexdigest() -> String {
+        // TODO: The array should be stack allocated in the best case. But we support down to 5.2.
+        //       Given that this method is called only on startup of a new connection, this is an
+        //       okay tradeoff for now.
+        var result = [UInt8]()
+        result.reserveCapacity(3 + 2 * Insecure.MD5Digest.byteCount)
+        result.append(UInt8(ascii: "m"))
+        result.append(UInt8(ascii: "d"))
+        result.append(UInt8(ascii: "5"))
+        
+        for byte in self {
+            result.append(Self.lowercaseLookup[Int(byte >> 4)])
+            result.append(Self.lowercaseLookup[Int(byte & 0x0F)])
+        }
+        return String(decoding: result, as: Unicode.UTF8.self)
     }
 }
