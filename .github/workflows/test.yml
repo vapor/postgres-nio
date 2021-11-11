@@ -57,10 +57,19 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
+      # Unfortunately, fluent-postgres-driver details leak through here
       POSTGRES_HOSTNAME: 'psql-a'
       POSTGRES_DB: 'test_database'
+      POSTGRES_DATABASE: 'test_database'
+      POSTGRES_DATABASE_A: 'test_database'
+      POSTGRES_DATABASE_B: 'test_database'
       POSTGRES_USER: 'test_username'
+      POSTGRES_USERNAME: 'test_username'
+      POSTGRES_USERNAME_A: 'test_username'
+      POSTGRES_USERNAME_B: 'test_username'
       POSTGRES_PASSWORD: 'test_password'
+      POSTGRES_PASSWORD_A: 'test_password'
+      POSTGRES_PASSWORD_B: 'test_password'
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
