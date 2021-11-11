@@ -55,8 +55,8 @@ jobs:
         
       - name: Run unit tests with code coverage
         run: |
-          swift --package-path postgres-nio test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage && \
-          echo "CODECOV_FILE=$(swift --package-path postgres-nio test --show-codecov-path)" >> $GITHUB_ENV
+          swift test --package-path postgres-nio --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage && \
+          echo "CODECOV_FILE=$(swift test --package-path postgres-nio --show-codecov-path)" >> $GITHUB_ENV
       - name: Send coverage report to codecov.io
         uses: codecov/codecov-action@v2
         with:
@@ -66,7 +66,7 @@ jobs:
           fail_ci_if_error: true
 
       - name: Run integration tests
-        run: swift --package-path postgres-nio test --enable-test-discovery --filter=^IntegrationTests
+        run: swift test --package-path postgres-nio --enable-test-discovery --filter=^IntegrationTests
 
       - name: Check out postgres-kit dependent
         uses: actions/checkout@v2
@@ -79,9 +79,9 @@ jobs:
           swift package --package-path postgres-kit edit postgres-nio --path postgres-nio
           swift package --package-path fluent-postgres-driver edit postgres-nio --path postgres-nio
       - name: Run postgres-kit tests
-        run: swift --package-path postgres-kit test --enable-test-discovery
+        run: swift test --package-path postgres-kit --enable-test-discovery
       - name: Run fluent-postgres-driver tests
-        run: swift --package-path fluent-postgres-driver test --enable-test-discovery
+        run: swift test --package-path fluent-postgres-driver --enable-test-discovery
 
   macos-all:
     strategy:
