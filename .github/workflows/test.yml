@@ -28,6 +28,8 @@ jobs:
     env:
       LOG_LEVEL: debug
       POSTGRES_HOSTNAME: 'psql-a'
+      POSTGRES_USER: 'vapor_username'
+      POSTGRES_PASSWORD: 'vapor_password'
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
       MATRIX_CONFIG: ${{ toJSON(matrix) }}
@@ -105,6 +107,8 @@ jobs:
     env:
       LOG_LEVEL: debug
       POSTGRES_HOSTNAME: 127.0.0.1
+      POSTGRES_USER: 'vapor_username'
+      POSTGRES_PASSWORD: 'vapor_password'
       POSTGRES_DB: postgres
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
     steps:
