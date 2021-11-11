@@ -4,7 +4,37 @@ env:
   LOG_LEVEL: notice
 
 jobs:
-  linux-all:
+  linux-unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        swiftver:
+          - swift:5.2
+          - swift:5.5
+          - swiftlang/swift:nightly-main
+        swiftos:
+          - focal
+    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
+    runs-on: ubuntu-latest
+    env:
+      LOG_LEVEL: debug
+      MATRIX_CONFIG: ${{ toJSON(matrix) }}
+    steps:
+      - name: Check out package
+        uses: actions/checkout@v2
+      - name: Run unit tests with code coverage
+        run: |
+          swift test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage && \
+          echo "CODECOV_FILE=$(swift test --show-codecov-path)" >> $GITHUB_ENV
+      - name: Send coverage report to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          files: ${{ env.CODECOV_FILE }}
+          flags: 'unittests'
+          env_vars: 'MATRIX_CONFIG'
+          fail_ci_if_error: true
+
+  linux-integration-and-dependencies:
     strategy:
       fail-fast: false
       matrix:
@@ -34,7 +64,6 @@ jobs:
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
-      MATRIX_CONFIG: ${{ toJSON(matrix) }}
     services:
       psql-a:
         image: ${{ matrix.dbimage }}
@@ -56,22 +85,8 @@ jobs:
       - name: Check out package
         uses: actions/checkout@v2
         with: { path: 'postgres-nio' }
-        
-      - name: Run unit tests with code coverage
-        run: |
-          swift test --package-path postgres-nio --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage && \
-          echo "CODECOV_FILE=$(swift test --package-path postgres-nio --show-codecov-path)" >> $GITHUB_ENV
-      - name: Send coverage report to codecov.io
-        uses: codecov/codecov-action@v2
-        with:
-          files: ${{ env.CODECOV_FILE }}
-          flags: 'unittests'
-          env_vars: 'MATRIX_CONFIG'
-          fail_ci_if_error: true
-
       - name: Run integration tests
         run: swift test --package-path postgres-nio --enable-test-discovery --filter=^IntegrationTests
-
       - name: Check out postgres-kit dependent
         uses: actions/checkout@v2
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
@@ -122,7 +137,7 @@ jobs:
         run: |
           export PATH="$(brew prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
           brew install ${{ matrix.dbimage }}
-          initdb --locale=C --auth-host ${{ matrix.dbauth }} -U vapor_username --pwfile=<(echo vapor_password)
+          initdb --locale=C --auth-host ${{ matrix.dbauth }} -U $POSTGRES_USER --pwfile=<(echo $POSTGRES_PASSWORD)
           pg_ctl start --wait
         timeout-minutes: 2
       - name: Checkout code
