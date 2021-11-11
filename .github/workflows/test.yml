@@ -4,147 +4,107 @@ env:
   LOG_LEVEL: notice
 
 jobs:
-
-  # Test that packages depending on us still work
-  dependents:
+  linux-all:
     strategy:
       fail-fast: false
       matrix:
-        swiftver:
-          - 5.2
-          - 5.3
-          - 5.4
         dbimage:
+          - postgres:14
           - postgres:13
           - postgres:12
           - postgres:11
-        dependent:
-          - postgres-kit
-          - fluent-postgres-driver
-    container: swift:${{ matrix.swiftver }}-focal
+        dbauth:
+          - trust
+          - md5
+          - scram-sha-256
+        swiftver:
+          - swift:5.2
+          - swift:5.5
+          - swiftlang/swift:nightly-main
+        swiftos:
+          - focal
+    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
     runs-on: ubuntu-latest
+    env:
+      LOG_LEVEL: debug
+      POSTGRES_HOSTNAME: 'psql-a'
+      POSTGRES_HOSTNAME_A: 'psql-a'
+      POSTGRES_HOSTNAME_B: 'psql-b'
+      MATRIX_CONFIG: ${{ toJSON(matrix) }}
     services:
       psql-a:
         image: ${{ matrix.dbimage }}
         env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
+          POSTGRES_USER: 'vapor_username'
+          POSTGRES_DB: 'vapor_database'
+          POSTGRES_PASSWORD: 'vapor_password'
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
       psql-b:
         image: ${{ matrix.dbimage }}
         env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
+          POSTGRES_USER: 'vapor_username'
+          POSTGRES_DB: 'vapor_database'
+          POSTGRES_PASSWORD: 'vapor_password'
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
     steps:
       - name: Check out package
         uses: actions/checkout@v2
+        with: { path: 'postgres-nio' }
+        
+      - name: Run unit tests with code coverage
+        run: |
+          swift --package-path postgres-nio test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage
+          echo "CODECOV_FILE=$(swift --package-path postgres-nio test --show-codecov-path)" >> $GITHUB_ENV
+      - name: Send coverage report to codecov.io
+        uses: codecov/codecov-action@v2
         with:
-          path: package
-      - name: Check out dependent
-        uses: actions/checkout@v2
-        with:
-          repository: vapor/${{ matrix.dependent }}
-          path: dependent
-      - name: Use local package
-        run: swift package edit postgres-nio --path ../package
-        working-directory: dependent
-      - name: Run tests with Thread Sanitizer
-        run: swift test --enable-test-discovery --sanitize=thread
-        working-directory: dependent
-        env:
-          POSTGRES_HOSTNAME: psql-a
-          POSTGRES_HOSTNAME_A: psql-a
-          POSTGRES_HOSTNAME_B: psql-b
-          
-  # Run unit tests on Linux Swift runners on 
-  linux-unit-tests:
-    strategy:
-      fail-fast: false
-      matrix:
-        swiftver:
-          - swift:5.2
-          - swift:5.3
-          - swift:5.4
-          - swiftlang/swift:nightly-5.5
-          - swiftlang/swift:nightly-main
-        swiftos:
-          #- xenial
-          #- bionic
-          - focal
-          #- centos7
-          #- centos8
-          #- amazonlinux2
-    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-      - name: Run tests with Thread Sanitizer
-        run: swift test --enable-test-discovery --sanitize=thread --filter=^PostgresNIOTests
+          files: ${{ env.CODECOV_FILE }}
+          flags: 'unittests'
+          env_vars: 'MATRIX_CONFIG'
+          fail_ci_if_error: true
 
-  # Run integration tests on Linux Swift runners against supported PSQL versions
-  linux-integration-tests:
+      - name: Run integration tests
+        run: swift --package-path postgres-nio test --enable-test-discovery --filter=^IntegrationTests
+
+      - name: Check out postgres-kit dependent
+        uses: actions/checkout@v2
+        with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
+      - name: Check out fluent-postgres-driver dependent
+        uses: actions/checkout@v2
+        with: { repository: 'vapor/fluent-postgres-driver', path: 'fluent-postgres-driver' }
+      - name: Use local package in dependents
+        run: |
+          swift package --package-path postgres-kit edit postgres-nio --path postgres-nio
+          swift package --package-path fluent-postgres-driver edit postgres-nio --path postgres-nio
+      - name: Run postgres-kit tests
+        run: swift --package-path postgres-kit test --enable-test-discovery
+      - name: Run fluent-postgres-driver tests
+        run: swift --package-path fluent-postgres-driver test --enable-test-discovery
+
+  macos-all:
     strategy:
       fail-fast: false
       matrix:
         dbimage:
-          - postgres:13
-          - postgres:12
-          - postgres:11
+          - postgresql@14
+          - postgresql@13
+          - postgresql@12
+          - postgresql@11
         dbauth:
           - trust
           - md5
           - scram-sha-256
-        swiftver:
-          - swift:5.4
-        swiftos:
-          #- xenial
-          #- bionic
-          - focal
-          #- centos7
-          #- centos8
-          #- amazonlinux2
-    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
-    runs-on: ubuntu-latest
-    services:
-      psql:
-        image: ${{ matrix.dbimage }}
-        env:
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
-          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-      - name: Run tests with Thread Sanitizer
-        run: swift test --enable-test-discovery --sanitize=thread --filter=^IntegrationTests
-        env:
-          POSTGRES_HOSTNAME: psql
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: vapor_database
-          POSTGRES_PASSWORD: vapor_password
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
-
-  # Run package tests on macOS against supported PSQL versions
-  macos:
-    strategy:
-      fail-fast: false
-      matrix:
         xcode:
           - latest-stable
           - latest
-        dbauth:
-          - trust
-          - md5
-          - scram-sha-256
-        formula:
-          - postgresql@11
-          - postgresql@12
-          - postgresql@13
-    runs-on: macos-latest
+    runs-on: macos-11
+    env:
+      LOG_LEVEL: debug
+      POSTGRES_HOSTNAME: 127.0.0.1
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
     steps:
       - name: Select latest available Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -152,18 +112,14 @@ jobs:
           xcode-version: ${{ matrix.xcode }}
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
-          export PATH="/usr/local/opt/${{ matrix.formula }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          brew install ${{ matrix.formula }}
+          export PATH="$(brew prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
+          brew install ${{ matrix.dbimage }}
           initdb --locale=C --auth-host ${{ matrix.dbauth }} -U vapor_username --pwfile=<(echo vapor_password)
           pg_ctl start --wait
-        timeout-minutes: 5
+        timeout-minutes: 2
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Run tests with Thread Sanitizer
-        run: swift test --enable-test-discovery --sanitize=thread
-        env:
-          POSTGRES_HOSTNAME: 127.0.0.1
-          POSTGRES_USER: vapor_username
-          POSTGRES_DB: postgres
-          POSTGRES_PASSWORD: vapor_password
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+      - name: Run all tests
+        run: |
+          swift test --enable-test-discovery -Xlinker -rpath \
+                -Xlinker $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx
