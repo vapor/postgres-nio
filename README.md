@@ -124,9 +124,9 @@ Once you have a connection, you will need to authenticate with the server using 
 
 ```swift
 try conn.authenticate(
-    username: "vapor_username",
-    database: "vapor_database",
-    password: "vapor_password"
+    username: "your_username",
+    database: "your_database",
+    password: "your_password"
 ).wait()
 ```
 
