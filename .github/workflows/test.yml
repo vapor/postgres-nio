@@ -55,7 +55,7 @@ jobs:
         
       - name: Run unit tests with code coverage
         run: |
-          swift --package-path postgres-nio test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage
+          swift --package-path postgres-nio test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage && \
           echo "CODECOV_FILE=$(swift --package-path postgres-nio test --show-codecov-path)" >> $GITHUB_ENV
       - name: Send coverage report to codecov.io
         uses: codecov/codecov-action@v2
