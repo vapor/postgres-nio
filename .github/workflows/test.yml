@@ -28,6 +28,7 @@ jobs:
     env:
       LOG_LEVEL: debug
       POSTGRES_HOSTNAME: 'psql-a'
+      POSTGRES_DB: 'vapor_database'
       POSTGRES_USER: 'vapor_username'
       POSTGRES_PASSWORD: 'vapor_password'
       POSTGRES_HOSTNAME_A: 'psql-a'
@@ -109,7 +110,7 @@ jobs:
       POSTGRES_HOSTNAME: 127.0.0.1
       POSTGRES_USER: 'vapor_username'
       POSTGRES_PASSWORD: 'vapor_password'
-      POSTGRES_DB: postgres
+      POSTGRES_DB: 'postgres'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
     steps:
       - name: Select latest available Xcode
