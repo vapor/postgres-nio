@@ -33,6 +33,7 @@ jobs:
       POSTGRES_PASSWORD: 'vapor_password'
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
+      POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
       MATRIX_CONFIG: ${{ toJSON(matrix) }}
     services:
       psql-a:
