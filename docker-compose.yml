@@ -1,33 +1,24 @@
 version: '3.7'
 
+x-shared-config: &shared_config
+  environment:
+    POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-scram-sha-256}"
+    POSTGRES_USER: test_username
+    POSTGRES_DB: test_database
+    POSTGRES_PASSWORD: test_password
+  ports:
+    - 5432:5432
+
 services:
+  psql-14:
+    image: postgres:14
+    <<: *shared_config
   psql-13:
     image: postgres:13
-    user: postgres:postgres
-    environment:
-      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
-      POSTGRES_USER: test_username
-      POSTGRES_DB: test_database
-      POSTGRES_PASSWORD: test_password
-    ports:
-      - 5432:5432
+    <<: *shared_config
   psql-12:
     image: postgres:12
-    user: postgres:postgres
-    environment:
-      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
-      POSTGRES_USER: test_username
-      POSTGRES_DB: test_database
-      POSTGRES_PASSWORD: test_password
-    ports:
-      - 5432:5432
+    <<: *shared_config
   psql-11:
     image: postgres:11
-    user: postgres:postgres
-    environment:
-      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
-      POSTGRES_USER: test_username
-      POSTGRES_DB: test_database
-      POSTGRES_PASSWORD: test_password
-    ports:
-      - 5432:5432
+    <<: *shared_config
