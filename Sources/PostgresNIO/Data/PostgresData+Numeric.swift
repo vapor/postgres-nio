@@ -251,36 +251,26 @@ extension PostgresData {
 }
 
 private extension Collection {
-    // splits the collection into chunks of the supplied size
-    // if the collection is not evenly divisible, the last chunk will be smaller
+    /// Split the collection into chunks of `maxSize` length each. The last chunk may contain anywhere between 1 and maxSize elements. `maxSize` must be greater than zero.
     func chunked(by maxSize: Int) -> [SubSequence] {
-        return stride(from: 0, to: self.count, by: maxSize).map { current in
-            let chunkStartIndex = self.index(self.startIndex, offsetBy: current)
-            let chunkEndOffset = Swift.min(
-                self.distance(from: chunkStartIndex, to: self.endIndex),
-                maxSize
-            )
-            let chunkEndIndex = self.index(chunkStartIndex, offsetBy: chunkEndOffset)
-            return self[chunkStartIndex..<chunkEndIndex]
+        let terminatorIndex = self.index(self.endIndex, offsetBy: -1, limitedBy: self.startIndex) ?? self.endIndex
+        let strided = Array(sequence(first: self.startIndex) {
+            self.index($0, offsetBy: maxSize, limitedBy: terminatorIndex)
+        })
+        return zip(strided, strided.dropFirst() + CollectionOfOne(self.endIndex)).map {
+            self[$0..<$1]
         }
     }
-    
-    // splits the collection into chunks of the supplied size
-    // if the collection is not evenly divisible, the first chunk will be smaller
+
+    /// Split the collection into chunks of `maxSize` length each. The **first** chunk may contain anywhere between 1 and maxSize elements. `maxSize` must be greater than zero.
     func reverseChunked(by maxSize: Int) -> [SubSequence] {
-        var lastDistance = 0
-        var chunkStartIndex = self.startIndex
-        return stride(from: 0, to: self.count, by: maxSize).reversed().map { current in
-            let distance = (self.count - current) - lastDistance
-            lastDistance = distance
-            let chunkEndOffset = Swift.min(
-                self.distance(from: chunkStartIndex, to: self.endIndex),
-                distance
-            )
-            let chunkEndIndex = self.index(chunkStartIndex, offsetBy: chunkEndOffset)
-            defer { chunkStartIndex = chunkEndIndex }
-            return self[chunkStartIndex..<chunkEndIndex]
+        let terminatorIndex = self.index(self.startIndex, offsetBy: 1, limitedBy: self.endIndex) ?? self.startIndex
+        let strided = Array(sequence(first: self.endIndex) {
+            self.index($0, offsetBy: -maxSize, limitedBy: terminatorIndex)
+        })
+        return zip(strided, strided.dropFirst() + CollectionOfOne(self.startIndex)).map {
+            self[$1..<$0]
         }
+        .reversed()
     }
 }
-

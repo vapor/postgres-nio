@@ -463,20 +463,24 @@ final class PostgresNIOTests: XCTestCase {
         let a = PostgresNumeric(string: "123456.789123")!
         let b = PostgresNumeric(string: "-123456.789123")!
         let c = PostgresNumeric(string: "3.14159265358979")!
+        let d = PostgresNumeric(string: "1234567890123")!
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("""
         select
             $1::numeric::text as a,
             $2::numeric::text as b,
-            $3::numeric::text as c
+            $3::numeric::text as c,
+            $4::numeric::text as d
         """, [
             .init(numeric: a),
             .init(numeric: b),
-            .init(numeric: c)
+            .init(numeric: c),
+            .init(numeric: d)
         ]).wait())
         XCTAssertEqual(rows?.first?.column("a")?.string, "123456.789123")
         XCTAssertEqual(rows?.first?.column("b")?.string, "-123456.789123")
         XCTAssertEqual(rows?.first?.column("c")?.string, "3.14159265358979")
+        XCTAssertEqual(rows?.first?.column("d")?.string, "1234567890123")
     }
 
     func testMoney() {
