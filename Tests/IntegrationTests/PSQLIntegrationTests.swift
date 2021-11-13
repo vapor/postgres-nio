@@ -25,8 +25,8 @@ final class IntegrationTests: XCTestCase {
         let config = PSQLConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: 5432,
-            username: env("POSTGRES_USER") ?? "postgres",
-            database: env("POSTGRES_DB"),
+            username: env("POSTGRES_USER") ?? "test_username",
+            database: env("POSTGRES_DB") ?? "test_database",
             password: "wrong_password",
             tlsConfiguration: nil)
         
@@ -327,9 +327,9 @@ extension PSQLConnection {
         let config = PSQLConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: 5432,
-            username: env("POSTGRES_USER") ?? "postgres",
-            database: env("POSTGRES_DB"),
-            password: env("POSTGRES_PASSWORD"),
+            username: env("POSTGRES_USER") ?? "test_username",
+            database: env("POSTGRES_DB") ?? "test_database",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
             tlsConfiguration: nil)
         
         return PSQLConnection.connect(configuration: config, logger: logger, on: eventLoop)

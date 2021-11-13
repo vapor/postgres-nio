@@ -6,9 +6,9 @@ services:
     user: postgres:postgres
     environment:
       POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
-      POSTGRES_USER: vapor_username
-      POSTGRES_DB: vapor_database
-      POSTGRES_PASSWORD: vapor_password
+      POSTGRES_USER: test_username
+      POSTGRES_DB: test_database
+      POSTGRES_PASSWORD: test_password
     ports:
       - 5432:5432
   psql-12:
@@ -16,9 +16,9 @@ services:
     user: postgres:postgres
     environment:
       POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
-      POSTGRES_USER: vapor_username
-      POSTGRES_DB: vapor_database
-      POSTGRES_PASSWORD: vapor_password
+      POSTGRES_USER: test_username
+      POSTGRES_DB: test_database
+      POSTGRES_PASSWORD: test_password
     ports:
       - 5432:5432
   psql-11:
@@ -26,8 +26,8 @@ services:
     user: postgres:postgres
     environment:
       POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
-      POSTGRES_USER: vapor_username
-      POSTGRES_DB: vapor_database
-      POSTGRES_PASSWORD: vapor_password
+      POSTGRES_USER: test_username
+      POSTGRES_DB: test_database
+      POSTGRES_PASSWORD: test_password
     ports:
       - 5432:5432
