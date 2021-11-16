@@ -1,5 +1,5 @@
 import NIOCore
-import Foundation.NSDecimal
+import struct Foundation.Decimal
 
 extension Decimal: PSQLCodable {
     var psqlType: PSQLDataType {
