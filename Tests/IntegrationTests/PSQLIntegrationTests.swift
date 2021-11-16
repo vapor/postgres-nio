@@ -251,6 +251,31 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(try row?.decode(column: "timestamptz", as: Date.self).description, "2016-01-18 00:20:03 +0000")
     }
     
+    func testDecodeDecimals() {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+        
+        var conn: PSQLConnection?
+        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        
+        var stream: PSQLRowStream?
+        XCTAssertNoThrow(stream = try conn?.query("""
+            SELECT
+                $1::numeric     as numeric,
+                $2::numeric     as numeric_negative
+            """, [Decimal(string: "123456.789123")!, Decimal(string: "-123456.789123")!], logger: .psqlTest).wait())
+        
+        var rows: [PSQLRow]?
+        XCTAssertNoThrow(rows = try stream?.all().wait())
+        XCTAssertEqual(rows?.count, 1)
+        let row = rows?.first
+        
+        XCTAssertEqual(try row?.decode(column: "numeric", as: Decimal.self), Decimal(string: "123456.789123")!)
+        XCTAssertEqual(try row?.decode(column: "numeric_negative", as: Decimal.self), Decimal(string: "-123456.789123")!)
+    }
+    
     func testDecodeUUID() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
