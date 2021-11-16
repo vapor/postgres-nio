@@ -467,16 +467,16 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(rows = try conn?.query("""
         select
             $1::numeric::text as a,
-            $2::numeric::text as b,
-            $3::numeric::text as c
+            $2::numeric as b,
+            $3::numeric as c
         """, [
             .init(numeric: a),
             .init(numeric: b),
             .init(numeric: c)
         ]).wait())
-        XCTAssertEqual(rows?.first?.column("a")?.string, "123456.789123")
-        XCTAssertEqual(rows?.first?.column("b")?.string, "-123456.789123")
-        XCTAssertEqual(rows?.first?.column("c")?.string, "3.14159265358979")
+        XCTAssertEqual(rows?.first?.column("a")?.decimal, Decimal(string: "123456.789123")!)
+        XCTAssertEqual(rows?.first?.column("b")?.decimal, Decimal(string: "-123456.789123")!)
+        XCTAssertEqual(rows?.first?.column("c")?.decimal, Decimal(string: "3.14159265358979")!)
     }
 
     func testMoney() {

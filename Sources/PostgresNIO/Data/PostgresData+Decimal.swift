@@ -22,10 +22,10 @@ extension Decimal: PostgresDataConvertible {
     }
 
     public init?(postgresData: PostgresData) {
-        guard let numeric = postgresData.numeric else {
+        guard let decimal = postgresData.decimal else {
             return nil
         }
-        self = numeric.decimal
+        self = decimal
     }
 
     public var postgresData: PostgresData? {
