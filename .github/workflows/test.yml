@@ -27,7 +27,7 @@ jobs:
       - name: Convert code coverage report to most expressive format
         run: |
           export pkgname="$(swift package dump-package | perl -e 'use JSON::PP; print (decode_json(join("",(<>)))->{name});')" \
-                 subpath="$([ "$(uname -s)" == "Darwin" ] && echo "/Contents/MacOS/${pkgname}PackageTests" || true)" \
+                 subpath="$([ "$(uname -s)" = 'Darwin' ] && echo "/Contents/MacOS/${pkgname}PackageTests" || true)" \
                  exc_prefix="$(which xcrun || true)" && \
           ${exc_prefix} llvm-cov export -format lcov \
               -instr-profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata" \
