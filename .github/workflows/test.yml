@@ -23,9 +23,18 @@ jobs:
       - name: Check out package
         uses: actions/checkout@v2
       - name: Run unit tests with code coverage
+        run: swift test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage
+      - name: Convert code coverage report to most expressive format
         run: |
-          swift test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage && \
-          echo "CODECOV_FILE=$(swift test --show-codecov-path)" >> $GITHUB_ENV
+          export pkgname="$(swift package dump-package | jq -r .name)" \
+                 subpath="$([[ $(uname -s) == "Darwin" ]] && echo "/Contents/MacOS/${pkgname}PackageTests" || true)" \
+                 exc_prefix="$(which xcrun || true)" && \
+          ${exc_prefix} llvm-cov export -format lcov \
+              -instr-profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata" \
+              --ignore-filename-regex='\.build/' \
+              "$(swift build --show-bin-path)/${pkgname}PackageTests.xctest${subpath}" \
+              >"${pkgname}.lcov"
+          echo "CODECOV_FILE=$(pwd)/${pkgname}.lcov" >> $GITHUB_ENV
       - name: Send coverage report to codecov.io
         uses: codecov/codecov-action@v2
         with:
