@@ -31,7 +31,8 @@ jobs:
                  exc_prefix="$(which xcrun || true)" && \
           ${exc_prefix} llvm-cov export -format lcov \
               -instr-profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata" \
-              --ignore-filename-regex='\.build/' \
+              --ignore-filename-regex='/\.build/' \
+              --ignore-filename-regex='/Tests/' \
               "$(swift build --show-bin-path)/${pkgname}PackageTests.xctest${subpath}" \
               >"${pkgname}.lcov"
           echo "CODECOV_FILE=$(pwd)/${pkgname}.lcov" >> $GITHUB_ENV
