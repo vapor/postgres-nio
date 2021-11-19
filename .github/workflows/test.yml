@@ -10,6 +10,8 @@ jobs:
       matrix:
         swiftver:
           - swift:5.2
+          - swift:5.3
+          - swift:5.4
           - swift:5.5
           - swiftlang/swift:nightly-main
         swiftos:
@@ -18,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
-      MATRIX_CONFIG: ${{ toJSON(matrix) }}
+      MATRIX_CONFIG: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
     steps:
       - name: Check out package
         uses: actions/checkout@v2
@@ -31,10 +33,8 @@ jobs:
                  exc_prefix="$(which xcrun || true)" && \
           ${exc_prefix} llvm-cov export -format lcov \
               -instr-profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata" \
-              --ignore-filename-regex='/\.build/' \
-              --ignore-filename-regex='/Tests/' \
-              "$(swift build --show-bin-path)/${pkgname}PackageTests.xctest${subpath}" \
-              >"${pkgname}.lcov"
+              --ignore-filename-regex='/\.build/' --ignore-filename-regex='/Tests/' \
+              "$(swift build --show-bin-path)/${pkgname}PackageTests.xctest${subpath}" >"${pkgname}.lcov"
           echo "CODECOV_FILE=$(pwd)/${pkgname}.lcov" >> $GITHUB_ENV
       - name: Send coverage report to codecov.io
         uses: codecov/codecov-action@v2
@@ -60,7 +60,6 @@ jobs:
         swiftver:
           - swift:5.2
           - swift:5.5
-          - swiftlang/swift:nightly-main
         swiftos:
           - focal
     container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
@@ -126,15 +125,10 @@ jobs:
       fail-fast: false
       matrix:
         dbimage:
-          # Only test the lastest couple of versions on macOS, let Linux do the rest
+          # Only test the lastest version on macOS, let Linux do the rest
           - postgresql@14
-          - postgresql@13
-          # - postgresql@12
-          # - postgresql@11
         dbauth:
           # Only test one auth method on macOS, Linux tests will cover the others
-          # - trust
-          # - md5
           - scram-sha-256
         xcode:
           - latest-stable
