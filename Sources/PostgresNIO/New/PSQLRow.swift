@@ -16,6 +16,12 @@ struct PSQLRow {
     }
 }
 
+extension PSQLRow: Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool {
+        lhs.data == rhs.data && lhs.columns == rhs.columns
+    }
+}
+
 extension PSQLRow {
     /// Access the data in the provided column and decode it into the target type.
     ///
