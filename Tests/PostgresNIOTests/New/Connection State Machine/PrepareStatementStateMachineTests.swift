@@ -7,7 +7,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
     func testCreatePreparedStatementReturningRowDescription() {
         var state = ConnectionStateMachine.readyForQuery()
         
-        let promise = EmbeddedEventLoop().makePromise(of: PSQLBackendMessage.RowDescription?.self)
+        let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         
         let name = "haha"
@@ -20,7 +20,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
-        let columns: [PSQLBackendMessage.RowDescription.Column] = [
+        let columns: [RowDescription.Column] = [
             .init(name: "id", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: -1, format: .binary)
         ]
         
@@ -32,7 +32,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
     func testCreatePreparedStatementReturningNoData() {
         var state = ConnectionStateMachine.readyForQuery()
         
-        let promise = EmbeddedEventLoop().makePromise(of: PSQLBackendMessage.RowDescription?.self)
+        let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         
         let name = "haha"

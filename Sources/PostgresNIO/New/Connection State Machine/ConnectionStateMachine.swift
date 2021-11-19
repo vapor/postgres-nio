@@ -87,18 +87,18 @@ struct ConnectionStateMachine {
         case sendParseDescribeBindExecuteSync(query: String, binds: [PSQLEncodable])
         case sendBindExecuteSync(statementName: String, binds: [PSQLEncodable])
         case failQuery(ExtendedQueryContext, with: PSQLError, cleanupContext: CleanUpContext?)
-        case succeedQuery(ExtendedQueryContext, columns: [PSQLBackendMessage.RowDescription.Column])
+        case succeedQuery(ExtendedQueryContext, columns: [RowDescription.Column])
         case succeedQueryNoRowsComming(ExtendedQueryContext, commandTag: String)
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
-        case forwardRows(CircularBuffer<PSQLBackendMessage.DataRow>)
-        case forwardStreamComplete(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
+        case forwardRows([DataRow])
+        case forwardStreamComplete([DataRow], commandTag: String)
         case forwardStreamError(PSQLError, read: Bool, cleanupContext: CleanUpContext?)
         
         // Prepare statement actions
         case sendParseDescribeSync(name: String, query: String)
-        case succeedPreparedStatementCreation(PrepareStatementContext, with: PSQLBackendMessage.RowDescription?)
+        case succeedPreparedStatementCreation(PrepareStatementContext, with: RowDescription?)
         case failPreparedStatementCreation(PrepareStatementContext, with: PSQLError, cleanupContext: CleanUpContext?)
         
         // Close actions
@@ -713,7 +713,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func rowDescriptionReceived(_ description: PSQLBackendMessage.RowDescription) -> ConnectionAction {
+    mutating func rowDescriptionReceived(_ description: RowDescription) -> ConnectionAction {
         switch self.state {
         case .extendedQuery(var queryState, let connectionContext) where !queryState.isComplete:
             return self.avoidingStateMachineCoW { machine -> ConnectionAction in
@@ -791,7 +791,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func dataRowReceived(_ dataRow: PSQLBackendMessage.DataRow) -> ConnectionAction {
+    mutating func dataRowReceived(_ dataRow: DataRow) -> ConnectionAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.dataRow(dataRow)))
         }

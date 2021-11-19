@@ -8,13 +8,13 @@ struct ExtendedQueryStateMachine {
         
         case parseCompleteReceived(ExtendedQueryContext)
         case parameterDescriptionReceived(ExtendedQueryContext)
-        case rowDescriptionReceived(ExtendedQueryContext, [PSQLBackendMessage.RowDescription.Column])
+        case rowDescriptionReceived(ExtendedQueryContext, [RowDescription.Column])
         case noDataMessageReceived(ExtendedQueryContext)
         
         /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
         /// used after receiving a `bindComplete` message
         case bindCompleteReceived(ExtendedQueryContext)
-        case streaming([PSQLBackendMessage.RowDescription.Column], RowStreamStateMachine)
+        case streaming([RowDescription.Column], RowStreamStateMachine)
         
         case commandComplete(commandTag: String)
         case error(PSQLError)
@@ -28,13 +28,13 @@ struct ExtendedQueryStateMachine {
         
         // --- general actions
         case failQuery(ExtendedQueryContext, with: PSQLError)
-        case succeedQuery(ExtendedQueryContext, columns: [PSQLBackendMessage.RowDescription.Column])
+        case succeedQuery(ExtendedQueryContext, columns: [RowDescription.Column])
         case succeedQueryNoRowsComming(ExtendedQueryContext, commandTag: String)
         
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
-        case forwardRows(CircularBuffer<PSQLBackendMessage.DataRow>)
-        case forwardStreamComplete(CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
+        case forwardRows([DataRow])
+        case forwardStreamComplete([DataRow], commandTag: String)
         case forwardStreamError(PSQLError, read: Bool)
 
         case read
@@ -105,7 +105,7 @@ struct ExtendedQueryStateMachine {
         }
     }
     
-    mutating func rowDescriptionReceived(_ rowDescription: PSQLBackendMessage.RowDescription) -> Action {
+    mutating func rowDescriptionReceived(_ rowDescription: RowDescription) -> Action {
         guard case .parameterDescriptionReceived(let queryContext) = self.state else {
             return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
         }
@@ -119,7 +119,7 @@ struct ExtendedQueryStateMachine {
             
             // In Postgres extended queries we always request the response rows to be returned in
             // `.binary` format.
-            let columns = rowDescription.columns.map { column -> PSQLBackendMessage.RowDescription.Column in                
+            let columns = rowDescription.columns.map { column -> RowDescription.Column in                
                 var column = column
                 column.format = .binary
                 return column
@@ -155,12 +155,12 @@ struct ExtendedQueryStateMachine {
         }
     }
     
-    mutating func dataRowReceived(_ dataRow: PSQLBackendMessage.DataRow) -> Action {
+    mutating func dataRowReceived(_ dataRow: DataRow) -> Action {
         switch self.state {
         case .streaming(let columns, var demandStateMachine):
             // When receiving a data row, we must ensure that the data row column count
             // matches the previously received row description column count.
-            guard dataRow.columns.count == columns.count else {
+            guard dataRow.columnCount == columns.count else {
                 return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
             }
             

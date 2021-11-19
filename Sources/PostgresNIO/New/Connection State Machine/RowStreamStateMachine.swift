@@ -13,15 +13,15 @@ struct RowStreamStateMachine {
     
     private enum State {
         /// The state machines expects further writes to `channelRead`. The writes are appended to the buffer.
-        case waitingForRows(CircularBuffer<PSQLBackendMessage.DataRow>)
+        case waitingForRows([DataRow])
         /// The state machines expects a call to `demandMoreResponseBodyParts` or `read`. The buffer is
         /// empty. It is preserved for performance reasons.
-        case waitingForReadOrDemand(CircularBuffer<PSQLBackendMessage.DataRow>)
+        case waitingForReadOrDemand([DataRow])
         /// The state machines expects a call to `read`. The buffer is empty. It is preserved for performance reasons.
-        case waitingForRead(CircularBuffer<PSQLBackendMessage.DataRow>)
+        case waitingForRead([DataRow])
         /// The state machines expects a call to `demandMoreResponseBodyParts`. The buffer is empty. It is
         /// preserved for performance reasons.
-        case waitingForDemand(CircularBuffer<PSQLBackendMessage.DataRow>)
+        case waitingForDemand([DataRow])
 
         case modifying
     }
@@ -29,10 +29,12 @@ struct RowStreamStateMachine {
     private var state: State
 
     init() {
-        self.state = .waitingForRows(CircularBuffer(initialCapacity: 32))
+        var buffer = [DataRow]()
+        buffer.reserveCapacity(32)
+        self.state = .waitingForRows(buffer)
     }
 
-    mutating func receivedRow(_ newRow: PSQLBackendMessage.DataRow) {
+    mutating func receivedRow(_ newRow: DataRow) {
         switch self.state {
         case .waitingForRows(var buffer):
             self.state = .modifying
@@ -66,7 +68,7 @@ struct RowStreamStateMachine {
         }
     }
 
-    mutating func channelReadComplete() -> CircularBuffer<PSQLBackendMessage.DataRow>? {
+    mutating func channelReadComplete() -> [DataRow]? {
         switch self.state {
         case .waitingForRows(let buffer):
             if buffer.isEmpty {
@@ -139,7 +141,7 @@ struct RowStreamStateMachine {
         }
     }
 
-    mutating func end() -> CircularBuffer<PSQLBackendMessage.DataRow> {
+    mutating func end() -> [DataRow] {
         switch self.state {
         case .waitingForRows(let buffer):
             return buffer

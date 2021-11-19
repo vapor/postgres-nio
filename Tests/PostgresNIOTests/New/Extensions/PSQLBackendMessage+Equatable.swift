@@ -1,4 +1,5 @@
 @testable import PostgresNIO
+import class Foundation.JSONEncoder
 
 extension PSQLBackendMessage: Equatable {
     
@@ -45,13 +46,5 @@ extension PSQLBackendMessage: Equatable {
         default:
             return false
         }
-    }
-}
-
-extension PSQLBackendMessage.DataRow: ExpressibleByArrayLiteral {
-    public typealias ArrayLiteralElement = ByteBuffer
-
-    public init(arrayLiteral elements: ByteBuffer...) {
-        self.init(columns: elements)
     }
 }

@@ -147,7 +147,7 @@ final class PSQLConnection {
     // MARK: Prepared statements
     
     func prepareStatement(_ query: String, with name: String, logger: Logger) -> EventLoopFuture<PSQLPreparedStatement> {
-        let promise = self.channel.eventLoop.makePromise(of: PSQLBackendMessage.RowDescription?.self)
+        let promise = self.channel.eventLoop.makePromise(of: RowDescription?.self)
         let context = PrepareStatementContext(
             name: name,
             query: query,
