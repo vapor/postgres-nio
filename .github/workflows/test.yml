@@ -58,7 +58,8 @@ jobs:
           - md5
           - scram-sha-256
         swiftver:
-          - swift:5.2
+          # Only test latest Swift for integration tests, issues from older Swift versions that don't show
+          # up in the unit tests are fairly unlikely.
           - swift:5.5
         swiftos:
           - focal
@@ -67,18 +68,16 @@ jobs:
     env:
       LOG_LEVEL: debug
       # Unfortunately, fluent-postgres-driver details leak through here
-      POSTGRES_HOSTNAME: 'psql-a'
       POSTGRES_DB: 'test_database'
-      POSTGRES_DATABASE: 'test_database'
-      POSTGRES_DATABASE_A: 'test_database'
-      POSTGRES_DATABASE_B: 'test_database'
+      POSTGRES_DB_A: 'test_database'
+      POSTGRES_DB_B: 'test_database'
       POSTGRES_USER: 'test_username'
-      POSTGRES_USERNAME: 'test_username'
-      POSTGRES_USERNAME_A: 'test_username'
-      POSTGRES_USERNAME_B: 'test_username'
+      POSTGRES_USER_A: 'test_username'
+      POSTGRES_USER_B: 'test_username'
       POSTGRES_PASSWORD: 'test_password'
       POSTGRES_PASSWORD_A: 'test_password'
       POSTGRES_PASSWORD_B: 'test_password'
+      POSTGRES_HOSTNAME: 'psql-a'
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
@@ -104,7 +103,7 @@ jobs:
         uses: actions/checkout@v2
         with: { path: 'postgres-nio' }
       - name: Run integration tests
-        run: swift test --package-path postgres-nio --enable-test-discovery --filter=^IntegrationTests
+        run: swift test --package-path postgres-nio --filter=^IntegrationTests
       - name: Check out postgres-kit dependent
         uses: actions/checkout@v2
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
@@ -116,9 +115,9 @@ jobs:
           swift package --package-path postgres-kit edit postgres-nio --path postgres-nio
           swift package --package-path fluent-postgres-driver edit postgres-nio --path postgres-nio
       - name: Run postgres-kit tests
-        run: swift test --package-path postgres-kit --enable-test-discovery
+        run: swift test --package-path postgres-kit
       - name: Run fluent-postgres-driver tests
-        run: swift test --package-path fluent-postgres-driver --enable-test-discovery
+        run: swift test --package-path fluent-postgres-driver
 
   macos-all:
     strategy:
