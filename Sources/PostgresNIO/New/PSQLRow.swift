@@ -1,34 +1,22 @@
+import NIOCore
 
 /// `PSQLRow` represents a single row that was received from the Postgres Server.
 struct PSQLRow {
     internal let lookupTable: [String: Int]
-    internal let data: PSQLBackendMessage.DataRow
+    internal let data: DataRow
     
-    internal let columns: [PSQLBackendMessage.RowDescription.Column]
+    internal let columns: [RowDescription.Column]
     internal let jsonDecoder: PSQLJSONDecoder
     
-    internal init(data: PSQLBackendMessage.DataRow, lookupTable: [String: Int], columns: [PSQLBackendMessage.RowDescription.Column], jsonDecoder: PSQLJSONDecoder) {
+    internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column], jsonDecoder: PSQLJSONDecoder) {
         self.data = data
         self.lookupTable = lookupTable
         self.columns = columns
         self.jsonDecoder = jsonDecoder
     }
-    
-    /// Access the raw Postgres data in the n-th column
-    subscript(index: Int) -> PSQLData {
-        PSQLData(bytes: self.data.columns[index], dataType: self.columns[index].dataType, format: self.columns[index].format)
-    }
-    
-    // TBD: Should this be optional?
-    /// Access the raw Postgres data in the column indentified by name
-    subscript(column columnName: String) -> PSQLData? {
-        guard let index = self.lookupTable[columnName] else {
-            return nil
-        }
-        
-        return self[index]
-    }
-    
+}
+
+extension PSQLRow {
     /// Access the data in the provided column and decode it into the target type.
     ///
     /// - Parameters:
@@ -52,15 +40,20 @@ struct PSQLRow {
     /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
     func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
-        let column = self.columns[index]
+        precondition(index < self.data.columnCount)
         
-        let decodingContext = PSQLDecodingContext(
-            jsonDecoder: jsonDecoder,
+        let column = self.columns[index]
+        let context = PSQLDecodingContext(
+            jsonDecoder: self.jsonDecoder,
             columnName: column.name,
             columnIndex: index,
             file: file,
             line: line)
         
-        return try self[index].decode(as: T.self, context: decodingContext)
+        guard var cellSlice = self.data[column: index] else {
+            throw PSQLCastingError.missingData(targetType: T.self, type: column.dataType, context: context)
+        }
+
+        return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)
     }
 }

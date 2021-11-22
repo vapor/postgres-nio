@@ -10,5 +10,5 @@ struct PSQLPreparedStatement {
     let connection: PSQLConnection
     
     /// The `RowDescription` to apply to all `DataRow`s when executing this `PSQLPreparedStatement`
-    let rowDescription: PSQLBackendMessage.RowDescription?
+    let rowDescription: RowDescription?
 }
