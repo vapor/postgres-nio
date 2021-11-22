@@ -466,7 +466,7 @@ final class PostgresNIOTests: XCTestCase {
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("""
         select
-            $1::numeric::text as a,
+            $1::numeric as a,
             $2::numeric as b,
             $3::numeric as c
         """, [
@@ -477,6 +477,30 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows?.first?.column("a")?.decimal, Decimal(string: "123456.789123")!)
         XCTAssertEqual(rows?.first?.column("b")?.decimal, Decimal(string: "-123456.789123")!)
         XCTAssertEqual(rows?.first?.column("c")?.decimal, Decimal(string: "3.14159265358979")!)
+    }
+    
+    func testDecimalStringSerialization() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table1\"").wait())
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
+        CREATE TABLE table1 (
+            "balance" text NOT NULL
+        );
+        """).wait())
+        defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table1\"").wait()) }
+        
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("INSERT INTO table1 VALUES ('123456.789123')").wait())
+        
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("""
+        SELECT
+            "balance"
+        FROM table1
+        """).wait())
+        XCTAssertEqual(rows?.first?.column("balance")?.decimal, Decimal(string: "123456.789123")!)
     }
 
     func testMoney() {
