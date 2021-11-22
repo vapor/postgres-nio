@@ -659,22 +659,6 @@ final class PostgresNIOTests: XCTestCase {
         }
     }
 
-    func testJSONBConvertible() {
-        struct Object: PostgresJSONBCodable {
-            let foo: Int
-            let bar: Int
-        }
-
-        XCTAssertEqual(Object.postgresDataType, .jsonb)
-
-        let postgresData = Object(foo: 1, bar: 2).postgresData
-        XCTAssertEqual(postgresData?.type, .jsonb)
-
-        let object = Object(postgresData: postgresData!)
-        XCTAssertEqual(object?.foo, 1)
-        XCTAssertEqual(object?.bar, 2)
-    }
-
     func testRemoteTLSServer() {
         // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
         var conn: PostgresConnection?
@@ -899,38 +883,6 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows?.first?.column("int")?.uint8, 5)
     }
 
-    func testMessageDecoder() {
-        let sample: [UInt8] = [
-            0x52, // R - authentication
-                0x00, 0x00, 0x00, 0x0C, // length = 12
-                0x00, 0x00, 0x00, 0x05, // md5
-                0x01, 0x02, 0x03, 0x04, // salt
-            0x4B, // B - backend key data
-                0x00, 0x00, 0x00, 0x0C, // length = 12
-                0x05, 0x05, 0x05, 0x05, // process id
-                0x01, 0x01, 0x01, 0x01, // secret key
-        ]
-        var input = ByteBufferAllocator().buffer(capacity: 0)
-        input.writeBytes(sample)
-
-        let output: [PostgresMessage] = [
-            PostgresMessage(identifier: .authentication, bytes: [
-                0x00, 0x00, 0x00, 0x05,
-                0x01, 0x02, 0x03, 0x04,
-            ]),
-            PostgresMessage(identifier: .backendKeyData, bytes: [
-                0x05, 0x05, 0x05, 0x05,
-                0x01, 0x01, 0x01, 0x01,
-            ])
-        ]
-        XCTAssertNoThrow(try XCTUnwrap(ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(input, output)],
-            decoderFactory: {
-                PostgresMessageDecoder()
-            }
-        )))
-    }
-
     func testPreparedQuery() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -1134,62 +1086,6 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows?.first?.column("max64")?.int32, nil)
         XCTAssertEqual(rows?.first?.column("min64")?.int64, .min)
         XCTAssertEqual(rows?.first?.column("max64")?.int64, .max)
-    }
-
-    // https://github.com/vapor/postgres-nio/issues/126
-    func testCustomJSONEncoder() {
-        let previousDefaultJSONEncoder = PostgresNIO._defaultJSONEncoder
-        defer {
-            PostgresNIO._defaultJSONEncoder = previousDefaultJSONEncoder
-        }
-        final class CustomJSONEncoder: PostgresJSONEncoder {
-            var didEncode = false
-            func encode<T>(_ value: T) throws -> Data where T : Encodable {
-                self.didEncode = true
-                return try JSONEncoder().encode(value)
-            }
-        }
-        struct Object: Codable {
-            var foo: Int
-            var bar: Int
-        }
-        let customJSONEncoder = CustomJSONEncoder()
-        PostgresNIO._defaultJSONEncoder = customJSONEncoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)))
-        XCTAssert(customJSONEncoder.didEncode)
-
-        let customJSONBEncoder = CustomJSONEncoder()
-        PostgresNIO._defaultJSONEncoder = customJSONBEncoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)))
-        XCTAssert(customJSONBEncoder.didEncode)
-    }
-
-    // https://github.com/vapor/postgres-nio/issues/126
-    func testCustomJSONDecoder() {
-        let previousDefaultJSONDecoder = PostgresNIO._defaultJSONDecoder
-        defer {
-            PostgresNIO._defaultJSONDecoder = previousDefaultJSONDecoder
-        }
-        final class CustomJSONDecoder: PostgresJSONDecoder {
-            var didDecode = false
-            func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable {
-                self.didDecode = true
-                return try JSONDecoder().decode(type, from: data)
-            }
-        }
-        struct Object: Codable {
-            var foo: Int
-            var bar: Int
-        }
-        let customJSONDecoder = CustomJSONDecoder()
-        PostgresNIO._defaultJSONDecoder = customJSONDecoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
-        XCTAssert(customJSONDecoder.didDecode)
-
-        let customJSONBDecoder = CustomJSONDecoder()
-        PostgresNIO._defaultJSONDecoder = customJSONBDecoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
-        XCTAssert(customJSONBDecoder.didDecode)
     }
 }
 

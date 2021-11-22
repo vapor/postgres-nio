@@ -1,0 +1,27 @@
+name: main codecov
+on:
+  push:
+    branches:
+      - main
+jobs:
+  update-main-codecov:
+    runs-on: ubuntu-latest
+    container: swift:5.5-focal
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v2
+      - name: Run unit tests with code coverage and Thread Sanitizer
+        run: swift test --enable-code-coverage --sanitize=thread --filter=^PostgresNIOTests
+      - name: Convert profdata to LCOV for upload
+        run: |
+          llvm-cov export -format lcov \
+            -instr-profile="$(dirname $(swift test --show-codecov-path))/default.profdata" \
+            --ignore-filename-regex='/(\.build|Tests)/' \
+            "$(swift build --show-bin-path)/postgres-nioPackageTests.xctest" >postgres-nio.lcov
+          echo "CODECOV_FILE=$(pwd)/postgres-nio.lcov" >>"${GITHUB_ENV}"
+      - name: Upload LCOV report to Codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          files: ${{ env.CODECOV_FILE }}
+          flags: 'unittests'
+          fail_ci_if_error: true
