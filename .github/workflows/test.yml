@@ -24,8 +24,8 @@ jobs:
     steps:
       - name: Check out package
         uses: actions/checkout@v2
-      - name: Run unit tests with code coverage
-        run: swift test --enable-test-discovery --filter=^PostgresNIOTests --enable-code-coverage
+      - name: Run unit tests with code coverage and Thread Sanitizer
+        run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
       - name: Convert code coverage report to most expressive format
         run: |
           export pkgname="$(swift package dump-package | perl -e 'use JSON::PP; print (decode_json(join("",(<>)))->{name});')" \
@@ -33,9 +33,9 @@ jobs:
                  exc_prefix="$(which xcrun || true)" && \
           ${exc_prefix} llvm-cov export -format lcov \
               -instr-profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata" \
-              --ignore-filename-regex='/\.build/' --ignore-filename-regex='/Tests/' \
+              --ignore-filename-regex='/(\.build|Tests)/' \
               "$(swift build --show-bin-path)/${pkgname}PackageTests.xctest${subpath}" >"${pkgname}.lcov"
-          echo "CODECOV_FILE=$(pwd)/${pkgname}.lcov" >> $GITHUB_ENV
+          echo "CODECOV_FILE=$(pwd)/${pkgname}.lcov" >> "${GITHUB_ENV}"
       - name: Send coverage report to codecov.io
         uses: codecov/codecov-action@v2
         with:
@@ -148,8 +148,8 @@ jobs:
           xcode-version: ${{ matrix.xcode }}
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
-          export PATH="$(brew prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          brew install ${{ matrix.dbimage }}
+          export PATH="$(brew --prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
+          (brew unlink postgresql || true) && brew install ${{ matrix.dbimage }} && brew link --force ${{ matrix.dbimage }}
           initdb --locale=C --auth-host ${{ matrix.dbauth }} -U $POSTGRES_USER --pwfile=<(echo $POSTGRES_PASSWORD)
           pg_ctl start --wait
         timeout-minutes: 2
