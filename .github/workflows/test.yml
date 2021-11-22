@@ -26,23 +26,14 @@ jobs:
         uses: actions/checkout@v2
       - name: Run unit tests with code coverage and Thread Sanitizer
         run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
-      - name: Convert code coverage report to most expressive format
-        run: |
-          export pkgname="$(swift package dump-package | perl -e 'use JSON::PP; print (decode_json(join("",(<>)))->{name});')" \
-                 subpath="$([ "$(uname -s)" = 'Darwin' ] && echo "/Contents/MacOS/${pkgname}PackageTests" || true)" \
-                 exc_prefix="$(which xcrun || true)" && \
-          ${exc_prefix} llvm-cov export -format lcov \
-              -instr-profile="$(dirname "$(swift test --show-codecov-path)")/default.profdata" \
-              --ignore-filename-regex='/(\.build|Tests)/' \
-              "$(swift build --show-bin-path)/${pkgname}PackageTests.xctest${subpath}" >"${pkgname}.lcov"
-          echo "CODECOV_FILE=$(pwd)/${pkgname}.lcov" >> "${GITHUB_ENV}"
-      - name: Send coverage report to codecov.io
-        uses: codecov/codecov-action@v2
+      - name: Submit coverage report to Codecov.io
+        uses: vapor/swift-codecov-action@main
         with:
-          files: ${{ env.CODECOV_FILE }}
-          flags: 'unittests'
-          env_vars: 'MATRIX_CONFIG'
-          fail_ci_if_error: true
+          cc_flags: 'unittests'
+          cc_env_vars: 'MATRIX_CONFIG'
+          cc_fail_ci_if_error: true
+          cc_verbose: true
+          cc_dry_run: true
 
   linux-integration-and-dependencies:
     strategy:
