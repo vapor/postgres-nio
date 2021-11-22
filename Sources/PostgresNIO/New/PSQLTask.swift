@@ -21,7 +21,7 @@ enum PSQLTask {
 final class ExtendedQueryContext {
     enum Query {
         case unnamed(String)
-        case preparedStatement(name: String, rowDescription: PSQLBackendMessage.RowDescription?)
+        case preparedStatement(name: String, rowDescription: RowDescription?)
     }
     
     let query: Query
@@ -65,12 +65,12 @@ final class PrepareStatementContext {
     let name: String
     let query: String
     let logger: Logger
-    let promise: EventLoopPromise<PSQLBackendMessage.RowDescription?>
+    let promise: EventLoopPromise<RowDescription?>
     
     init(name: String,
          query: String,
          logger: Logger,
-         promise: EventLoopPromise<PSQLBackendMessage.RowDescription?>)
+         promise: EventLoopPromise<RowDescription?>)
     {
         self.name = name
         self.query = query

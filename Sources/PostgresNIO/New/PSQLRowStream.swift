@@ -12,8 +12,8 @@ final class PSQLRowStream {
     let logger: Logger
     
     private enum UpstreamState {
-        case streaming(buffer: CircularBuffer<PSQLBackendMessage.DataRow>, dataSource: PSQLRowsDataSource)
-        case finished(buffer: CircularBuffer<PSQLBackendMessage.DataRow>, commandTag: String)
+        case streaming(buffer: CircularBuffer<DataRow>, dataSource: PSQLRowsDataSource)
+        case finished(buffer: CircularBuffer<DataRow>, commandTag: String)
         case failure(Error)
         case consumed(Result<String, Error>)
         case modifying
@@ -25,18 +25,18 @@ final class PSQLRowStream {
         case consuming
     }
     
-    internal let rowDescription: [PSQLBackendMessage.RowDescription.Column]
+    internal let rowDescription: [RowDescription.Column]
     private let lookupTable: [String: Int]
     private var upstreamState: UpstreamState
     private var downstreamState: DownstreamState
     private let jsonDecoder: PSQLJSONDecoder
     
-    init(rowDescription: [PSQLBackendMessage.RowDescription.Column],
+    init(rowDescription: [RowDescription.Column],
          queryContext: ExtendedQueryContext,
          eventLoop: EventLoop,
          rowSource: RowSource)
     {
-        let buffer = CircularBuffer<PSQLBackendMessage.DataRow>()
+        let buffer = CircularBuffer<DataRow>()
         
         self.downstreamState = .consuming
         switch rowSource {
@@ -186,7 +186,7 @@ final class PSQLRowStream {
         ])
     }
     
-    internal func receive(_ newRows: CircularBuffer<PSQLBackendMessage.DataRow>) {
+    internal func receive(_ newRows: [DataRow]) {
         precondition(!newRows.isEmpty, "Expected to get rows!")
         self.eventLoop.preconditionInEventLoop()
         self.logger.trace("Row stream received rows", metadata: [
