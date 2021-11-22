@@ -190,7 +190,7 @@ extension PSQLBackendMessage.BackendKeyData: PSQLMessagePayloadEncodable {
 
 extension DataRow: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
-        buffer.writeInteger(Int16(self.columnCount))
+        buffer.writeInteger(self.columnCount, as: Int16.self)
         buffer.writeBytes(self.bytes.readableBytesView)
     }
 }

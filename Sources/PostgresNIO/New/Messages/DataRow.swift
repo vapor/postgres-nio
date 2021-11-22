@@ -58,24 +58,9 @@ extension DataRow: Collection {
             self.offset = index
         }
         
-        static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.offset == rhs.offset
-        }
-        
+        // Only needed implementation for comparable. The compiler synthesizes the rest from this.
         static func < (lhs: Self, rhs: Self) -> Bool {
             lhs.offset < rhs.offset
-        }
-
-        static func <= (lhs: Self, rhs: Self) -> Bool {
-            lhs.offset <= rhs.offset
-        }
-
-        static func >= (lhs: Self, rhs: Self) -> Bool {
-            lhs.offset >= rhs.offset
-        }
-
-        static func > (lhs: Self, rhs: Self) -> Bool {
-            lhs.offset > rhs.offset
         }
     }
     

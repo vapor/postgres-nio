@@ -1,5 +1,4 @@
 @testable import PostgresNIO
-import class Foundation.JSONEncoder
 
 extension PSQLBackendMessage: Equatable {
     

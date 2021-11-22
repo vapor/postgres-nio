@@ -107,9 +107,8 @@ class DataRowTests: XCTestCase {
             nil
         )
         
-        XCTAssertNil(dataRow.withContiguousStorageIfAvailable { _ -> Int in
-            XCTFail("DataRow does not have a contiguous storage")
-            return 123
+        XCTAssertNil(dataRow.withContiguousStorageIfAvailable { _ in
+            return XCTFail("DataRow does not have a contiguous storage")
         })
     }
 }
