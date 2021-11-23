@@ -13,8 +13,8 @@ extension PSQLFrontendMessage {
         let parameters: [PSQLDataType]
         
         func encode(into buffer: inout ByteBuffer) {
-            buffer.writeNullTerminatedString(self.preparedStatementName)
-            buffer.writeNullTerminatedString(self.query)
+            buffer.psqlWriteNullTerminatedString(self.preparedStatementName)
+            buffer.psqlWriteNullTerminatedString(self.query)
             buffer.writeInteger(Int16(self.parameters.count))
             
             self.parameters.forEach { dataType in

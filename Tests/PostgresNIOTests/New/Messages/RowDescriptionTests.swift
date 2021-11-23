@@ -25,7 +25,7 @@ class RowDescriptionTests: XCTestCase {
                 buffer.writeInteger(Int16(description.columns.count))
                 
                 description.columns.forEach { column in
-                    buffer.writeNullTerminatedString(column.name)
+                    buffer.psqlWriteNullTerminatedString(column.name)
                     buffer.writeInteger(column.tableOID)
                     buffer.writeInteger(column.columnAttributeNumber)
                     buffer.writeInteger(column.dataType.rawValue)
@@ -70,7 +70,7 @@ class RowDescriptionTests: XCTestCase {
         
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
-            buffer.writeNullTerminatedString(column.name)
+            buffer.psqlWriteNullTerminatedString(column.name)
             buffer.writeInteger(column.tableOID)
             buffer.writeInteger(column.columnAttributeNumber)
             buffer.writeInteger(column.dataType.rawValue)
@@ -93,7 +93,7 @@ class RowDescriptionTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
             buffer.writeInteger(Int16(1))
-            buffer.writeNullTerminatedString(column.name)
+            buffer.psqlWriteNullTerminatedString(column.name)
             buffer.writeInteger(column.tableOID)
             buffer.writeInteger(column.columnAttributeNumber)
             buffer.writeInteger(column.dataType.rawValue)
@@ -116,7 +116,7 @@ class RowDescriptionTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
             buffer.writeInteger(Int16(-1))
-            buffer.writeNullTerminatedString(column.name)
+            buffer.psqlWriteNullTerminatedString(column.name)
             buffer.writeInteger(column.tableOID)
             buffer.writeInteger(column.columnAttributeNumber)
             buffer.writeInteger(column.dataType.rawValue)

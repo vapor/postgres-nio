@@ -51,29 +51,29 @@ extension PSQLFrontendMessage {
         /// Serializes this message into a byte buffer.
         func encode(into buffer: inout ByteBuffer) {
             buffer.writeInteger(self.protocolVersion)
-            buffer.writeNullTerminatedString("user")
+            buffer.psqlWriteNullTerminatedString("user")
             buffer.writeString(self.parameters.user)
             buffer.writeInteger(UInt8(0))
             
             if let database = self.parameters.database {
-                buffer.writeNullTerminatedString("database")
+                buffer.psqlWriteNullTerminatedString("database")
                 buffer.writeString(database)
                 buffer.writeInteger(UInt8(0))
             }
             
             if let options = self.parameters.options {
-                buffer.writeNullTerminatedString("options")
+                buffer.psqlWriteNullTerminatedString("options")
                 buffer.writeString(options)
                 buffer.writeInteger(UInt8(0))
             }
             
             switch self.parameters.replication {
             case .database:
-                buffer.writeNullTerminatedString("replication")
-                buffer.writeNullTerminatedString("replication")
+                buffer.psqlWriteNullTerminatedString("replication")
+                buffer.psqlWriteNullTerminatedString("replication")
             case .true:
-                buffer.writeNullTerminatedString("replication")
-                buffer.writeNullTerminatedString("true")
+                buffer.psqlWriteNullTerminatedString("replication")
+                buffer.psqlWriteNullTerminatedString("true")
             case .false:
                 break
             }

@@ -1,12 +1,12 @@
 import NIOCore
 
 internal extension ByteBuffer {
-    mutating func writeNullTerminatedString(_ string: String) {
+    mutating func psqlWriteNullTerminatedString(_ string: String) {
         self.writeString(string)
         self.writeInteger(0, as: UInt8.self)
     }
     
-    mutating func readNullTerminatedString() -> String? {
+    mutating func psqlReadNullTerminatedString() -> String? {
         guard let nullIndex = readableBytesView.firstIndex(of: 0) else {
             return nil
         }
@@ -15,27 +15,27 @@ internal extension ByteBuffer {
         return readString(length: nullIndex - readerIndex)
     }
     
-    mutating func writeBackendMessageID(_ messageID: PSQLBackendMessage.ID) {
+    mutating func psqlWriteBackendMessageID(_ messageID: PSQLBackendMessage.ID) {
         self.writeInteger(messageID.rawValue)
     }
     
-    mutating func writeFrontendMessageID(_ messageID: PSQLFrontendMessage.ID) {
+    mutating func psqlWriteFrontendMessageID(_ messageID: PSQLFrontendMessage.ID) {
         self.writeInteger(messageID.rawValue)
     }
 
-    mutating func readFloat() -> Float? {
+    mutating func psqlReadFloat() -> Float? {
         return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }
     }
 
-    mutating func readDouble() -> Double? {
+    mutating func psqlReadDouble() -> Double? {
         return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
     }
 
-    mutating func writeFloat(_ float: Float) {
+    mutating func psqlWriteFloat(_ float: Float) {
         self.writeInteger(float.bitPattern)
     }
 
-    mutating func writeDouble(_ double: Double) {
+    mutating func psqlWriteDouble(_ double: Double) {
         self.writeInteger(double.bitPattern)
     }
 }

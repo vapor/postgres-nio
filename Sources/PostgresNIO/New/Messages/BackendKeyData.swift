@@ -7,7 +7,7 @@ extension PSQLBackendMessage {
         let secretKey: Int32
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
-            try buffer.ensureExactNBytesRemaining(8)
+            try buffer.psqlEnsureExactNBytesRemaining(8)
             
             // We have verified the correct length before, this means we have exactly eight bytes
             // to read. If we have enough readable bytes, a read of Int32 should always succeed.

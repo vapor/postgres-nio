@@ -12,12 +12,12 @@ extension Float: PSQLCodable {
     static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Float {
         switch (format, type) {
         case (.binary, .float4):
-            guard buffer.readableBytes == 4, let float = buffer.readFloat() else {
+            guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
                 throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             return float
         case (.binary, .float8):
-            guard buffer.readableBytes == 8, let double = buffer.readDouble() else {
+            guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
                 throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             return Float(double)
@@ -32,7 +32,7 @@ extension Float: PSQLCodable {
     }
     
     func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeFloat(self)
+        byteBuffer.psqlWriteFloat(self)
     }
 }
 
@@ -48,12 +48,12 @@ extension Double: PSQLCodable {
     static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Double {
         switch (format, type) {
         case (.binary, .float4):
-            guard buffer.readableBytes == 4, let float = buffer.readFloat() else {
+            guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
                 throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             return Double(float)
         case (.binary, .float8):
-            guard buffer.readableBytes == 8, let double = buffer.readDouble() else {
+            guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
                 throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             return double
@@ -68,7 +68,7 @@ extension Double: PSQLCodable {
     }
     
     func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeDouble(self)
+        byteBuffer.psqlWriteDouble(self)
     }
 }
 
