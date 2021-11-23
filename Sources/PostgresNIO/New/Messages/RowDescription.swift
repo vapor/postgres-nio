@@ -37,7 +37,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
     }
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
-        try buffer.ensureAtLeastNBytesRemaining(2)
+        try buffer.psqlEnsureAtLeastNBytesRemaining(2)
         let columnCount = buffer.readInteger(as: Int16.self)!
         
         guard columnCount >= 0 else {
@@ -48,11 +48,11 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
         result.reserveCapacity(Int(columnCount))
         
         for _ in 0..<columnCount {
-            guard let name = buffer.readNullTerminatedString() else {
+            guard let name = buffer.psqlReadNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             
-            try buffer.ensureAtLeastNBytesRemaining(18)
+            try buffer.psqlEnsureAtLeastNBytesRemaining(18)
             
             let tableOID = buffer.readInteger(as: Int32.self)!
             let columnAttributeNumber = buffer.readInteger(as: Int16.self)!

@@ -15,12 +15,12 @@ struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
     var bytes: ByteBuffer
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
-        try buffer.ensureAtLeastNBytesRemaining(2)
+        try buffer.psqlEnsureAtLeastNBytesRemaining(2)
         let columnCount = buffer.readInteger(as: Int16.self)!
         let firstColumnIndex = buffer.readerIndex
         
         for _ in 0..<columnCount {
-            try buffer.ensureAtLeastNBytesRemaining(2)
+            try buffer.psqlEnsureAtLeastNBytesRemaining(2)
             let bufferLength = Int(buffer.readInteger(as: Int32.self)!)
             
             guard bufferLength >= 0 else {
@@ -28,11 +28,11 @@ struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
                 continue
             }
             
-            try buffer.ensureAtLeastNBytesRemaining(bufferLength)
+            try buffer.psqlEnsureAtLeastNBytesRemaining(bufferLength)
             buffer.moveReaderIndex(forwardBy: bufferLength)
         }
         
-        try buffer.ensureExactNBytesRemaining(0)
+        try buffer.psqlEnsureExactNBytesRemaining(0)
         
         buffer.moveReaderIndex(to: firstColumnIndex)
         let columnSlice = buffer.readSlice(length: buffer.readableBytes)!

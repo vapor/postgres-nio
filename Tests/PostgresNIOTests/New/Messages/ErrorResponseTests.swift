@@ -19,7 +19,7 @@ class ErrorResponseTests: XCTestCase {
         let buffer = ByteBuffer.backendMessage(id: .error) { buffer in
             fields.forEach { (key, value) in
                 buffer.writeInteger(key.rawValue, as: UInt8.self)
-                buffer.writeNullTerminatedString(value)
+                buffer.psqlWriteNullTerminatedString(value)
             }
             buffer.writeInteger(0, as: UInt8.self) // signal done
         }

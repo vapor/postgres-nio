@@ -38,7 +38,7 @@ extension PostgresMessage {
         public let initialData: [UInt8]
         
         public static func parse(from buffer: inout ByteBuffer) throws -> PostgresMessage.SASLInitialResponse {
-            guard let mechanism = buffer.readNullTerminatedString() else {
+            guard let mechanism = buffer.psqlReadNullTerminatedString() else {
                 throw PostgresError.protocol("Could not parse SASL mechanism from initial response message")
             }
             guard let dataLength = buffer.readInteger(as: Int32.self) else {
@@ -57,7 +57,7 @@ extension PostgresMessage {
         }
         
         public func serialize(into buffer: inout ByteBuffer) throws {
-            buffer.writeNullTerminatedString(mechanism)
+            buffer.psqlWriteNullTerminatedString(mechanism)
             if initialData.count > 0 {
                 buffer.writeInteger(Int32(initialData.count), as: Int32.self) // write(array:) writes Int16, which is incorrect here
                 buffer.writeBytes(initialData)

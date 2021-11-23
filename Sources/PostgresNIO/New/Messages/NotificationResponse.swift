@@ -8,13 +8,13 @@ extension PSQLBackendMessage {
         let payload: String
         
         static func decode(from buffer: inout ByteBuffer) throws -> PSQLBackendMessage.NotificationResponse {
-            try buffer.ensureAtLeastNBytesRemaining(6)
+            try buffer.psqlEnsureAtLeastNBytesRemaining(6)
             let backendPID = buffer.readInteger(as: Int32.self)!
             
-            guard let channel = buffer.readNullTerminatedString() else {
+            guard let channel = buffer.psqlReadNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
-            guard let payload = buffer.readNullTerminatedString() else {
+            guard let payload = buffer.psqlReadNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             

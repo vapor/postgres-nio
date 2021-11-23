@@ -5,7 +5,7 @@ extension PostgresMessage {
     public struct CommandComplete: PostgresMessageType {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> CommandComplete {
-            guard let string = buffer.readNullTerminatedString() else {
+            guard let string = buffer.psqlReadNullTerminatedString() else {
                 throw PostgresError.protocol("Could not parse close response message")
             }
             return .init(tag: string)
