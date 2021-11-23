@@ -15,9 +15,7 @@ extension PSQLFrontendMessage {
         let secretKey: Int32
         
         func encode(into buffer: inout ByteBuffer) {
-            buffer.writeInteger(self.cancelRequestCode)
-            buffer.writeInteger(self.processID)
-            buffer.writeInteger(self.secretKey)
+            buffer.writeMultipleIntegers(self.cancelRequestCode, self.processID, self.secretKey)
         }
     }
 }

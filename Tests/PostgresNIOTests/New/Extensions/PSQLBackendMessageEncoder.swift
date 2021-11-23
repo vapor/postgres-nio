@@ -68,7 +68,7 @@ struct PSQLBackendMessageEncoder: MessageToByteEncoder {
         var string: String
         init(_ string: String) { self.string = string }
         func encode(into buffer: inout ByteBuffer) {
-            buffer.psqlWriteNullTerminatedString(self.string)
+            buffer.writeNullTerminatedString(self.string)
         }
     }
 
@@ -166,7 +166,7 @@ extension PSQLBackendMessage.Authentication: PSQLMessagePayloadEncodable {
         case .sasl(names: let names):
             buffer.writeInteger(Int32(10))
             for name in names {
-                buffer.psqlWriteNullTerminatedString(name)
+                buffer.writeNullTerminatedString(name)
             }
             
         case .saslContinue(data: var data):
@@ -199,7 +199,7 @@ extension PSQLBackendMessage.ErrorResponse: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
         for (key, value) in self.fields {
             buffer.writeInteger(key.rawValue, as: UInt8.self)
-            buffer.psqlWriteNullTerminatedString(value)
+            buffer.writeNullTerminatedString(value)
         }
         buffer.writeInteger(0, as: UInt8.self) // signal done
     }
@@ -209,7 +209,7 @@ extension PSQLBackendMessage.NoticeResponse: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
         for (key, value) in self.fields {
             buffer.writeInteger(key.rawValue, as: UInt8.self)
-            buffer.psqlWriteNullTerminatedString(value)
+            buffer.writeNullTerminatedString(value)
         }
         buffer.writeInteger(0, as: UInt8.self) // signal done
     }
@@ -218,8 +218,8 @@ extension PSQLBackendMessage.NoticeResponse: PSQLMessagePayloadEncodable {
 extension PSQLBackendMessage.NotificationResponse: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
         buffer.writeInteger(self.backendPID)
-        buffer.psqlWriteNullTerminatedString(self.channel)
-        buffer.psqlWriteNullTerminatedString(self.payload)
+        buffer.writeNullTerminatedString(self.channel)
+        buffer.writeNullTerminatedString(self.payload)
     }
 }
 
@@ -235,8 +235,8 @@ extension PSQLBackendMessage.ParameterDescription: PSQLMessagePayloadEncodable {
 
 extension PSQLBackendMessage.ParameterStatus: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
-        buffer.psqlWriteNullTerminatedString(self.parameter)
-        buffer.psqlWriteNullTerminatedString(self.value)
+        buffer.writeNullTerminatedString(self.parameter)
+        buffer.writeNullTerminatedString(self.value)
     }
 }
 
@@ -251,7 +251,7 @@ extension RowDescription: PSQLMessagePayloadEncodable {
         buffer.writeInteger(Int16(self.columns.count))
         
         for column in self.columns {
-            buffer.psqlWriteNullTerminatedString(column.name)
+            buffer.writeNullTerminatedString(column.name)
             buffer.writeInteger(column.tableOID)
             buffer.writeInteger(column.columnAttributeNumber)
             buffer.writeInteger(column.dataType.rawValue)

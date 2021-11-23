@@ -37,8 +37,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
     }
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
-        try buffer.psqlEnsureAtLeastNBytesRemaining(2)
-        let columnCount = buffer.readInteger(as: Int16.self)!
+        let columnCount = try buffer.throwingReadInteger(as: Int16.self)
         
         guard columnCount >= 0 else {
             throw PSQLPartialDecodingError.integerMustBePositiveOrNull(columnCount)
@@ -48,18 +47,15 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
         result.reserveCapacity(Int(columnCount))
         
         for _ in 0..<columnCount {
-            guard let name = buffer.psqlReadNullTerminatedString() else {
+            guard let name = buffer.readNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             
-            try buffer.psqlEnsureAtLeastNBytesRemaining(18)
+            let hextuple = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int16, Int32, Int16, Int32, Int16).self)
             
-            let tableOID = buffer.readInteger(as: Int32.self)!
-            let columnAttributeNumber = buffer.readInteger(as: Int16.self)!
-            let dataType = PSQLDataType(rawValue: buffer.readInteger(as: Int32.self)!)
-            let dataTypeSize = buffer.readInteger(as: Int16.self)!
-            let dataTypeModifier = buffer.readInteger(as: Int32.self)!
-            let formatCodeInt16 = buffer.readInteger(as: Int16.self)!
+            guard let (tableOID, columnAttributeNumber, dataType, dataTypeSize, dataTypeModifier, formatCodeInt16) = hextuple else {
+                throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(18, actual: buffer.readableBytes)
+            }
             
             guard let format = PSQLFormat(rawValue: formatCodeInt16) else {
                 throw PSQLPartialDecodingError.valueNotRawRepresentable(value: formatCodeInt16, asType: PSQLFormat.self)
@@ -69,7 +65,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
                 name: name,
                 tableOID: tableOID,
                 columnAttributeNumber: columnAttributeNumber,
-                dataType: dataType,
+                dataType: PSQLDataType(rawValue: dataType),
                 dataTypeSize: dataTypeSize,
                 dataTypeModifier: dataTypeModifier,
                 format: format)

@@ -51,29 +51,26 @@ extension PSQLFrontendMessage {
         /// Serializes this message into a byte buffer.
         func encode(into buffer: inout ByteBuffer) {
             buffer.writeInteger(self.protocolVersion)
-            buffer.psqlWriteNullTerminatedString("user")
-            buffer.writeString(self.parameters.user)
-            buffer.writeInteger(UInt8(0))
+            buffer.writeNullTerminatedString("user")
+            buffer.writeNullTerminatedString(self.parameters.user)
             
             if let database = self.parameters.database {
-                buffer.psqlWriteNullTerminatedString("database")
-                buffer.writeString(database)
-                buffer.writeInteger(UInt8(0))
+                buffer.writeNullTerminatedString("database")
+                buffer.writeNullTerminatedString(database)
             }
             
             if let options = self.parameters.options {
-                buffer.psqlWriteNullTerminatedString("options")
-                buffer.writeString(options)
-                buffer.writeInteger(UInt8(0))
+                buffer.writeNullTerminatedString("options")
+                buffer.writeNullTerminatedString(options)
             }
             
             switch self.parameters.replication {
             case .database:
-                buffer.psqlWriteNullTerminatedString("replication")
-                buffer.psqlWriteNullTerminatedString("replication")
+                buffer.writeNullTerminatedString("replication")
+                buffer.writeNullTerminatedString("replication")
             case .true:
-                buffer.psqlWriteNullTerminatedString("replication")
-                buffer.psqlWriteNullTerminatedString("true")
+                buffer.writeNullTerminatedString("replication")
+                buffer.writeNullTerminatedString("true")
             case .false:
                 break
             }

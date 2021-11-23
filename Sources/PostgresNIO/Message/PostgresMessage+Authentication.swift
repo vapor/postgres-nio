@@ -23,7 +23,7 @@ extension PostgresMessage {
             case 10:
                 var mechanisms: [String] = []
                 while buffer.readableBytes > 0 {
-                    guard let nextString = buffer.psqlReadNullTerminatedString() else {
+                    guard let nextString = buffer.readNullTerminatedString() else {
                         throw PostgresError.protocol("Could not parse SASL mechanisms from authentication message")
                     }
                     if nextString.isEmpty {
@@ -68,7 +68,7 @@ extension PostgresMessage {
             case .saslMechanisms(let mechanisms):
                 buffer.writeInteger(10, as: Int32.self)
                 mechanisms.forEach {
-                    buffer.psqlWriteNullTerminatedString($0)
+                    buffer.writeNullTerminatedString($0)
                 }
             case .saslContinue(let challenge):
                 buffer.writeInteger(11, as: Int32.self)

@@ -33,7 +33,7 @@ extension PostgresMessage {
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) throws {
             buffer.writeInteger(target.rawValue)
-            buffer.psqlWriteNullTerminatedString(name)
+            buffer.writeNullTerminatedString(name)
         }
     }
 }

@@ -11,7 +11,7 @@ extension PostgresMessage {
         /// Describes a single field returns in a `RowDescription` message.
         public struct Field: CustomStringConvertible {
             static func parse(from buffer: inout ByteBuffer) throws -> Field {
-                guard let name = buffer.psqlReadNullTerminatedString() else {
+                guard let name = buffer.readNullTerminatedString() else {
                     throw PostgresError.protocol("Could not read row description field name")
                 }
                 guard let tableOID = buffer.readInteger(as: UInt32.self) else {
