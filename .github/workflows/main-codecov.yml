@@ -12,16 +12,11 @@ jobs:
         uses: actions/checkout@v2
       - name: Run unit tests with code coverage and Thread Sanitizer
         run: swift test --enable-code-coverage --sanitize=thread --filter=^PostgresNIOTests
-      - name: Convert profdata to LCOV for upload
-        run: |
-          llvm-cov export -format lcov \
-            -instr-profile="$(dirname $(swift test --show-codecov-path))/default.profdata" \
-            --ignore-filename-regex='/(\.build|Tests)/' \
-            "$(swift build --show-bin-path)/postgres-nioPackageTests.xctest" >postgres-nio.lcov
-          echo "CODECOV_FILE=$(pwd)/postgres-nio.lcov" >>"${GITHUB_ENV}"
-      - name: Upload LCOV report to Codecov.io
-        uses: codecov/codecov-action@v2
+      - name: Submit coverage report to Codecov.io
+        uses: vapor/swift-codecov-action@v0.1.1
         with:
-          files: ${{ env.CODECOV_FILE }}
-          flags: 'unittests'
-          fail_ci_if_error: true
+          cc_flags: 'unittests'
+          cc_env_vars: 'SWIFT_VERSION,SWIFT_PLATFORM,RUNNER_OS,RUNNER_ARCH'
+          cc_fail_ci_if_error: true
+          cc_verbose: true
+          cc_dry_run: false
