@@ -90,8 +90,8 @@ class PSQLBackendMessageTests: XCTestCase {
         
         parameterStatus.forEach { parameterStatus in
             buffer.writeBackendMessage(id: .parameterStatus) { buffer in
-                buffer.writeNullTerminatedString(parameterStatus.parameter)
-                buffer.writeNullTerminatedString(parameterStatus.value)
+                buffer.psqlWriteNullTerminatedString(parameterStatus.parameter)
+                buffer.psqlWriteNullTerminatedString(parameterStatus.value)
             }
             
             expectedMessages.append(.parameterStatus(parameterStatus))
@@ -132,7 +132,7 @@ class PSQLBackendMessageTests: XCTestCase {
         buffer.writeBackendMessage(id: .noticeResponse) { buffer in
             fields.forEach { (key, value) in
                 buffer.writeInteger(key.rawValue, as: UInt8.self)
-                buffer.writeNullTerminatedString(value)
+                buffer.psqlWriteNullTerminatedString(value)
             }
             buffer.writeInteger(0, as: UInt8.self) // signal done
         }
@@ -216,7 +216,7 @@ class PSQLBackendMessageTests: XCTestCase {
             }
             
             okBuffer.writeBackendMessage(id: .commandComplete) { buffer in
-                buffer.writeNullTerminatedString(commandTag)
+                buffer.psqlWriteNullTerminatedString(commandTag)
             }
         }
         

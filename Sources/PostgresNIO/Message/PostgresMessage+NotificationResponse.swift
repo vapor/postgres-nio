@@ -10,10 +10,10 @@ extension PostgresMessage {
             guard let backendPID: Int32 = buffer.readInteger() else {
                 throw PostgresError.protocol("Invalid NotificationResponse message: unable to read backend PID")
             }
-            guard let channel = buffer.readNullTerminatedString() else {
+            guard let channel = buffer.psqlReadNullTerminatedString() else {
                 throw PostgresError.protocol("Invalid NotificationResponse message: unable to read channel")
             }
-            guard let payload = buffer.readNullTerminatedString() else {
+            guard let payload = buffer.psqlReadNullTerminatedString() else {
                 throw PostgresError.protocol("Invalid NotificationResponse message: unable to read payload")
             }
             return .init(backendPID: backendPID, channel: channel, payload: payload)
