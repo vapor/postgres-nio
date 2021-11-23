@@ -16,7 +16,7 @@ extension PSQLBackendMessage {
         case saslFinal(data: ByteBuffer)
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
-            try buffer.ensureAtLeastNBytesRemaining(2)
+            try buffer.psqlEnsureAtLeastNBytesRemaining(2)
             
             // we have at least two bytes remaining, therefore we can force unwrap this read.
             let authID = buffer.readInteger(as: Int32.self)!
@@ -29,7 +29,7 @@ extension PSQLBackendMessage {
             case 3:
                 return .plaintext
             case 5:
-                try buffer.ensureExactNBytesRemaining(4)
+                try buffer.psqlEnsureExactNBytesRemaining(4)
                 let salt1 = buffer.readInteger(as: UInt8.self)!
                 let salt2 = buffer.readInteger(as: UInt8.self)!
                 let salt3 = buffer.readInteger(as: UInt8.self)!
@@ -47,7 +47,7 @@ extension PSQLBackendMessage {
             case 10:
                 var names = [String]()
                 let endIndex = buffer.readerIndex + buffer.readableBytes
-                while buffer.readerIndex < endIndex, let next = buffer.readNullTerminatedString() {
+                while buffer.readerIndex < endIndex, let next = buffer.psqlReadNullTerminatedString() {
                     names.append(next)
                 }
                 

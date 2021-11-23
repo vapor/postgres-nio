@@ -16,6 +16,6 @@ class PasswordTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readableBytes, expectedLength)
         XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.password.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(expectedLength - 1)) // length
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "md522d085ed8dc3377968dc1c1a40519a2a")
+        XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "md522d085ed8dc3377968dc1c1a40519a2a")
     }
 }

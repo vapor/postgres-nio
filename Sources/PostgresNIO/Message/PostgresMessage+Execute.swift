@@ -20,7 +20,7 @@ extension PostgresMessage {
         
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
-            buffer.writeNullTerminatedString(portalName)
+            buffer.psqlWriteNullTerminatedString(portalName)
             buffer.writeInteger(self.maxRows)
         }
     }

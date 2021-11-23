@@ -14,8 +14,8 @@ class BindTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readableBytes, 37)
         XCTAssertEqual(PSQLFrontendMessage.ID.bind.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 36)
-        XCTAssertEqual("", byteBuffer.readNullTerminatedString())
-        XCTAssertEqual("", byteBuffer.readNullTerminatedString())
+        XCTAssertEqual("", byteBuffer.psqlReadNullTerminatedString())
+        XCTAssertEqual("", byteBuffer.psqlReadNullTerminatedString())
         // the number of parameters
         XCTAssertEqual(2, byteBuffer.readInteger(as: Int16.self))
         // all (two) parameters have the same format (binary)

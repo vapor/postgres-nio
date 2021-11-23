@@ -21,7 +21,7 @@ class BackendKeyDataTests: XCTestCase {
     
     func testDecodeInvalidLength() {
         var buffer = ByteBuffer()
-        buffer.writeBackendMessageID(.backendKeyData)
+        buffer.psqlWriteBackendMessageID(.backendKeyData)
         buffer.writeInteger(Int32(11))
         buffer.writeInteger(Int32(1234))
         buffer.writeInteger(Int32(4567))
