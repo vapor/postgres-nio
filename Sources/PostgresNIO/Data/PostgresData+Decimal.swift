@@ -18,7 +18,7 @@ extension PostgresData {
 
 extension Decimal: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
-        return String.postgresDataType
+        return .numeric
     }
 
     public init?(postgresData: PostgresData) {
@@ -29,6 +29,6 @@ extension Decimal: PostgresDataConvertible {
     }
 
     public var postgresData: PostgresData? {
-        return .init(decimal: self)
+        return .init(numeric: PostgresNumeric(decimal: self))
     }
 }
