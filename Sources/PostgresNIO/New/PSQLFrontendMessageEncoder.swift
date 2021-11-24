@@ -71,7 +71,7 @@ struct PSQLFrontendMessageEncoder: MessageToByteEncoder {
         payload: Payload,
         into buffer: inout ByteBuffer)
     {
-        buffer.writeFrontendMessageID(messageID)
+        buffer.psqlWriteFrontendMessageID(messageID)
         self.encode(payload: payload, into: &buffer)
     }
     

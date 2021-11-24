@@ -15,7 +15,7 @@ extension PSQLFrontendMessage {
         }
         
         func encode(into buffer: inout ByteBuffer) {
-            buffer.writeNullTerminatedString(self.portalName)
+            buffer.psqlWriteNullTerminatedString(self.portalName)
             buffer.writeInteger(self.maxNumberOfRows)
         }
     }

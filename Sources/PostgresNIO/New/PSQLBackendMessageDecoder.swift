@@ -192,13 +192,13 @@ struct PSQLPartialDecodingError: Error {
 }
 
 extension ByteBuffer {
-    func ensureAtLeastNBytesRemaining(_ n: Int, file: String = #file, line: Int = #line) throws {
+    func psqlEnsureAtLeastNBytesRemaining(_ n: Int, file: String = #file, line: Int = #line) throws {
         guard self.readableBytes >= n else {
             throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(2, actual: self.readableBytes, file: file, line: line)
         }
     }
 
-    func ensureExactNBytesRemaining(_ n: Int, file: String = #file, line: Int = #line) throws {
+    func psqlEnsureExactNBytesRemaining(_ n: Int, file: String = #file, line: Int = #line) throws {
         guard self.readableBytes == n else {
             throw PSQLPartialDecodingError.expectedExactlyNRemainingBytes(n, actual: self.readableBytes, file: file, line: line)
         }

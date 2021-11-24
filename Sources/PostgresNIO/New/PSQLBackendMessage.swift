@@ -193,27 +193,27 @@ extension PSQLBackendMessage {
         case .backendKeyData:
             return try .backendKeyData(.decode(from: &buffer))
         case .bindComplete:
-            try buffer.ensureExactNBytesRemaining(0)
+            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .bindComplete
         case .closeComplete:
-            try buffer.ensureExactNBytesRemaining(0)
+            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .closeComplete
         case .commandComplete:
-            guard let commandTag = buffer.readNullTerminatedString() else {
+            guard let commandTag = buffer.psqlReadNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             return .commandComplete(commandTag)
         case .dataRow:
             return try .dataRow(.decode(from: &buffer))
         case .emptyQueryResponse:
-            try buffer.ensureExactNBytesRemaining(0)
+            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .emptyQueryResponse
         case .parameterStatus:
             return try .parameterStatus(.decode(from: &buffer))
         case .error:
             return try .error(.decode(from: &buffer))
         case .noData:
-            try buffer.ensureExactNBytesRemaining(0)
+            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .noData
         case .noticeResponse:
             return try .notice(.decode(from: &buffer))
@@ -222,10 +222,10 @@ extension PSQLBackendMessage {
         case .parameterDescription:
             return try .parameterDescription(.decode(from: &buffer))
         case .parseComplete:
-            try buffer.ensureExactNBytesRemaining(0)
+            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .parseComplete
         case .portalSuspended:
-            try buffer.ensureExactNBytesRemaining(0)
+            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .portalSuspended
         case .readyForQuery:
             return try .readyForQuery(.decode(from: &buffer))

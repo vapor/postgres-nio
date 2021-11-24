@@ -10,7 +10,7 @@ extension ByteBuffer {
     }
     
     mutating func writeBackendMessage(id: PSQLBackendMessage.ID, _ payload: (inout ByteBuffer) throws -> ()) rethrows {
-        self.writeBackendMessageID(id)
+        self.psqlWriteBackendMessageID(id)
         let lengthIndex = self.writerIndex
         self.writeInteger(Int32(0))
         try payload(&self)

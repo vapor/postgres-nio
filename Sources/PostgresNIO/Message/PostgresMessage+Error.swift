@@ -11,7 +11,7 @@ extension PostgresMessage {
         public static func parse(from buffer: inout ByteBuffer) throws -> Error {
             var fields: [Field: String] = [:]
             while let field = buffer.readInteger(as: Field.self) {
-                guard let string = buffer.readNullTerminatedString() else {
+                guard let string = buffer.psqlReadNullTerminatedString() else {
                     throw PostgresError.protocol("Could not read error response string.")
                 }
                 fields[field] = string

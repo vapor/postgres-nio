@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresData {
     public init(double: Double) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
-        buffer.writeDouble(double)
+        buffer.psqlWriteDouble(double)
         self.init(type: .float8, formatCode: .binary, value: buffer)
     }
     
@@ -16,10 +16,10 @@ extension PostgresData {
         case .binary:
             switch self.type {
             case .float4:
-                return value.readFloat()
+                return value.psqlReadFloat()
                     .flatMap { Double($0) }
             case .float8:
-                return value.readDouble()
+                return value.psqlReadDouble()
             case .numeric:
                 return self.numeric?.double
             default:
