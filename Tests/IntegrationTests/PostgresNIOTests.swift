@@ -492,7 +492,7 @@ final class PostgresNIOTests: XCTestCase {
         """).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table1\"").wait()) }
         
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("INSERT INTO table1 VALUES ('123456.789123')").wait())
+        XCTAssertNoThrow(_ = try conn?.query("INSERT INTO table1 VALUES ($1)", [.init(decimal: Decimal(string: "123456.789123")!)]).wait())
         
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("""
