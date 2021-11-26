@@ -1,19 +1,6 @@
 import NIOCore
 
 internal extension ByteBuffer {
-    mutating func psqlWriteNullTerminatedString(_ string: String) {
-        self.writeString(string)
-        self.writeInteger(0, as: UInt8.self)
-    }
-    
-    mutating func psqlReadNullTerminatedString() -> String? {
-        guard let nullIndex = readableBytesView.firstIndex(of: 0) else {
-            return nil
-        }
-
-        defer { moveReaderIndex(forwardBy: 1) }
-        return readString(length: nullIndex - readerIndex)
-    }
     
     mutating func psqlWriteBackendMessageID(_ messageID: PSQLBackendMessage.ID) {
         self.writeInteger(messageID.rawValue)

@@ -23,7 +23,7 @@ class SASLInitialResponseTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readableBytes, length)
         XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.saslInitialResponse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
-        XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), sasl.saslMechanism)
+        XCTAssertEqual(byteBuffer.readNullTerminatedString(), sasl.saslMechanism)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(sasl.initialData.count))
         XCTAssertEqual(byteBuffer.readBytes(length: sasl.initialData.count), sasl.initialData)
         XCTAssertEqual(byteBuffer.readableBytes, 0)
@@ -48,7 +48,7 @@ class SASLInitialResponseTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readableBytes, length)
         XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.saslInitialResponse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
-        XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), sasl.saslMechanism)
+        XCTAssertEqual(byteBuffer.readNullTerminatedString(), sasl.saslMechanism)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(-1))
         XCTAssertEqual(byteBuffer.readableBytes, 0)
     }

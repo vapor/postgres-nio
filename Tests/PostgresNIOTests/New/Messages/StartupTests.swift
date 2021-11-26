@@ -29,15 +29,15 @@ class StartupTests: XCTestCase {
             let byteBufferLength = Int32(byteBuffer.readableBytes)
             XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())
             XCTAssertEqual(startup.protocolVersion, byteBuffer.readInteger())
-            XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "user")
-            XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "test")
-            XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "database")
-            XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "abc123")
-            XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "options")
-            XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "some options")
+            XCTAssertEqual(byteBuffer.readNullTerminatedString(), "user")
+            XCTAssertEqual(byteBuffer.readNullTerminatedString(), "test")
+            XCTAssertEqual(byteBuffer.readNullTerminatedString(), "database")
+            XCTAssertEqual(byteBuffer.readNullTerminatedString(), "abc123")
+            XCTAssertEqual(byteBuffer.readNullTerminatedString(), "options")
+            XCTAssertEqual(byteBuffer.readNullTerminatedString(), "some options")
             if replication != .false {
-                XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), "replication")
-                XCTAssertEqual(byteBuffer.psqlReadNullTerminatedString(), replication.stringValue)
+                XCTAssertEqual(byteBuffer.readNullTerminatedString(), "replication")
+                XCTAssertEqual(byteBuffer.readNullTerminatedString(), replication.stringValue)
             }
             XCTAssertEqual(byteBuffer.readInteger(), UInt8(0))
             

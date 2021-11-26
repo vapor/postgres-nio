@@ -190,47 +190,58 @@ extension PSQLBackendMessage {
         switch messageID {
         case .authentication:
             return try .authentication(.decode(from: &buffer))
+            
         case .backendKeyData:
             return try .backendKeyData(.decode(from: &buffer))
+            
         case .bindComplete:
-            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .bindComplete
+            
         case .closeComplete:
-            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .closeComplete
+            
         case .commandComplete:
-            guard let commandTag = buffer.psqlReadNullTerminatedString() else {
+            guard let commandTag = buffer.readNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             return .commandComplete(commandTag)
+            
         case .dataRow:
             return try .dataRow(.decode(from: &buffer))
+            
         case .emptyQueryResponse:
-            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .emptyQueryResponse
+            
         case .parameterStatus:
             return try .parameterStatus(.decode(from: &buffer))
+            
         case .error:
             return try .error(.decode(from: &buffer))
+            
         case .noData:
-            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .noData
+            
         case .noticeResponse:
             return try .notice(.decode(from: &buffer))
+            
         case .notificationResponse:
             return try .notification(.decode(from: &buffer))
+            
         case .parameterDescription:
             return try .parameterDescription(.decode(from: &buffer))
+            
         case .parseComplete:
-            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .parseComplete
+            
         case .portalSuspended:
-            try buffer.psqlEnsureExactNBytesRemaining(0)
             return .portalSuspended
+            
         case .readyForQuery:
             return try .readyForQuery(.decode(from: &buffer))
+            
         case .rowDescription:
             return try .rowDescription(.decode(from: &buffer))
+            
         case .copyData, .copyDone, .copyInResponse, .copyOutResponse, .copyBothResponse, .functionCallResponse, .negotiateProtocolVersion:
             preconditionFailure()
         }

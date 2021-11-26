@@ -6,7 +6,7 @@ extension PSQLFrontendMessage {
         let value: String
         
         func encode(into buffer: inout ByteBuffer) {
-            buffer.psqlWriteNullTerminatedString(value)
+            buffer.writeNullTerminatedString(value)
         }
     }
     

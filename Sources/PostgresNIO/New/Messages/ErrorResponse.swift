@@ -117,7 +117,7 @@ extension PSQLBackendMessage.PayloadDecodable where Self: PSQLMessageNotice {
                     asType: PSQLBackendMessage.Field.self)
             }
             
-            guard let string = buffer.psqlReadNullTerminatedString() else {
+            guard let string = buffer.readNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             fields[field] = string

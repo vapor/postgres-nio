@@ -8,68 +8,66 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
     }
     
     mutating func decode(buffer: inout ByteBuffer) throws -> PSQLBackendMessage? {
-        // make sure we have at least one byte to read
-        guard buffer.readableBytes > 0 else {
-            return nil
-        }
         
         if !self.hasAlreadyReceivedBytes {
             // We have not received any bytes yet! Let's peek at the first message id. If it
             // is a "S" or "N" we assume that it is connected to an SSL upgrade request. All
             // other messages that we expect now, don't start with either "S" or "N"
             
-            // we made sure, we have at least one byte available, above, thus force unwrap is okay
-            let firstByte = buffer.getInteger(at: buffer.readerIndex, as: UInt8.self)!
+            let startReaderIndex = buffer.readerIndex
+            guard let firstByte = buffer.readInteger(as: UInt8.self) else {
+                return nil
+            }
             
             switch firstByte {
             case UInt8(ascii: "S"):
-                // mark byte as read
-                buffer.moveReaderIndex(forwardBy: 1)
                 self.hasAlreadyReceivedBytes = true
                 return .sslSupported
+                
             case UInt8(ascii: "N"):
-                // mark byte as read
-                buffer.moveReaderIndex(forwardBy: 1)
                 self.hasAlreadyReceivedBytes = true
                 return .sslUnsupported
+                
             default:
+                // move reader index back
+                buffer.moveReaderIndex(to: startReaderIndex)
                 self.hasAlreadyReceivedBytes = true
             }
         }
         
-        // all other packages have an Int32 after the identifier that determines their length.
+        // all other packages start with a MessageID (UInt8) and their message length (UInt32).
         // do we have enough bytes for that?
-        guard buffer.readableBytes >= 5 else {
+        let startReaderIndex = buffer.readerIndex
+        guard let (idByte, length) = buffer.readMultipleIntegers(endianness: .big, as: (UInt8, UInt32).self) else {
+            // if this fails, the readerIndex wasn't changed
             return nil
         }
         
-        let idByte = buffer.getInteger(at: buffer.readerIndex, as: UInt8.self)!
-        let length = buffer.getInteger(at: buffer.readerIndex + 1, as: Int32.self)!
-        
-        guard length + 1 <= buffer.readableBytes else {
+        // 1. try to read the message
+        guard var message = buffer.readSlice(length: Int(length) - 4) else {
+            // we need to move the reader index back to its start point
+            buffer.moveReaderIndex(to: startReaderIndex)
             return nil
         }
-        
-        // At this point we are sure, that we have enough bytes to decode the next message.
-        // 1. Create a byteBuffer that represents exactly the next message. This can be force
-        //    unwrapped, since it was verified that enough bytes are available.
-        let completeMessageBuffer = buffer.readSlice(length: 1 + Int(length))!
         
         // 2. make sure we have a known message identifier
         guard let messageID = PSQLBackendMessage.ID(rawValue: idByte) else {
-            throw PSQLDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessageBuffer)
+            buffer.moveReaderIndex(to: startReaderIndex)
+            let completeMessage = buffer.readSlice(length: Int(length) + 1)!
+            throw PSQLDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessage)
         }
         
         // 3. decode the message
         do {
-            // get a mutable byteBuffer copy
-            var slice = completeMessageBuffer
-            // move reader index forward by five bytes
-            slice.moveReaderIndex(forwardBy: 5)
-            
-            return try PSQLBackendMessage.decode(from: &slice, for: messageID)
+            let result = try PSQLBackendMessage.decode(from: &message, for: messageID)
+            if message.readableBytes > 0 {
+                throw PSQLPartialDecodingError.expectedExactlyNRemainingBytes(0, actual: message.readableBytes)
+            }
+            return result
         } catch let error as PSQLPartialDecodingError {
-            throw PSQLDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessageBuffer)
+            buffer.moveReaderIndex(to: startReaderIndex)
+            let completeMessage = buffer.readSlice(length: Int(length) + 1)!
+            throw PSQLDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessage)
         } catch {
             preconditionFailure("Expected to only see `PartialDecodingError`s here.")
         }
@@ -192,15 +190,16 @@ struct PSQLPartialDecodingError: Error {
 }
 
 extension ByteBuffer {
-    func psqlEnsureAtLeastNBytesRemaining(_ n: Int, file: String = #file, line: Int = #line) throws {
-        guard self.readableBytes >= n else {
-            throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(2, actual: self.readableBytes, file: file, line: line)
+    mutating func throwingReadInteger<I: FixedWidthInteger>(as: I.Type, file: String = #file, line: Int = #line) throws -> I {
+        guard let result = self.readInteger(endianness: .big, as: I.self) else {
+            throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(MemoryLayout<I>.size, actual: self.readableBytes, file: file, line: line)
         }
+        return result
     }
-
-    func psqlEnsureExactNBytesRemaining(_ n: Int, file: String = #file, line: Int = #line) throws {
-        guard self.readableBytes == n else {
-            throw PSQLPartialDecodingError.expectedExactlyNRemainingBytes(n, actual: self.readableBytes, file: file, line: line)
+    
+    mutating func throwingMoveReaderIndex(forwardBy offset: Int, file: String = #file, line: Int = #line) throws {
+        guard self.readSlice(length: offset) != nil else {
+            throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(offset, actual: self.readableBytes, file: file, line: line)
         }
     }
 }

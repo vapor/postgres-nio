@@ -10,10 +10,10 @@ extension PSQLFrontendMessage {
             switch self {
             case .preparedStatement(let name):
                 buffer.writeInteger(UInt8(ascii: "S"))
-                buffer.psqlWriteNullTerminatedString(name)
+                buffer.writeNullTerminatedString(name)
             case .portal(let name):
                 buffer.writeInteger(UInt8(ascii: "P"))
-                buffer.psqlWriteNullTerminatedString(name)
+                buffer.writeNullTerminatedString(name)
             }
         }
     }

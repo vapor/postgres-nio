@@ -27,8 +27,8 @@ class ParameterStatusTests: XCTestCase {
             switch message {
             case .parameterStatus(let parameterStatus):
                 buffer.writeBackendMessage(id: .parameterStatus) { buffer in
-                    buffer.psqlWriteNullTerminatedString(parameterStatus.parameter)
-                    buffer.psqlWriteNullTerminatedString(parameterStatus.value)
+                    buffer.writeNullTerminatedString(parameterStatus.parameter)
+                    buffer.writeNullTerminatedString(parameterStatus.value)
                 }
             case .backendKeyData(let backendKeyData):
                 buffer.writeBackendMessage(id: .backendKeyData) { buffer in
@@ -62,7 +62,7 @@ class ParameterStatusTests: XCTestCase {
     func testDecodeFailureBecauseOfMissingNullTerminationInValue() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .parameterStatus) { buffer in
-            buffer.psqlWriteNullTerminatedString("DateStyle")
+            buffer.writeNullTerminatedString("DateStyle")
             buffer.writeString("ISO, MDY")
         }
         
