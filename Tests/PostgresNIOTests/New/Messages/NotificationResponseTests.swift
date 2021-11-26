@@ -20,8 +20,8 @@ class NotificationResponseTests: XCTestCase {
             
             buffer.writeBackendMessage(id: .notificationResponse) { buffer in
                 buffer.writeInteger(notification.backendPID)
-                buffer.psqlWriteNullTerminatedString(notification.channel)
-                buffer.psqlWriteNullTerminatedString(notification.payload)
+                buffer.writeNullTerminatedString(notification.channel)
+                buffer.writeNullTerminatedString(notification.payload)
             }
         }
         
@@ -49,7 +49,7 @@ class NotificationResponseTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .notificationResponse) { buffer in
             buffer.writeInteger(Int32(123))
-            buffer.psqlWriteNullTerminatedString("hello")
+            buffer.writeNullTerminatedString("hello")
             buffer.writeString("world")
         }
         

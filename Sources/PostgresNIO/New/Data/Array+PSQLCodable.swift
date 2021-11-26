@@ -108,30 +108,25 @@ extension Array: PSQLDecodable where Element: PSQLArrayElement {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
         
-        guard let isNotEmpty = buffer.readInteger(as: Int32.self), (0...1).contains(isNotEmpty) else {
+        guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, Int32).self),
+              0 <= isNotEmpty, isNotEmpty <= 1, b == 0
+        else {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
         
-        guard let b = buffer.readInteger(as: Int32.self), b == 0 else {
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
-        }
-        
-        guard let elementType = buffer.readInteger(as: PSQLDataType.self) else {
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
-        }
+        let elementType = PSQLDataType(rawValue: element)
         
         guard isNotEmpty == 1 else {
             return []
         }
         
-        guard let expectedArrayCount = buffer.readInteger(as: Int32.self), expectedArrayCount > 0 else {
+        guard let (expectedArrayCount, dimensions) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32).self),
+              expectedArrayCount > 0,
+              dimensions == 1
+        else {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
-        
-        guard let dimensions = buffer.readInteger(as: Int32.self), dimensions == 1 else {
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
-        }
-        
+                
         var result = Array<Element>()
         result.reserveCapacity(Int(expectedArrayCount))
         

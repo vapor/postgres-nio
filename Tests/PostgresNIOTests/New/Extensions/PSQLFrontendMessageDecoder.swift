@@ -40,8 +40,8 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
                 var database: String?
                 var options: String?
                 
-                while let name = messageSlice.psqlReadNullTerminatedString(), messageSlice.readerIndex < finalIndex {
-                    let value = messageSlice.psqlReadNullTerminatedString()
+                while let name = messageSlice.readNullTerminatedString(), messageSlice.readerIndex < finalIndex {
+                    let value = messageSlice.readNullTerminatedString()
                     
                     switch name {
                     case "user":
@@ -136,7 +136,7 @@ extension PSQLFrontendMessage {
         case .parse:
             preconditionFailure("TODO: Unimplemented")
         case .password:
-            guard let password = buffer.psqlReadNullTerminatedString() else {
+            guard let password = buffer.readNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             return .password(.init(value: password))

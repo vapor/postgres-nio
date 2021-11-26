@@ -13,8 +13,8 @@ extension PSQLFrontendMessage {
         var parameters: [PSQLEncodable]
         
         func encode(into buffer: inout ByteBuffer, using jsonEncoder: PSQLJSONEncoder) throws {
-            buffer.psqlWriteNullTerminatedString(self.portalName)
-            buffer.psqlWriteNullTerminatedString(self.preparedStatementName)
+            buffer.writeNullTerminatedString(self.portalName)
+            buffer.writeNullTerminatedString(self.preparedStatementName)
             
             // The number of parameter format codes that follow (denoted C below). This can be
             // zero to indicate that there are no parameters or that the parameters all use the

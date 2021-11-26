@@ -7,20 +7,16 @@ extension PSQLBackendMessage {
         var dataTypes: [PSQLDataType]
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
-            try buffer.psqlEnsureAtLeastNBytesRemaining(2)
-            
-            let parameterCount = buffer.readInteger(as: Int16.self)!
+            let parameterCount = try buffer.throwingReadInteger(as: Int16.self)
             guard parameterCount >= 0 else {
                 throw PSQLPartialDecodingError.integerMustBePositiveOrNull(parameterCount)
             }
-            
-            try buffer.psqlEnsureExactNBytesRemaining(Int(parameterCount) * 4)
             
             var result = [PSQLDataType]()
             result.reserveCapacity(Int(parameterCount))
             
             for _ in 0..<parameterCount {
-                let rawValue = buffer.readInteger(as: Int32.self)!
+                let rawValue = try buffer.throwingReadInteger(as: Int32.self)
                 result.append(PSQLDataType(rawValue))
             }
             

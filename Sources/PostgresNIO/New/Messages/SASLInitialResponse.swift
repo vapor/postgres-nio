@@ -15,7 +15,7 @@ extension PSQLFrontendMessage {
         
         /// Serializes this message into a byte buffer.
         func encode(into buffer: inout ByteBuffer) {
-            buffer.psqlWriteNullTerminatedString(self.saslMechanism)
+            buffer.writeNullTerminatedString(self.saslMechanism)
             
             if self.initialData.count > 0 {
                 buffer.writeInteger(Int32(self.initialData.count))
