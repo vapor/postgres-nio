@@ -41,7 +41,7 @@ PostgresNIO supports the following platforms:
 - Ubuntu 16.04+
 - macOS 10.15+
 
-### Secrurity
+### Security
 
 Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
 
