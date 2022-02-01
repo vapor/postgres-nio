@@ -118,7 +118,29 @@ final class PSQLRowStream {
     }
     
     func cancel() {
-        preconditionFailure("Unimplemented")
+        if self.eventLoop.inEventLoop {
+            self.cancel0()
+        } else {
+            self.eventLoop.execute {
+                self.cancel0()
+            }
+        }
+    }
+
+    private func cancel0() {
+        switch self.downstreamState {
+        case .asyncSequence(let consumer, let dataSource):
+            let error = PSQLError.connectionClosed
+            self.downstreamState = .consumed(.failure(error))
+            consumer.receive(completion: .failure(error))
+            dataSource.cancel(for: self)
+
+        case .consumed:
+            return
+
+        case .waitingForConsumer, .iteratingRows, .waitingForAll:
+            preconditionFailure("Invalid state: \(self.downstreamState)")
+        }
     }
     #endif
     
