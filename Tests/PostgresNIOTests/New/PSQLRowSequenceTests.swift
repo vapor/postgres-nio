@@ -202,6 +202,7 @@ final class PSQLRowSequenceTests: XCTestCase {
             for try await _ in rowSequence {
                 counter += 1
             }
+            XCTFail("Expected that an error was thrown before.")
         } catch {
             XCTAssertEqual(error as? PSQLError, .connectionClosed)
         }
@@ -241,12 +242,46 @@ final class PSQLRowSequenceTests: XCTestCase {
         XCTAssertNil(row2)
     }
 
+    func testFailingRowContinuationsWorks() async throws {
+        let eventLoop = EmbeddedEventLoop()
+        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
+        let logger = Logger(label: "test")
+        let dataSource = MockRowDataSource()
+        let stream = PSQLRowStream(
+            rowDescription: [
+                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+            ],
+            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            eventLoop: eventLoop,
+            rowSource: .stream(dataSource)
+        )
+        promise.succeed(stream)
 
+        let rowSequence = stream.asyncSequence()
+        var rowIterator = rowSequence.makeAsyncIterator()
 
+        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+            let dataRows: [DataRow] = (0..<1).map { [ByteBuffer(integer: Int64($0))] }
+            stream.receive(dataRows)
+        }
+
+        let row1 = try await rowIterator.next()
+        XCTAssertEqual(try row1?.decode(column: 0, as: Int.self), 0)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+            stream.receive(completion: .failure(PSQLError.connectionClosed))
+        }
+
+        do {
+            _ = try await rowIterator.next()
+            XCTFail("Expected that an error was thrown before.")
+        } catch {
+            XCTAssertEqual(error as? PSQLError, .connectionClosed)
+        }
+    }
 }
 
 final class MockRowDataSource: PSQLRowsDataSource {
-
     var requestCount: Int {
         self._requestCount.load()
     }
