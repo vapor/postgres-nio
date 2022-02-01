@@ -224,10 +224,13 @@ extension AsyncStreamConsumer {
             
             case initialized
             case streaming(AdaptiveRowBuffer, PSQLRowStream, DemandState)
+            /// The upstream has finished, but the downstream has not consumed all events.
             case finished(AdaptiveRowBuffer, String)
+            /// The upstream has failed, but the downstream has not consumed the error yet.
             case failed(Error)
-            case done
-            
+            /// The upstream has failed or finished and the downstream has consumed all events. Final state.
+            case consumed
+
             case modifying
         }
         
@@ -290,7 +293,7 @@ extension AsyncStreamConsumer {
                 return .cancelStream(source)
                 
             case (.sequenceCreated, .finished),
-                 (.sequenceCreated, .done),
+                 (.sequenceCreated, .consumed),
                  (.sequenceCreated, .failed):
                 return .none
                 
@@ -314,7 +317,7 @@ extension AsyncStreamConsumer {
                 return .cancelStream(source)
 
             case (.iteratorCreated, .finished),
-                 (.iteratorCreated, .done),
+                 (.iteratorCreated, .consumed),
                  (.iteratorCreated, .failed):
                 return .none
 
@@ -365,7 +368,7 @@ extension AsyncStreamConsumer {
             case .finished(var buffer, let commandTag):
                 self.upstreamState = .modifying
                 guard let (data, _) = buffer.popFirst() else {
-                    self.upstreamState = .done
+                    self.upstreamState = .consumed
                     return .returnNil
                 }
                 
@@ -373,10 +376,10 @@ extension AsyncStreamConsumer {
                 return .returnRow(data, signalDemandTo: nil)
 
             case .failed(let error):
-                self.upstreamState = .done
+                self.upstreamState = .consumed
                 return .throwError(error)
 
-            case .done:
+            case .consumed:
                 return .returnNil
 
             case .modifying:
@@ -413,7 +416,7 @@ extension AsyncStreamConsumer {
             case .failed:
                 preconditionFailure()
                 
-            case .done:
+            case .consumed:
                 preconditionFailure()
                 
             case .modifying:
@@ -450,7 +453,7 @@ extension AsyncStreamConsumer {
                 self.upstreamState = .streaming(buffer, source, .canAskForMore)
                 return .none
                 
-            case .initialized, .finished, .done:
+            case .initialized, .finished, .consumed:
                 preconditionFailure()
                 
             case .failed:
@@ -480,7 +483,7 @@ extension AsyncStreamConsumer {
             switch self.upstreamState {
             case .streaming(let buffer, _, .waitingForMore(.some(let continuation))):
                 precondition(buffer.isEmpty)
-                self.upstreamState = .done
+                self.upstreamState = .consumed
                 return .succeed(continuation)
             
             case .streaming(let buffer, _, .waitingForMore(.none)):
@@ -491,7 +494,7 @@ extension AsyncStreamConsumer {
                 self.upstreamState = .finished(buffer, commandTag)
                 return .none
                 
-            case .initialized, .finished, .done:
+            case .initialized, .finished, .consumed:
                 preconditionFailure()
                 
             case .failed:
@@ -506,11 +509,10 @@ extension AsyncStreamConsumer {
             switch self.upstreamState {
             case .streaming(let buffer, _, .waitingForMore(.some(let continuation))):
                 precondition(buffer.isEmpty)
-                self.upstreamState = .done
+                self.upstreamState = .consumed
                 return .fail(continuation, error)
             
-            case .streaming(let buffer, _, .waitingForMore(.none)):
-                precondition(buffer.isEmpty)
+            case .streaming(_, _, .waitingForMore(.none)):
                 self.upstreamState = .failed(error)
                 return .none
                 
@@ -518,7 +520,7 @@ extension AsyncStreamConsumer {
                 self.upstreamState = .failed(error)
                 return .none
                 
-            case .initialized, .finished, .done:
+            case .initialized, .finished, .consumed:
                 preconditionFailure()
                 
             case .failed:
@@ -542,8 +544,12 @@ extension PSQLRowSequence {
 }
 
 struct AdaptiveRowBuffer {
-    public let minimum: Int
-    public let maximum: Int
+    static let defaultBufferTarget = 256
+    static let defaultBufferMinimum = 1
+    static let defaultBufferMaximum = 16384
+
+    let minimum: Int
+    let maximum: Int
 
     private var circularBuffer: CircularBuffer<DataRow>
     private var target: Int
@@ -557,18 +563,21 @@ struct AdaptiveRowBuffer {
         self.circularBuffer.isEmpty
     }
     
-    init() {
-        self.minimum = 1
-        self.maximum = 16384
-        self.target = 256
-        self.circularBuffer = CircularBuffer()
+    init(minimum: Int, maximum: Int, target: Int, buffer: CircularBuffer<DataRow>) {
+        precondition(minimum <= target && target <= maximum)
+        self.minimum = minimum
+        self.maximum = maximum
+        self.target = target
+        self.circularBuffer = buffer
     }
     
     init(_ circularBuffer: CircularBuffer<DataRow>) {
-        self.minimum = 1
-        self.maximum = 16384
-        self.target = 64
-        self.circularBuffer = circularBuffer
+        self.init(
+            minimum: Self.defaultBufferMinimum,
+            maximum: Self.defaultBufferMaximum,
+            target: Self.defaultBufferTarget,
+            buffer: circularBuffer
+        )
     }
     
     mutating func append<Rows: Sequence>(contentsOf newRows: Rows) where Rows.Element == DataRow {
