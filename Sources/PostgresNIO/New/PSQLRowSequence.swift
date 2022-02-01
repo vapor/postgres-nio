@@ -50,24 +50,18 @@ extension PSQLRowSequence {
         }
         
         final class _Internal {
-            struct ID: Hashable {
-                let objectID: ObjectIdentifier
-                
-                init(_ object: _Internal) {
-                    self.objectID = ObjectIdentifier(object)
-                }
-            }
-            
-            var id: ID { ID(self) }
-            
             let consumer: AsyncStreamConsumer
             
             init(consumer: AsyncStreamConsumer) {
                 self.consumer = consumer
             }
+
+            deinit {
+                self.consumer.iteratorDeinitialized()
+            }
             
             func next() async throws -> PSQLRow? {
-                try await self.consumer.next(for: self.id)
+                try await self.consumer.next()
             }
         }
     }
@@ -163,14 +157,27 @@ final class AsyncStreamConsumer {
     }
     
     func makeAsyncIterator() -> PSQLRowSequence.Iterator {
-        let iterator = PSQLRowSequence.Iterator(consumer: self)
         self.lock.withLock {
-            self.state.registerAsyncIteratorID(ObjectIdentifier(iterator._internal))
+            self.state.createAsyncIterator()
         }
+        let iterator = PSQLRowSequence.Iterator(consumer: self)
         return iterator
     }
+
+    func iteratorDeinitialized() {
+        let action = self.lock.withLock {
+            self.state.iteratorDeinitialized()
+        }
+
+        switch action {
+        case .cancelStream(let source):
+            source.cancel()
+        case .none:
+            break
+        }
+    }
     
-    func next(for id: PSQLRowSequence.Iterator._Internal.ID) async throws -> PSQLRow? {
+    func next() async throws -> PSQLRow? {
         self.lock.lock()
         switch self.state.next() {
         case .returnNil:
@@ -226,7 +233,7 @@ extension AsyncStreamConsumer {
         
         enum DownstreamState {
             case sequenceCreated
-            case iteratorCreated(ObjectIdentifier)
+            case iteratorCreated
         }
         
         var upstreamState: UpstreamState
@@ -260,10 +267,10 @@ extension AsyncStreamConsumer {
             self.upstreamState = .failed(error)
         }
         
-        mutating func registerAsyncIteratorID(_ id: ObjectIdentifier) {
+        mutating func createAsyncIterator() {
             switch self.downstreamState {
             case .sequenceCreated:
-                self.downstreamState = .iteratorCreated(id)
+                self.downstreamState = .iteratorCreated
             case .iteratorCreated:
                 preconditionFailure("An iterator already exists")
             }
@@ -294,6 +301,28 @@ extension AsyncStreamConsumer {
                 preconditionFailure()
             }
         }
+
+        mutating func iteratorDeinitialized() -> SequenceDeinitializedAction {
+            switch (self.downstreamState, self.upstreamState) {
+            case (.sequenceCreated, _):
+                preconditionFailure()
+
+            case (.iteratorCreated, .initialized):
+                preconditionFailure()
+
+            case (.iteratorCreated, .streaming(_, let source, _)):
+                return .cancelStream(source)
+
+            case (.iteratorCreated, .finished),
+                 (.iteratorCreated, .done),
+                 (.iteratorCreated, .failed):
+                return .none
+
+            case (_, .modifying):
+                preconditionFailure()
+            }
+        }
+
         
         enum NextFastPathAction {
             case hitSlowPath
@@ -447,7 +476,7 @@ extension AsyncStreamConsumer {
             }
         }
         
-        mutating func receiveEnd(commandTag: String) -> CompletionResult {
+        private mutating func receiveEnd(commandTag: String) -> CompletionResult {
             switch self.upstreamState {
             case .streaming(let buffer, _, .waitingForMore(.some(let continuation))):
                 precondition(buffer.isEmpty)
@@ -473,7 +502,7 @@ extension AsyncStreamConsumer {
             }
         }
         
-        mutating func receiveError(_ error: Error) -> CompletionResult {
+        private mutating func receiveError(_ error: Error) -> CompletionResult {
             switch self.upstreamState {
             case .streaming(let buffer, _, .waitingForMore(.some(let continuation))):
                 precondition(buffer.isEmpty)
