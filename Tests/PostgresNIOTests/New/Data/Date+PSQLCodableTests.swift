@@ -31,8 +31,8 @@ class Date_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
-        XCTAssertThrowsError(try Date.decode(from: &buffer, type: .timestamptz, format: .binary, context: .forTests())) { error in
-            XCTAssert(error is PSQLCastingError)
+        XCTAssertThrowsError(try Date.decode(from: &buffer, type: .timestamptz, format: .binary, context: .forTests())) {
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
     
@@ -73,7 +73,7 @@ class Date_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int64(0))
 
         XCTAssertThrowsError(try Date.decode(from: &buffer, type: .date, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
     
@@ -82,7 +82,7 @@ class Date_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int64(0))
 
         XCTAssertThrowsError(try Date.decode(from: &buffer, type: .int8, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
         }
     }
     
