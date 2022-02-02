@@ -89,7 +89,7 @@ extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
             return false
         }
         
-        guard lhs.error == rhs.error else {
+        guard lhs.error.code == rhs.error.code else {
             return false
         }
         

@@ -38,12 +38,12 @@ class PSQLRowStreamTests: XCTestCase {
             rowDescription: [],
             queryContext: queryContext,
             eventLoop: eventLoop,
-            rowSource: .noRows(.failure(PSQLError.connectionClosed))
+            rowSource: .noRows(.failure(PSQLError(.connectionClosed)))
         )
         promise.succeed(stream)
         
         XCTAssertThrowsError(try stream.all().wait()) {
-            XCTAssertEqual($0 as? PSQLError, .connectionClosed)
+            XCTAssertEqual(($0 as? PSQLError)?.code, .connectionClosed)
         }
     }
     

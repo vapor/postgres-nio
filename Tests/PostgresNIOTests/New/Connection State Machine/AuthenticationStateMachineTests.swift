@@ -30,7 +30,7 @@ class AuthenticationStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .authMechanismRequiresPassword, closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError(.authMechanismRequiresPassword), closePromise: nil)))
     }
     
     func testAuthenticateOkAfterStartUpWithoutAuthChallenge() {
@@ -58,13 +58,13 @@ class AuthenticationStateMachineTests: XCTestCase {
             .file: "auth.c"
         ]
         XCTAssertEqual(state.errorReceived(.init(fields: fields)),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .server(.init(fields: fields)), closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError(.server(.init(fields: fields))), closePromise: nil)))
     }
 
     // MARK: Test unsupported messages
     
     func testUnsupportedAuthMechanism() {
-        let unsupported: [(PSQLBackendMessage.Authentication, PSQLAuthScheme)] = [
+        let unsupported: [(PSQLBackendMessage.Authentication, PSQLError.Code.UnsupportedAuthScheme)] = [
             (.kerberosV5, .kerberosV5),
             (.scmCredential, .scmCredential),
             (.gss, .gss),
@@ -77,7 +77,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             var state = ConnectionStateMachine(.waitingToStartAuthentication)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
-                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unsupportedAuthMechanism(mechanism), closePromise: nil)))
+                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError(.unsupportedAuthMechanism(mechanism)), closePromise: nil)))
         }
     }
     
@@ -95,7 +95,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             var state = ConnectionStateMachine(.waitingToStartAuthentication)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
-                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(message)), closePromise: nil)))
+                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError(.unexpectedBackendMessage(.authentication(message))), closePromise: nil)))
         }
     }
     
@@ -122,7 +122,7 @@ class AuthenticationStateMachineTests: XCTestCase {
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
-                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(message)), closePromise: nil)))
+                           .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError(.unexpectedBackendMessage(.authentication(message))), closePromise: nil)))
         }
     }
 }

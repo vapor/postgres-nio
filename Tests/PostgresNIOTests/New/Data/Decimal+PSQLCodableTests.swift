@@ -11,10 +11,9 @@ class Decimal_PSQLCodableTests: XCTestCase {
             var buffer = ByteBuffer()
             value.encode(into: &buffer, context: .forTests())
             XCTAssertEqual(value.psqlType, .numeric)
-            let data = PSQLData(bytes: buffer, dataType: .numeric, format: .binary)
-            
+
             var result: Decimal?
-            XCTAssertNoThrow(result = try data.decode(as: Decimal.self, context: .forTests()))
+            XCTAssertNoThrow(result = try Decimal.decode(from: &buffer, type: .numeric, format: .binary, context: .forTests()))
             XCTAssertEqual(value, result)
         }
     }
@@ -22,10 +21,9 @@ class Decimal_PSQLCodableTests: XCTestCase {
     func testDecodeFailureInvalidType() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(0))
-        let data = PSQLData(bytes: buffer, dataType: .int8, format: .binary)
         
-        XCTAssertThrowsError(try data.decode(as: Decimal.self, context: .forTests())) { error in
-            XCTAssert(error is PSQLCastingError)
+        XCTAssertThrowsError(try Decimal.decode(from: &buffer, type: .int8, format: .binary, context: .forTests())) {
+            XCTAssert($0 is PSQLCastingError)
         }
     }
     

@@ -8,7 +8,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PSQLError(.uncleanShutdown)) // we don't care about the error at all.
         
         let name = "haha"
         let query = #"SELECT id FROM users WHERE id = $1 "#
@@ -33,7 +33,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PSQLError(.uncleanShutdown)) // we don't care about the error at all.
         
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
@@ -55,7 +55,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine(.prepareStatement(.init(.noDataMessageReceived), connectionContext))
         
         XCTAssertEqual(state.authenticationMessageReceived(.ok),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(.ok)), closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError(.unexpectedBackendMessage(.authentication(.ok))), closePromise: nil)))
     }
 
 }

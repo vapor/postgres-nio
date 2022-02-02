@@ -84,7 +84,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         
         let handler = PSQLChannelHandler(configuration: config) { channel in
             XCTFail("This callback should never be exectuded")
-            throw PSQLError.sslUnsupported
+            throw PSQLError(.sslUnsupported)
         }
         let embedded = EmbeddedChannel(handlers: [
             ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
