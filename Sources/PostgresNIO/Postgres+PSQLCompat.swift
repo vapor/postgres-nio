@@ -52,16 +52,6 @@ extension PostgresData: PSQLEncodable {
     }
 }
 
-extension PostgresData: PSQLDecodable {
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> PostgresData {
-        let myBuffer = byteBuffer.readSlice(length: byteBuffer.readableBytes)!
-        
-        return PostgresData(type: PostgresDataType(UInt32(type.rawValue)), typeModifier: nil, formatCode: .binary, value: myBuffer)
-    }
-}
-
-extension PostgresData: PSQLCodable {}
-
 extension PSQLError {
     func toPostgresError() -> Error {
         switch self.code.base {

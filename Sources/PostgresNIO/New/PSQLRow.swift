@@ -22,6 +22,7 @@ extension PSQLRow: Equatable {
     }
 }
 
+#if false
 extension PSQLRow {
     /// Access the data in the provided column and decode it into the target type.
     ///
@@ -49,12 +50,7 @@ extension PSQLRow {
         precondition(index < self.data.columnCount)
         
         let column = self.columns[index]
-        let context = PSQLDecodingContext(
-            jsonDecoder: self.jsonDecoder,
-            columnName: column.name,
-            columnIndex: index,
-            file: file,
-            line: line)
+        let context = PSQLDecodingContext(jsonDecoder: self.jsonDecoder)
         
         guard var cellSlice = self.data[column: index] else {
             throw PSQLCastingError.Code.missingData
@@ -63,3 +59,4 @@ extension PSQLRow {
         return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)
     }
 }
+#endif

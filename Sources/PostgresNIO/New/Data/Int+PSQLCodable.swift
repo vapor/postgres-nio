@@ -10,7 +10,12 @@ extension UInt8: PSQLCodable {
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch type {
         case .bpchar, .char:
             guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
@@ -40,7 +45,12 @@ extension Int16: PSQLCodable {
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -73,7 +83,12 @@ extension Int32: PSQLCodable {
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -111,7 +126,12 @@ extension Int64: PSQLCodable {
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -161,7 +181,12 @@ extension Int: PSQLCodable {
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {

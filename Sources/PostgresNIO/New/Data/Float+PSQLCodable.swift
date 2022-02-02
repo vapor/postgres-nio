@@ -9,7 +9,12 @@ extension Float: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Float {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
@@ -45,7 +50,12 @@ extension Double: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Double {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {

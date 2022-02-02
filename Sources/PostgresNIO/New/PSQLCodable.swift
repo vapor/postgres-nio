@@ -1,4 +1,5 @@
 import NIOCore
+import Foundation
 
 /// A type that can encode itself to a postgres wire binary representation.
 protocol PSQLEncodable {
@@ -33,17 +34,17 @@ protocol PSQLDecodable {
     ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self
+    static func decode<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format.
     /// This method has a default implementation and may be overriden
     /// only for special cases, like `Optional`s.
-    static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self
+    static func decodeRaw<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self
 }
 
 extension PSQLDecodable {
     @inlinable
-    public static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decodeRaw<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self {
         switch byteBuffer {
         case .some(var buffer):
             return try self.decode(from: &buffer, type: type, format: format, context: context)
@@ -76,22 +77,15 @@ struct PSQLEncodingContext {
     let jsonEncoder: PSQLJSONEncoder
 }
 
-struct PSQLDecodingContext {
+struct PSQLDecodingContext<Decoder: PSQLJSONDecoder> {
     
-    let jsonDecoder: PSQLJSONDecoder
+    let jsonDecoder: Decoder
     
-    let columnIndex: Int
-    let columnName: String
-    
-    let file: String
-    let line: Int
-    
-    init(jsonDecoder: PSQLJSONDecoder, columnName: String, columnIndex: Int, file: String, line: Int) {
+    init(jsonDecoder: Decoder) {
         self.jsonDecoder = jsonDecoder
-        self.columnName = columnName
-        self.columnIndex = columnIndex
-        
-        self.file = file
-        self.line = line
     }
+}
+
+extension PSQLDecodingContext where Decoder == Foundation.JSONDecoder {
+    static let `default` = PSQLDecodingContext(jsonDecoder: JSONDecoder())
 }

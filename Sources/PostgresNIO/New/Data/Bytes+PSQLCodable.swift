@@ -30,7 +30,12 @@ extension ByteBuffer: PSQLCodable {
         byteBuffer.writeBuffer(&copyOfSelf)
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> ByteBuffer {
         return buffer
     }
 }
@@ -48,7 +53,12 @@ extension Data: PSQLCodable {
         byteBuffer.writeBytes(self)
     }
 
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         return buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }
 }

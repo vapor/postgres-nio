@@ -21,8 +21,13 @@ extension UUID: PSQLCodable {
             uuid.12, uuid.13, uuid.14, uuid.15,
         ])
     }
-    
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> UUID {
+
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> UUID {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {

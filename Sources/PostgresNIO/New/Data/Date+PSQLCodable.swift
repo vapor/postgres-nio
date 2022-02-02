@@ -10,7 +10,12 @@ extension Date: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch type {
         case .timestamp, .timestamptz:
             guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {

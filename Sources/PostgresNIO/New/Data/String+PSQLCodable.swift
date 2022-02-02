@@ -14,7 +14,12 @@ extension String: PSQLCodable {
         byteBuffer.writeString(self)
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> String {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> String {
         switch (format, type) {
         case (_, .varchar),
              (_, .text),

@@ -59,7 +59,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var version: String?
-        XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
+        XCTAssertNoThrow(version = try rows?.first?.decode(String.self, context: .default))
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
     }
     
@@ -80,7 +80,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(try stream?.onRow { row in
             func workaround() {
                 var number: Int64?
-                XCTAssertNoThrow(number = try row.decode(column: 0, as: Int64.self))
+                XCTAssertNoThrow(number = try row.decode(Int64.self, context: .default))
                 received += 1
                 XCTAssertEqual(number, received)
             }
@@ -106,7 +106,7 @@ final class IntegrationTests: XCTestCase {
             var rows: [PSQLRow]?
             XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
             var version: String?
-            XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
+            XCTAssertNoThrow(version = try rows?.first?.decode(String.self, context: .default))
             XCTAssertEqual(version?.contains("PostgreSQL"), true)
         }
     }
@@ -125,7 +125,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var foo: String?
-        XCTAssertNoThrow(foo = try rows?.first?.decode(column: 0, as: String.self))
+        XCTAssertNoThrow(foo = try rows?.first?.decode(String.self, context: .default))
         XCTAssertEqual(foo, "hello")
     }
     
@@ -156,16 +156,19 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first
+
+        var cells: (Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64)?
+        XCTAssertNoThrow(cells = try row?.decode((Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64).self, context: .default))
         
-        XCTAssertEqual(try row?.decode(column: "smallint", as: Int16.self), 1)
-        XCTAssertEqual(try row?.decode(column: "smallint_min", as: Int16.self), -32_767)
-        XCTAssertEqual(try row?.decode(column: "smallint_max", as: Int16.self), 32_767)
-        XCTAssertEqual(try row?.decode(column: "int", as: Int32.self), 1)
-        XCTAssertEqual(try row?.decode(column: "int_min", as: Int32.self), -2_147_483_647)
-        XCTAssertEqual(try row?.decode(column: "int_max", as: Int32.self), 2_147_483_647)
-        XCTAssertEqual(try row?.decode(column: "bigint", as: Int64.self), 1)
-        XCTAssertEqual(try row?.decode(column: "bigint_min", as: Int64.self), -9_223_372_036_854_775_807)
-        XCTAssertEqual(try row?.decode(column: "bigint_max", as: Int64.self), 9_223_372_036_854_775_807)
+        XCTAssertEqual(cells?.0, 1)
+        XCTAssertEqual(cells?.1, -32_767)
+        XCTAssertEqual(cells?.2, 32_767)
+        XCTAssertEqual(cells?.3, 1)
+        XCTAssertEqual(cells?.4, -2_147_483_647)
+        XCTAssertEqual(cells?.5, 2_147_483_647)
+        XCTAssertEqual(cells?.6, 1)
+        XCTAssertEqual(cells?.7, -9_223_372_036_854_775_807)
+        XCTAssertEqual(cells?.8, 9_223_372_036_854_775_807)
     }
     
     func testEncodeAndDecodeIntArray() {
@@ -184,7 +187,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode(column: "array", as: [Int64].self), array)
+        XCTAssertEqual(try rows?.first?.decode([Int64].self, context: .default), array)
     }
     
     func testDecodeEmptyIntegerArray() {
@@ -202,7 +205,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode(column: "array", as: [Int64].self), [])
+        XCTAssertEqual(try rows?.first?.decode([Int64].self, context: .default), [])
     }
     
     func testDoubleArraySerialization() {
@@ -221,7 +224,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode(column: "doubles", as: [Double].self), doubles)
+        XCTAssertEqual(try rows?.first?.decode([Double].self, context: .default), doubles)
     }
     
     func testDecodeDates() {
@@ -244,11 +247,13 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        let row = rows?.first
+
+        var cells: (Date, Date, Date)?
+        XCTAssertNoThrow(cells = try rows?.first?.decode((Date, Date, Date).self, context: .default))
         
-        XCTAssertEqual(try row?.decode(column: "date", as: Date.self).description, "2016-01-18 00:00:00 +0000")
-        XCTAssertEqual(try row?.decode(column: "timestamp", as: Date.self).description, "2016-01-18 01:02:03 +0000")
-        XCTAssertEqual(try row?.decode(column: "timestamptz", as: Date.self).description, "2016-01-18 00:20:03 +0000")
+        XCTAssertEqual(cells?.0.description, "2016-01-18 00:00:00 +0000")
+        XCTAssertEqual(cells?.1.description, "2016-01-18 01:02:03 +0000")
+        XCTAssertEqual(cells?.2.description, "2016-01-18 00:20:03 +0000")
     }
     
     func testDecodeDecimals() {
@@ -270,10 +275,12 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        let row = rows?.first
-        
-        XCTAssertEqual(try row?.decode(column: "numeric", as: Decimal.self), Decimal(string: "123456.789123")!)
-        XCTAssertEqual(try row?.decode(column: "numeric_negative", as: Decimal.self), Decimal(string: "-123456.789123")!)
+
+        var cells: (Decimal, Decimal)?
+        XCTAssertNoThrow(cells = try rows?.first?.decode((Decimal, Decimal).self, context: .default))
+
+        XCTAssertEqual(cells?.0, Decimal(string: "123456.789123"))
+        XCTAssertEqual(cells?.1, Decimal(string: "-123456.789123"))
     }
     
     func testDecodeUUID() {
@@ -293,8 +300,7 @@ final class IntegrationTests: XCTestCase {
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        
-        XCTAssertEqual(try rows?.first?.decode(column: "uuid", as: UUID.self), UUID(uuidString: "2c68f645-9ca6-468b-b193-ee97f241c2f8"))
+        XCTAssertEqual(try rows?.first?.decode(UUID.self, context: .default), UUID(uuidString: "2c68f645-9ca6-468b-b193-ee97f241c2f8"))
     }
     
     func testRoundTripJSONB() {
@@ -321,7 +327,7 @@ final class IntegrationTests: XCTestCase {
             XCTAssertNoThrow(rows = try stream?.all().wait())
             XCTAssertEqual(rows?.count, 1)
             var result: Object?
-            XCTAssertNoThrow(result = try rows?.first?.decode(column: "jsonb", as: Object.self))
+            XCTAssertNoThrow(result = try rows?.first?.decode(Object.self, context: .default))
             XCTAssertEqual(result?.foo, 1)
             XCTAssertEqual(result?.bar, 2)
         }
@@ -336,7 +342,7 @@ final class IntegrationTests: XCTestCase {
             XCTAssertNoThrow(rows = try stream?.all().wait())
             XCTAssertEqual(rows?.count, 1)
             var result: Object?
-            XCTAssertNoThrow(result = try rows?.first?.decode(column: "json", as: Object.self))
+            XCTAssertNoThrow(result = try rows?.first?.decode(Object.self, context: .default))
             XCTAssertEqual(result?.foo, 1)
             XCTAssertEqual(result?.bar, 2)
         }

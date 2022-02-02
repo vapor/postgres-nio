@@ -9,7 +9,12 @@ extension Bool: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Bool {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         guard type == .bool else {
             throw PSQLCastingError.Code.typeMismatch
         }

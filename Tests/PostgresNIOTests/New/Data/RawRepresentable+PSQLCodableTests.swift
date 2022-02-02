@@ -20,7 +20,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
             XCTAssertEqual(buffer.readableBytes, 2)
 
             var result: MyRawRepresentable?
-            XCTAssertNoThrow(result = try MyRawRepresentable.decode(from: &buffer, type: Int16.psqlArrayElementType, format: .binary, context: .forTests()))
+            XCTAssertNoThrow(result = try MyRawRepresentable.decode(from: &buffer, type: Int16.psqlArrayElementType, format: .binary, context: .default))
             XCTAssertEqual(value, result)
         }
     }
@@ -29,7 +29,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int16(4)) // out of bounds
 
-        XCTAssertThrowsError(try MyRawRepresentable.decode(from: &buffer, type: Int16.psqlArrayElementType, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try MyRawRepresentable.decode(from: &buffer, type: Int16.psqlArrayElementType, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
@@ -38,7 +38,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(1)) // out of bounds
 
-        XCTAssertThrowsError(try MyRawRepresentable.decode(from: &buffer, type: Int32.psqlArrayElementType, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try MyRawRepresentable.decode(from: &buffer, type: Int32.psqlArrayElementType, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }

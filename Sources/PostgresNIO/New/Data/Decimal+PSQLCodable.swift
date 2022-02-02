@@ -10,15 +10,20 @@ extension Decimal: PSQLCodable {
         .binary
     }
     
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Decimal {
+    static func decode<JSONDecoder : PSQLJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PSQLDataType,
+        format: PSQLFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Decimal {
         switch (format, type) {
         case (.binary, .numeric):
-            guard let numeric = PostgresNumeric(buffer: &byteBuffer) else {
+            guard let numeric = PostgresNumeric(buffer: &buffer) else {
                 throw PSQLCastingError.Code.failure
             }
             return numeric.decimal
         case (.text, .numeric):
-            guard let string = byteBuffer.readString(length: byteBuffer.readableBytes), let value = Decimal(string: string) else {
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
                 throw PSQLCastingError.Code.failure
             }
             return value

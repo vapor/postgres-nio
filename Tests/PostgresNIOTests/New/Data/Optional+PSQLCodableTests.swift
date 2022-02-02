@@ -14,7 +14,7 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: String?
         var optBuffer: ByteBuffer? = buffer
-        XCTAssertNoThrow(result = try String?.decodeRaw(from: &optBuffer, type: .text, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try String?.decodeRaw(from: &optBuffer, type: .text, format: .binary, context: .default))
         XCTAssertEqual(result, value)
     }
     
@@ -29,7 +29,7 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: String?
         var inBuffer: ByteBuffer? = nil
-        XCTAssertNoThrow(result = try String?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try String?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .default))
         XCTAssertEqual(result, value)
     }
     
@@ -45,7 +45,7 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: UUID?
         var optBuffer: ByteBuffer? = buffer
-        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &optBuffer, type: .uuid, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &optBuffer, type: .uuid, format: .binary, context: .default))
         XCTAssertEqual(result, value)
     }
     
@@ -61,7 +61,7 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: UUID?
         var inBuffer: ByteBuffer? = nil
-        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .default))
         XCTAssertEqual(result, value)
     }
 }
