@@ -555,10 +555,6 @@ struct AdaptiveRowBuffer {
     private var target: Int
     private var canShrink: Bool = false
     
-    private var hasDemand: Bool {
-        self.circularBuffer.count < self.maximum
-    }
-    
     var isEmpty: Bool {
         self.circularBuffer.isEmpty
     }
@@ -587,7 +583,8 @@ struct AdaptiveRowBuffer {
         }
         self.canShrink = true
     }
-    
+
+    /// Returns the next row in the FIFO buffer and a `bool` signalling if new rows should be loaded.
     mutating func removeFirst() -> (DataRow, Bool) {
         let element = self.circularBuffer.removeFirst()
         
