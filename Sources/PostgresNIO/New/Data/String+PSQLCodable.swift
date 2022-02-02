@@ -24,11 +24,11 @@ extension String: PSQLCodable {
             return buffer.readString(length: buffer.readableBytes)!
         case (_, .uuid):
             guard let uuid = try? UUID.decode(from: &buffer, type: .uuid, format: format, context: context) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return uuid.uuidString
         default:
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+            throw PSQLCastingError.Code.typeMismatch
         }
     }
 }

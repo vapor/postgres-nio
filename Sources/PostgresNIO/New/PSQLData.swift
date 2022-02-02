@@ -32,7 +32,7 @@ struct PSQLData: Equatable {
     func decode<T: PSQLDecodable>(as type: T.Type, context: PSQLDecodingContext) throws -> T {
         switch self.bytes {
         case .none:
-            throw PSQLCastingError.missingData(targetType: type, type: self.dataType, context: context)
+            throw PSQLCastingError.Code.missingData
         case .some(var buffer):
             return try T.decode(from: &buffer, type: self.dataType, format: self.format, context: context)
         }

@@ -74,7 +74,7 @@ struct ExtendedQueryStateMachine {
     
     mutating func parseCompletedReceived() -> Action {
         guard case .parseDescribeBindExecuteSyncSent(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.parseComplete))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.parseComplete)))
         }
         
         return self.avoidingStateMachineCoW { state -> Action in
@@ -85,7 +85,7 @@ struct ExtendedQueryStateMachine {
     
     mutating func parameterDescriptionReceived(_ parameterDescription: PSQLBackendMessage.ParameterDescription) -> Action {
         guard case .parseCompleteReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.parameterDescription(parameterDescription)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.parameterDescription(parameterDescription))))
         }
         
         return self.avoidingStateMachineCoW { state -> Action in
@@ -96,7 +96,7 @@ struct ExtendedQueryStateMachine {
     
     mutating func noDataReceived() -> Action {
         guard case .parameterDescriptionReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.noData))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.noData)))
         }
         
         return self.avoidingStateMachineCoW { state -> Action in
@@ -107,7 +107,7 @@ struct ExtendedQueryStateMachine {
     
     mutating func rowDescriptionReceived(_ rowDescription: RowDescription) -> Action {
         guard case .parameterDescriptionReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.rowDescription(rowDescription))))
         }
         
         return self.avoidingStateMachineCoW { state -> Action in
@@ -149,7 +149,7 @@ struct ExtendedQueryStateMachine {
              .streaming,
              .commandComplete,
              .error:
-            return self.setAndFireError(.unexpectedBackendMessage(.bindComplete))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.bindComplete)))
         case .modifying:
             preconditionFailure("Invalid state")
         }
@@ -161,7 +161,7 @@ struct ExtendedQueryStateMachine {
             // When receiving a data row, we must ensure that the data row column count
             // matches the previously received row description column count.
             guard dataRow.columnCount == columns.count else {
-                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+                return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.dataRow(dataRow))))
             }
             
             return self.avoidingStateMachineCoW { state -> Action in
@@ -179,7 +179,7 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived,
              .commandComplete,
              .error:
-            return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.dataRow(dataRow))))
         case .modifying:
             preconditionFailure("Invalid state")
         }
@@ -207,7 +207,7 @@ struct ExtendedQueryStateMachine {
              .rowDescriptionReceived,
              .commandComplete,
              .error:
-            return self.setAndFireError(.unexpectedBackendMessage(.commandComplete(commandTag)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.commandComplete(commandTag))))
         case .modifying:
             preconditionFailure("Invalid state")
         }
@@ -218,10 +218,10 @@ struct ExtendedQueryStateMachine {
     }
     
     mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> Action {
-        let error = PSQLError.server(errorMessage)
+        let error = PSQLError(.server(errorMessage))
         switch self.state {
         case .initialized:
-            return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.error(errorMessage))))
         case .parseDescribeBindExecuteSyncSent,
              .parseCompleteReceived,
              .parameterDescriptionReceived,
@@ -232,7 +232,7 @@ struct ExtendedQueryStateMachine {
         case .streaming:
             return self.setAndFireError(error)
         case .commandComplete:
-            return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.error(errorMessage))))
         case .error:
             preconditionFailure("""
                 This state must not be reached. If the query `.isComplete`, the

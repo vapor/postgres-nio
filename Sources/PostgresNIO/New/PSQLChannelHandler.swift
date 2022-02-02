@@ -95,7 +95,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
         self.logger.debug("Channel error caught.", metadata: [.error: "\(error)"])
-        let action = self.state.errorHappened(.channel(underlying: error))
+        let action = self.state.errorHappened(.init(.channel, underlying: error))
         self.run(action, with: context)
     }
     
@@ -151,7 +151,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
                 self.run(action, with: context)
             }
         } catch let error as PSQLDecodingError {
-            let action = self.state.errorHappened(.decoding(error))
+            let action = self.state.errorHappened(PSQLError(.decoding(error)))
             self.run(action, with: context)
         } catch {
             preconditionFailure("Expected to only get PSQLDecodingErrors from the PSQLBackendMessageDecoder.")
@@ -344,7 +344,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             let action = self.state.sslHandlerAdded()
             self.run(action, with: context)
         } catch {
-            let action = self.state.errorHappened(.failedToAddSSLHandler(underlying: error))
+            let action = self.state.errorHappened(PSQLError(.failedToAddSSLHandler, underlying: error))
             self.run(action, with: context)
         }
     }
@@ -409,7 +409,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             try self.encoder.encode(.sync)
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
         } catch {
-            let action = self.state.errorHappened(.channel(underlying: error))
+            let action = self.state.errorHappened(PSQLError(.channel, underlying: error))
             self.run(action, with: context)
         }
     }
@@ -430,7 +430,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             try self.encoder.encode(.sync)
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
         } catch {
-            let action = self.state.errorHappened(.channel(underlying: error))
+            let action = self.state.errorHappened(PSQLError(.channel, underlying: error))
             self.run(action, with: context)
         }
     }
@@ -458,7 +458,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             try self.encoder.encode(.sync)
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
         } catch {
-            let action = self.state.errorHappened(.channel(underlying: error))
+            let action = self.state.errorHappened(PSQLError(.channel, underlying: error))
             self.run(action, with: context)
         }
     }

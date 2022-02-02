@@ -64,7 +64,7 @@ extension PostgresData: PSQLCodable {}
 
 extension PSQLError {
     func toPostgresError() -> Error {
-        switch self.base {
+        switch self.code.base {
         case .server(let errorMessage):
             var fields = [PostgresMessage.Error.Field: String]()
             fields.reserveCapacity(errorMessage.fields.count)
@@ -74,8 +74,8 @@ extension PSQLError {
             return PostgresError.server(PostgresMessage.Error(fields: fields))
         case .sslUnsupported:
             return PostgresError.protocol("Server does not support TLS")
-        case .failedToAddSSLHandler(underlying: let underlying):
-            return underlying
+        case .failedToAddSSLHandler:
+            return self.underlying ?? self
         case .decoding(let decodingError):
             return PostgresError.protocol("Error decoding message: \(decodingError)")
         case .unexpectedBackendMessage(let message):
@@ -84,16 +84,16 @@ extension PSQLError {
             return PostgresError.protocol("Unsupported auth scheme: \(authScheme)")
         case .authMechanismRequiresPassword:
             return PostgresError.protocol("Unable to authenticate without password")
-        case .saslError(underlyingError: let underlying):
-            return underlying
+        case .saslError:
+            return self.underlying ?? self
         case .tooManyParameters:
             return self
         case .connectionQuiescing:
             return PostgresError.connectionClosed
         case .connectionClosed:
             return PostgresError.connectionClosed
-        case .connectionError(underlying: let underlying):
-            return underlying
+        case .connectionError:
+            return self.underlying ?? self
         case .casting(let castingError):
             return castingError
         case .uncleanShutdown:

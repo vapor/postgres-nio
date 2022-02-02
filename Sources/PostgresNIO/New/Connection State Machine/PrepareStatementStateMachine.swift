@@ -47,7 +47,7 @@ struct PrepareStatementStateMachine {
     
     mutating func parseCompletedReceived() -> Action {
         guard case .parseDescribeSent(let createContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.parseComplete))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.parseComplete)))
         }
         
         self.state = .parseCompleteReceived(createContext)
@@ -56,7 +56,7 @@ struct PrepareStatementStateMachine {
     
     mutating func parameterDescriptionReceived(_ parameterDescription: PSQLBackendMessage.ParameterDescription) -> Action {
         guard case .parseCompleteReceived(let createContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.parameterDescription(parameterDescription)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.parameterDescription(parameterDescription))))
         }
         
         self.state = .parameterDescriptionReceived(createContext)
@@ -65,7 +65,7 @@ struct PrepareStatementStateMachine {
     
     mutating func noDataReceived() -> Action {
         guard case .parameterDescriptionReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.noData))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.noData)))
         }
         
         self.state = .noDataMessageReceived
@@ -74,7 +74,7 @@ struct PrepareStatementStateMachine {
     
     mutating func rowDescriptionReceived(_ rowDescription: RowDescription) -> Action {
         guard case .parameterDescriptionReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.rowDescription(rowDescription))))
         }
         
         self.state = .rowDescriptionReceived
@@ -82,10 +82,10 @@ struct PrepareStatementStateMachine {
     }
     
     mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> Action {
-        let error = PSQLError.server(errorMessage)
+        let error = PSQLError(.server(errorMessage))
         switch self.state {
         case .initialized:
-            return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.error(errorMessage))))
             
         case .parseDescribeSent,
              .parseCompleteReceived,

@@ -85,7 +85,7 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
 ///
 /// If you encounter a `DecodingError` when using a trusted Postgres server please make to file an issue at:
 /// [https://github.com/vapor/postgres-nio/issues](https://github.com/vapor/postgres-nio/issues)
-struct PSQLDecodingError: Error {
+struct PSQLDecodingError: Error, Equatable {
     
     /// The backend message ID bytes
     let messageID: UInt8

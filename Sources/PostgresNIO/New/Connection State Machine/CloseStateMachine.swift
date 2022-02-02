@@ -36,7 +36,7 @@ struct CloseStateMachine {
     
     mutating func closeCompletedReceived() -> Action {
         guard case .closeSyncSent(let closeContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.closeComplete))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.closeComplete)))
         }
         
         self.state = .closeCompleteReceived
@@ -44,16 +44,16 @@ struct CloseStateMachine {
     }
     
     mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> Action {
-        let error = PSQLError.server(errorMessage)
+        let error = PSQLError(.server(errorMessage))
         switch self.state {
         case .initialized:
-            return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.error(errorMessage))))
             
         case .closeSyncSent:
             return self.setAndFireError(error)
             
         case .closeCompleteReceived:
-            return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
+            return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.error(errorMessage))))
             
         case .error:
             preconditionFailure("""

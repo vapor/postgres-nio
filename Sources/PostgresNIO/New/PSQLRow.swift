@@ -57,7 +57,7 @@ extension PSQLRow {
             line: line)
         
         guard var cellSlice = self.data[column: index] else {
-            throw PSQLCastingError.missingData(targetType: T.self, type: column.dataType, context: context)
+            throw PSQLCastingError.Code.missingData
         }
 
         return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)

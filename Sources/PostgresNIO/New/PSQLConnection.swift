@@ -129,7 +129,7 @@ final class PSQLConnection {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.connectionID)"
         guard bind.count <= Int(Int16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
+            return self.channel.eventLoop.makeFailedFuture(PSQLError(.tooManyParameters))
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -164,7 +164,7 @@ final class PSQLConnection {
                  _ bind: [PSQLEncodable], logger: Logger) -> EventLoopFuture<PSQLRowStream>
     {
         guard bind.count <= Int(Int16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
+            return self.channel.eventLoop.makeFailedFuture(PSQLError(.tooManyParameters))
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -264,7 +264,7 @@ final class PSQLConnection {
                 case is PSQLError:
                     throw error
                 default:
-                    throw PSQLError.channel(underlying: error)
+                    throw PSQLError(.channel, underlying: error)
                 }
             }
         }

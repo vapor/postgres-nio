@@ -13,21 +13,21 @@ extension Float: PSQLCodable {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return float
         case (.binary, .float8):
             guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return Float(double)
         case (.text, .float4), (.text, .float8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Float(string) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+            throw PSQLCastingError.Code.typeMismatch
         }
     }
     
@@ -49,21 +49,21 @@ extension Double: PSQLCodable {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return Double(float)
         case (.binary, .float8):
             guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return double
         case (.text, .float4), (.text, .float8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Double(string) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+            throw PSQLCastingError.Code.typeMismatch
         }
     }
     

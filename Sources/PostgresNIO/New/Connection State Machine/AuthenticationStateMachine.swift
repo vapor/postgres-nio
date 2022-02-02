@@ -51,7 +51,7 @@ struct AuthenticationStateMachine {
                 return .authenticated
             case .md5(let salt):
                 guard self.authContext.password != nil else {
-                    return self.setAndFireError(.authMechanismRequiresPassword)
+                    return self.setAndFireError(PSQLError(.authMechanismRequiresPassword))
                 }
                 self.state = .passwordAuthenticationSent
                 return .sendPassword(.md5(salt: salt), self.authContext)
@@ -59,20 +59,20 @@ struct AuthenticationStateMachine {
                 self.state = .passwordAuthenticationSent
                 return .sendPassword(.cleartext, authContext)
             case .kerberosV5:
-                return self.setAndFireError(.unsupportedAuthMechanism(.kerberosV5))
+                return self.setAndFireError(PSQLError(.unsupportedAuthMechanism(.kerberosV5)))
             case .scmCredential:
-                return self.setAndFireError(.unsupportedAuthMechanism(.scmCredential))
+                return self.setAndFireError(PSQLError(.unsupportedAuthMechanism(.scmCredential)))
             case .gss:
-                return self.setAndFireError(.unsupportedAuthMechanism(.gss))
+                return self.setAndFireError(PSQLError(.unsupportedAuthMechanism(.gss)))
             case .sspi:
-                return self.setAndFireError(.unsupportedAuthMechanism(.sspi))
+                return self.setAndFireError(PSQLError(.unsupportedAuthMechanism(.sspi)))
             case .sasl(let mechanisms):
                 guard mechanisms.contains(SASLMechanism.SCRAM.SHA256.name) else {
-                    return self.setAndFireError(.unsupportedAuthMechanism(.sasl(mechanisms: mechanisms)))
+                    return self.setAndFireError(PSQLError(.unsupportedAuthMechanism(.sasl(mechanisms: mechanisms))))
                 }
                 
                 guard let password = self.authContext.password else {
-                    return self.setAndFireError(.authMechanismRequiresPassword)
+                    return self.setAndFireError(PSQLError(.authMechanismRequiresPassword))
                 }
                 
                 let saslManager = SASLAuthenticationManager(asClientSpeaking:
@@ -91,16 +91,16 @@ struct AuthenticationStateMachine {
                     self.state = .saslInitialResponseSent(saslManager)
                     return .sendSaslInitialResponse(name: SASLMechanism.SCRAM.SHA256.name, initialResponse: output)
                 } catch {
-                    return self.setAndFireError(.sasl(underlying: error))
+                    return self.setAndFireError(PSQLError(.sasl, underlying: error))
                 }
             case .gssContinue,
                  .saslContinue,
                  .saslFinal:
-                return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
+                return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.authentication(message))))
             }
         case .passwordAuthenticationSent, .saslFinalReceived:
             guard case .ok = message else {
-                return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
+                return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.authentication(message))))
             }
             
             self.state = .authenticated
@@ -108,7 +108,7 @@ struct AuthenticationStateMachine {
         
         case .saslInitialResponseSent(let saslManager):
             guard case .saslContinue(data: var data) = message else {
-                return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
+                return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.authentication(message))))
             }
             
             let input = data.readBytes(length: data.readableBytes)
@@ -124,12 +124,12 @@ struct AuthenticationStateMachine {
                 self.state = .saslChallengeResponseSent(saslManager)
                 return .sendSaslResponse(output)
             } catch {
-                return self.setAndFireError(.sasl(underlying: error))
+                return self.setAndFireError(PSQLError(.sasl, underlying: error))
             }
             
         case .saslChallengeResponseSent(let saslManager):
             guard case .saslFinal(data: var data) = message else {
-                return self.setAndFireError(.unexpectedBackendMessage(.authentication(message)))
+                return self.setAndFireError(PSQLError(.unexpectedBackendMessage(.authentication(message))))
             }
             
             let input = data.readBytes(length: data.readableBytes)
@@ -145,7 +145,7 @@ struct AuthenticationStateMachine {
                 self.state = .saslFinalReceived
                 return .wait
             } catch {
-                return self.setAndFireError(.sasl(underlying: error))
+                return self.setAndFireError(PSQLError(.sasl, underlying: error))
             }
         
         case .initialized:
@@ -157,7 +157,7 @@ struct AuthenticationStateMachine {
     }
     
     mutating func errorReceived(_ message: PSQLBackendMessage.ErrorResponse) -> Action {
-        return self.setAndFireError(.server(message))
+        return self.setAndFireError(PSQLError(.server(message)))
     }
     
     mutating func errorHappened(_ error: PSQLError) -> Action {
