@@ -21,7 +21,6 @@ protocol PSQLMessagePayloadDecodable {
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
 enum PSQLBackendMessage: Equatable {
-    
     typealias PayloadDecodable = PSQLMessagePayloadDecodable
     
     case authentication(Authentication)
