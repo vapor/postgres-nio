@@ -10,17 +10,42 @@ enum PSQLFormat: Int16 {
     case binary = 1
 }
 
-struct PSQLData: Equatable {
+struct PSQLCell: Equatable {
     
-    @usableFromInline var bytes: ByteBuffer?
-    @usableFromInline var dataType: PSQLDataType
-    @usableFromInline var format: PSQLFormat
+    var bytes: ByteBuffer?
+    var columnIndex: Int
+    var columnDescription: RowDescription.Column
     
     /// use this only for testing
-    init(bytes: ByteBuffer?, dataType: PSQLDataType, format: PSQLFormat) {
+    init(bytes: ByteBuffer?, columnIndex: Int, columnDescription: RowDescription.Column) {
         self.bytes = bytes
-        self.dataType = dataType
-        self.format = format
+        self.columnIndex = columnIndex
+        self.columnDescription = columnDescription
+    }
+}
+
+extension PSQLCell {
+    func decode<T: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: T.Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> T {
+        var cellData = self.bytes
+
+        do {
+            return try T.decodeRaw(
+                from: &cellData,
+                type: self.columnDescription.dataType,
+                format: self.columnDescription.format,
+                context: context
+            )
+        } catch let code as PSQLCastingError.Code {
+            let castingError = PSQLCastingError(
+                code: code,
+                columnName: self.columnDescription.name,
+                columnIndex: self.columnIndex,
+                targetType: T.self,
+                postgresType: self.columnDescription.dataType,
+                postgresData: cellData
+            )
+            throw PSQLError(.casting(castingError), file: file, line: line)
+        }
     }
 }
 

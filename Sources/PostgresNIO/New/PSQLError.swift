@@ -83,6 +83,10 @@ struct PSQLError: Error {
         static let channel: Code = Self.init(.connectionError)
 
         static let uncleanShutdown: Code = Self.init(.uncleanShutdown)
+
+        static func casting(_ error: PSQLCastingError) -> Code {
+            Self.init(.casting(error))
+        }
     }
     
     internal var code: Code
