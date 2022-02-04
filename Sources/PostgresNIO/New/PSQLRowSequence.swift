@@ -223,6 +223,7 @@ extension AsyncStreamConsumer {
             }
             
             case initialized
+            /// The upstream has more data that can be received
             case streaming(AdaptiveRowBuffer, PSQLRowStream, DemandState)
             /// The upstream has finished, but the downstream has not consumed all events.
             case finished(AdaptiveRowBuffer, String)
@@ -231,6 +232,8 @@ extension AsyncStreamConsumer {
             /// The upstream has failed or finished and the downstream has consumed all events. Final state.
             case consumed
 
+            /// A state used to prevent CoW allocations when modifying an internal struct in the
+            /// `.streaming` or `.finished` state.
             case modifying
         }
         
@@ -287,7 +290,7 @@ extension AsyncStreamConsumer {
         mutating func sequenceDeinitialized() -> SequenceDeinitializedAction {
             switch (self.downstreamState, self.upstreamState) {
             case (.sequenceCreated, .initialized):
-                preconditionFailure()
+                preconditionFailure("Invalid state: \(self.downstreamState), \(self.upstreamState)")
                 
             case (.sequenceCreated, .streaming(_, let source, _)):
                 return .cancelStream(source)
@@ -301,17 +304,15 @@ extension AsyncStreamConsumer {
                 return .none
                 
             case (_, .modifying):
-                preconditionFailure()
+                preconditionFailure("Invalid state: \(self.downstreamState), \(self.upstreamState)")
             }
         }
 
         mutating func iteratorDeinitialized() -> SequenceDeinitializedAction {
             switch (self.downstreamState, self.upstreamState) {
-            case (.sequenceCreated, _):
-                preconditionFailure()
-
-            case (.iteratorCreated, .initialized):
-                preconditionFailure()
+            case (.sequenceCreated, _),
+                 (.iteratorCreated, .initialized):
+                preconditionFailure("Invalid state: \(self.downstreamState), \(self.upstreamState)")
 
             case (.iteratorCreated, .streaming(_, let source, _)):
                 return .cancelStream(source)
@@ -322,7 +323,7 @@ extension AsyncStreamConsumer {
                 return .none
 
             case (_, .modifying):
-                preconditionFailure()
+                preconditionFailure("Invalid state: \(self.downstreamState), \(self.upstreamState)")
             }
         }
 
@@ -383,7 +384,7 @@ extension AsyncStreamConsumer {
                 return .returnNil
 
             case .modifying:
-                preconditionFailure()
+                preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
         }
 
@@ -407,20 +408,14 @@ extension AsyncStreamConsumer {
                 self.upstreamState = .streaming(buffer, source, .waitingForMore(continuation))
                 return .none
             
-            case .streaming(_, _, .waitingForMore(.some)):
-                preconditionFailure()
-                
-            case .finished:
-                preconditionFailure()
-                
-            case .failed:
-                preconditionFailure()
-                
-            case .consumed:
-                preconditionFailure()
+            case .streaming(_, _, .waitingForMore(.some)),
+                 .finished,
+                 .failed,
+                 .consumed:
+                preconditionFailure("Expected that state was already handled by fast path. Invalid upstream state: \(self.upstreamState)")
                 
             case .modifying:
-                preconditionFailure()
+                preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
         }
         
@@ -495,7 +490,7 @@ extension AsyncStreamConsumer {
                 return .none
                 
             case .initialized, .finished, .consumed:
-                preconditionFailure()
+                preconditionFailure("Invalid upstream state: \(self.upstreamState)")
                 
             case .failed:
                 return .none
@@ -521,7 +516,7 @@ extension AsyncStreamConsumer {
                 return .none
                 
             case .initialized, .finished, .consumed:
-                preconditionFailure()
+                preconditionFailure("Invalid upstream state: \(self.upstreamState)")
                 
             case .failed:
                 return .none
