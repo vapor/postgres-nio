@@ -5,7 +5,7 @@ import NIOCore
 /// Currently there a two wire formats supported:
 ///  - text
 ///  - binary
-enum PSQLFormat: Int16 {
+public enum PSQLFormat: Int16 {
     case text = 0
     case binary = 1
 }
