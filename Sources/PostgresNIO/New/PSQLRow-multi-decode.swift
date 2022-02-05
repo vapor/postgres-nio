@@ -2,7 +2,7 @@
 
 extension PSQLRow {
     @inlinable
-    func decode<T0: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0) {
+    public func decode<T0: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0) {
         assert(self.columns.count >= 1)
         let columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -28,7 +28,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1) {
         assert(self.columns.count >= 2)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -60,7 +60,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2) {
         assert(self.columns.count >= 3)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -98,7 +98,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3) {
         assert(self.columns.count >= 4)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -142,7 +142,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4) {
         assert(self.columns.count >= 5)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -192,7 +192,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5) {
         assert(self.columns.count >= 6)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -248,7 +248,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6) {
         assert(self.columns.count >= 7)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -310,7 +310,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7) {
         assert(self.columns.count >= 8)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -378,7 +378,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8) {
         assert(self.columns.count >= 9)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -452,7 +452,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) {
         assert(self.columns.count >= 10)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -532,7 +532,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) {
         assert(self.columns.count >= 11)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -618,7 +618,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) {
         assert(self.columns.count >= 12)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -710,7 +710,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12) {
         assert(self.columns.count >= 13)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -808,7 +808,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, T13: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, T13: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13) {
         assert(self.columns.count >= 14)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -912,7 +912,7 @@ extension PSQLRow {
     }
 
     @inlinable
-    func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, T13: PSQLDecodable, T14: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14) {
+    public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, T13: PSQLDecodable, T14: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14) {
         assert(self.columns.count >= 15)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
