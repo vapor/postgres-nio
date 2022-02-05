@@ -1,15 +1,15 @@
 import NIOCore
 
 extension Float: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .float4
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -36,21 +36,21 @@ extension Float: PSQLCodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.psqlWriteFloat(self)
     }
 }
 
 extension Double: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .float8
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -77,7 +77,7 @@ extension Double: PSQLCodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.psqlWriteDouble(self)
     }
 }

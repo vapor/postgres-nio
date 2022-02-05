@@ -17,20 +17,20 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
 }
 
 extension ByteBuffer: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .bytea
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         var copyOfSelf = self // dirty hack
         byteBuffer.writeBuffer(&copyOfSelf)
     }
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -41,19 +41,19 @@ extension ByteBuffer: PSQLCodable {
 }
 
 extension Data: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .bytea
     }
 
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeBytes(self)
     }
 
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,

@@ -2,7 +2,7 @@ import NIOCore
 import Foundation
 
 /// A type that can encode itself to a postgres wire binary representation.
-protocol PSQLEncodable {
+public protocol PSQLEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     var psqlType: PSQLDataType { get }
     
@@ -20,7 +20,7 @@ protocol PSQLEncodable {
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
-protocol PSQLDecodable {
+public protocol PSQLDecodable {
     typealias ActualType = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
@@ -44,7 +44,7 @@ protocol PSQLDecodable {
 
 extension PSQLDecodable {
     @inlinable
-    static func decodeRaw<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self {
+    public static func decodeRaw<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self {
         switch byteBuffer {
         case .some(var buffer):
             return try self.decode(from: &buffer, type: type, format: format, context: context)
@@ -55,10 +55,11 @@ extension PSQLDecodable {
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
+public protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
 
 extension PSQLEncodable {
-    func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    @inlinable
+    public func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
         let lengthIndex = buffer.writerIndex
@@ -73,7 +74,7 @@ extension PSQLEncodable {
     }
 }
 
-struct PSQLEncodingContext {
+public struct PSQLEncodingContext {
     let jsonEncoder: PSQLJSONEncoder
 }
 

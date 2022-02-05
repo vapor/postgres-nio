@@ -4,15 +4,15 @@ import typealias Foundation.uuid_t
 
 extension UUID: PSQLCodable {
     
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .uuid
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         let uuid = self.uuid
         byteBuffer.writeBytes([
             uuid.0, uuid.1, uuid.2, uuid.3,
@@ -22,7 +22,7 @@ extension UUID: PSQLCodable {
         ])
     }
 
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,

@@ -2,19 +2,19 @@ import NIOCore
 import struct Foundation.UUID
 
 extension String: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .text
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeString(self)
     }
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,

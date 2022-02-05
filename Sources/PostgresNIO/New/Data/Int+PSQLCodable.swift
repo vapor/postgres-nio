@@ -1,16 +1,16 @@
 import NIOCore
 
 extension UInt8: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .char
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -29,23 +29,23 @@ extension UInt8: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: UInt8.self)
     }
 }
 
 extension Int16: PSQLCodable {
     
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .int2
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -68,22 +68,22 @@ extension Int16: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int16.self)
     }
 }
 
 extension Int32: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .int4
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -111,22 +111,22 @@ extension Int32: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int32.self)
     }
 }
 
 extension Int64: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .int8
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -159,13 +159,13 @@ extension Int64: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int64.self)
     }
 }
 
 extension Int: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         switch self.bitWidth {
         case Int32.bitWidth:
             return .int4
@@ -176,12 +176,12 @@ extension Int: PSQLCodable {
         }
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
     // decoding
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -214,7 +214,7 @@ extension Int: PSQLCodable {
     }
     
     // encoding
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self, as: Int.self)
     }
 }

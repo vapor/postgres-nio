@@ -1,15 +1,15 @@
 import NIOCore
 
 extension Bool: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .bool
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -49,7 +49,7 @@ extension Bool: PSQLCodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }
 }

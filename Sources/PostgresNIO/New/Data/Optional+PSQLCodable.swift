@@ -3,11 +3,11 @@ import NIOCore
 extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
     typealias ActualType = Wrapped
 
-    static func decode<JSONDecoder : PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")
     }
 
-    static func decodeRaw<JSONDecoder : PSQLJSONDecoder>(
+    public static func decodeRaw<JSONDecoder : PSQLJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -23,7 +23,7 @@ extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
 }
 
 extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         switch self {
         case .some(let value):
             return value.psqlType
@@ -32,7 +32,7 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         switch self {
         case .some(let value):
             return value.psqlFormat
@@ -41,11 +41,11 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         switch self {
         case .none:
             byteBuffer.writeInteger(-1, as: Int32.self)

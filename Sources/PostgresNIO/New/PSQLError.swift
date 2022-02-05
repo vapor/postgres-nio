@@ -102,8 +102,11 @@ struct PSQLError: Error {
     }
 }
 
+@usableFromInline
 struct PSQLCastingError: Error, Equatable {
+    @usableFromInline
     struct Code: Hashable, Error {
+        @usableFromInline
         enum Base {
             case missingData
             case typeMismatch
@@ -112,12 +115,16 @@ struct PSQLCastingError: Error, Equatable {
 
         var base: Base
 
+        @usableFromInline
         init(_ base: Base) {
             self.base = base
         }
 
+        @usableFromInline
         static let missingData = Self.init(.missingData)
+        @usableFromInline
         static let typeMismatch = Self.init(.typeMismatch)
+        @usableFromInline
         static let failure = Self.init(.failure)
     }
 
@@ -148,7 +155,8 @@ struct PSQLCastingError: Error, Equatable {
         }
 
     }
-    
+
+    @usableFromInline
     static func ==(lhs: PSQLCastingError, rhs: PSQLCastingError) -> Bool {
         lhs.targetType == rhs.targetType
     }

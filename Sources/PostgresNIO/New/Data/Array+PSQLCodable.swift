@@ -2,39 +2,39 @@ import NIOCore
 import struct Foundation.UUID
 
 /// A type, of which arrays can be encoded into and decoded from a postgres binary format
-protocol PSQLArrayElement: PSQLCodable {
+public protocol PSQLArrayElement: PSQLCodable {
     static var psqlArrayType: PSQLDataType { get }
     static var psqlArrayElementType: PSQLDataType { get }
 }
 
 extension Bool: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .boolArray }
-    static var psqlArrayElementType: PSQLDataType { .bool }
+    public static var psqlArrayType: PSQLDataType { .boolArray }
+    public static var psqlArrayElementType: PSQLDataType { .bool }
 }
 
 extension ByteBuffer: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .byteaArray }
-    static var psqlArrayElementType: PSQLDataType { .bytea }
+    public static var psqlArrayType: PSQLDataType { .byteaArray }
+    public static var psqlArrayElementType: PSQLDataType { .bytea }
 }
 
 extension UInt8: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .charArray }
-    static var psqlArrayElementType: PSQLDataType { .char }
+    public static var psqlArrayType: PSQLDataType { .charArray }
+    public static var psqlArrayElementType: PSQLDataType { .char }
 }
 
 extension Int16: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .int2Array }
-    static var psqlArrayElementType: PSQLDataType { .int2 }
+    public static var psqlArrayType: PSQLDataType { .int2Array }
+    public static var psqlArrayElementType: PSQLDataType { .int2 }
 }
 
 extension Int32: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .int4Array }
-    static var psqlArrayElementType: PSQLDataType { .int4 }
+    public static var psqlArrayType: PSQLDataType { .int4Array }
+    public static var psqlArrayElementType: PSQLDataType { .int4 }
 }
 
 extension Int64: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .int8Array }
-    static var psqlArrayElementType: PSQLDataType { .int8 }
+    public static var psqlArrayType: PSQLDataType { .int8Array }
+    public static var psqlArrayElementType: PSQLDataType { .int8 }
 }
 
 extension Int: PSQLArrayElement {
@@ -42,41 +42,41 @@ extension Int: PSQLArrayElement {
     static var psqlArrayType: PSQLDataType { .int4Array }
     static var psqlArrayElementType: PSQLDataType { .int4 }
     #else
-    static var psqlArrayType: PSQLDataType { .int8Array }
-    static var psqlArrayElementType: PSQLDataType { .int8 }
+    public static var psqlArrayType: PSQLDataType { .int8Array }
+    public static var psqlArrayElementType: PSQLDataType { .int8 }
     #endif
 }
 
 extension Float: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .float4Array }
-    static var psqlArrayElementType: PSQLDataType { .float4 }
+    public static var psqlArrayType: PSQLDataType { .float4Array }
+    public static var psqlArrayElementType: PSQLDataType { .float4 }
 }
 
 extension Double: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .float8Array }
-    static var psqlArrayElementType: PSQLDataType { .float8 }
+    public static var psqlArrayType: PSQLDataType { .float8Array }
+    public static var psqlArrayElementType: PSQLDataType { .float8 }
 }
 
 extension String: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .textArray }
-    static var psqlArrayElementType: PSQLDataType { .text }
+    public static var psqlArrayType: PSQLDataType { .textArray }
+    public static var psqlArrayElementType: PSQLDataType { .text }
 }
 
 extension UUID: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .uuidArray }
-    static var psqlArrayElementType: PSQLDataType { .uuid }
+    public static var psqlArrayType: PSQLDataType { .uuidArray }
+    public static var psqlArrayElementType: PSQLDataType { .uuid }
 }
 
 extension Array: PSQLEncodable where Element: PSQLArrayElement {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         Element.psqlArrayType
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    func encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
         // 0 if empty, 1 if not
         buffer.writeInteger(self.isEmpty ? 0 : 1, as: UInt32.self)
         // b
@@ -102,7 +102,7 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
 
 extension Array: PSQLDecodable where Element: PSQLArrayElement {
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,

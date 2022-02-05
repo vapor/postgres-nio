@@ -2,15 +2,15 @@ import NIOCore
 import struct Foundation.Decimal
 
 extension Decimal: PSQLCodable {
-    var psqlType: PSQLDataType {
+    public var psqlType: PSQLDataType {
         .numeric
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
-    static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
         format: PSQLFormat,
@@ -32,7 +32,7 @@ extension Decimal: PSQLCodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         let numeric = PostgresNumeric(decimal: self)
         byteBuffer.writeInteger(numeric.ndigits)
         byteBuffer.writeInteger(numeric.weight)
