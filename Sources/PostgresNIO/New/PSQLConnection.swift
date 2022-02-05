@@ -7,51 +7,50 @@ import class Foundation.JSONDecoder
 import struct Foundation.UUID
 import Logging
 
-@usableFromInline
-final class PSQLConnection {
+public final class PSQLConnection {
     
-    struct Configuration {
+    public struct Configuration {
         
-        struct Coders {
-            var jsonEncoder: PSQLJSONEncoder
-            var jsonDecoder: PSQLJSONDecoder
+        public struct Coders {
+            public var jsonEncoder: PSQLJSONEncoder
+            public var jsonDecoder: PSQLJSONDecoder
             
-            init(jsonEncoder: PSQLJSONEncoder, jsonDecoder: PSQLJSONDecoder) {
+            public init(jsonEncoder: PSQLJSONEncoder, jsonDecoder: PSQLJSONDecoder) {
                 self.jsonEncoder = jsonEncoder
                 self.jsonDecoder = jsonDecoder
             }
             
-            static var foundation: Coders {
+            public static var foundation: Coders {
                 Coders(jsonEncoder: JSONEncoder(), jsonDecoder: JSONDecoder())
             }
         }
         
-        struct Authentication {
-            var username: String
-            var database: String? = nil
-            var password: String? = nil
+        public struct Authentication {
+            public var username: String
+            public var database: String? = nil
+            public var password: String? = nil
             
-            init(username: String, password: String?, database: String?) {
+            public init(username: String, password: String?, database: String?) {
                 self.username = username
                 self.database = database
                 self.password = password
             }
         }
         
-        enum Connection {
+        public enum Connection {
             case unresolved(host: String, port: Int)
             case resolved(address: SocketAddress, serverName: String?)
         }
         
-        var connection: Connection
+        public var connection: Connection
         
         /// The authentication properties to send to the Postgres server during startup auth handshake
-        var authentication: Authentication?
+        public var authentication: Authentication?
         
-        var tlsConfiguration: TLSConfiguration?
-        var coders: Coders
+        public var tlsConfiguration: TLSConfiguration?
+        public var coders: Coders
         
-        init(host: String,
+        public init(host: String,
              port: Int = 5432,
              username: String,
              database: String? = nil,
