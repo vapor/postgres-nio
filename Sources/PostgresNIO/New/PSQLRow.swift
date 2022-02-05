@@ -1,11 +1,15 @@
 import NIOCore
 
 /// `PSQLRow` represents a single row that was received from the Postgres Server.
-struct PSQLRow {
+public struct PSQLRow {
+    @usableFromInline
     internal let lookupTable: [String: Int]
+    @usableFromInline
     internal let data: DataRow
-    
+
+    @usableFromInline
     internal let columns: [RowDescription.Column]
+    @usableFromInline
     internal let jsonDecoder: PSQLJSONDecoder
     
     internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column], jsonDecoder: PSQLJSONDecoder) {
@@ -17,7 +21,7 @@ struct PSQLRow {
 }
 
 extension PSQLRow: Equatable {
-    static func ==(lhs: Self, rhs: Self) -> Bool {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
         lhs.data == rhs.data && lhs.columns == rhs.columns
     }
 }
