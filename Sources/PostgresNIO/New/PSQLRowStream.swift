@@ -132,7 +132,7 @@ final class PSQLRowStream {
     private func cancel0() {
         switch self.downstreamState {
         case .asyncSequence(let consumer, let dataSource):
-            let error = PSQLError.connectionClosed
+            let error = PSQLError(.connectionClosed)
             self.downstreamState = .consumed(.failure(error))
             consumer.receive(completion: .failure(error))
             dataSource.cancel(for: self)
