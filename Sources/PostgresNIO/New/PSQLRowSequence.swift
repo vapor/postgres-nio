@@ -2,9 +2,9 @@ import NIOCore
 import NIOConcurrencyHelpers
 
 #if swift(>=5.5) && canImport(_Concurrency)
-struct PSQLRowSequence: AsyncSequence {
-    typealias Element = PSQLRow
-    typealias AsyncIterator = Iterator
+public struct PSQLRowSequence: AsyncSequence {
+    public typealias Element = PSQLRow
+    public typealias AsyncIterator = Iterator
     
     final class _Internal {
         
@@ -30,14 +30,14 @@ struct PSQLRowSequence: AsyncSequence {
         self._internal = .init(consumer: consumer)
     }
     
-    func makeAsyncIterator() -> Iterator {
+    public func makeAsyncIterator() -> Iterator {
         self._internal.makeAsyncIterator()
     }
 }
 
 extension PSQLRowSequence {
-    struct Iterator: AsyncIteratorProtocol {
-        typealias Element = PSQLRow
+    public struct Iterator: AsyncIteratorProtocol {
+        public typealias Element = PSQLRow
         
         let _internal: _Internal
         
@@ -45,7 +45,7 @@ extension PSQLRowSequence {
             self._internal = _Internal(consumer: consumer)
         }
         
-        mutating func next() async throws -> PSQLRow? {
+        public mutating func next() async throws -> PSQLRow? {
             try await self._internal.next()
         }
         
