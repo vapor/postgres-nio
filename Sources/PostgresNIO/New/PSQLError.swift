@@ -136,6 +136,23 @@ struct PSQLCastingError: Error, Equatable {
     let targetType: PSQLDecodable.Type
     let postgresType: PSQLDataType
     let postgresData: ByteBuffer?
+
+    @usableFromInline
+    init(
+        code: Code,
+        columnName: String,
+        columnIndex: Int,
+        targetType: PSQLDecodable.Type,
+        postgresType: PSQLDataType,
+        postgresData: ByteBuffer?
+    ) {
+        self.code = code
+        self.columnName = columnName
+        self.columnIndex = columnIndex
+        self.targetType = targetType
+        self.postgresType = postgresType
+        self.postgresData = postgresData
+    }
     
     var description: String {
         switch self.code.base {
