@@ -21,6 +21,10 @@ final class PSQLRowStream {
         case iteratingRows(onRow: (PSQLRow) throws -> (), EventLoopPromise<Void>, PSQLRowsDataSource)
         case waitingForAll([PSQLRow], EventLoopPromise<[PSQLRow]>, PSQLRowsDataSource)
         case consumed(Result<String, Error>)
+        
+        #if swift(>=5.5) && canImport(_Concurrency)
+        case asyncSequence(AsyncStreamConsumer, PSQLRowsDataSource)
+        #endif
     }
     
     internal let rowDescription: [RowDescription.Column]
@@ -58,7 +62,90 @@ final class PSQLRowStream {
         }
         self.lookupTable = lookup
     }
+    
+    // MARK: Async Sequence
+    
+    #if swift(>=5.5) && canImport(_Concurrency)
+    func asyncSequence() -> PSQLRowSequence {
+        self.eventLoop.preconditionInEventLoop()
 
+        guard case .waitingForConsumer(let bufferState) = self.downstreamState else {
+            preconditionFailure("Invalid state: \(self.downstreamState)")
+        }
+        
+        let consumer = AsyncStreamConsumer(
+            lookupTable: self.lookupTable,
+            columns: self.rowDescription,
+            jsonDecoder: self.jsonDecoder
+        )
+        
+        switch bufferState {
+        case .streaming(let bufferedRows, let dataSource):
+            consumer.startStreaming(bufferedRows, upstream: self)
+            self.downstreamState = .asyncSequence(consumer, dataSource)
+            
+        case .finished(let buffer, let commandTag):
+            consumer.startCompleted(buffer, commandTag: commandTag)
+            self.downstreamState = .consumed(.success(commandTag))
+            
+        case .failure(let error):
+            consumer.startFailed(error)
+            self.downstreamState = .consumed(.failure(error))
+        }
+        
+        return PSQLRowSequence(consumer)
+    }
+    
+    func demand() {
+        if self.eventLoop.inEventLoop {
+            self.demand0()
+        } else {
+            self.eventLoop.execute {
+                self.demand0()
+            }
+        }
+    }
+    
+    private func demand0() {
+        switch self.downstreamState {
+        case .waitingForConsumer, .iteratingRows, .waitingForAll:
+            preconditionFailure("Invalid state: \(self.downstreamState)")
+            
+        case .consumed:
+            break
+            
+        case .asyncSequence(_, let dataSource):
+            dataSource.request(for: self)
+        }
+    }
+    
+    func cancel() {
+        if self.eventLoop.inEventLoop {
+            self.cancel0()
+        } else {
+            self.eventLoop.execute {
+                self.cancel0()
+            }
+        }
+    }
+
+    private func cancel0() {
+        switch self.downstreamState {
+        case .asyncSequence(let consumer, let dataSource):
+            let error = PSQLError.connectionClosed
+            self.downstreamState = .consumed(.failure(error))
+            consumer.receive(completion: .failure(error))
+            dataSource.cancel(for: self)
+
+        case .consumed:
+            return
+
+        case .waitingForConsumer, .iteratingRows, .waitingForAll:
+            preconditionFailure("Invalid state: \(self.downstreamState)")
+        }
+    }
+    #endif
+    
     // MARK: Consume in array
         
     func all() -> EventLoopFuture<[PSQLRow]> {
@@ -222,6 +309,11 @@ final class PSQLRowStream {
             self.downstreamState = .waitingForAll(rows, promise, dataSource)
             // immediately request more
             dataSource.request(for: self)
+        
+        #if swift(>=5.5) && canImport(_Concurrency)
+        case .asyncSequence(let consumer, _):
+            consumer.receive(newRows)
+        #endif
             
         case .consumed(.success):
             preconditionFailure("How can we receive further rows, if we are supposed to be done")
@@ -258,6 +350,12 @@ final class PSQLRowStream {
             self.downstreamState = .consumed(.success(commandTag))
             promise.succeed(rows)
             
+        #if swift(>=5.5) && canImport(_Concurrency)
+        case .asyncSequence(let consumer, _):
+            consumer.receive(completion: .success(commandTag))
+            self.downstreamState = .consumed(.success(commandTag))
+        #endif
+            
         case .consumed:
             break
         }
@@ -278,6 +376,12 @@ final class PSQLRowStream {
         case .waitingForAll(_, let promise, _):
             self.downstreamState = .consumed(.failure(error))
             promise.fail(error)
+            
+        #if swift(>=5.5) && canImport(_Concurrency)
+        case .asyncSequence(let consumer, _):
+            consumer.receive(completion: .failure(error))
+            self.downstreamState = .consumed(.failure(error))
+        #endif
             
         case .consumed:
             break
