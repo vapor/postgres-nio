@@ -8,6 +8,7 @@ import NIOCore
 ///         enclosing type, the enclosing type must be @usableFromInline as well.
 ///         Not putting `DataRow` in ``PSQLBackendMessage`` is our way to trick
 ///         the Swift compiler
+@usableFromInline
 struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
     
     var columnCount: Int16
@@ -35,16 +36,19 @@ struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
 }
 
 extension DataRow: Sequence {
+    @usableFromInline
     typealias Element = ByteBuffer?
     
     // There is no contiguous storage available... Sadly
+    @usableFromInline
     func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<ByteBuffer?>) throws -> R) rethrows -> R? {
         nil
     }
 }
 
 extension DataRow: Collection {
-    
+
+    @usableFromInline
     struct ColumnIndex: Comparable {
         var offset: Int
         
@@ -53,25 +57,31 @@ extension DataRow: Collection {
         }
         
         // Only needed implementation for comparable. The compiler synthesizes the rest from this.
+        @usableFromInline
         static func < (lhs: Self, rhs: Self) -> Bool {
             lhs.offset < rhs.offset
         }
     }
-    
+
+    @usableFromInline
     typealias Index = DataRow.ColumnIndex
-    
+
+    @usableFromInline
     var startIndex: ColumnIndex {
         ColumnIndex(self.bytes.readerIndex)
     }
-    
+
+    @usableFromInline
     var endIndex: ColumnIndex {
         ColumnIndex(self.bytes.readerIndex + self.bytes.readableBytes)
     }
-    
+
+    @usableFromInline
     var count: Int {
         Int(self.columnCount)
     }
-    
+
+    @usableFromInline
     func index(after index: ColumnIndex) -> ColumnIndex {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
@@ -82,7 +92,8 @@ extension DataRow: Collection {
         }
         return ColumnIndex(index.offset + MemoryLayout<Int32>.size + elementLength)
     }
-    
+
+    @usableFromInline
     subscript(index: ColumnIndex) -> Element {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
