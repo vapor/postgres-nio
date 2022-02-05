@@ -77,9 +77,9 @@ struct PSQLEncodingContext {
     let jsonEncoder: PSQLJSONEncoder
 }
 
-struct PSQLDecodingContext<Decoder: PSQLJSONDecoder> {
+public struct PSQLDecodingContext<Decoder: PSQLJSONDecoder> {
     
-    let jsonDecoder: Decoder
+    public let jsonDecoder: Decoder
     
     init(jsonDecoder: Decoder) {
         self.jsonDecoder = jsonDecoder
