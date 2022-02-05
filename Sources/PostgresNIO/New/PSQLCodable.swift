@@ -88,5 +88,5 @@ public struct PSQLDecodingContext<Decoder: PSQLJSONDecoder> {
 }
 
 extension PSQLDecodingContext where Decoder == Foundation.JSONDecoder {
-    static let `default` = PSQLDecodingContext(jsonDecoder: JSONDecoder())
+    public static let `default` = PSQLDecodingContext(jsonDecoder: JSONDecoder())
 }
