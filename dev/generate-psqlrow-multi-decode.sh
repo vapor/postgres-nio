@@ -7,7 +7,7 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 function gen() {
     how_many=$1
 
-    #echo "    @inlinable"
+    echo "    @inlinable"
     #echo "    @_alwaysEmitIntoClient"
     echo -n "    func decode<T0: PSQLDecodable"
     for ((n = 1; n<$how_many; n +=1)); do
