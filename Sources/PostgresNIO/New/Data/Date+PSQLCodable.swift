@@ -9,7 +9,8 @@ extension Date: PSQLCodable {
     public var psqlFormat: PSQLFormat {
         .binary
     }
-    
+
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -40,11 +41,14 @@ extension Date: PSQLCodable {
     }
     
     // MARK: Private Constants
-    
-    private static let _microsecondsPerSecond: Int64 = 1_000_000
-    private static let _secondsInDay: Int64 = 24 * 60 * 60
+
+    @usableFromInline
+    static let _microsecondsPerSecond: Int64 = 1_000_000
+    @usableFromInline
+    static let _secondsInDay: Int64 = 24 * 60 * 60
     
     /// values are stored as seconds before or after midnight 2000-01-01
-    private static let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)
+    @usableFromInline
+    static let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)
 }
 

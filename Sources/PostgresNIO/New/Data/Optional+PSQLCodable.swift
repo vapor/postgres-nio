@@ -1,12 +1,14 @@
 import NIOCore
 
 extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
+    @usableFromInline
     typealias ActualType = Wrapped
 
     public static func decode<JSONDecoder : PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")
     }
 
+    @inlinable
     public static func decodeRaw<JSONDecoder : PSQLJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PSQLDataType,

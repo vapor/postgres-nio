@@ -10,6 +10,7 @@ extension UInt8: PSQLCodable {
     }
     
     // decoding
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -44,7 +45,7 @@ extension Int16: PSQLCodable {
         .binary
     }
     
-    // decoding
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -82,7 +83,7 @@ extension Int32: PSQLCodable {
         .binary
     }
     
-    // decoding
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -125,7 +126,7 @@ extension Int64: PSQLCodable {
         .binary
     }
     
-    // decoding
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -180,7 +181,7 @@ extension Int: PSQLCodable {
         .binary
     }
     
-    // decoding
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,

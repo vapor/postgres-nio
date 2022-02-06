@@ -72,19 +72,16 @@ final class AsyncStreamConsumer {
     
     let lookupTable: [String: Int]
     let columns: [RowDescription.Column]
-    let jsonDecoder: PSQLJSONDecoder
     private var state: StateMachine
     
     init(
         lookupTable: [String: Int],
-        columns: [RowDescription.Column],
-        jsonDecoder: PSQLJSONDecoder
+        columns: [RowDescription.Column]
     ) {
         self.state = StateMachine()
         
         self.lookupTable = lookupTable
         self.columns = columns
-        self.jsonDecoder = jsonDecoder
     }
     
     func startCompleted(_ buffer: CircularBuffer<DataRow>, commandTag: String) {
@@ -115,8 +112,7 @@ final class AsyncStreamConsumer {
             let row = PSQLRow(
                 data: data,
                 lookupTable: self.lookupTable,
-                columns: self.columns,
-                jsonDecoder: self.jsonDecoder
+                columns: self.columns
             )
             continuation.resume(returning: row)
             source?.demand()
@@ -190,8 +186,7 @@ final class AsyncStreamConsumer {
             return PSQLRow(
                 data: data,
                 lookupTable: self.lookupTable,
-                columns: self.columns,
-                jsonDecoder: self.jsonDecoder
+                columns: self.columns
             )
             
         case .throwError(let error):
@@ -215,8 +210,8 @@ final class AsyncStreamConsumer {
 }
 
 extension AsyncStreamConsumer {
-    struct StateMachine {
-        enum UpstreamState {
+    private struct StateMachine {
+        private enum UpstreamState {
             enum DemandState {
                 case canAskForMore
                 case waitingForMore(CheckedContinuation<PSQLRow?, Error>?)
@@ -237,13 +232,13 @@ extension AsyncStreamConsumer {
             case modifying
         }
         
-        enum DownstreamState {
+        private enum DownstreamState {
             case sequenceCreated
             case iteratorCreated
         }
         
-        var upstreamState: UpstreamState
-        var downstreamState: DownstreamState
+        private var upstreamState: UpstreamState
+        private var downstreamState: DownstreamState
         
         init() {
             self.upstreamState = .initialized

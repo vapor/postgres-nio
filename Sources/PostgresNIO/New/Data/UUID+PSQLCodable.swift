@@ -22,6 +22,7 @@ extension UUID: PSQLCodable {
         ])
     }
 
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -54,6 +55,7 @@ extension UUID: PSQLCodable {
 }
 
 extension ByteBuffer {
+    @usableFromInline
     mutating func readUUID() -> UUID? {
         guard self.readableBytes >= MemoryLayout<uuid_t>.size else {
             return nil
@@ -64,7 +66,8 @@ extension ByteBuffer {
         self.moveReaderIndex(forwardBy: MemoryLayout<uuid_t>.size)
         return value
     }
-    
+
+    @usableFromInline
     func getUUID(at index: Int) -> UUID? {
         var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         return self.viewBytes(at: index, length: MemoryLayout.size(ofValue: uuid)).map { bufferBytes in

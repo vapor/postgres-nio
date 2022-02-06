@@ -13,7 +13,8 @@ extension String: PSQLCodable {
     public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.writeString(self)
     }
-    
+
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,

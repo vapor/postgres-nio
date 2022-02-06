@@ -8,7 +8,8 @@ extension Float: PSQLCodable {
     public var psqlFormat: PSQLFormat {
         .binary
     }
-    
+
+    @inlinable
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -35,7 +36,7 @@ extension Float: PSQLCodable {
             throw PSQLCastingError.Code.typeMismatch
         }
     }
-    
+
     public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
         byteBuffer.psqlWriteFloat(self)
     }

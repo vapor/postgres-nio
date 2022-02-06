@@ -9,14 +9,11 @@ public struct PSQLRow {
 
     @usableFromInline
     internal let columns: [RowDescription.Column]
-    @usableFromInline
-    internal let jsonDecoder: PSQLJSONDecoder
     
-    internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column], jsonDecoder: PSQLJSONDecoder) {
+    internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column]) {
         self.data = data
         self.lookupTable = lookupTable
         self.columns = columns
-        self.jsonDecoder = jsonDecoder
     }
 }
 
