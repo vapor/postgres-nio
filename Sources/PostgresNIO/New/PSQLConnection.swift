@@ -16,10 +16,10 @@ public final class PSQLConnection {
             public var database: String? = nil
             public var password: String? = nil
             
-            public init(username: String, password: String?, database: String?) {
-                self.username = username
-                self.database = database
-                self.password = password
+            public init() {
+                self.username = "postgres"
+                self.database = nil
+                self.password = nil
             }
         }
         
@@ -35,15 +35,19 @@ public final class PSQLConnection {
         
         public var tlsConfiguration: TLSConfiguration?
         
-        public init(host: String,
-             port: Int = 5432,
-             username: String,
-             database: String? = nil,
-             password: String? = nil,
-             tlsConfiguration: TLSConfiguration? = nil
+        public init(
+            host: String,
+            port: Int = 5432,
+            username: String,
+            database: String? = nil,
+            password: String? = nil,
+            tlsConfiguration: TLSConfiguration? = nil
         ) {
             self.connection = .unresolved(host: host, port: port)
-            self.authentication = Authentication(username: username, password: password, database: database)
+            self.authentication = .init()
+            self.authentication!.username = username
+            self.authentication!.database = database
+            self.authentication!.password = password
             self.tlsConfiguration = tlsConfiguration
         }
         
