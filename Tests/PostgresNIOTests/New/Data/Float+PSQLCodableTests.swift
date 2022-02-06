@@ -9,7 +9,7 @@ class Float_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            value.encode(into: &buffer, context: .forTests())
+            value.encode(into: &buffer, context: .default)
             XCTAssertEqual(value.psqlType, .float8)
             XCTAssertEqual(buffer.readableBytes, 8)
 
@@ -24,7 +24,7 @@ class Float_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            value.encode(into: &buffer, context: .forTests())
+            value.encode(into: &buffer, context: .default)
             XCTAssertEqual(value.psqlType, .float4)
             XCTAssertEqual(buffer.readableBytes, 4)
 
@@ -38,7 +38,7 @@ class Float_PSQLCodableTests: XCTestCase {
         let value: Double = .nan
         
         var buffer = ByteBuffer()
-        value.encode(into: &buffer, context: .forTests())
+        value.encode(into: &buffer, context: .default)
         XCTAssertEqual(value.psqlType, .float8)
         XCTAssertEqual(buffer.readableBytes, 8)
 
@@ -51,7 +51,7 @@ class Float_PSQLCodableTests: XCTestCase {
         let value: Double = .infinity
         
         var buffer = ByteBuffer()
-        value.encode(into: &buffer, context: .forTests())
+        value.encode(into: &buffer, context: .default)
         XCTAssertEqual(value.psqlType, .float8)
         XCTAssertEqual(buffer.readableBytes, 8)
 
@@ -65,7 +65,7 @@ class Float_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            value.encode(into: &buffer, context: .forTests())
+            value.encode(into: &buffer, context: .default)
             XCTAssertEqual(value.psqlType, .float4)
             XCTAssertEqual(buffer.readableBytes, 4)
 
@@ -80,7 +80,7 @@ class Float_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            value.encode(into: &buffer, context: .forTests())
+            value.encode(into: &buffer, context: .default)
             XCTAssertEqual(value.psqlType, .float8)
             XCTAssertEqual(buffer.readableBytes, 8)
 

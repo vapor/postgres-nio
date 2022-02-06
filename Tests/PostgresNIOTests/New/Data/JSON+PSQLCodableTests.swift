@@ -15,7 +15,7 @@ class JSON_PSQLCodableTests: XCTestCase {
     func testRoundTrip() {
         var buffer = ByteBuffer()
         let hello = Hello(name: "world")
-        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .forTests()))
+        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .default))
         XCTAssertEqual(hello.psqlType, .jsonb)
         
         // verify jsonb prefix byte
@@ -80,7 +80,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         let hello = Hello(name: "world")
         let encoder = TestEncoder()
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .forTests(jsonEncoder: encoder)))
+        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .init(jsonEncoder: encoder)))
         XCTAssertEqual(encoder.encodeHits, 1)
     }
 }

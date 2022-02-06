@@ -181,8 +181,8 @@ class PSQLChannelHandlerTests: XCTestCase {
             username: username,
             database: database,
             password: password,
-            tlsConfiguration: tlsConfiguration,
-            coders: .foundation)
+            tlsConfiguration: tlsConfiguration
+        )
     }
 }
 

@@ -10,7 +10,7 @@ class Bool_PSQLCodableTests: XCTestCase {
         let value = true
         
         var buffer = ByteBuffer()
-        value.encode(into: &buffer, context: .forTests())
+        value.encode(into: &buffer, context: .default)
         XCTAssertEqual(value.psqlType, .bool)
         XCTAssertEqual(value.psqlFormat, .binary)
         XCTAssertEqual(buffer.readableBytes, 1)
@@ -25,7 +25,7 @@ class Bool_PSQLCodableTests: XCTestCase {
         let value = false
         
         var buffer = ByteBuffer()
-        value.encode(into: &buffer, context: .forTests())
+        value.encode(into: &buffer, context: .default)
         XCTAssertEqual(value.psqlType, .bool)
         XCTAssertEqual(value.psqlFormat, .binary)
         XCTAssertEqual(buffer.readableBytes, 1)

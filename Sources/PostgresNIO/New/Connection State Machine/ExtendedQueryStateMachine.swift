@@ -23,8 +23,8 @@ struct ExtendedQueryStateMachine {
     }
     
     enum Action {
-        case sendParseDescribeBindExecuteSync(query: String, binds: [PSQLEncodable])
-        case sendBindExecuteSync(statementName: String, binds: [PSQLEncodable])
+        case sendParseDescribeBindExecuteSync(PSQLQuery)
+        case sendBindExecuteSync(PSQLExecuteStatement)
         
         // --- general actions
         case failQuery(ExtendedQueryContext, with: PSQLError)
@@ -56,18 +56,18 @@ struct ExtendedQueryStateMachine {
         case .unnamed(let query):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .parseDescribeBindExecuteSyncSent(queryContext)
-                return .sendParseDescribeBindExecuteSync(query: query, binds: queryContext.bind)
+                return .sendParseDescribeBindExecuteSync(query)
             }
 
-        case .preparedStatement(let name, let rowDescription):
+        case .preparedStatement(let prepared):
             return self.avoidingStateMachineCoW { state -> Action in
-                switch rowDescription {
+                switch prepared.rowDescription {
                 case .some(let rowDescription):
                     state = .rowDescriptionReceived(queryContext, rowDescription.columns)
                 case .none:
                     state = .noDataMessageReceived(queryContext)
                 }
-                return .sendBindExecuteSync(statementName: name, binds: queryContext.bind)
+                return .sendBindExecuteSync(prepared)
             }
         }
     }

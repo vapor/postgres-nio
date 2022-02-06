@@ -12,10 +12,10 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError(.uncleanShutdown)) // we don't care about the error at all.
-        let query = "DELETE FROM table WHERE id=$0"
-        let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
+        let query = PSQLQuery("DELETE FROM table WHERE id=$0", binds: [1])
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: [1]))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
@@ -28,12 +28,12 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine.readyForQuery()
         
         let logger = Logger.psqlTest
-        let queryPromise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        queryPromise.fail(PSQLError(.uncleanShutdown)) // we don't care about the error at all.
-        let query = "SELECT version()"
-        let queryContext = ExtendedQueryContext(query: query, bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: queryPromise)
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError(.uncleanShutdown)) // we don't care about the error at all.
+        let query = PSQLQuery("SELECT version()", binds: [])
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: []))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
@@ -84,10 +84,10 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError(.uncleanShutdown)) // we don't care about the error at all.
-        let query = "DELETE FROM table WHERE id=$0"
-        let queryContext = ExtendedQueryContext(query: query, bind: [1], logger: logger, jsonDecoder: JSONDecoder(), promise: promise)
+        let query = PSQLQuery("DELETE FROM table WHERE id=$0", binds: [1])
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query: query, binds: [1]))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         

@@ -3,47 +3,6 @@ import NIOCore
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 
-extension PSQLFrontendMessage.Bind: Equatable {
-    public static func ==(lhs: Self, rhs: Self) -> Bool {
-        guard lhs.preparedStatementName == rhs.preparedStatementName else {
-            return false
-        }
-        
-        guard lhs.portalName == rhs.portalName else {
-            return false
-        }
-        
-        guard lhs.parameters.count == rhs.parameters.count else {
-            return false
-        }
-        
-        var lhsIterator = lhs.parameters.makeIterator()
-        var rhsIterator = rhs.parameters.makeIterator()
-        
-        do {
-            while let lhs = lhsIterator.next(), let rhs = rhsIterator.next() {
-                guard lhs.psqlType == rhs.psqlType else {
-                    return false
-                }
-                
-                var lhsBuffer = ByteBuffer()
-                var rhsBuffer = ByteBuffer()
-                
-                try lhs.encode(into: &lhsBuffer, context: .forTests())
-                try rhs.encode(into: &rhsBuffer, context: .forTests())
-                
-                guard lhsBuffer == rhsBuffer else {
-                    return false
-                }
-            }
-            
-            return true
-        } catch {
-            return false
-        }
-    }
-}
-
 extension PSQLFrontendMessage: Equatable {
     public static func ==(lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {

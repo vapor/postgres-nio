@@ -5,11 +5,11 @@ import NIOCore
 class CancelTests: XCTestCase {
     
     func testEncodeCancel() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let cancel = PSQLFrontendMessage.Cancel(processID: 1234, secretKey: 4567)
         let message = PSQLFrontendMessage.cancel(cancel)
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 16)
         XCTAssertEqual(16, byteBuffer.readInteger(as: Int32.self)) // payload length

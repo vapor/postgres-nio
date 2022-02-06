@@ -43,16 +43,16 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
-    public func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encodeRaw<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
         switch self {
         case .none:
-            byteBuffer.writeInteger(-1, as: Int32.self)
+            buffer.writeInteger(-1, as: Int32.self)
         case .some(let value):
-            try value.encodeRaw(into: &byteBuffer, context: context)
+            try value.encodeRaw(into: &buffer, context: context)
         }
     }
 }

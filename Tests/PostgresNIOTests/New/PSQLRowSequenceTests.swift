@@ -12,11 +12,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -42,11 +43,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -75,11 +77,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -102,11 +105,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -124,11 +128,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -153,11 +158,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -183,11 +189,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -213,11 +220,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -247,11 +255,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -285,11 +294,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -350,11 +360,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )
@@ -405,11 +416,12 @@ final class PSQLRowSequenceTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
+        let query = PSQLQuery("SELECT * FROM foo", binds: [])
         let stream = PSQLRowStream(
             rowDescription: [
                 .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
             ],
-            queryContext: .init(query: "SELECT * FROM foo", bind: [], logger: logger, jsonDecoder: JSONDecoder(), promise: promise),
+            queryContext: .init(query: query, logger: logger, promise: promise),
             eventLoop: eventLoop,
             rowSource: .stream(dataSource)
         )

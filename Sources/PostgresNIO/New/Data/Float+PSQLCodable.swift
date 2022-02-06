@@ -37,8 +37,8 @@ extension Float: PSQLCodable {
         }
     }
 
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.psqlWriteFloat(self)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+        buffer.psqlWriteFloat(self)
     }
 }
 
@@ -78,8 +78,8 @@ extension Double: PSQLCodable {
         }
     }
     
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.psqlWriteDouble(self)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+        buffer.psqlWriteDouble(self)
     }
 }
 

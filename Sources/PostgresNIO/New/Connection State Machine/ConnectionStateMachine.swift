@@ -84,8 +84,8 @@ struct ConnectionStateMachine {
         // Connection Actions
         
         // --- general actions
-        case sendParseDescribeBindExecuteSync(query: String, binds: [PSQLEncodable])
-        case sendBindExecuteSync(statementName: String, binds: [PSQLEncodable])
+        case sendParseDescribeBindExecuteSync(PSQLQuery)
+        case sendBindExecuteSync(PSQLExecuteStatement)
         case failQuery(ExtendedQueryContext, with: PSQLError, cleanupContext: CleanUpContext?)
         case succeedQuery(ExtendedQueryContext, columns: [RowDescription.Column])
         case succeedQueryNoRowsComming(ExtendedQueryContext, commandTag: String)
@@ -1106,10 +1106,10 @@ extension ConnectionStateMachine {
 extension ConnectionStateMachine {
     mutating func modify(with action: ExtendedQueryStateMachine.Action) -> ConnectionStateMachine.ConnectionAction {
         switch action {
-        case .sendParseDescribeBindExecuteSync(let query, let binds):
-            return .sendParseDescribeBindExecuteSync(query: query, binds: binds)
-        case .sendBindExecuteSync(let statementName, let binds):
-            return .sendBindExecuteSync(statementName: statementName, binds: binds)
+        case .sendParseDescribeBindExecuteSync(let query):
+            return .sendParseDescribeBindExecuteSync(query)
+        case .sendBindExecuteSync(let executeStatement):
+            return .sendBindExecuteSync(executeStatement)
         case .failQuery(let requestContext, with: let error):
             let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
             return .failQuery(requestContext, with: error, cleanupContext: cleanupContext)

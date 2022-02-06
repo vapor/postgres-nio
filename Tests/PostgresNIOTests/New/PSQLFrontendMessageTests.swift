@@ -23,9 +23,9 @@ class PSQLFrontendMessageTests: XCTestCase {
     // MARK: Encoder
     
     func testEncodeFlush() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        XCTAssertNoThrow(try encoder.encode(data: .flush, out: &byteBuffer))
+        encoder.encode(data: .flush, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PSQLFrontendMessage.ID.flush.rawValue, byteBuffer.readInteger(as: UInt8.self))
@@ -33,9 +33,9 @@ class PSQLFrontendMessageTests: XCTestCase {
     }
     
     func testEncodeSync() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        XCTAssertNoThrow(try encoder.encode(data: .sync, out: &byteBuffer))
+        encoder.encode(data: .sync, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PSQLFrontendMessage.ID.sync.rawValue, byteBuffer.readInteger(as: UInt8.self))
@@ -43,9 +43,9 @@ class PSQLFrontendMessageTests: XCTestCase {
     }
     
     func testEncodeTerminate() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        XCTAssertNoThrow(try encoder.encode(data: .terminate, out: &byteBuffer))
+        encoder.encode(data: .terminate, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PSQLFrontendMessage.ID.terminate.rawValue, byteBuffer.readInteger(as: UInt8.self))
@@ -53,3 +53,19 @@ class PSQLFrontendMessageTests: XCTestCase {
     }
 
 }
+
+extension PSQLBindings: ExpressibleByArrayLiteral {
+    public typealias ArrayLiteralElement = PSQLEncodable
+
+    public init(arrayLiteral elements: PSQLEncodable...) {
+        self = PSQLBindings()
+        do {
+            try elements.forEach {
+                try self._append($0, context: .default)
+            }
+        } catch {
+            preconditionFailure("Can not create PSQLBindings")
+        }
+    }
+}
+

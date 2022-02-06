@@ -5,14 +5,14 @@ import NIOCore
 class ParseTests: XCTestCase {
 
     func testEncode() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let parse = PSQLFrontendMessage.Parse(
             preparedStatementName: "test",
             query: "SELECT version()",
             parameters: [.bool, .int8, .bytea, .varchar, .text, .uuid, .json, .jsonbArray])
         let message = PSQLFrontendMessage.parse(parse)
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         let length: Int = 1 + 4 + (parse.preparedStatementName.count + 1) + (parse.query.count + 1) + 2 + parse.parameters.count * 4
 

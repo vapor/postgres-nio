@@ -13,22 +13,16 @@ extension PSQLConnection {
         try await self.close().get()
     }
 
-    public func query(_ query: String, logger: Logger) async throws -> PSQLRowSequence {
-        try await self.query(query, [], logger: logger)
-    }
-
-    public func query(_ query: String, _ bind: [PSQLEncodable], logger: Logger) async throws -> PSQLRowSequence {
+    public func query(_ query: PSQLQuery, logger: Logger) async throws -> PSQLRowSequence {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.connectionID)"
-        guard bind.count <= Int(Int16.max) else {
+        guard query.binds.count <= Int(Int16.max) else {
             throw PSQLError(.tooManyParameters)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
             query: query,
-            bind: bind,
             logger: logger,
-            jsonDecoder: self.jsonDecoder,
             promise: promise)
 
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)

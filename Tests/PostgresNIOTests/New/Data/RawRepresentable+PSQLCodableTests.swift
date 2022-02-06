@@ -15,7 +15,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            XCTAssertNoThrow(try value.encode(into: &buffer, context: .forTests()))
+            XCTAssertNoThrow(try value.encode(into: &buffer, context: .default))
             XCTAssertEqual(value.psqlType, Int16.psqlArrayElementType)
             XCTAssertEqual(buffer.readableBytes, 2)
 

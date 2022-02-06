@@ -9,7 +9,7 @@ class Decimal_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            value.encode(into: &buffer, context: .forTests())
+            value.encode(into: &buffer, context: .default)
             XCTAssertEqual(value.psqlType, .numeric)
 
             var result: Decimal?

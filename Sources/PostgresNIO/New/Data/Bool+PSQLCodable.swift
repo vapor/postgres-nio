@@ -49,7 +49,7 @@ extension Bool: PSQLCodable {
         }
     }
     
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+        buffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }
 }

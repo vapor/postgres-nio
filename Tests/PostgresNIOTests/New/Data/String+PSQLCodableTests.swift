@@ -8,7 +8,7 @@ class String_PSQLCodableTests: XCTestCase {
         let value = "Hello World"
         var buffer = ByteBuffer()
         
-        value.encode(into: &buffer, context: .forTests())
+        value.encode(into: &buffer, context: .default)
         
         XCTAssertEqual(value.psqlType, .text)
         XCTAssertEqual(buffer.readString(length: buffer.readableBytes), value)
@@ -46,7 +46,7 @@ class String_PSQLCodableTests: XCTestCase {
     func testDecodeFromUUID() {
         let uuid = UUID()
         var buffer = ByteBuffer()
-        uuid.encode(into: &buffer, context: .forTests())
+        uuid.encode(into: &buffer, context: .default)
         
         var decoded: String?
         XCTAssertNoThrow(decoded = try String.decode(from: &buffer, type: .uuid, format: .binary, context: .default))
@@ -56,7 +56,7 @@ class String_PSQLCodableTests: XCTestCase {
     func testDecodeFailureFromInvalidUUID() {
         let uuid = UUID()
         var buffer = ByteBuffer()
-        uuid.encode(into: &buffer, context: .forTests())
+        uuid.encode(into: &buffer, context: .default)
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
         

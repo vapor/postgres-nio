@@ -2,21 +2,12 @@
 struct PSQLFrontendMessageEncoder: MessageToByteEncoder {
     typealias OutboundIn = PSQLFrontendMessage
     
-    let jsonEncoder: PSQLJSONEncoder
+    init() {}
     
-    init(jsonEncoder: PSQLJSONEncoder) {
-        self.jsonEncoder = jsonEncoder
-    }
-    
-    func encode(data message: PSQLFrontendMessage, out buffer: inout ByteBuffer) throws {
+    func encode(data message: PSQLFrontendMessage, out buffer: inout ByteBuffer) {
         switch message {
         case .bind(let bind):
-            buffer.writeInteger(message.id.rawValue)
-            let startIndex = buffer.writerIndex
-            buffer.writeInteger(Int32(0)) // placeholder for length
-            try bind.encode(into: &buffer, using: self.jsonEncoder)
-            let length = Int32(buffer.writerIndex - startIndex)
-            buffer.setInteger(length, at: startIndex)
+            self.encode(messageID: message.id, payload: bind, into: &buffer)
             
         case .cancel(let cancel):
             // cancel requests don't have an identifier

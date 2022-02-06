@@ -32,13 +32,13 @@ extension Decimal: PSQLCodable {
         }
     }
     
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
         let numeric = PostgresNumeric(decimal: self)
-        byteBuffer.writeInteger(numeric.ndigits)
-        byteBuffer.writeInteger(numeric.weight)
-        byteBuffer.writeInteger(numeric.sign)
-        byteBuffer.writeInteger(numeric.dscale)
+        buffer.writeInteger(numeric.ndigits)
+        buffer.writeInteger(numeric.weight)
+        buffer.writeInteger(numeric.sign)
+        buffer.writeInteger(numeric.dscale)
         var value = numeric.value
-        byteBuffer.writeBuffer(&value)
+        buffer.writeBuffer(&value)
     }
 }

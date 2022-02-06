@@ -10,17 +10,12 @@ extension PostgresConnection {
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
-        
-        let coders = PSQLConnection.Configuration.Coders(
-            jsonEncoder: PostgresJSONEncoderWrapper(_defaultJSONEncoder),
-            jsonDecoder: PostgresJSONDecoderWrapper(_defaultJSONDecoder)
-        )
-        
+
         let configuration = PSQLConnection.Configuration(
             connection: .resolved(address: socketAddress, serverName: serverHostname),
             authentication: nil,
-            tlsConfiguration: tlsConfiguration,
-            coders: coders)
+            tlsConfiguration: tlsConfiguration
+        )
         
         return PSQLConnection.connect(
             configuration: configuration,

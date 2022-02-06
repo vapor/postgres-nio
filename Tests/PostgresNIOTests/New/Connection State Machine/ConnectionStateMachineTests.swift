@@ -124,15 +124,12 @@ class ConnectionStateMachineTests: XCTestCase {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
 
-        let jsonDecoder = JSONDecoder()
         let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRowStream.self)
 
         var state = ConnectionStateMachine()
         let extendedQueryContext = ExtendedQueryContext(
-            query: "Select version()",
-            bind: [],
+            query: .init("Select version()", binds: .init()),
             logger: .psqlTest,
-            jsonDecoder: jsonDecoder,
             promise: queryPromise)
 
         XCTAssertEqual(state.enqueue(task: .extendedQuery(extendedQueryContext)), .wait)

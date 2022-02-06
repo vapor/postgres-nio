@@ -5,7 +5,7 @@ import NIOCore
 class StartupTests: XCTestCase {
     
     func testStartupMessage() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         
         let replicationValues: [PSQLFrontendMessage.Startup.Parameters.Replication] = [
@@ -24,7 +24,7 @@ class StartupTests: XCTestCase {
             
             let startup = PSQLFrontendMessage.Startup.versionThree(parameters: parameters)
             let message = PSQLFrontendMessage.startup(startup)
-            XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+            encoder.encode(data: message, out: &byteBuffer)
             
             let byteBufferLength = Int32(byteBuffer.readableBytes)
             XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())

@@ -33,8 +33,8 @@ extension PSQLCodable where Self: Codable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
-        byteBuffer.writeInteger(JSONBVersionByte)
-        try context.jsonEncoder.encode(self, into: &byteBuffer)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+        buffer.writeInteger(JSONBVersionByte)
+        try context.jsonEncoder.encode(self, into: &buffer)
     }
 }

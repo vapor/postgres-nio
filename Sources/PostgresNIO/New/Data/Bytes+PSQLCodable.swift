@@ -11,8 +11,8 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeBytes(self)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+        buffer.writeBytes(self)
     }
 }
 
@@ -25,9 +25,9 @@ extension ByteBuffer: PSQLCodable {
         .binary
     }
     
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
         var copyOfSelf = self // dirty hack
-        byteBuffer.writeBuffer(&copyOfSelf)
+        buffer.writeBuffer(&copyOfSelf)
     }
     
     public static func decode<JSONDecoder : PSQLJSONDecoder>(
@@ -49,8 +49,8 @@ extension Data: PSQLCodable {
         .binary
     }
 
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeBytes(self)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+        buffer.writeBytes(self)
     }
 
     public static func decode<JSONDecoder : PSQLJSONDecoder>(

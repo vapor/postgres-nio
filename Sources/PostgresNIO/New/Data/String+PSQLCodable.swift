@@ -10,8 +10,8 @@ extension String: PSQLCodable {
         .binary
     }
     
-    public func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
-        byteBuffer.writeString(self)
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+        buffer.writeString(self)
     }
 
     @inlinable

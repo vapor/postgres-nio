@@ -11,12 +11,12 @@ public protocol PSQLEncodable {
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the default `encodeRaw` implementation.
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws
+    func encode<JSONEncoder: PSQLJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format including its
     /// leading byte count. This method has a default implementation and may be overriden
     /// only for special cases, like `Optional`s.
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws
+    func encodeRaw<JSONEncoder: PSQLJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
@@ -59,7 +59,7 @@ public protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
 
 extension PSQLEncodable {
     @inlinable
-    public func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    public func encodeRaw<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
         let lengthIndex = buffer.writerIndex
@@ -74,19 +74,26 @@ extension PSQLEncodable {
     }
 }
 
-public struct PSQLEncodingContext {
-    let jsonEncoder: PSQLJSONEncoder
+public struct PSQLEncodingContext<Encoder: PSQLJSONEncoder> {
+    public let jsonEncoder: Encoder
+
+    public init(jsonEncoder: Encoder) {
+        self.jsonEncoder = jsonEncoder
+    }
 }
 
 public struct PSQLDecodingContext<Decoder: PSQLJSONDecoder> {
-    
     public let jsonDecoder: Decoder
     
-    init(jsonDecoder: Decoder) {
+    public init(jsonDecoder: Decoder) {
         self.jsonDecoder = jsonDecoder
     }
 }
 
 extension PSQLDecodingContext where Decoder == Foundation.JSONDecoder {
     public static let `default` = PSQLDecodingContext(jsonDecoder: JSONDecoder())
+}
+
+extension PSQLEncodingContext where Encoder == Foundation.JSONEncoder {
+    public static let `default` = PSQLEncodingContext(jsonEncoder: JSONEncoder())
 }

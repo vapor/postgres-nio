@@ -61,7 +61,7 @@ class Array_PSQLCodableTests: XCTestCase {
         let values = ["foo", "bar", "hello", "world"]
         
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try values.encode(into: &buffer, context: .forTests()))
+        XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
         
         var result: [String]?
         XCTAssertNoThrow(result = try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default))
@@ -72,7 +72,7 @@ class Array_PSQLCodableTests: XCTestCase {
         let values: [String] = []
         
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try values.encode(into: &buffer, context: .forTests()))
+        XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
         
         var result: [String]?
         XCTAssertNoThrow(result = try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default))
@@ -104,7 +104,7 @@ class Array_PSQLCodableTests: XCTestCase {
     func testDecodeFailureTriesDecodeInt8() {
         let value: Int64 = 1 << 32
         var buffer = ByteBuffer()
-        value.encode(into: &buffer, context: .forTests())
+        XCTAssertNoThrow(try value.encode(into: &buffer, context: .default))
 
         XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)

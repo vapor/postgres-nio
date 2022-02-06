@@ -10,9 +10,11 @@ import NIOCore
 ///         the Swift compiler
 @usableFromInline
 struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
-    
+
+    @usableFromInline
     var columnCount: Int16
-    
+
+    @usableFromInline
     var bytes: ByteBuffer
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
@@ -38,6 +40,11 @@ struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
 extension DataRow: Sequence {
     @usableFromInline
     typealias Element = ByteBuffer?
+
+    @inlinable
+    func makeIterator() -> Iterator {
+        return Iterator(self)
+    }
     
     // There is no contiguous storage available... Sadly
     @usableFromInline
@@ -50,14 +57,16 @@ extension DataRow: Collection {
 
     @usableFromInline
     struct ColumnIndex: Comparable {
+        @usableFromInline
         var offset: Int
-        
+
+        @inlinable
         init(_ index: Int) {
             self.offset = index
         }
         
         // Only needed implementation for comparable. The compiler synthesizes the rest from this.
-        @usableFromInline
+        @inlinable
         static func < (lhs: Self, rhs: Self) -> Bool {
             lhs.offset < rhs.offset
         }
@@ -66,22 +75,22 @@ extension DataRow: Collection {
     @usableFromInline
     typealias Index = DataRow.ColumnIndex
 
-    @usableFromInline
+    @inlinable
     var startIndex: ColumnIndex {
         ColumnIndex(self.bytes.readerIndex)
     }
 
-    @usableFromInline
+    @inlinable
     var endIndex: ColumnIndex {
         ColumnIndex(self.bytes.readerIndex + self.bytes.readableBytes)
     }
 
-    @usableFromInline
+    @inlinable
     var count: Int {
         Int(self.columnCount)
     }
 
-    @usableFromInline
+    @inlinable
     func index(after index: ColumnIndex) -> ColumnIndex {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
@@ -93,7 +102,7 @@ extension DataRow: Collection {
         return ColumnIndex(index.offset + MemoryLayout<Int32>.size + elementLength)
     }
 
-    @usableFromInline
+    @inlinable
     subscript(index: ColumnIndex) -> Element {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
@@ -118,5 +127,47 @@ extension DataRow {
         }
         
         return self[byteIndex]
+    }
+}
+
+extension DataRow {
+    @usableFromInline
+    struct Iterator: Swift.IteratorProtocol {
+        @usableFromInline
+        typealias Element = ByteBuffer?
+
+        @usableFromInline
+        let dataRow: DataRow
+
+        @usableFromInline
+        var columnIndex: Int16 = 0
+
+        @usableFromInline
+        var bufferOffset: Int
+
+        @inlinable
+        init(_ dataRow: DataRow) {
+            self.dataRow = dataRow
+            self.bufferOffset = dataRow.bytes.readerIndex
+        }
+
+        @inlinable
+        mutating func next() -> Optional<Optional<ByteBuffer>> {
+            guard self.columnIndex < self.dataRow.columnCount else {
+                return .none
+            }
+
+            self.columnIndex &+= 1
+
+            let elementLength = Int(self.dataRow.bytes.getInteger(at: self.bufferOffset, as: Int32.self)!)
+            self.bufferOffset &+= MemoryLayout<Int32>.size
+            if elementLength < 0 {
+                return .some(.none)
+            }
+            defer {
+                self.bufferOffset &+= elementLength
+            }
+            return .some(self.dataRow.bytes.getSlice(at: self.bufferOffset, length: elementLength)!)
+        }
     }
 }

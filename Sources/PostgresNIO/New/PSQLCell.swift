@@ -5,7 +5,7 @@ import NIOCore
 /// Currently there a two wire formats supported:
 ///  - text
 ///  - binary
-public enum PSQLFormat: Int16 {
+public enum PSQLFormat: Int16, Hashable {
     case text = 0
     case binary = 1
 }
@@ -49,7 +49,7 @@ extension PSQLCell {
     }
 }
 
-public struct PSQLDataType: RawRepresentable, Equatable, CustomStringConvertible {
+public struct PSQLDataType: RawRepresentable, Hashable, CustomStringConvertible {
     public typealias RawValue = Int32
     
     /// The raw data type code recognized by PostgreSQL.

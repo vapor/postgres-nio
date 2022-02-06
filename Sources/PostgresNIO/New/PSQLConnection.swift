@@ -11,20 +11,6 @@ public final class PSQLConnection {
     
     public struct Configuration {
         
-        public struct Coders {
-            public var jsonEncoder: PSQLJSONEncoder
-            public var jsonDecoder: PSQLJSONDecoder
-            
-            public init(jsonEncoder: PSQLJSONEncoder, jsonDecoder: PSQLJSONDecoder) {
-                self.jsonEncoder = jsonEncoder
-                self.jsonDecoder = jsonDecoder
-            }
-            
-            public static var foundation: Coders {
-                Coders(jsonEncoder: JSONEncoder(), jsonDecoder: JSONDecoder())
-            }
-        }
-        
         public struct Authentication {
             public var username: String
             public var database: String? = nil
@@ -48,31 +34,26 @@ public final class PSQLConnection {
         public var authentication: Authentication?
         
         public var tlsConfiguration: TLSConfiguration?
-        public var coders: Coders
         
         public init(host: String,
              port: Int = 5432,
              username: String,
              database: String? = nil,
              password: String? = nil,
-             tlsConfiguration: TLSConfiguration? = nil,
-             coders: Coders = .foundation)
-        {
+             tlsConfiguration: TLSConfiguration? = nil
+        ) {
             self.connection = .unresolved(host: host, port: port)
             self.authentication = Authentication(username: username, password: password, database: database)
             self.tlsConfiguration = tlsConfiguration
-            self.coders = coders
         }
         
         init(connection: Connection,
              authentication: Authentication?,
-             tlsConfiguration: TLSConfiguration?,
-             coders: Coders = .foundation)
-        {
+             tlsConfiguration: TLSConfiguration?
+        ) {
             self.connection = connection
             self.authentication = authentication
             self.tlsConfiguration = tlsConfiguration
-            self.coders = coders
         }
     }
     
@@ -97,13 +78,11 @@ public final class PSQLConnection {
     /// A logger to use in case
     private var logger: Logger
     let connectionID: String
-    let jsonDecoder: PSQLJSONDecoder
 
-    init(channel: Channel, connectionID: String, logger: Logger, jsonDecoder: PSQLJSONDecoder) {
+    init(channel: Channel, connectionID: String, logger: Logger) {
         self.channel = channel
         self.connectionID = connectionID
         self.logger = logger
-        self.jsonDecoder = jsonDecoder
     }
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
@@ -130,12 +109,20 @@ public final class PSQLConnection {
         guard bind.count <= Int(Int16.max) else {
             return self.channel.eventLoop.makeFailedFuture(PSQLError(.tooManyParameters))
         }
+
+        var psqlQuery = PSQLQuery(query, binds: .init())
+        do {
+            try bind.forEach {
+                try psqlQuery.binds._append($0, context: .default)
+            }
+        } catch {
+            return self.channel.eventLoop.makeFailedFuture(error)
+        }
+
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
-            query: query,
-            bind: bind,
+            query: psqlQuery,
             logger: logger,
-            jsonDecoder: self.jsonDecoder,
             promise: promise)
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
@@ -159,18 +146,14 @@ public final class PSQLConnection {
         }
     }
     
-    func execute(_ preparedStatement: PSQLPreparedStatement,
-                 _ bind: [PSQLEncodable], logger: Logger) -> EventLoopFuture<PSQLRowStream>
-    {
-        guard bind.count <= Int(Int16.max) else {
+    func execute(_ executeStatement: PSQLExecuteStatement, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
+        guard executeStatement.binds.count <= Int(Int16.max) else {
             return self.channel.eventLoop.makeFailedFuture(PSQLError(.tooManyParameters))
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
-            preparedStatement: preparedStatement,
-            bind: bind,
+            executeStatement: executeStatement,
             logger: logger,
-            jsonDecoder: self.jsonDecoder,
             promise: promise)
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
@@ -257,7 +240,7 @@ public final class PSQLConnection {
                     }
                 }.map { _ in channel }
             }.map { channel in
-                PSQLConnection(channel: channel, connectionID: connectionID, logger: logger, jsonDecoder: configuration.coders.jsonDecoder)
+                PSQLConnection(channel: channel, connectionID: connectionID, logger: logger)
             }.flatMapErrorThrowing { error -> PSQLConnection in
                 switch error {
                 case is PSQLError:
