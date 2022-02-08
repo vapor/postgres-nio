@@ -5,15 +5,22 @@ import class Foundation.JSONDecoder
 
 private let JSONBVersionByte: UInt8 = 0x01
 
-extension PSQLCodable where Self: Codable {
-    var psqlType: PSQLDataType {
+extension PSQLEncodable where Self: Encodable {
+    public var psqlType: PSQLDataType {
         .jsonb
     }
     
-    var psqlFormat: PSQLFormat {
+    public var psqlFormat: PSQLFormat {
         .binary
     }
     
+    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+        buffer.writeInteger(JSONBVersionByte)
+        try context.jsonEncoder.encode(self, into: &buffer)
+    }
+}
+
+extension PSQLDecodable where Self: Decodable {
     static func decode<JSONDecoder : PSQLJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PSQLDataType,
@@ -32,9 +39,5 @@ extension PSQLCodable where Self: Codable {
             throw PSQLCastingError.Code.typeMismatch
         }
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(JSONBVersionByte)
-        try context.jsonEncoder.encode(self, into: &buffer)
-    }
 }
+

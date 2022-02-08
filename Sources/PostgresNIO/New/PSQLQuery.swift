@@ -51,6 +51,14 @@ extension PSQLQuery {
             try self.binds.append(value, context: .default)
             self.query.append(contentsOf: "$\(self.binds.count)")
         }
+
+        public mutating func appendInterpolation<Value: PSQLEncodable & Encodable, JSONEncoder: PSQLJSONEncoder>(
+            _ value: Value,
+            context: PSQLEncodingContext<JSONEncoder>
+        ) throws {
+            try self.binds.append(value, context: context)
+            self.query.append(contentsOf: "$\(self.binds.count)")
+        }
     }
 }
 
@@ -79,7 +87,6 @@ public struct PSQLBindings: Hashable {
     }
 
     var metadata: [Metadata]
-
     var bytes: ByteBuffer
 
     var count: Int {

@@ -7,6 +7,10 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 function gen() {
     how_many=$1
 
+    if [[ $how_many -ne 1 ]] ; then
+        echo ""
+    fi
+
     echo "    @inlinable"
     #echo "    @_alwaysEmitIntoClient"
     echo -n "    public func decode<T0: PSQLDecodable"
@@ -18,7 +22,7 @@ function gen() {
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n))"
     done
-    echo -n ").Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws"
+    echo -n ").Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws"
 
     echo -n " -> (T0"
     for ((n = 1; n<$how_many; n +=1)); do
@@ -62,17 +66,17 @@ function gen() {
     done
     echo ")"
     echo "        } catch let code as PSQLCastingError.Code {"
-    echo "           throw PSQLCastingError("
-    echo "               code: code,"
-    echo "               columnName: column.name,"
-    echo "               columnIndex: columnIndex,"
-    echo "               targetType: swiftTargetType,"
-    echo "               postgresType: column.dataType,"
-    echo "               postgresData: cellData"
-    echo "           )"
+    echo "            let castingError = PSQLCastingError("
+    echo "                code: code,"
+    echo "                columnName: column.name,"
+    echo "                columnIndex: columnIndex,"
+    echo "                targetType: swiftTargetType,"
+    echo "                postgresType: column.dataType,"
+    echo "                postgresData: cellData"
+    echo "            )"
+    echo "            throw PSQLError(.casting(castingError), file: file, line: line)"
     echo "        }"
     echo "    }"
-    echo
 }
 
 grep -q "ByteBuffer" "${BASH_SOURCE[0]}" || {

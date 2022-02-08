@@ -32,8 +32,8 @@ struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
         }
         
         buffer.moveReaderIndex(to: firstColumnIndex)
-        let columnSlice = buffer.readSlice(length: buffer.readableBytes)!
-        return DataRow(columnCount: columnCount, bytes: columnSlice)
+        let rowSlice = buffer.readSlice(length: buffer.readableBytes)!
+        return DataRow(columnCount: columnCount, bytes: rowSlice)
     }
 }
 

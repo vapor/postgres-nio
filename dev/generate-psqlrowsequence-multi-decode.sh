@@ -7,6 +7,10 @@ here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 function gen() {
     how_many=$1
 
+    if [[ $how_many -ne 1 ]] ; then
+        echo ""
+    fi
+
     echo "    @inlinable"
     #echo "    @_alwaysEmitIntoClient"
     echo -n "    public func decode<T0: PSQLDecodable"
@@ -42,7 +46,6 @@ function gen() {
 
     echo "        }"
     echo "    }"
-    echo
 }
 
 grep -q "ByteBuffer" "${BASH_SOURCE[0]}" || {
