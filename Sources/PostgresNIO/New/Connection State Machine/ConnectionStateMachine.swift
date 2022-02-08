@@ -1068,8 +1068,6 @@ extension ConnectionStateMachine {
             preconditionFailure("Pure client error, that is thrown directly and should never ")
         case .connectionError:
             return true
-        case .casting(_):
-            preconditionFailure("Pure client error, that is thrown directly in PSQLRows")
         case .uncleanShutdown:
             return true
         }

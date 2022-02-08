@@ -1,7 +1,6 @@
 import NIOCore
 
-struct PSQLError: Error {
-
+public struct PSQLError: Error {
     struct Code: Equatable {
         struct UnsupportedAuthScheme: Equatable {
             enum Base: Equatable {
@@ -40,8 +39,6 @@ struct PSQLError: Error {
             case connectionClosed
             case connectionError
             case uncleanShutdown
-
-            case casting(PSQLCastingError)
         }
 
         internal var base: Base
@@ -83,17 +80,13 @@ struct PSQLError: Error {
         static let channel: Code = Self.init(.connectionError)
 
         static let uncleanShutdown: Code = Self.init(.uncleanShutdown)
-
-        static func casting(_ error: PSQLCastingError) -> Code {
-            Self.init(.casting(error))
-        }
     }
     
     internal var code: Code
     internal var underlying: Error?
     internal var file: String
     internal var line: UInt
-    
+
     init(_ code: Code, underlying: Error? = nil, file: String = #file, line: UInt = #line) {
         self.code = code
         self.underlying = underlying
@@ -137,6 +130,9 @@ struct PSQLCastingError: Error, Equatable {
     let postgresType: PSQLDataType
     let postgresData: ByteBuffer?
 
+    let file: String
+    let line: UInt
+
     @usableFromInline
     init(
         code: Code,
@@ -144,7 +140,9 @@ struct PSQLCastingError: Error, Equatable {
         columnIndex: Int,
         targetType: PSQLDecodable.Type,
         postgresType: PSQLDataType,
-        postgresData: ByteBuffer?
+        postgresData: ByteBuffer?,
+        file: String,
+        line: UInt
     ) {
         self.code = code
         self.columnName = columnName
@@ -152,6 +150,9 @@ struct PSQLCastingError: Error, Equatable {
         self.targetType = targetType
         self.postgresType = postgresType
         self.postgresData = postgresData
+
+        self.file = file
+        self.line = line
     }
     
     var description: String {

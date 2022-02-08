@@ -16,15 +16,16 @@ extension PSQLRow {
 
             return (r0)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -49,15 +50,16 @@ extension PSQLRow {
 
             return (r0, r1)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -88,15 +90,16 @@ extension PSQLRow {
 
             return (r0, r1, r2)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -133,15 +136,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -184,15 +188,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -241,15 +246,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -304,15 +310,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -373,15 +380,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -448,15 +456,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -529,15 +538,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -616,15 +626,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -709,15 +720,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -808,15 +820,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -913,15 +926,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 
@@ -1024,15 +1038,16 @@ extension PSQLRow {
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14)
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
-               code: code,
-               columnName: column.name,
-               columnIndex: columnIndex,
-               targetType: swiftTargetType,
-               postgresType: column.dataType,
-               postgresData: cellData
+            throw PSQLCastingError(
+                code: code,
+                columnName: column.name,
+                columnIndex: columnIndex,
+                targetType: swiftTargetType,
+                postgresType: column.dataType,
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 }

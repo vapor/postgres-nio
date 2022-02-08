@@ -36,15 +36,16 @@ extension PSQLCell {
                 context: context
             )
         } catch let code as PSQLCastingError.Code {
-            let castingError = PSQLCastingError(
+            throw PSQLCastingError(
                 code: code,
                 columnName: self.columnDescription.name,
                 columnIndex: self.columnIndex,
                 targetType: T.self,
                 postgresType: self.columnDescription.dataType,
-                postgresData: cellData
+                postgresData: cellData,
+                file: file,
+                line: line
             )
-            throw PSQLError(.casting(castingError), file: file, line: line)
         }
     }
 }
