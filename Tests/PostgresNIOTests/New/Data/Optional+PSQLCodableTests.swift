@@ -14,7 +14,11 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: String?
         var optBuffer: ByteBuffer? = buffer
+        #if swift(<5.4)
+        XCTAssertNoThrow(result = try Optional<String>.decodeRaw(from: &optBuffer, type: .text, format: .binary, context: .default))
+        #else
         XCTAssertNoThrow(result = try String?.decodeRaw(from: &optBuffer, type: .text, format: .binary, context: .default))
+        #endif
         XCTAssertEqual(result, value)
     }
     
