@@ -28,11 +28,7 @@ struct BufferedMessageEncoder {
         self.encoder.encode(data: message, out: &self.buffer)
     }
     
-    mutating func flush() -> ByteBuffer? {
-        guard self.buffer.readableBytes > 0 else {
-            return nil
-        }
-        
+    mutating func flush() -> ByteBuffer {
         self.state = .flushed
         return self.buffer
     }

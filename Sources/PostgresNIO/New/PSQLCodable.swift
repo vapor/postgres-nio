@@ -21,7 +21,7 @@ public protocol PSQLEncodable {
 
 /// A type that can decode itself from a postgres wire binary representation.
 public protocol PSQLDecodable {
-    typealias ActualType = Self
+    associatedtype DecodableType: PSQLDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///

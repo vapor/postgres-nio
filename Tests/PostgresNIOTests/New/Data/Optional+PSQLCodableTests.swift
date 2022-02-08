@@ -3,10 +3,10 @@ import NIOCore
 @testable import PostgresNIO
 
 class Optional_PSQLCodableTests: XCTestCase {
-    
+
     func testRoundTripSomeString() {
         let value: String? = "Hello World"
-        
+
         var buffer = ByteBuffer()
         XCTAssertNoThrow(try value.encodeRaw(into: &buffer, context: .default))
         XCTAssertEqual(value.psqlType, .text)
@@ -21,7 +21,7 @@ class Optional_PSQLCodableTests: XCTestCase {
         #endif
         XCTAssertEqual(result, value)
     }
-    
+
     func testRoundTripNoneString() {
         let value: Optional<String> = .none
 
@@ -33,7 +33,11 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: String?
         var inBuffer: ByteBuffer? = nil
+        #if swift(<5.4)
+        XCTAssertNoThrow(result = try Optional<String>.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .default))
+        #else
         XCTAssertNoThrow(result = try String?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .default))
+        #endif
         XCTAssertEqual(result, value)
     }
     
@@ -49,7 +53,11 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: UUID?
         var optBuffer: ByteBuffer? = buffer
+        #if swift(<5.4)
+        XCTAssertNoThrow(result = try Optional<UUID>.decodeRaw(from: &optBuffer, type: .uuid, format: .binary, context: .default))
+        #else
         XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &optBuffer, type: .uuid, format: .binary, context: .default))
+        #endif
         XCTAssertEqual(result, value)
     }
     
@@ -65,7 +73,11 @@ class Optional_PSQLCodableTests: XCTestCase {
 
         var result: UUID?
         var inBuffer: ByteBuffer? = nil
-        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .default))
+        #if swift(<5.4)
+        XCTAssertNoThrow(result = try Optional<UUID>.decodeRaw(from: &inBuffer, type: .uuid, format: .binary, context: .default))
+        #else
+        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &inBuffer, type: .uuid, format: .binary, context: .default))
+        #endif
         XCTAssertEqual(result, value)
     }
 }

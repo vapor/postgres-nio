@@ -29,22 +29,22 @@ function gen() {
         echo -n ", T$(($n))"
     done
     echo ") {"
-    echo "        assert(self.columns.count >= $how_many)"
+    echo "        precondition(self.columns.count >= $how_many)"
     #echo "        var columnIndex = 0"
     if [[ $how_many -eq 1 ]] ; then
         echo "        let columnIndex = 0"
         echo "        var cellIterator = self.data.makeIterator()"
-        echo "        var cellData = cellIterator.next()!"
+        echo "        var cellData = cellIterator.next().unsafelyUnwrapped"
         echo "        var columnIterator = self.columns.makeIterator()"
-        echo "        let column = columnIterator.next()!"
-        echo "        let swiftTargetType: PSQLDecodable.Type = T0.self"
+        echo "        let column = columnIterator.next().unsafelyUnwrapped"
+        echo "        let swiftTargetType: Any.Type = T0.self"
     else
         echo "        var columnIndex = 0"
         echo "        var cellIterator = self.data.makeIterator()"
-        echo "        var cellData = cellIterator.next()!"
+        echo "        var cellData = cellIterator.next().unsafelyUnwrapped"
         echo "        var columnIterator = self.columns.makeIterator()"
-        echo "        var column = columnIterator.next()!"
-        echo "        var swiftTargetType: PSQLDecodable.Type = T0.self"
+        echo "        var column = columnIterator.next().unsafelyUnwrapped"
+        echo "        var swiftTargetType: Any.Type = T0.self"
     fi
 
     echo
@@ -53,8 +53,8 @@ function gen() {
     echo
     for ((n = 1; n<$how_many; n +=1)); do
         echo "            columnIndex = $n"
-        echo "            cellData = cellIterator.next()!"
-        echo "            column = columnIterator.next()!"
+        echo "            cellData = cellIterator.next().unsafelyUnwrapped"
+        echo "            column = columnIterator.next().unsafelyUnwrapped"
         echo "            swiftTargetType = T$n.self"
         echo "            let r$n = try T$n.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)"
         echo

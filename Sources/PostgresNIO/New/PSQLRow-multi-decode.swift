@@ -3,13 +3,13 @@
 extension PSQLRow {
     @inlinable
     public func decode<T0: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0) {
-        assert(self.columns.count >= 1)
+        precondition(self.columns.count >= 1)
         let columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        let column = columnIterator.next()!
-        let swiftTargetType: PSQLDecodable.Type = T0.self
+        let column = columnIterator.next().unsafelyUnwrapped
+        let swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
@@ -31,20 +31,20 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1) {
-        assert(self.columns.count >= 2)
+        precondition(self.columns.count >= 2)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -65,26 +65,26 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2) {
-        assert(self.columns.count >= 3)
+        precondition(self.columns.count >= 3)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -105,32 +105,32 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3) {
-        assert(self.columns.count >= 4)
+        precondition(self.columns.count >= 4)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -151,38 +151,38 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4) {
-        assert(self.columns.count >= 5)
+        precondition(self.columns.count >= 5)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -203,44 +203,44 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5) {
-        assert(self.columns.count >= 6)
+        precondition(self.columns.count >= 6)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -261,50 +261,50 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6) {
-        assert(self.columns.count >= 7)
+        precondition(self.columns.count >= 7)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -325,56 +325,56 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7) {
-        assert(self.columns.count >= 8)
+        precondition(self.columns.count >= 8)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -395,62 +395,62 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8) {
-        assert(self.columns.count >= 9)
+        precondition(self.columns.count >= 9)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -471,68 +471,68 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) {
-        assert(self.columns.count >= 10)
+        precondition(self.columns.count >= 10)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
             let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -553,74 +553,74 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) {
-        assert(self.columns.count >= 11)
+        precondition(self.columns.count >= 11)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
             let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
             let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -641,80 +641,80 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) {
-        assert(self.columns.count >= 12)
+        precondition(self.columns.count >= 12)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
             let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
             let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
             let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -735,86 +735,86 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12) {
-        assert(self.columns.count >= 13)
+        precondition(self.columns.count >= 13)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
             let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
             let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
             let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 12
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T12.self
             let r12 = try T12.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -835,92 +835,92 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, T13: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13) {
-        assert(self.columns.count >= 14)
+        precondition(self.columns.count >= 14)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
             let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
             let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
             let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 12
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T12.self
             let r12 = try T12.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 13
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T13.self
             let r13 = try T13.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
@@ -941,98 +941,98 @@ extension PSQLRow {
 
     @inlinable
     public func decode<T0: PSQLDecodable, T1: PSQLDecodable, T2: PSQLDecodable, T3: PSQLDecodable, T4: PSQLDecodable, T5: PSQLDecodable, T6: PSQLDecodable, T7: PSQLDecodable, T8: PSQLDecodable, T9: PSQLDecodable, T10: PSQLDecodable, T11: PSQLDecodable, T12: PSQLDecodable, T13: PSQLDecodable, T14: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14).Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14) {
-        assert(self.columns.count >= 15)
+        precondition(self.columns.count >= 15)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
-        var cellData = cellIterator.next()!
+        var cellData = cellIterator.next().unsafelyUnwrapped
         var columnIterator = self.columns.makeIterator()
-        var column = columnIterator.next()!
-        var swiftTargetType: PSQLDecodable.Type = T0.self
+        var column = columnIterator.next().unsafelyUnwrapped
+        var swiftTargetType: Any.Type = T0.self
 
         do {
             let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
             let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
             let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
             let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
             let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
             let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
             let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
             let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
             let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
             let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
             let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
             let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 12
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T12.self
             let r12 = try T12.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 13
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T13.self
             let r13 = try T13.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 14
-            cellData = cellIterator.next()!
-            column = columnIterator.next()!
+            cellData = cellIterator.next().unsafelyUnwrapped
+            column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T14.self
             let r14 = try T14.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 

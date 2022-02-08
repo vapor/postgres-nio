@@ -1,8 +1,7 @@
 import NIOCore
 
-extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
-    @usableFromInline
-    typealias ActualType = Wrapped
+extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.DecodableType == Wrapped {
+    public typealias DecodableType = Wrapped
 
     public static func decode<JSONDecoder : PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")
@@ -14,12 +13,12 @@ extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
         type: PSQLDataType,
         format: PSQLFormat,
         context: PSQLDecodingContext<JSONDecoder>
-    ) throws -> Self {
+    ) throws -> Optional<Wrapped> {
         switch byteBuffer {
         case .some(var buffer):
-            return try ActualType.decode(from: &buffer, type: type, format: format, context: context)
+            return try Wrapped.decode(from: &buffer, type: type, format: format, context: context)
         case .none:
-            return nil
+            return .none
         }
     }
 }
@@ -57,6 +56,6 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
     }
 }
 
-extension Optional: PSQLCodable where Wrapped: PSQLCodable {
-    
+extension Optional: PSQLCodable where Wrapped: PSQLCodable, Wrapped.DecodableType == Wrapped {
+
 }

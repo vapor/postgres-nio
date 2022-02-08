@@ -214,7 +214,7 @@ extension AsyncStreamConsumer {
         private enum UpstreamState {
             enum DemandState {
                 case canAskForMore
-                case waitingForMore(CheckedContinuation<PSQLRow?, Error>?)
+                case waitingForMore(Optional<CheckedContinuation<Optional<PSQLRow>, Error>>)
             }
             
             case initialized

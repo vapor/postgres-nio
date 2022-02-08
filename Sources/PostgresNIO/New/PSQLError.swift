@@ -126,7 +126,7 @@ struct PSQLCastingError: Error, Equatable {
     let columnName: String
     let columnIndex: Int
     
-    let targetType: PSQLDecodable.Type
+    let targetType: Any.Type
     let postgresType: PSQLDataType
     let postgresData: ByteBuffer?
 
@@ -138,7 +138,7 @@ struct PSQLCastingError: Error, Equatable {
         code: Code,
         columnName: String,
         columnIndex: Int,
-        targetType: PSQLDecodable.Type,
+        targetType: Any.Type,
         postgresType: PSQLDataType,
         postgresData: ByteBuffer?,
         file: String,

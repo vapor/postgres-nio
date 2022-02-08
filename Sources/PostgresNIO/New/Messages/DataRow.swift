@@ -12,10 +12,10 @@ import NIOCore
 struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
 
     @usableFromInline
-    var columnCount: Int16
+    private(set) var columnCount: Int16
 
     @usableFromInline
-    var bytes: ByteBuffer
+    private(set) var bytes: ByteBuffer
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
         let columnCount = try buffer.throwingReadInteger(as: Int16.self)
@@ -39,7 +39,7 @@ struct DataRow: PSQLBackendMessage.PayloadDecodable, Equatable {
 
 extension DataRow: Sequence {
     @usableFromInline
-    typealias Element = ByteBuffer?
+    typealias Element = Optional<ByteBuffer>
 
     @inlinable
     func makeIterator() -> Iterator {
@@ -140,10 +140,10 @@ extension DataRow {
         let dataRow: DataRow
 
         @usableFromInline
-        var columnIndex: Int16 = 0
+        private(set) var columnIndex: Int16 = 0
 
         @usableFromInline
-        var bufferOffset: Int
+        private(set) var bufferOffset: Int
 
         @inlinable
         init(_ dataRow: DataRow) {
