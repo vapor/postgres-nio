@@ -1,7 +1,7 @@
 public struct PostgresRow: CustomStringConvertible {
     final class LookupTable {
         let rowDescription: PostgresMessage.RowDescription
-        let resultFormat: [PostgresFormatCode]
+        let resultFormat: [PostgresFormat]
 
         struct Value {
             let index: Int
@@ -27,7 +27,7 @@ public struct PostgresRow: CustomStringConvertible {
 
         init(
             rowDescription: PostgresMessage.RowDescription,
-            resultFormat: [PostgresFormatCode]
+            resultFormat: [PostgresFormat]
         ) {
             self.rowDescription = rowDescription
             self.resultFormat = resultFormat
@@ -54,7 +54,7 @@ public struct PostgresRow: CustomStringConvertible {
         guard let entry = self.lookupTable.lookup(column: column) else {
             return nil
         }
-        let formatCode: PostgresFormatCode
+        let formatCode: PostgresFormat
         switch self.lookupTable.resultFormat.count {
         case 1: formatCode = self.lookupTable.resultFormat[0]
         default: formatCode = entry.field.formatCode

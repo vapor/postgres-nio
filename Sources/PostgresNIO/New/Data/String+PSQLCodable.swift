@@ -6,7 +6,7 @@ extension String: PSQLCodable {
         .text
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -14,7 +14,7 @@ extension String: PSQLCodable {
         byteBuffer.writeString(self)
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> String {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> String {
         switch (format, type) {
         case (_, .varchar),
              (_, .text),

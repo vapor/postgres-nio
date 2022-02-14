@@ -7,7 +7,7 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
         .bytea
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -21,7 +21,7 @@ extension ByteBuffer: PSQLCodable {
         .bytea
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -30,7 +30,7 @@ extension ByteBuffer: PSQLCodable {
         byteBuffer.writeBuffer(&copyOfSelf)
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         return buffer
     }
 }
@@ -40,7 +40,7 @@ extension Data: PSQLCodable {
         .bytea
     }
 
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
 
@@ -48,7 +48,7 @@ extension Data: PSQLCodable {
         byteBuffer.writeBytes(self)
     }
 
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         return buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }
 }

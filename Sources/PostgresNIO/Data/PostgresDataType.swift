@@ -1,11 +1,14 @@
-/// The format code being used for the field.
-/// Currently will be zero (text) or one (binary).
-/// In a RowDescription returned from the statement variant of Describe,
-/// the format code is not yet known and will always be zero.
-public enum PostgresFormatCode: Int16, Codable, CustomStringConvertible {
+/// The format the postgres types are encoded in on the wire.
+///
+/// Currently there a two wire formats supported:
+///  - text
+///  - binary
+public enum PostgresFormat: Int16 {
     case text = 0
     case binary = 1
-    
+}
+
+extension PostgresFormat: CustomStringConvertible {
     public var description: String {
         switch self {
         case .text: return "text"
@@ -13,6 +16,11 @@ public enum PostgresFormatCode: Int16, Codable, CustomStringConvertible {
         }
     }
 }
+
+extension PostgresFormat: Codable {}
+
+@available(*, deprecated, renamed: "PostgresFormat")
+public typealias PostgresFormatCode = PostgresFormat
 
 /// The data type's raw object ID.
 /// Use `select * from pg_type where oid = <idhere>;` to lookup more information.

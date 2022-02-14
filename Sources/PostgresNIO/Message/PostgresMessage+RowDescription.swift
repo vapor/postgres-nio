@@ -29,7 +29,7 @@ extension PostgresMessage {
                 guard let dataTypeModifier = buffer.readInteger(as: Int32.self) else {
                     throw PostgresError.protocol("Could not read row description field data type modifier")
                 }
-                guard let formatCode = buffer.readInteger(as: PostgresFormatCode.self) else {
+                guard let formatCode = buffer.readInteger(as: PostgresFormat.self) else {
                     throw PostgresError.protocol("Could not read row description field format code")
                 }
                 return .init(
@@ -65,7 +65,7 @@ extension PostgresMessage {
             /// Currently will be zero (text) or one (binary).
             /// In a RowDescription returned from the statement variant of Describe,
             /// the format code is not yet known and will always be zero.
-            public var formatCode: PostgresFormatCode
+            public var formatCode: PostgresFormat
             
             /// See `CustomStringConvertible`.
             public var description: String {

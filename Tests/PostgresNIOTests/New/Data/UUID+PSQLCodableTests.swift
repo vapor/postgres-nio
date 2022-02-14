@@ -40,7 +40,7 @@ class UUID_PSQLCodableTests: XCTestCase {
     }
     
     func testDecodeFromString() {
-        let options: [(PSQLFormat, PSQLDataType)] = [
+        let options: [(PostgresFormat, PSQLDataType)] = [
             (.binary, .text),
             (.binary, .varchar),
             (.text, .uuid),
