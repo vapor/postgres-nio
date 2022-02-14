@@ -1,4 +1,5 @@
 import NIOCore
+import Foundation
 
 /// `PSQLRow` represents a single row that was received from the Postgres Server.
 struct PSQLRow {
@@ -6,13 +7,11 @@ struct PSQLRow {
     internal let data: DataRow
     
     internal let columns: [RowDescription.Column]
-    internal let jsonDecoder: PSQLJSONDecoder
     
-    internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column], jsonDecoder: PSQLJSONDecoder) {
+    internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column]) {
         self.data = data
         self.lookupTable = lookupTable
         self.columns = columns
-        self.jsonDecoder = jsonDecoder
     }
 }
 
@@ -30,12 +29,12 @@ extension PSQLRow {
     ///   - type: The type to decode the data into
     /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
-    func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
+    func decode<T: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(column: String, as type: T.Type, jsonDecoder: JSONDecoder, file: String = #file, line: Int = #line) throws -> T {
         guard let index = self.lookupTable[column] else {
             preconditionFailure("A column '\(column)' does not exist.")
         }
         
-        return try self.decode(column: index, as: type, file: file, line: line)
+        return try self.decode(column: index, as: type, jsonDecoder: jsonDecoder, file: file, line: line)
     }
     
     /// Access the data in the provided column and decode it into the target type.
@@ -45,12 +44,12 @@ extension PSQLRow {
     ///   - type: The type to decode the data into
     /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
-    func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
+    func decode<T: PSQLDecodable, JSONDecoder: PSQLJSONDecoder>(column index: Int, as type: T.Type, jsonDecoder: JSONDecoder, file: String = #file, line: Int = #line) throws -> T {
         precondition(index < self.data.columnCount)
         
         let column = self.columns[index]
         let context = PSQLDecodingContext(
-            jsonDecoder: self.jsonDecoder,
+            jsonDecoder: jsonDecoder,
             columnName: column.name,
             columnIndex: index,
             file: file,
@@ -61,5 +60,15 @@ extension PSQLRow {
         }
 
         return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)
+    }
+}
+
+extension PSQLRow {
+    func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
+        try self.decode(column: column, as: type, jsonDecoder: JSONDecoder(), file: file, line: line)
+    }
+
+    func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
+        try self.decode(column: index, as: type, jsonDecoder: JSONDecoder(), file: file, line: line)
     }
 }

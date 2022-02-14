@@ -14,15 +14,13 @@ final class PSQLConnection {
         
         struct Coders {
             var jsonEncoder: PSQLJSONEncoder
-            var jsonDecoder: PSQLJSONDecoder
             
-            init(jsonEncoder: PSQLJSONEncoder, jsonDecoder: PSQLJSONDecoder) {
+            init(jsonEncoder: PSQLJSONEncoder) {
                 self.jsonEncoder = jsonEncoder
-                self.jsonDecoder = jsonDecoder
             }
             
             static var foundation: Coders {
-                Coders(jsonEncoder: JSONEncoder(), jsonDecoder: JSONDecoder())
+                Coders(jsonEncoder: JSONEncoder())
             }
         }
         
@@ -98,13 +96,11 @@ final class PSQLConnection {
     /// A logger to use in case
     private var logger: Logger
     let connectionID: String
-    let jsonDecoder: PSQLJSONDecoder
 
-    init(channel: Channel, connectionID: String, logger: Logger, jsonDecoder: PSQLJSONDecoder) {
+    init(channel: Channel, connectionID: String, logger: Logger) {
         self.channel = channel
         self.connectionID = connectionID
         self.logger = logger
-        self.jsonDecoder = jsonDecoder
     }
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
@@ -136,7 +132,6 @@ final class PSQLConnection {
             query: query,
             bind: bind,
             logger: logger,
-            jsonDecoder: self.jsonDecoder,
             promise: promise)
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
@@ -171,7 +166,6 @@ final class PSQLConnection {
             preparedStatement: preparedStatement,
             bind: bind,
             logger: logger,
-            jsonDecoder: self.jsonDecoder,
             promise: promise)
         
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
@@ -258,7 +252,7 @@ final class PSQLConnection {
                     }
                 }.map { _ in channel }
             }.map { channel in
-                PSQLConnection(channel: channel, connectionID: connectionID, logger: logger, jsonDecoder: configuration.coders.jsonDecoder)
+                PSQLConnection(channel: channel, connectionID: connectionID, logger: logger)
             }.flatMapErrorThrowing { error -> PSQLConnection in
                 switch error {
                 case is PSQLError:
