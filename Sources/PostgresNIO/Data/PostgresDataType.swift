@@ -17,8 +17,10 @@ extension PostgresFormat: CustomStringConvertible {
     }
 }
 
+// TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
 extension PostgresFormat: Codable {}
 
+// TODO: Renamed during 1.x. Remove this with next major break.
 @available(*, deprecated, renamed: "PostgresFormat")
 public typealias PostgresFormatCode = PostgresFormat
 
