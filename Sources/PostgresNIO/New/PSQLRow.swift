@@ -64,10 +64,12 @@ extension PSQLRow {
 }
 
 extension PSQLRow {
+    // TODO: Remove this function. Only here to keep the tests running as of today.
     func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
         try self.decode(column: column, as: type, jsonDecoder: JSONDecoder(), file: file, line: line)
     }
 
+    // TODO: Remove this function. Only here to keep the tests running as of today.
     func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
         try self.decode(column: index, as: type, jsonDecoder: JSONDecoder(), file: file, line: line)
     }
