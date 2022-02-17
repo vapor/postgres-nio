@@ -9,9 +9,8 @@ jobs:
         swiftver:
           - swift:5.2
           - swift:5.3
-          - swift:5.4
           - swift:5.5
-          - swiftlang/swift:nightly-main
+          - swiftlang/swift:5.6-main
         swiftos:
           - focal
     container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
@@ -36,21 +35,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dbimage:
-          - postgres:14
-          - postgres:13
-          - postgres:12
-          - postgres:11
-        dbauth:
-          - trust
-          - md5
-          - scram-sha-256
         swiftver:
           # Only test latest Swift for integration tests, issues from older Swift versions that don't show
           # up in the unit tests are fairly unlikely.
           - swift:5.5
         swiftos:
           - focal
+        include:
+          - dbimage: postgres:14
+            dbauth: scram-sha-256
+          - dbimage: postgres:13
+            dbauth: md5
+          - dbimage: postgres:11
+            dbauth: trust
     container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
     runs-on: ubuntu-latest
     env:
@@ -119,7 +116,7 @@ jobs:
           - scram-sha-256
         xcode:
           - latest-stable
-          - latest
+          #- latest
     runs-on: macos-11
     env:
       LOG_LEVEL: debug
