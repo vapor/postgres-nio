@@ -8,27 +8,28 @@ class Optional_PSQLCodableTests: XCTestCase {
         let value: String? = "Hello World"
         
         var buffer = ByteBuffer()
-        value?.encode(into: &buffer, context: .forTests())
+        XCTAssertNoThrow(try value.encodeRaw(into: &buffer, context: .forTests()))
         XCTAssertEqual(value.psqlType, .text)
-        let data = PSQLData(bytes: buffer, dataType: .text, format: .binary)
-        
+        XCTAssertEqual(buffer.readInteger(as: Int32.self), 11)
+
         var result: String?
-        XCTAssertNoThrow(result = try data.decode(as: String?.self, context: .forTests()))
+        var optBuffer: ByteBuffer? = buffer
+        XCTAssertNoThrow(result = try String?.decodeRaw(from: &optBuffer, type: .text, format: .binary, context: .forTests()))
         XCTAssertEqual(result, value)
     }
     
     func testRoundTripNoneString() {
         let value: Optional<String> = .none
-        
+
         var buffer = ByteBuffer()
-        value?.encode(into: &buffer, context: .forTests())
-        XCTAssertEqual(buffer.readableBytes, 0)
+        XCTAssertNoThrow(try value.encodeRaw(into: &buffer, context: .forTests()))
+        XCTAssertEqual(buffer.readableBytes, 4)
+        XCTAssertEqual(buffer.getInteger(at: 0, as: Int32.self), -1)
         XCTAssertEqual(value.psqlType, .null)
-        
-        let data = PSQLData(bytes: nil, dataType: .text, format: .binary)
-        
+
         var result: String?
-        XCTAssertNoThrow(result = try data.decode(as: String?.self, context: .forTests()))
+        var inBuffer: ByteBuffer? = nil
+        XCTAssertNoThrow(result = try String?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .forTests()))
         XCTAssertEqual(result, value)
     }
     
@@ -41,10 +42,10 @@ class Optional_PSQLCodableTests: XCTestCase {
         XCTAssertNoThrow(try encodable.encodeRaw(into: &buffer, context: .forTests()))
         XCTAssertEqual(buffer.readableBytes, 20)
         XCTAssertEqual(buffer.readInteger(as: Int32.self), 16)
-        let data = PSQLData(bytes: buffer, dataType: .uuid, format: .binary)
-        
+
         var result: UUID?
-        XCTAssertNoThrow(result = try data.decode(as: UUID?.self, context: .forTests()))
+        var optBuffer: ByteBuffer? = buffer
+        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &optBuffer, type: .uuid, format: .binary, context: .forTests()))
         XCTAssertEqual(result, value)
     }
     
@@ -57,11 +58,10 @@ class Optional_PSQLCodableTests: XCTestCase {
         XCTAssertNoThrow(try encodable.encodeRaw(into: &buffer, context: .forTests()))
         XCTAssertEqual(buffer.readableBytes, 4)
         XCTAssertEqual(buffer.readInteger(as: Int32.self), -1)
-        
-        let data = PSQLData(bytes: nil, dataType: .uuid, format: .binary)
-        
+
         var result: UUID?
-        XCTAssertNoThrow(result = try data.decode(as: UUID?.self, context: .forTests()))
+        var inBuffer: ByteBuffer? = nil
+        XCTAssertNoThrow(result = try UUID?.decodeRaw(from: &inBuffer, type: .text, format: .binary, context: .forTests()))
         XCTAssertEqual(result, value)
     }
 }
