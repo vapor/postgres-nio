@@ -1,23 +1,13 @@
 import NIOCore
 
-/// The format the postgres types are encoded in on the wire.
-///
-/// Currently there a two wire formats supported:
-///  - text
-///  - binary
-enum PSQLFormat: Int16 {
-    case text = 0
-    case binary = 1
-}
-
 struct PSQLData: Equatable {
     
     @usableFromInline var bytes: ByteBuffer?
     @usableFromInline var dataType: PSQLDataType
-    @usableFromInline var format: PSQLFormat
+    @usableFromInline var format: PostgresFormat
     
     /// use this only for testing
-    init(bytes: ByteBuffer?, dataType: PSQLDataType, format: PSQLFormat) {
+    init(bytes: ByteBuffer?, dataType: PSQLDataType, format: PostgresFormat) {
         self.bytes = bytes
         self.dataType = dataType
         self.format = format

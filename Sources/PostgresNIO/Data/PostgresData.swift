@@ -16,11 +16,11 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
     /// Currently will be zero (text) or one (binary).
     /// In a RowDescription returned from the statement variant of Describe,
     /// the format code is not yet known and will always be zero.
-    public var formatCode: PostgresFormatCode
+    public var formatCode: PostgresFormat
     
     public var value: ByteBuffer?
     
-    public init(type: PostgresDataType, typeModifier: Int32? = nil, formatCode: PostgresFormatCode = .binary, value: ByteBuffer? = nil) {
+    public init(type: PostgresDataType, typeModifier: Int32? = nil, formatCode: PostgresFormat = .binary, value: ByteBuffer? = nil) {
         self.type = type
         self.typeModifier = typeModifier
         self.formatCode = formatCode

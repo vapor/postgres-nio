@@ -5,12 +5,12 @@ extension UInt8: PSQLCodable {
         .char
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch type {
         case .bpchar, .char:
             guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
@@ -35,12 +35,12 @@ extension Int16: PSQLCodable {
         .int2
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -68,12 +68,12 @@ extension Int32: PSQLCodable {
         .int4
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -106,12 +106,12 @@ extension Int64: PSQLCodable {
         .int8
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
@@ -156,12 +156,12 @@ extension Int: PSQLCodable {
         }
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
     // decoding
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {

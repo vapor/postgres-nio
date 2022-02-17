@@ -18,7 +18,7 @@ extension PostgresData: PSQLEncodable {
         PSQLDataType(Int32(self.type.rawValue))
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -39,7 +39,7 @@ extension PostgresData: PSQLEncodable {
 }
 
 extension PostgresData: PSQLDecodable {
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> PostgresData {
+    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> PostgresData {
         let myBuffer = byteBuffer.readSlice(length: byteBuffer.readableBytes)!
         
         return PostgresData(type: PostgresDataType(UInt32(type.rawValue)), typeModifier: nil, formatCode: .binary, value: myBuffer)
@@ -88,8 +88,8 @@ extension PSQLError {
     }
 }
 
-extension PostgresFormatCode {
-    init(psqlFormatCode: PSQLFormat) {
+extension PostgresFormat {
+    init(psqlFormatCode: PostgresFormat) {
         switch psqlFormatCode {
         case .binary:
             self = .binary
