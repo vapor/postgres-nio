@@ -40,7 +40,7 @@ class UUID_PSQLCodableTests: XCTestCase {
     }
     
     func testDecodeFromString() {
-        let options: [(PostgresFormat, PSQLDataType)] = [
+        let options: [(PostgresFormat, PostgresDataType)] = [
             (.binary, .text),
             (.binary, .varchar),
             (.text, .uuid),
@@ -98,7 +98,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
         
-        let dataTypes: [PSQLDataType] = [.varchar, .text]
+        let dataTypes: [PostgresDataType] = [.varchar, .text]
         
         for dataType in dataTypes {
             var loopBuffer = buffer
@@ -117,7 +117,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeString(uuid.uuidString)
         
-        let dataTypes: [PSQLDataType] = [.bool, .int8, .int2, .int4Array]
+        let dataTypes: [PostgresDataType] = [.bool, .int8, .int2, .int4Array]
         
         for dataType in dataTypes {
             let data = PSQLData(bytes: buffer, dataType: dataType, format: .binary)

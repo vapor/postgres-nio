@@ -2,7 +2,7 @@ import NIOCore
 import struct Foundation.Decimal
 
 extension Decimal: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .numeric
     }
     
@@ -10,20 +10,20 @@ extension Decimal: PSQLCodable {
         .binary
     }
     
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Decimal {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .numeric):
-            guard let numeric = PostgresNumeric(buffer: &byteBuffer) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: byteBuffer, context: context)
+            guard let numeric = PostgresNumeric(buffer: &buffer) else {
+                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             return numeric.decimal
         case (.text, .numeric):
-            guard let string = byteBuffer.readString(length: byteBuffer.readableBytes), let value = Decimal(string: string) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: byteBuffer, context: context)
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
+                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
             }
             return value
         default:
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: byteBuffer, context: context)
+            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
     }
     

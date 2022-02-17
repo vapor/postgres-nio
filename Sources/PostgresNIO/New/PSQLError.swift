@@ -89,13 +89,13 @@ struct PSQLCastingError: Error {
     let line: Int
     
     let targetType: PSQLDecodable.Type
-    let postgresType: PSQLDataType
+    let postgresType: PostgresDataType
     let postgresData: ByteBuffer?
     
     let description: String
     let underlying: Error?
     
-    static func missingData(targetType: PSQLDecodable.Type, type: PSQLDataType, context: PSQLDecodingContext) -> Self {
+    static func missingData(targetType: PSQLDecodable.Type, type: PostgresDataType, context: PSQLDecodingContext) -> Self {
         PSQLCastingError(
             columnName: context.columnName,
             columnIndex: context.columnIndex,
@@ -113,7 +113,7 @@ struct PSQLCastingError: Error {
     }
     
     static func failure(targetType: PSQLDecodable.Type,
-                        type: PSQLDataType,
+                        type: PostgresDataType,
                         postgresData: ByteBuffer,
                         description: String? = nil,
                         underlying: Error? = nil,

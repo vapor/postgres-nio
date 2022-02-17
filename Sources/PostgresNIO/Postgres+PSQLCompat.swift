@@ -14,8 +14,8 @@ struct PostgresJSONEncoderWrapper: PSQLJSONEncoder {
 }
 
 extension PostgresData: PSQLEncodable {
-    var psqlType: PSQLDataType {
-        PSQLDataType(Int32(self.type.rawValue))
+    var psqlType: PostgresDataType {
+        self.type
     }
     
     var psqlFormat: PostgresFormat {
@@ -39,8 +39,8 @@ extension PostgresData: PSQLEncodable {
 }
 
 extension PostgresData: PSQLDecodable {
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> PostgresData {
-        let myBuffer = byteBuffer.readSlice(length: byteBuffer.readableBytes)!
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
+        let myBuffer = buffer.readSlice(length: buffer.readableBytes)!
         
         return PostgresData(type: PostgresDataType(UInt32(type.rawValue)), typeModifier: nil, formatCode: .binary, value: myBuffer)
     }

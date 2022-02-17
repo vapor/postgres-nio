@@ -1,7 +1,7 @@
 import NIOCore
 
 extension Float: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .float4
     }
     
@@ -9,7 +9,7 @@ extension Float: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Float {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
@@ -37,7 +37,7 @@ extension Float: PSQLCodable {
 }
 
 extension Double: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .float8
     }
     
@@ -45,7 +45,7 @@ extension Double: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Double {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {

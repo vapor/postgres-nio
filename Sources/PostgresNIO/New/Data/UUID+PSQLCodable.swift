@@ -4,7 +4,7 @@ import typealias Foundation.uuid_t
 
 extension UUID: PSQLCodable {
     
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .uuid
     }
     
@@ -22,7 +22,7 @@ extension UUID: PSQLCodable {
         ])
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> UUID {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {

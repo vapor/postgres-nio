@@ -287,7 +287,7 @@ class PSQLRowStreamTests: XCTestCase {
         XCTAssertEqual(stream.commandTag, "SELECT 6")
     }
 
-    func makeColumnDescription(name: String, dataType: PSQLDataType, format: PostgresFormat) -> RowDescription.Column {
+    func makeColumnDescription(name: String, dataType: PostgresDataType, format: PostgresFormat) -> RowDescription.Column {
         RowDescription.Column(
             name: "test",
             tableOID: 123,

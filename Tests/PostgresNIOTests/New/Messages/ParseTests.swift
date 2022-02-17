@@ -27,14 +27,14 @@ class ParseTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.preparedStatementName)
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.query)
         XCTAssertEqual(byteBuffer.readInteger(as: Int16.self), Int16(parse.parameters.count))
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.bool.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.int8.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.bytea.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.varchar.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.text.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.uuid.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.json.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), PSQLDataType.jsonbArray.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.bool.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.int8.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.bytea.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.varchar.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.text.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.uuid.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.json.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.jsonbArray.rawValue)
     }
 
 }

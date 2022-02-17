@@ -2,7 +2,7 @@ import NIOCore
 import struct Foundation.UUID
 
 extension String: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .text
     }
     
@@ -14,7 +14,7 @@ extension String: PSQLCodable {
         byteBuffer.writeString(self)
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> String {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (_, .varchar),
              (_, .text),

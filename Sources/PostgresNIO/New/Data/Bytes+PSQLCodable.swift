@@ -3,7 +3,7 @@ import NIOCore
 import NIOFoundationCompat
 
 extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .bytea
     }
     
@@ -17,7 +17,7 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
 }
 
 extension ByteBuffer: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .bytea
     }
     
@@ -29,14 +29,14 @@ extension ByteBuffer: PSQLCodable {
         var copyOfSelf = self // dirty hack
         byteBuffer.writeBuffer(&copyOfSelf)
     }
-    
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
+
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         return buffer
     }
 }
 
 extension Data: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .bytea
     }
 
@@ -48,7 +48,7 @@ extension Data: PSQLCodable {
         byteBuffer.writeBytes(self)
     }
 
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         return buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }
 }

@@ -23,7 +23,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
         var columnAttributeNumber: Int16
         
         /// The object ID of the field's data type.
-        var dataType: PSQLDataType
+        var dataType: PostgresDataType
         
         /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
         var dataTypeSize: Int16
@@ -51,7 +51,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             
-            let hextuple = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int16, Int32, Int16, Int32, Int16).self)
+            let hextuple = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int16, UInt32, Int16, Int32, Int16).self)
             
             guard let (tableOID, columnAttributeNumber, dataType, dataTypeSize, dataTypeModifier, formatCodeInt16) = hextuple else {
                 throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(18, actual: buffer.readableBytes)
@@ -65,7 +65,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
                 name: name,
                 tableOID: tableOID,
                 columnAttributeNumber: columnAttributeNumber,
-                dataType: PSQLDataType(rawValue: dataType),
+                dataType: PostgresDataType(dataType),
                 dataTypeSize: dataTypeSize,
                 dataTypeModifier: dataTypeModifier,
                 format: format)

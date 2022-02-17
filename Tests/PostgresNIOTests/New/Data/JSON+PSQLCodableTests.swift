@@ -38,7 +38,7 @@ class JSON_PSQLCodableTests: XCTestCase {
     }
     
     func testDecodeFromJSONAsText() {
-        let combinations : [(PostgresFormat, PSQLDataType)] = [
+        let combinations : [(PostgresFormat, PostgresDataType)] = [
             (.text, .json), (.text, .jsonb),
         ]
         var buffer = ByteBuffer()
