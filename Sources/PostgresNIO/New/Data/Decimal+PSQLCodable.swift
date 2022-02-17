@@ -10,7 +10,12 @@ extension Decimal: PSQLCodable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PSQLDecodingContext<JSONDecoder>
+    ) throws -> Self {
         switch (format, type) {
         case (.binary, .numeric):
             guard let numeric = PostgresNumeric(buffer: &buffer) else {

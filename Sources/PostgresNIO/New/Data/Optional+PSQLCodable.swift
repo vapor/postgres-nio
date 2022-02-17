@@ -3,27 +3,25 @@ import NIOCore
 extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.DecodableType == Wrapped {
     typealias DecodableType = Wrapped
 
-    static func decode(
+    static func decode<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext
+        context: PSQLDecodingContext<JSONDecoder>
     ) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")
     }
 
-    static func decodeRaw(
+    static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext
+        context: PSQLDecodingContext<JSONDecoder>
     ) throws -> Self {
-        switch byteBuffer {
-        case .some(var buffer):
-            return try DecodableType.decode(from: &buffer, type: type, format: format, context: context)
-        case .none:
+        guard var buffer = byteBuffer else {
             return nil
         }
+        return try DecodableType.decode(from: &buffer, type: type, format: format, context: context)
     }
 }
 
