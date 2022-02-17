@@ -10,10 +10,9 @@ class Bytes_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         data.encode(into: &buffer, context: .forTests())
         XCTAssertEqual(data.psqlType, .bytea)
-        let psqlData = PSQLData(bytes: buffer, dataType: .bytea, format: .binary)
         
         var result: Data?
-        XCTAssertNoThrow(result = try psqlData.decode(as: Data.self, context: .forTests()))
+        XCTAssertNoThrow(result = try Data.decode(from: &buffer, type: .bytea, format: .binary, context: .forTests()))
         XCTAssertEqual(data, result)
     }
     
@@ -23,10 +22,9 @@ class Bytes_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         bytes.encode(into: &buffer, context: .forTests())
         XCTAssertEqual(bytes.psqlType, .bytea)
-        let psqlData = PSQLData(bytes: buffer, dataType: .bytea, format: .binary)
         
         var result: ByteBuffer?
-        XCTAssertNoThrow(result = try psqlData.decode(as: ByteBuffer.self, context: .forTests()))
+        XCTAssertNoThrow(result = try ByteBuffer.decode(from: &buffer, type: .bytea, format: .binary, context: .forTests()))
         XCTAssertEqual(bytes, result)
     }
     

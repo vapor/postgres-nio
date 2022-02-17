@@ -37,27 +37,8 @@ class String_PSQLCodableTests: XCTestCase {
         
         for dataType in dataTypes {
             var loopBuffer = buffer
-            XCTAssertThrowsError(try String.decode(from: &loopBuffer, type: dataType, format: .binary, context: .forTests())) { error in
-                XCTAssertEqual((error as? PSQLCastingError)?.line, #line - 1)
-                XCTAssertEqual((error as? PSQLCastingError)?.file, #file)
-                
-                XCTAssertEqual((error as? PSQLCastingError)?.columnIndex, 0)
-                XCTAssertEqual((error as? PSQLCastingError)?.postgresData, loopBuffer)
-            }
-        }
-    }
-    
-    func testDecodeFailureFromNoData() {
-        let dataTypes: [PostgresDataType] = [.text, .varchar, .name]
-        
-        for dataType in dataTypes {
-            let data = PSQLData(bytes: nil, dataType: dataType, format: .binary)
-            XCTAssertThrowsError(try data.decode(as: String.self, context: .forTests())) { error in
-                XCTAssertEqual((error as? PSQLCastingError)?.line, #line - 1)
-                XCTAssertEqual((error as? PSQLCastingError)?.file, #file)
-                
-                XCTAssertEqual((error as? PSQLCastingError)?.columnIndex, 0)
-                XCTAssertEqual((error as? PSQLCastingError)?.postgresData, nil)
+            XCTAssertThrowsError(try String.decode(from: &loopBuffer, type: dataType, format: .binary, context: .forTests())) {
+                XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
             }
         }
     }
@@ -79,12 +60,8 @@ class String_PSQLCodableTests: XCTestCase {
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
         
-        XCTAssertThrowsError(try String.decode(from: &buffer, type: .uuid, format: .binary, context: .forTests())) { error in
-            XCTAssertEqual((error as? PSQLCastingError)?.line, #line - 1)
-            XCTAssertEqual((error as? PSQLCastingError)?.file, #file)
-            
-            XCTAssertEqual((error as? PSQLCastingError)?.columnIndex, 0)
-            XCTAssertEqual((error as? PSQLCastingError)?.postgresData, buffer)
+        XCTAssertThrowsError(try String.decode(from: &buffer, type: .uuid, format: .binary, context: .forTests())) {
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
 }

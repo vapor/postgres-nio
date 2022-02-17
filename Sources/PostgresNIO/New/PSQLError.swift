@@ -80,59 +80,55 @@ struct PSQLError: Error {
     }
 }
 
-struct PSQLCastingError: Error {
+struct PSQLCastingError: Error, Equatable {
+    struct Code: Hashable, Error {
+        enum Base {
+            case missingData
+            case typeMismatch
+            case failure
+        }
+
+        var base: Base
+
+        init(_ base: Base) {
+            self.base = base
+        }
+
+        static let missingData = Self.init(.missingData)
+        static let typeMismatch = Self.init(.typeMismatch)
+        static let failure = Self.init(.failure)
+    }
+
+    var code: Code
     
     let columnName: String
     let columnIndex: Int
-    
-    let file: String
-    let line: Int
     
     let targetType: PSQLDecodable.Type
     let postgresType: PostgresDataType
     let postgresData: ByteBuffer?
     
-    let description: String
-    let underlying: Error?
-    
-    static func missingData(targetType: PSQLDecodable.Type, type: PostgresDataType, context: PSQLDecodingContext) -> Self {
-        PSQLCastingError(
-            columnName: context.columnName,
-            columnIndex: context.columnIndex,
-            file: context.file,
-            line: context.line,
-            targetType: targetType,
-            postgresType: type,
-            postgresData: nil,
-            description: """
-                Failed to cast Postgres data type \(type.description) to Swift type \(targetType) \
-                because of missing data in \(context.file) line \(context.line).
-                """,
-            underlying: nil
-        )
+    var description: String {
+        switch self.code.base {
+        case .missingData:
+            return """
+                Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType) \
+                because of missing data.
+                """
+
+        case .typeMismatch:
+            preconditionFailure()
+
+        case .failure:
+            return """
+                Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType).
+                """
+        }
+
     }
     
-    static func failure(targetType: PSQLDecodable.Type,
-                        type: PostgresDataType,
-                        postgresData: ByteBuffer,
-                        description: String? = nil,
-                        underlying: Error? = nil,
-                        context: PSQLDecodingContext) -> Self
-    {
-        PSQLCastingError(
-            columnName: context.columnName,
-            columnIndex: context.columnIndex,
-            file: context.file,
-            line: context.line,
-            targetType: targetType,
-            postgresType: type,
-            postgresData: postgresData,
-            description: description ?? """
-                Failed to cast Postgres data type \(type.description) to Swift type \(targetType) \
-                in \(context.file) line \(context.line)."
-                """,
-            underlying: underlying
-        )
+    static func ==(lhs: PSQLCastingError, rhs: PSQLCastingError) -> Bool {
+        lhs.targetType == rhs.targetType
     }
 }
 

@@ -104,13 +104,13 @@ extension Array: PSQLDecodable where Element: PSQLArrayElement {
     static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Array<Element> {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+            throw PSQLCastingError.Code.failure
         }
         
         guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, UInt32).self),
               0 <= isNotEmpty, isNotEmpty <= 1, b == 0
         else {
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+            throw PSQLCastingError.Code.failure
         }
         
         let elementType = PostgresDataType(element)
@@ -123,7 +123,7 @@ extension Array: PSQLDecodable where Element: PSQLArrayElement {
               expectedArrayCount > 0,
               dimensions == 1
         else {
-            throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+            throw PSQLCastingError.Code.failure
         }
                 
         var result = Array<Element>()
@@ -131,11 +131,11 @@ extension Array: PSQLDecodable where Element: PSQLArrayElement {
         
         for _ in 0 ..< expectedArrayCount {
             guard let elementLength = buffer.readInteger(as: Int32.self) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             
             guard var elementBuffer = buffer.readSlice(length: numericCast(elementLength)) else {
-                throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
+                throw PSQLCastingError.Code.failure
             }
             
             let element = try Element.decode(from: &elementBuffer, type: elementType, format: format, context: context)
