@@ -49,12 +49,10 @@ extension PSQLDecodable {
         format: PostgresFormat,
         context: PSQLDecodingContext
     ) throws -> Self {
-        switch byteBuffer {
-        case .some(var buffer):
-            return try self.decode(from: &buffer, type: type, format: format, context: context)
-        case .none:
+        guard var buffer = byteBuffer else {
             throw PostgresCastingError.Code.missingData
         }
+        return try self.decode(from: &buffer, type: type, format: format, context: context)
     }
 }
 
