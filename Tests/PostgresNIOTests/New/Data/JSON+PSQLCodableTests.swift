@@ -20,20 +20,18 @@ class JSON_PSQLCodableTests: XCTestCase {
         
         // verify jsonb prefix byte
         XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 1)
-        
-        let data = PSQLData(bytes: buffer, dataType: .jsonb, format: .binary)
+
         var result: Hello?
-        XCTAssertNoThrow(result = try data.decode(as: Hello.self, context: .forTests()))
+        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .forTests()))
         XCTAssertEqual(result, hello)
     }
     
     func testDecodeFromJSON() {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
-        
-        let data = PSQLData(bytes: buffer, dataType: .json, format: .binary)
+
         var result: Hello?
-        XCTAssertNoThrow(result = try data.decode(as: Hello.self, context: .forTests()))
+        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .json, format: .binary, context: .forTests()))
         XCTAssertEqual(result, Hello(name: "world"))
     }
     
@@ -45,9 +43,9 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
         
         for (format, dataType) in combinations {
-            let data = PSQLData(bytes: buffer, dataType: dataType, format: format)
+            var loopBuffer = buffer
             var result: Hello?
-            XCTAssertNoThrow(result = try data.decode(as: Hello.self, context: .forTests()))
+            XCTAssertNoThrow(result = try Hello.decode(from: &loopBuffer, type: dataType, format: format, context: .forTests()))
             XCTAssertEqual(result, Hello(name: "world"))
         }
     }
@@ -55,20 +53,18 @@ class JSON_PSQLCodableTests: XCTestCase {
     func testDecodeFromJSONBWithoutVersionPrefixByte() {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
-        
-        let data = PSQLData(bytes: buffer, dataType: .jsonb, format: .binary)
-        XCTAssertThrowsError(try data.decode(as: Hello.self, context: .forTests())) { error in
-            XCTAssert(error is PSQLCastingError)
+
+        XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .forTests())) {
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
     
     func testDecodeFromJSONBWithWrongDataType() {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
-        
-        let data = PSQLData(bytes: buffer, dataType: .text, format: .binary)
-        XCTAssertThrowsError(try data.decode(as: Hello.self, context: .forTests())) { error in
-            XCTAssert(error is PSQLCastingError)
+
+        XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .text, format: .binary, context: .forTests())) {
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
         }
     }
     

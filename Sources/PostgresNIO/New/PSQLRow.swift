@@ -54,10 +54,9 @@ extension PSQLRow {
             columnIndex: index,
             file: file,
             line: line)
-        
-        guard var cellSlice = self.data[column: index] else {
-            throw PSQLCastingError.missingData(targetType: T.self, type: column.dataType, context: context)
-        }
+
+        // Safe to force unwrap here, as we have ensured above that the row has enough columns 
+        var cellSlice = self.data[column: index]!
 
         return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)
     }
