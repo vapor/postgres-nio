@@ -2,6 +2,9 @@ import NIOCore
 import NIOConcurrencyHelpers
 
 #if swift(>=5.5) && canImport(_Concurrency)
+/// An async sequence of ``PSQLRow``s.
+///
+/// - NOTE:This is a struct to allow us to move to a move only type easily once they become available.
 struct PSQLRowSequence: AsyncSequence {
     typealias Element = PSQLRow
     typealias AsyncIterator = Iterator
@@ -72,19 +75,16 @@ final class AsyncStreamConsumer {
     
     let lookupTable: [String: Int]
     let columns: [RowDescription.Column]
-    let jsonDecoder: PSQLJSONDecoder
     private var state: StateMachine
     
     init(
         lookupTable: [String: Int],
-        columns: [RowDescription.Column],
-        jsonDecoder: PSQLJSONDecoder
+        columns: [RowDescription.Column]
     ) {
         self.state = StateMachine()
         
         self.lookupTable = lookupTable
         self.columns = columns
-        self.jsonDecoder = jsonDecoder
     }
     
     func startCompleted(_ buffer: CircularBuffer<DataRow>, commandTag: String) {
@@ -115,8 +115,7 @@ final class AsyncStreamConsumer {
             let row = PSQLRow(
                 data: data,
                 lookupTable: self.lookupTable,
-                columns: self.columns,
-                jsonDecoder: self.jsonDecoder
+                columns: self.columns
             )
             continuation.resume(returning: row)
             source?.demand()
@@ -190,8 +189,7 @@ final class AsyncStreamConsumer {
             return PSQLRow(
                 data: data,
                 lookupTable: self.lookupTable,
-                columns: self.columns,
-                jsonDecoder: self.jsonDecoder
+                columns: self.columns
             )
             
         case .throwError(let error):

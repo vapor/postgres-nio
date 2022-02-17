@@ -73,8 +73,7 @@ final class PSQLRowStream {
         
         let consumer = AsyncStreamConsumer(
             lookupTable: self.lookupTable,
-            columns: self.rowDescription,
-            jsonDecoder: self.jsonDecoder
+            columns: self.rowDescription
         )
         
         switch bufferState {
