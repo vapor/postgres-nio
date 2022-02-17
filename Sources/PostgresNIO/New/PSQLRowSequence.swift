@@ -6,7 +6,7 @@ import NIOConcurrencyHelpers
 ///
 /// - Note: This is a struct to allow us to move to a move only type easily once they become available.
 struct PSQLRowSequence: AsyncSequence {
-    typealias Element = PSQLRow
+    typealias Element = PostgresRow
     typealias AsyncIterator = Iterator
     
     final class _Internal {
@@ -40,7 +40,7 @@ struct PSQLRowSequence: AsyncSequence {
 
 extension PSQLRowSequence {
     struct Iterator: AsyncIteratorProtocol {
-        typealias Element = PSQLRow
+        typealias Element = PostgresRow
         
         let _internal: _Internal
         
@@ -48,7 +48,7 @@ extension PSQLRowSequence {
             self._internal = _Internal(consumer: consumer)
         }
         
-        mutating func next() async throws -> PSQLRow? {
+        mutating func next() async throws -> PostgresRow? {
             try await self._internal.next()
         }
         
@@ -63,7 +63,7 @@ extension PSQLRowSequence {
                 self.consumer.iteratorDeinitialized()
             }
             
-            func next() async throws -> PSQLRow? {
+            func next() async throws -> PostgresRow? {
                 try await self.consumer.next()
             }
         }
@@ -112,7 +112,7 @@ final class AsyncStreamConsumer {
         
         switch receiveAction {
         case .succeed(let continuation, let data, signalDemandTo: let source):
-            let row = PSQLRow(
+            let row = PostgresRow(
                 data: data,
                 lookupTable: self.lookupTable,
                 columns: self.columns
@@ -176,7 +176,7 @@ final class AsyncStreamConsumer {
         }
     }
     
-    func next() async throws -> PSQLRow? {
+    func next() async throws -> PostgresRow? {
         self.lock.lock()
         switch self.state.next() {
         case .returnNil:
@@ -186,7 +186,7 @@ final class AsyncStreamConsumer {
         case .returnRow(let data, signalDemandTo: let source):
             self.lock.unlock()
             source?.demand()
-            return PSQLRow(
+            return PostgresRow(
                 data: data,
                 lookupTable: self.lookupTable,
                 columns: self.columns
@@ -217,7 +217,7 @@ extension AsyncStreamConsumer {
         enum UpstreamState {
             enum DemandState {
                 case canAskForMore
-                case waitingForMore(CheckedContinuation<PSQLRow?, Error>?)
+                case waitingForMore(CheckedContinuation<PostgresRow?, Error>?)
             }
             
             case initialized
@@ -397,7 +397,7 @@ extension AsyncStreamConsumer {
             case none
         }
         
-        mutating func next(for continuation: CheckedContinuation<PSQLRow?, Error>) -> NextSlowPathAction {
+        mutating func next(for continuation: CheckedContinuation<PostgresRow?, Error>) -> NextSlowPathAction {
             switch self.upstreamState {
             case .initialized:
                 preconditionFailure()
@@ -424,7 +424,7 @@ extension AsyncStreamConsumer {
         }
         
         enum ReceiveAction {
-            case succeed(CheckedContinuation<PSQLRow?, Error>, DataRow, signalDemandTo: PSQLRowStream?)
+            case succeed(CheckedContinuation<PostgresRow?, Error>, DataRow, signalDemandTo: PSQLRowStream?)
             case none
         }
         
@@ -464,8 +464,8 @@ extension AsyncStreamConsumer {
         }
         
         enum CompletionResult {
-            case succeed(CheckedContinuation<PSQLRow?, Error>)
-            case fail(CheckedContinuation<PSQLRow?, Error>, Error)
+            case succeed(CheckedContinuation<PostgresRow?, Error>)
+            case fail(CheckedContinuation<PostgresRow?, Error>, Error)
             case none
         }
         
@@ -533,8 +533,8 @@ extension AsyncStreamConsumer {
 }
 
 extension PSQLRowSequence {
-    func collect() async throws -> [PSQLRow] {
-        var result = [PSQLRow]()
+    func collect() async throws -> [PostgresRow] {
+        var result = [PostgresRow]()
         for try await row in self {
             result.append(row)
         }

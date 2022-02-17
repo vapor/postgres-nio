@@ -90,18 +90,23 @@ extension PostgresRow {
         precondition(index < self.data.columnCount)
 
         let column = self.columns[index]
-        let context = PSQLDecodingContext(
-            jsonDecoder: jsonDecoder,
-            columnName: column.name,
-            columnIndex: index,
-            file: file,
-            line: line)
+        let context = PostgresDecodingContext(
+            jsonDecoder: jsonDecoder
+        )
 
-        guard var cellSlice = self.data[column: index] else {
-            throw PSQLCastingError.missingData(targetType: T.self, type: column.dataType, context: context)
+        var cellSlice = self.data[column: index]
+        do {
+            return try T.decodeRaw(from: &cellSlice, type: column.dataType, format: column.format, context: context)
+        } catch let code as PostgresCastingError.Code {
+            throw PostgresCastingError(
+                code: code,
+                columnName: self.columns[index].name,
+                columnIndex: index,
+                targetType: T.self,
+                postgresType: self.columns[index].dataType,
+                postgresData: cellSlice
+            )
         }
-
-        return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)
     }
 }
 
