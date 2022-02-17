@@ -60,7 +60,7 @@ struct PSQLEncodingContext {
 
 struct PSQLDecodingContext {
     
-    let jsonDecoder: PSQLJSONDecoder
+    let jsonDecoder: PostgresJSONDecoder
     
     let columnIndex: Int
     let columnName: String
@@ -68,7 +68,7 @@ struct PSQLDecodingContext {
     let file: String
     let line: Int
     
-    init(jsonDecoder: PSQLJSONDecoder, columnName: String, columnIndex: Int, file: String, line: Int) {
+    init(jsonDecoder: PostgresJSONDecoder, columnName: String, columnIndex: Int, file: String, line: Int) {
         self.jsonDecoder = jsonDecoder
         self.columnName = columnName
         self.columnIndex = columnIndex

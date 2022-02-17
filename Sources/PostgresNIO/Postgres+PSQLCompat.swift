@@ -1,19 +1,5 @@
 import NIOCore
 
-struct PostgresJSONDecoderWrapper: PSQLJSONDecoder {
-    let downstream: PostgresJSONDecoder
-    
-    init(_ downstream: PostgresJSONDecoder) {
-        self.downstream = downstream
-    }
-    
-    func decode<T>(_ type: T.Type, from buffer: ByteBuffer) throws -> T where T : Decodable {
-        var buffer = buffer
-        let data = buffer.readData(length: buffer.readableBytes)!
-        return try self.downstream.decode(T.self, from: data)
-    }
-}
-
 struct PostgresJSONEncoderWrapper: PSQLJSONEncoder {
     let downstream: PostgresJSONEncoder
     
