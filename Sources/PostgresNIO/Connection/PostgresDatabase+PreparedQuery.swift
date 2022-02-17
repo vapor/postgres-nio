@@ -28,29 +28,10 @@ extension PostgresDatabase {
 
 public struct PreparedQuery {
     let underlying: PSQLPreparedStatement
-    let lookupTable: PostgresRow.LookupTable?
     let database: PostgresDatabase
 
     init(underlying: PSQLPreparedStatement, database: PostgresDatabase) {
         self.underlying = underlying
-        self.lookupTable = underlying.rowDescription.flatMap {
-            rowDescription -> PostgresRow.LookupTable in
-            
-            let fields = rowDescription.columns.map { column in
-                PostgresMessage.RowDescription.Field(
-                    name: column.name,
-                    tableOID: UInt32(column.tableOID),
-                    columnAttributeNumber: column.columnAttributeNumber,
-                    dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
-                    dataTypeSize: column.dataTypeSize,
-                    dataTypeModifier: column.dataTypeModifier,
-                    formatCode: .init(psqlFormatCode: column.format)
-                )
-            }
-            
-            return .init(rowDescription: .init(fields: fields), resultFormat: [.binary])
-        }
-        
         self.database = database
     }
 

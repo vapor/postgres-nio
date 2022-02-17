@@ -16,47 +16,14 @@ extension PostgresConnection: PostgresDatabase {
         switch command {
         case .query(let query, let binds, let onMetadata, let onRow):
             resultFuture = self.underlying.query(query, binds, logger: logger).flatMap { stream in
-                let fields = stream.rowDescription.map { column in
-                    PostgresMessage.RowDescription.Field(
-                        name: column.name,
-                        tableOID: UInt32(column.tableOID),
-                        columnAttributeNumber: column.columnAttributeNumber,
-                        dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
-                        dataTypeSize: column.dataTypeSize,
-                        dataTypeModifier: column.dataTypeModifier,
-                        formatCode: .init(psqlFormatCode: column.format)
-                    )
-                }
-                
-                let lookupTable = PostgresRow.LookupTable(rowDescription: .init(fields: fields), resultFormat: [.binary])
-                return stream.iterateRowsWithoutBackpressureOption(lookupTable: lookupTable, onRow: onRow).map { _ in
+                return stream.onRow(onRow).map { _ in
                     onMetadata(PostgresQueryMetadata(string: stream.commandTag)!)
                 }
             }
         case .queryAll(let query, let binds, let onResult):
             resultFuture = self.underlying.query(query, binds, logger: logger).flatMap { rows in
-                let fields = rows.rowDescription.map { column in
-                    PostgresMessage.RowDescription.Field(
-                        name: column.name,
-                        tableOID: UInt32(column.tableOID),
-                        columnAttributeNumber: column.columnAttributeNumber,
-                        dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
-                        dataTypeSize: column.dataTypeSize,
-                        dataTypeModifier: column.dataTypeModifier,
-                        formatCode: .init(psqlFormatCode: column.format)
-                    )
-                }
-                
-                let lookupTable = PostgresRow.LookupTable(rowDescription: .init(fields: fields), resultFormat: [.binary])
                 return rows.all().map { allrows in
-                    let r = allrows.map { psqlRow -> PostgresRow in
-                        let columns = psqlRow.data.map {
-                            PostgresMessage.DataRow.Column(value: $0)
-                        }
-                        return PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)
-                    }
-                    
-                    onResult(.init(metadata: PostgresQueryMetadata(string: rows.commandTag)!, rows: r))
+                    onResult(.init(metadata: PostgresQueryMetadata(string: rows.commandTag)!, rows: allrows))
                 }
             }
             
@@ -66,11 +33,7 @@ extension PostgresConnection: PostgresDatabase {
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
             resultFuture = self.underlying.execute(preparedQuery.underlying, binds, logger: logger).flatMap { rows in
-                guard let lookupTable = preparedQuery.lookupTable else {
-                    return self.eventLoop.makeSucceededFuture(())
-                }
-                
-                return rows.iterateRowsWithoutBackpressureOption(lookupTable: lookupTable, onRow: onRow)
+                return rows.onRow(onRow)
             }
         }
         
@@ -106,19 +69,4 @@ internal enum PostgresCommands: PostgresRequest {
     func log(to logger: Logger) {
         fatalError("This function must not be called")
     }
-}
-
-extension PSQLRowStream {
-    
-    func iterateRowsWithoutBackpressureOption(lookupTable: PostgresRow.LookupTable, onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
-        self.onRow { psqlRow in
-            let columns = psqlRow.data.map {
-                PostgresMessage.DataRow.Column(value: $0)
-            }
-            
-            let row = PostgresRow(dataRow: .init(columns: columns), lookupTable: lookupTable)
-            try onRow(row)
-        }
-    }
-    
 }

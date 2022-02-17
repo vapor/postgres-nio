@@ -1,75 +1,58 @@
-public struct PostgresRow: CustomStringConvertible {
-    final class LookupTable {
-        let rowDescription: PostgresMessage.RowDescription
-        let resultFormat: [PostgresFormat]
+/// `PostgresRow` represents a single row that was received from the server for a query or prepared statement.
+public struct PostgresRow {
+    let lookupTable: [String: Int]
+    let data: DataRow
 
-        struct Value {
-            let index: Int
-            let field: PostgresMessage.RowDescription.Field
-        }
-        
-        private var _storage: [String: Value]?
-        var storage: [String: Value] {
-            if let existing = self._storage {
-                return existing
-            } else {
-                let all = self.rowDescription.fields.enumerated().map { (index, field) in
-                    return (field.name, Value(index: index, field: field))
-                }
-                let storage = [String: Value](all) { a, b in
-                    // take the first value
-                    return a
-                }
-                self._storage = storage
-                return storage
-            }
-        }
+    let columns: [RowDescription.Column]
 
-        init(
-            rowDescription: PostgresMessage.RowDescription,
-            resultFormat: [PostgresFormat]
-        ) {
-            self.rowDescription = rowDescription
-            self.resultFormat = resultFormat
-        }
-
-        func lookup(column: String) -> Value? {
-            if let value = self.storage[column] {
-                return value
-            } else {
-                return nil
-            }
-        }
+    init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column]) {
+        self.data = data
+        self.lookupTable = lookupTable
+        self.columns = columns
     }
 
-    public let dataRow: PostgresMessage.DataRow
+    // MARK: Pre async await interface
 
     public var rowDescription: PostgresMessage.RowDescription {
-        self.lookupTable.rowDescription
+        let fields = self.columns.map { column in
+            PostgresMessage.RowDescription.Field(
+                name: column.name,
+                tableOID: UInt32(column.tableOID),
+                columnAttributeNumber: column.columnAttributeNumber,
+                dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
+                dataTypeSize: column.dataTypeSize,
+                dataTypeModifier: column.dataTypeModifier,
+                formatCode: .init(psqlFormatCode: column.format)
+            )
+        }
+        return PostgresMessage.RowDescription(fields: fields)
     }
 
-    let lookupTable: LookupTable
+    public var dataRow: PostgresMessage.DataRow {
+        let columns = self.data.map {
+            PostgresMessage.DataRow.Column(value: $0)
+        }
+        return PostgresMessage.DataRow(columns: columns)
+    }
 
     public func column(_ column: String) -> PostgresData? {
-        guard let entry = self.lookupTable.lookup(column: column) else {
+        guard let index = self.lookupTable[column] else {
             return nil
         }
-        let formatCode: PostgresFormat
-        switch self.lookupTable.resultFormat.count {
-        case 1: formatCode = self.lookupTable.resultFormat[0]
-        default: formatCode = entry.field.formatCode
-        }
+
         return PostgresData(
-            type: entry.field.dataType,
-            typeModifier: entry.field.dataTypeModifier,
-            formatCode: formatCode,
-            value: self.dataRow.columns[entry.index].value
+            type: self.columns[index].dataType,
+            typeModifier: self.columns[index].dataTypeModifier,
+            formatCode: .binary,
+            value: self.data[column: index]
         )
     }
+}
 
+extension PostgresRow: CustomStringConvertible {
     public var description: String {
         var row: [String: PostgresData] = [:]
-        for field in self.lookupTable.rowDescription.fields {
+        for field in self.rowDescription.fields {
             row[field.name] = self.column(field.name)
         }
         return row.description

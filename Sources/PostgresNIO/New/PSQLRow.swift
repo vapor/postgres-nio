@@ -1,22 +1,10 @@
 import NIOCore
 import Foundation
 
-/// `PSQLRow` represents a single row that was received from the Postgres Server.
-struct PSQLRow {
-    internal let lookupTable: [String: Int]
-    internal let data: DataRow
-    
-    internal let columns: [RowDescription.Column]
-    
-    internal init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column]) {
-        self.data = data
-        self.lookupTable = lookupTable
-        self.columns = columns
-    }
-}
+typealias PSQLRow = PostgresRow
 
 extension PSQLRow: Equatable {
-    static func ==(lhs: Self, rhs: Self) -> Bool {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
         lhs.data == rhs.data && lhs.columns == rhs.columns
     }
 }
