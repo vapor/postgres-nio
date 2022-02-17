@@ -3,7 +3,7 @@ import NIOCore
 /// A type that can encode itself to a postgres wire binary representation.
 protocol PSQLEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
-    var psqlType: PSQLDataType { get }
+    var psqlType: PostgresDataType { get }
     
     /// identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
     var psqlFormat: PostgresFormat { get }
@@ -32,7 +32,7 @@ protocol PSQLDecodable {
     ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format

@@ -1,15 +1,15 @@
 import NIOCore
 
 extension Bool: PSQLCodable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .bool
     }
     
     var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Bool {
+
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Bool {
         guard type == .bool else {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }

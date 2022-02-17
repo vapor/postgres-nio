@@ -6,7 +6,7 @@ import class Foundation.JSONDecoder
 private let JSONBVersionByte: UInt8 = 0x01
 
 extension PSQLCodable where Self: Codable {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .jsonb
     }
     
@@ -14,7 +14,7 @@ extension PSQLCodable where Self: Codable {
         .binary
     }
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
         switch (format, type) {
         case (.binary, .jsonb):
             guard JSONBVersionByte == buffer.readInteger(as: UInt8.self) else {

@@ -3,72 +3,72 @@ import struct Foundation.UUID
 
 /// A type, of which arrays can be encoded into and decoded from a postgres binary format
 protocol PSQLArrayElement: PSQLCodable {
-    static var psqlArrayType: PSQLDataType { get }
-    static var psqlArrayElementType: PSQLDataType { get }
+    static var psqlArrayType: PostgresDataType { get }
+    static var psqlArrayElementType: PostgresDataType { get }
 }
 
 extension Bool: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .boolArray }
-    static var psqlArrayElementType: PSQLDataType { .bool }
+    static var psqlArrayType: PostgresDataType { .boolArray }
+    static var psqlArrayElementType: PostgresDataType { .bool }
 }
 
 extension ByteBuffer: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .byteaArray }
-    static var psqlArrayElementType: PSQLDataType { .bytea }
+    static var psqlArrayType: PostgresDataType { .byteaArray }
+    static var psqlArrayElementType: PostgresDataType { .bytea }
 }
 
 extension UInt8: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .charArray }
-    static var psqlArrayElementType: PSQLDataType { .char }
+    static var psqlArrayType: PostgresDataType { .charArray }
+    static var psqlArrayElementType: PostgresDataType { .char }
 }
 
 extension Int16: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .int2Array }
-    static var psqlArrayElementType: PSQLDataType { .int2 }
+    static var psqlArrayType: PostgresDataType { .int2Array }
+    static var psqlArrayElementType: PostgresDataType { .int2 }
 }
 
 extension Int32: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .int4Array }
-    static var psqlArrayElementType: PSQLDataType { .int4 }
+    static var psqlArrayType: PostgresDataType { .int4Array }
+    static var psqlArrayElementType: PostgresDataType { .int4 }
 }
 
 extension Int64: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .int8Array }
-    static var psqlArrayElementType: PSQLDataType { .int8 }
+    static var psqlArrayType: PostgresDataType { .int8Array }
+    static var psqlArrayElementType: PostgresDataType { .int8 }
 }
 
 extension Int: PSQLArrayElement {
     #if (arch(i386) || arch(arm))
-    static var psqlArrayType: PSQLDataType { .int4Array }
-    static var psqlArrayElementType: PSQLDataType { .int4 }
+    static var psqlArrayType: PostgresDataType { .int4Array }
+    static var psqlArrayElementType: PostgresDataType { .int4 }
     #else
-    static var psqlArrayType: PSQLDataType { .int8Array }
-    static var psqlArrayElementType: PSQLDataType { .int8 }
+    static var psqlArrayType: PostgresDataType { .int8Array }
+    static var psqlArrayElementType: PostgresDataType { .int8 }
     #endif
 }
 
 extension Float: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .float4Array }
-    static var psqlArrayElementType: PSQLDataType { .float4 }
+    static var psqlArrayType: PostgresDataType { .float4Array }
+    static var psqlArrayElementType: PostgresDataType { .float4 }
 }
 
 extension Double: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .float8Array }
-    static var psqlArrayElementType: PSQLDataType { .float8 }
+    static var psqlArrayType: PostgresDataType { .float8Array }
+    static var psqlArrayElementType: PostgresDataType { .float8 }
 }
 
 extension String: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .textArray }
-    static var psqlArrayElementType: PSQLDataType { .text }
+    static var psqlArrayType: PostgresDataType { .textArray }
+    static var psqlArrayElementType: PostgresDataType { .text }
 }
 
 extension UUID: PSQLArrayElement {
-    static var psqlArrayType: PSQLDataType { .uuidArray }
-    static var psqlArrayElementType: PSQLDataType { .uuid }
+    static var psqlArrayType: PostgresDataType { .uuidArray }
+    static var psqlArrayElementType: PostgresDataType { .uuid }
 }
 
 extension Array: PSQLEncodable where Element: PSQLArrayElement {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
     
@@ -101,20 +101,19 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
 }
 
 extension Array: PSQLDecodable where Element: PSQLArrayElement {
-    
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Array<Element> {
+    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Array<Element> {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
         
-        guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, Int32).self),
+        guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, UInt32).self),
               0 <= isNotEmpty, isNotEmpty <= 1, b == 0
         else {
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)
         }
         
-        let elementType = PSQLDataType(rawValue: element)
+        let elementType = PostgresDataType(element)
         
         guard isNotEmpty == 1 else {
             return []
