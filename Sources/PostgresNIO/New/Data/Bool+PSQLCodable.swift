@@ -11,13 +11,13 @@ extension Bool: PSQLCodable {
 
     static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Bool {
         guard type == .bool else {
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
         
         switch format {
         case .binary:
             guard buffer.readableBytes == 1 else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             switch buffer.readInteger(as: UInt8.self) {
@@ -26,11 +26,11 @@ extension Bool: PSQLCodable {
             case .some(1):
                 return true
             default:
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
         case .text:
             guard buffer.readableBytes == 1 else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             switch buffer.readInteger(as: UInt8.self) {
@@ -39,7 +39,7 @@ extension Bool: PSQLCodable {
             case .some(UInt8(ascii: "t")):
                 return true
             default:
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
         }
     }

@@ -83,7 +83,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         buffer.moveReaderIndex(forwardBy: 1)
         
         XCTAssertThrowsError(try UUID.decode(from: &buffer, type: .uuid, format: .binary, context: .forTests())) { error in
-            XCTAssertEqual(error as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual(error as? PostgresCastingError.Code, .failure)
         }
     }
     
@@ -99,7 +99,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         for dataType in dataTypes {
             var loopBuffer = buffer
             XCTAssertThrowsError(try UUID.decode(from: &loopBuffer, type: dataType, format: .binary, context: .forTests())) {
-                XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+                XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
             }
         }
     }
@@ -114,7 +114,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         for dataType in dataTypes {
             var copy = buffer            
             XCTAssertThrowsError(try UUID.decode(from: &copy, type: dataType, format: .binary, context: .forTests())) {
-                XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
+                XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
             }
         }
     }

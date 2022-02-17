@@ -53,7 +53,7 @@ extension PSQLDecodable {
         case .some(var buffer):
             return try self.decode(from: &buffer, type: type, format: format, context: context)
         case .none:
-            throw PSQLCastingError.Code.missingData
+            throw PostgresCastingError.Code.missingData
         }
     }
 }

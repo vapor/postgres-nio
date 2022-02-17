@@ -18,13 +18,13 @@ extension PSQLCodable where Self: Codable {
         switch (format, type) {
         case (.binary, .jsonb):
             guard JSONBVersionByte == buffer.readInteger(as: UInt8.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return try context.jsonDecoder.decode(Self.self, from: buffer)
         case (.binary, .json), (.text, .jsonb), (.text, .json):
             return try context.jsonDecoder.decode(Self.self, from: buffer)
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
     

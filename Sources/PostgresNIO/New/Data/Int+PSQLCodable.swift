@@ -13,12 +13,12 @@ extension UInt8: PSQLCodable {
         switch type {
         case .bpchar, .char:
             guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             return value
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 
@@ -41,16 +41,16 @@ extension Int16: PSQLCodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         case (.text, .int2):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int16(string) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 
@@ -72,21 +72,21 @@ extension Int32: PSQLCodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return Int32(value)
         case (.binary, .int4):
             guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return Int32(value)
         case (.text, .int2), (.text, .int4):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int32(string) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 
@@ -108,26 +108,26 @@ extension Int64: PSQLCodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return Int64(value)
         case (.binary, .int4):
             guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return Int64(value)
         case (.binary, .int8):
             guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int64.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         case (.text, .int2), (.text, .int4), (.text, .int8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int64(string) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 
@@ -156,26 +156,26 @@ extension Int: PSQLCodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return Int(value)
         case (.binary, .int4):
             guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return Int(value)
         case (.binary, .int8) where Int.bitWidth == 64:
             guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         case (.text, .int2), (.text, .int4), (.text, .int8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int(string) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 

@@ -26,7 +26,7 @@ extension UUID: PSQLCodable {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return uuid
         case (.binary, .varchar),
@@ -35,15 +35,15 @@ extension UUID: PSQLCodable {
              (.text, .text),
              (.text, .varchar):
             guard buffer.readableBytes == 36 else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             guard let uuid = buffer.readString(length: 36).flatMap({ UUID(uuidString: $0) }) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return uuid
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 }

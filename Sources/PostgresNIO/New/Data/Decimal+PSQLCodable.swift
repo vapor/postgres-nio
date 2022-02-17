@@ -14,16 +14,16 @@ extension Decimal: PSQLCodable {
         switch (format, type) {
         case (.binary, .numeric):
             guard let numeric = PostgresNumeric(buffer: &buffer) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return numeric.decimal
         case (.text, .numeric):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return value
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
     

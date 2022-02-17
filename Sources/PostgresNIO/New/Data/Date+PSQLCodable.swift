@@ -14,18 +14,18 @@ extension Date: PSQLCodable {
         switch type {
         case .timestamp, .timestamptz:
             guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             let seconds = Double(microseconds) / Double(_microsecondsPerSecond)
             return Date(timeInterval: seconds, since: _psqlDateStart)
         case .date:
             guard buffer.readableBytes == 4, let days = buffer.readInteger(as: Int32.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             let seconds = Int64(days) * _secondsInDay
             return Date(timeInterval: Double(seconds), since: _psqlDateStart)
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
     

@@ -18,7 +18,7 @@ struct PSQLError: Error {
         case connectionError(underlying: Error)
         case uncleanShutdown
         
-        case casting(PSQLCastingError)
+        case casting(PostgresCastingError)
     }
     
     internal var base: Base
@@ -80,7 +80,7 @@ struct PSQLError: Error {
     }
 }
 
-struct PSQLCastingError: Error, Equatable {
+struct PostgresCastingError: Error, Equatable {
     struct Code: Hashable, Error {
         enum Base {
             case missingData
@@ -126,7 +126,7 @@ struct PSQLCastingError: Error, Equatable {
 
     }
     
-    static func ==(lhs: PSQLCastingError, rhs: PSQLCastingError) -> Bool {
+    static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
         lhs.targetType == rhs.targetType
     }
 }
