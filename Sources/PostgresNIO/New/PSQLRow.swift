@@ -48,7 +48,7 @@ extension PSQLRow {
         precondition(index < self.data.columnCount)
         
         let column = self.columns[index]
-        let context = PSQLDecodingContext(jsonDecoder: jsonDecoder)
+        let context = PostgresDecodingContext(jsonDecoder: jsonDecoder)
 
         // Safe to force unwrap here, as we have ensured above that the row has enough columns 
         var cellSlice = self.data[column: index]!

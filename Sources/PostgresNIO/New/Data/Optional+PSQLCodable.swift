@@ -7,7 +7,7 @@ extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.Decodabl
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")
     }
@@ -16,7 +16,7 @@ extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.Decodabl
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard var buffer = byteBuffer else {
             return nil

@@ -105,7 +105,7 @@ extension Array: PSQLDecodable where Element: PSQLArrayElement {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Array<Element> {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.

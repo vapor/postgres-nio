@@ -34,7 +34,7 @@ extension ByteBuffer: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         return buffer
     }
@@ -57,7 +57,7 @@ extension Data: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         return buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }

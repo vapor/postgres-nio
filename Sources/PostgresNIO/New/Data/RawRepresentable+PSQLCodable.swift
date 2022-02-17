@@ -13,7 +13,7 @@ extension PSQLCodable where Self: RawRepresentable, RawValue: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard let rawValue = try? RawValue.decode(from: &buffer, type: type, format: format, context: context),
               let selfValue = Self.init(rawValue: rawValue) else {

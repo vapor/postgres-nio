@@ -13,7 +13,7 @@ extension Bool: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard type == .bool else {
             throw PostgresCastingError.Code.typeMismatch

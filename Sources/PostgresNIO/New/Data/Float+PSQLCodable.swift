@@ -13,7 +13,7 @@ extension Float: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         switch (format, type) {
         case (.binary, .float4):
@@ -54,7 +54,7 @@ extension Double: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         switch (format, type) {
         case (.binary, .float4):

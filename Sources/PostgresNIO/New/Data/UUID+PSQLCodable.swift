@@ -26,7 +26,7 @@ extension UUID: PSQLCodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         switch (format, type) {
         case (.binary, .uuid):

@@ -7,7 +7,7 @@ extension PSQLFrontendMessageEncoder {
     }
 }
 
-extension PSQLDecodingContext where JSONDecoder == Foundation.JSONDecoder {
+extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
     static func forTests() -> Self {
         Self(jsonDecoder: JSONDecoder())
     }

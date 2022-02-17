@@ -30,7 +30,7 @@ extension PostgresData: PSQLDecodable {
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         let myBuffer = buffer.readSlice(length: buffer.readableBytes)!
         

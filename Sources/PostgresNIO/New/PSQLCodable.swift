@@ -37,7 +37,7 @@ protocol PSQLDecodable {
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format.
@@ -47,7 +47,7 @@ protocol PSQLDecodable {
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self
 }
 
@@ -57,7 +57,7 @@ extension PSQLDecodable {
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard var buffer = byteBuffer else {
             throw PostgresCastingError.Code.missingData
@@ -89,7 +89,7 @@ struct PSQLEncodingContext {
     let jsonEncoder: PostgresJSONEncoder
 }
 
-struct PSQLDecodingContext<JSONDecoder: PostgresJSONDecoder> {
+struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
     let jsonDecoder: JSONDecoder
     
     init(jsonDecoder: JSONDecoder) {
