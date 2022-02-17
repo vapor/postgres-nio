@@ -72,7 +72,7 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
         Element.psqlArrayType
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -102,7 +102,7 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
 
 extension Array: PSQLDecodable where Element: PSQLArrayElement {
     
-    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext) throws -> Array<Element> {
+    static func decode(from buffer: inout ByteBuffer, type: PSQLDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Array<Element> {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.
             throw PSQLCastingError.failure(targetType: Self.self, type: type, postgresData: buffer, context: context)

@@ -26,7 +26,7 @@ extension PostgresMessage {
         /// This can be zero to indicate that there are no parameters or that the parameters all use the default format (text);
         /// or one, in which case the specified format code is applied to all parameters; or it can equal the actual number of parameters.
         /// The parameter format codes. Each must presently be zero (text) or one (binary).
-        public var parameterFormatCodes: [PostgresFormatCode]
+        public var parameterFormatCodes: [PostgresFormat]
         
         /// The number of parameter values that follow (possibly zero). This must match the number of parameters needed by the query.
         public var parameters: [Parameter]
@@ -35,7 +35,7 @@ extension PostgresMessage {
         /// This can be zero to indicate that there are no result columns or that the result columns should all use the default format (text);
         /// or one, in which case the specified format code is applied to all result columns (if any);
         /// or it can equal the actual number of result columns of the query.
-        public var resultFormatCodes: [PostgresFormatCode]
+        public var resultFormatCodes: [PostgresFormat]
         
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
