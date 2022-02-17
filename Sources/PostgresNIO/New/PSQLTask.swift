@@ -28,26 +28,22 @@ final class ExtendedQueryContext {
     let bind: [PSQLEncodable]
     let logger: Logger
     
-    let jsonDecoder: PSQLJSONDecoder
     let promise: EventLoopPromise<PSQLRowStream>
     
     init(query: String,
          bind: [PSQLEncodable],
          logger: Logger,
-         jsonDecoder: PSQLJSONDecoder,
          promise: EventLoopPromise<PSQLRowStream>)
     {
         self.query = .unnamed(query)
         self.bind = bind
         self.logger = logger
-        self.jsonDecoder = jsonDecoder
         self.promise = promise
     }
     
     init(preparedStatement: PSQLPreparedStatement,
          bind: [PSQLEncodable],
          logger: Logger,
-         jsonDecoder: PSQLJSONDecoder,
          promise: EventLoopPromise<PSQLRowStream>)
     {
         self.query = .preparedStatement(
@@ -55,7 +51,6 @@ final class ExtendedQueryContext {
             rowDescription: preparedStatement.rowDescription)
         self.bind = bind
         self.logger = logger
-        self.jsonDecoder = jsonDecoder
         self.promise = promise
     }
 
