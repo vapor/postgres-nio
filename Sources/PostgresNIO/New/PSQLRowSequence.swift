@@ -240,13 +240,10 @@ extension AsyncStreamConsumer {
             case iteratorCreated
         }
         
-        var upstreamState: UpstreamState
-        var downstreamState: DownstreamState
+        var upstreamState = UpstreamState.initialized
+        var downstreamState = DownstreamState.sequenceCreated
         
-        init() {
-            self.upstreamState = .initialized
-            self.downstreamState = .sequenceCreated
-        }
+        init() {}
         
         mutating func buffered(_ buffer: CircularBuffer<DataRow>, upstream: PSQLRowStream) {
             switch self.upstreamState {
