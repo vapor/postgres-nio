@@ -36,23 +36,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swiftver:
-          # Only test latest Swift for integration tests, issues from older Swift versions that don't show
-          # up in the unit tests are fairly unlikely.
-          - swift:5.5
-        swiftos:
-          - focal
+        dbimage:
+          - postgres:14
+          - postgres:13
+          - postgres:11
         include:
-          - swiftver: swift:5.5
-            dbimage: postgres:14
+          - dbimage: postgres:14
             dbauth: scram-sha-256
-          - swiftver: swift:5.5
-            dbimage: postgres:13
+          - dbimage: postgres:13
             dbauth: md5
-          - swiftver: swift:5.5
-            dbimage: postgres:11
+          - dbimage: postgres:11
             dbauth: trust
-    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
+    container: swift:5.5-focal
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
