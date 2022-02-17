@@ -75,7 +75,7 @@ public final class PSQLConnection {
         return self.channel.closeFuture
     }
     
-    var isClosed: Bool {
+    public var isClosed: Bool {
         return !self.channel.isActive
     }
     
