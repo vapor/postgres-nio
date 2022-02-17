@@ -56,7 +56,7 @@ final class IntegrationTests: XCTestCase {
         
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var version: String?
         XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
@@ -103,7 +103,7 @@ final class IntegrationTests: XCTestCase {
         for _ in 0..<1_000 {
             var stream: PSQLRowStream?
             XCTAssertNoThrow(stream = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-            var rows: [PSQLRow]?
+            var rows: [PostgresRow]?
             XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
             var version: String?
             XCTAssertNoThrow(version = try rows?.first?.decode(column: 0, as: String.self))
@@ -122,7 +122,7 @@ final class IntegrationTests: XCTestCase {
         
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT $1::TEXT as foo", ["hello"], logger: .psqlTest).wait())
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var foo: String?
         XCTAssertNoThrow(foo = try rows?.first?.decode(column: 0, as: String.self))
@@ -152,7 +152,7 @@ final class IntegrationTests: XCTestCase {
             9223372036854775807::BIGINT   as bigint_max
         """, logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first
@@ -181,7 +181,7 @@ final class IntegrationTests: XCTestCase {
         let array: [Int64] = [1, 2, 3]
         XCTAssertNoThrow(stream = try conn?.query("SELECT $1::int8[] as array", [array], logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         XCTAssertEqual(try rows?.first?.decode(column: "array", as: [Int64].self), array)
@@ -199,7 +199,7 @@ final class IntegrationTests: XCTestCase {
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("SELECT '{}'::int[] as array", logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         XCTAssertEqual(try rows?.first?.decode(column: "array", as: [Int64].self), [])
@@ -218,7 +218,7 @@ final class IntegrationTests: XCTestCase {
         let doubles: [Double] = [3.14, 42]
         XCTAssertNoThrow(stream = try conn?.query("SELECT $1::double precision[] as doubles", [doubles], logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         XCTAssertEqual(try rows?.first?.decode(column: "doubles", as: [Double].self), doubles)
@@ -241,7 +241,7 @@ final class IntegrationTests: XCTestCase {
                 '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
             """, logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first
@@ -267,7 +267,7 @@ final class IntegrationTests: XCTestCase {
                 $2::numeric     as numeric_negative
             """, [Decimal(string: "123456.789123")!, Decimal(string: "-123456.789123")!], logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first
@@ -290,7 +290,7 @@ final class IntegrationTests: XCTestCase {
             SELECT '2c68f645-9ca6-468b-b193-ee97f241c2f8'::UUID as uuid
             """, logger: .psqlTest).wait())
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
         
@@ -317,7 +317,7 @@ final class IntegrationTests: XCTestCase {
                 select $1::jsonb as jsonb
                 """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
             
-            var rows: [PSQLRow]?
+            var rows: [PostgresRow]?
             XCTAssertNoThrow(rows = try stream?.all().wait())
             XCTAssertEqual(rows?.count, 1)
             var result: Object?
@@ -332,7 +332,7 @@ final class IntegrationTests: XCTestCase {
                 select $1::json as json
                 """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
             
-            var rows: [PSQLRow]?
+            var rows: [PostgresRow]?
             XCTAssertNoThrow(rows = try stream?.all().wait())
             XCTAssertEqual(rows?.count, 1)
             var result: Object?

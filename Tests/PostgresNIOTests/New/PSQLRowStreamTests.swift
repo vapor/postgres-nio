@@ -81,7 +81,7 @@ class PSQLRowStreamTests: XCTestCase {
         let future = stream.all()
         XCTAssertEqual(dataSource.hitDemand, 0) // TODO: Is this right?
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try future.wait())
         XCTAssertEqual(rows?.count, 2)
     }
@@ -131,7 +131,7 @@ class PSQLRowStreamTests: XCTestCase {
         
         stream.receive(completion: .success("SELECT 2"))
         
-        var rows: [PSQLRow]?
+        var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try future.wait())
         XCTAssertEqual(rows?.count, 6)
     }
