@@ -55,7 +55,7 @@ extension PSQLRow {
             file: file,
             line: line)
 
-        // Safe to force unwrap here, as we have ensured above, that the row has enough columns 
+        // Safe to force unwrap here, as we have ensured above that the row has enough columns 
         var cellSlice = self.data[column: index]!
 
         return try T.decode(from: &cellSlice, type: column.dataType, format: column.format, context: context)

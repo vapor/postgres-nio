@@ -99,7 +99,7 @@ struct PostgresCastingError: Error, Equatable {
         static let failure = Self.init(.failure)
     }
 
-    var code: Code
+    let code: Code
     
     let columnName: String
     let columnIndex: Int
@@ -127,7 +127,12 @@ struct PostgresCastingError: Error, Equatable {
     }
     
     static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
-        lhs.targetType == rhs.targetType
+        return lhs.code == rhs.code
+            && lhs.columnName == rhs.columnName
+            && lhs.columnIndex == rhs.columnIndex
+            && lhs.targetType == rhs.targetType
+            && lhs.postgresType == rhs.postgresType
+            && lhs.postgresData == rhs.postgresData
     }
 }
 
