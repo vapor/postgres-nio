@@ -249,26 +249,35 @@ extension AsyncStreamConsumer {
         }
         
         mutating func buffered(_ buffer: CircularBuffer<DataRow>, upstream: PSQLRowStream) {
-            guard case .initialized = self.upstreamState else {
+            switch self.upstreamState {
+            case .initialized:
+                let adaptive = AdaptiveRowBuffer(buffer)
+                self.upstreamState = .streaming(adaptive, upstream, buffer.isEmpty ? .waitingForMore(nil) : .canAskForMore)
+
+            case .streaming, .finished, .failed, .consumed, .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
-            let adaptive = AdaptiveRowBuffer(buffer)
-            self.upstreamState = .streaming(adaptive, upstream, buffer.isEmpty ? .waitingForMore(nil) : .canAskForMore)
         }
         
         mutating func finished(_ buffer: CircularBuffer<DataRow>, commandTag: String) {
-            guard case .initialized = self.upstreamState else {
+            switch self.upstreamState {
+            case .initialized:
+                let adaptive = AdaptiveRowBuffer(buffer)
+                self.upstreamState = .finished(adaptive, commandTag)
+
+            case .streaming, .finished, .failed, .consumed, .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
-            let adaptive = AdaptiveRowBuffer(buffer)
-            self.upstreamState = .finished(adaptive, commandTag)
         }
         
         mutating func failed(_ error: Error) {
-            guard case .initialized = self.upstreamState else {
+            switch self.upstreamState {
+            case .initialized:
+                self.upstreamState = .failed(error)
+
+            case .streaming, .finished, .failed, .consumed, .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
-            self.upstreamState = .failed(error)
         }
         
         mutating func createAsyncIterator() {
