@@ -12,8 +12,7 @@ extension PostgresConnection {
     ) -> EventLoopFuture<PostgresConnection> {
         
         let coders = PSQLConnection.Configuration.Coders(
-            jsonEncoder: PostgresJSONEncoderWrapper(_defaultJSONEncoder),
-            jsonDecoder: PostgresJSONDecoderWrapper(_defaultJSONDecoder)
+            jsonEncoder: PostgresJSONEncoderWrapper(_defaultJSONEncoder)
         )
         
         let configuration = PSQLConnection.Configuration(

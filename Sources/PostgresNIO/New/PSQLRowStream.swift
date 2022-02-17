@@ -26,7 +26,6 @@ final class PSQLRowStream {
     internal let rowDescription: [RowDescription.Column]
     private let lookupTable: [String: Int]
     private var downstreamState: DownstreamState
-    private let jsonDecoder: PSQLJSONDecoder
     
     init(rowDescription: [RowDescription.Column],
          queryContext: ExtendedQueryContext,
@@ -47,7 +46,6 @@ final class PSQLRowStream {
         
         self.eventLoop = eventLoop
         self.logger = queryContext.logger
-        self.jsonDecoder = queryContext.jsonDecoder
         
         self.rowDescription = rowDescription
 
@@ -82,7 +80,7 @@ final class PSQLRowStream {
         case .streaming(let bufferedRows, let dataSource):
             let promise = self.eventLoop.makePromise(of: [PSQLRow].self)
             let rows = bufferedRows.map { data in
-                PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription)
             }
             self.downstreamState = .waitingForAll(rows, promise, dataSource)
             // immediately request more
@@ -91,7 +89,7 @@ final class PSQLRowStream {
             
         case .finished(let buffer, let commandTag):
             let rows = buffer.map {
-                PSQLRow(data: $0, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                PSQLRow(data: $0, lookupTable: self.lookupTable, columns: self.rowDescription)
             }
             
             self.downstreamState = .consumed(.success(commandTag))
@@ -130,8 +128,7 @@ final class PSQLRowStream {
                     let row = PSQLRow(
                         data: data,
                         lookupTable: self.lookupTable,
-                        columns: self.rowDescription,
-                        jsonDecoder: self.jsonDecoder
+                        columns: self.rowDescription
                     )
                     try onRow(row)
                 }
@@ -154,8 +151,7 @@ final class PSQLRowStream {
                     let row = PSQLRow(
                         data: data,
                         lookupTable: self.lookupTable,
-                        columns: self.rowDescription,
-                        jsonDecoder: self.jsonDecoder
+                        columns: self.rowDescription
                     )
                     try onRow(row)
                 }
@@ -200,8 +196,7 @@ final class PSQLRowStream {
                     let row = PSQLRow(
                         data: data,
                         lookupTable: self.lookupTable,
-                        columns: self.rowDescription,
-                        jsonDecoder: self.jsonDecoder
+                        columns: self.rowDescription
                     )
                     try onRow(row)
                 }
@@ -216,7 +211,7 @@ final class PSQLRowStream {
 
         case .waitingForAll(var rows, let promise, let dataSource):
             newRows.forEach { data in
-                let row = PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription, jsonDecoder: self.jsonDecoder)
+                let row = PSQLRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription)
                 rows.append(row)
             }
             self.downstreamState = .waitingForAll(rows, promise, dataSource)
