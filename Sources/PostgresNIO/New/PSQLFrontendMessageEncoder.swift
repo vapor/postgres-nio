@@ -2,9 +2,9 @@
 struct PSQLFrontendMessageEncoder: MessageToByteEncoder {
     typealias OutboundIn = PSQLFrontendMessage
     
-    let jsonEncoder: PSQLJSONEncoder
+    let jsonEncoder: PostgresJSONEncoder
     
-    init(jsonEncoder: PSQLJSONEncoder) {
+    init(jsonEncoder: PostgresJSONEncoder) {
         self.jsonEncoder = jsonEncoder
     }
     
