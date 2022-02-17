@@ -13,9 +13,9 @@ final class PSQLConnection {
     struct Configuration {
         
         struct Coders {
-            var jsonEncoder: PSQLJSONEncoder
+            var jsonEncoder: PostgresJSONEncoder
             
-            init(jsonEncoder: PSQLJSONEncoder) {
+            init(jsonEncoder: PostgresJSONEncoder) {
                 self.jsonEncoder = jsonEncoder
             }
             

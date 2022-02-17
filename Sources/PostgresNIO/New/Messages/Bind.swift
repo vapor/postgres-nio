@@ -12,7 +12,7 @@ extension PSQLFrontendMessage {
         /// The number of parameter values that follow (possibly zero). This must match the number of parameters needed by the query.
         var parameters: [PSQLEncodable]
         
-        func encode(into buffer: inout ByteBuffer, using jsonEncoder: PSQLJSONEncoder) throws {
+        func encode(into buffer: inout ByteBuffer, using jsonEncoder: PostgresJSONEncoder) throws {
             buffer.writeNullTerminatedString(self.portalName)
             buffer.writeNullTerminatedString(self.preparedStatementName)
             
