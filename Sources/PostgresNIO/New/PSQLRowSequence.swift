@@ -4,7 +4,7 @@ import NIOConcurrencyHelpers
 #if swift(>=5.5) && canImport(_Concurrency)
 /// An async sequence of ``PSQLRow``s.
 ///
-/// - NOTE:This is a struct to allow us to move to a move only type easily once they become available.
+/// - Note: This is a struct to allow us to move to a move only type easily once they become available.
 struct PSQLRowSequence: AsyncSequence {
     typealias Element = PSQLRow
     typealias AsyncIterator = Iterator
