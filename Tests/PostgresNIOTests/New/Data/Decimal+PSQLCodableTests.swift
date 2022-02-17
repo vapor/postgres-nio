@@ -23,7 +23,7 @@ class Decimal_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int64(0))
         
         XCTAssertThrowsError(try Decimal.decode(from: &buffer, type: .int8, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
         }
     }
     

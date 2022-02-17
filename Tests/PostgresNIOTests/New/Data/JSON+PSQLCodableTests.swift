@@ -31,7 +31,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         var result: Hello?
-        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .json, format: .binary, context: .forTests()))
         XCTAssertEqual(result, Hello(name: "world"))
     }
     
@@ -55,7 +55,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
     
@@ -64,7 +64,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .text, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
         }
     }
     

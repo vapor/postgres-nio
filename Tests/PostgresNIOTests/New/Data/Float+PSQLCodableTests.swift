@@ -98,22 +98,22 @@ class Float_PSQLCodableTests: XCTestCase {
 
         var toLongBuffer1 = eightByteBuffer
         XCTAssertThrowsError(try Double.decode(from: &toLongBuffer1, type: .float4, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
 
         var toLongBuffer2 = eightByteBuffer
         XCTAssertThrowsError(try Float.decode(from: &toLongBuffer2, type: .float4, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
 
         var toShortBuffer1 = fourByteBuffer
         XCTAssertThrowsError(try Double.decode(from: &toShortBuffer1, type: .float8, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
 
         var toShortBuffer2 = fourByteBuffer
         XCTAssertThrowsError(try Float.decode(from: &toShortBuffer2, type: .float8, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
     
@@ -123,12 +123,12 @@ class Float_PSQLCodableTests: XCTestCase {
 
         var copy1 = buffer
         XCTAssertThrowsError(try Double.decode(from: &copy1, type: .int8, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
         }
 
         var copy2 = buffer
         XCTAssertThrowsError(try Float.decode(from: &copy2, type: .int8, format: .binary, context: .forTests())) {
-            XCTAssert($0 is PSQLCastingError)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
         }
     }
 }

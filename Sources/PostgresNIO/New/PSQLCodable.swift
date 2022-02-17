@@ -20,6 +20,7 @@ protocol PSQLEncodable {
 
 /// A type that can decode itself from a postgres wire binary representation.
 protocol PSQLDecodable {
+    associatedtype DecodableType: PSQLDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -32,7 +33,29 @@ protocol PSQLDecodable {
     ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
+    static func decode(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
+
+    /// Decode an entity from the `byteBuffer` in postgres wire format.
+    /// This method has a default implementation and may be overriden
+    /// only for special cases, like `Optional`s.
+    static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
+}
+
+extension PSQLDecodable {
+    @inlinable
+    public static func decodeRaw(
+        from byteBuffer: inout ByteBuffer?,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PSQLDecodingContext
+    ) throws -> Self {
+        switch byteBuffer {
+        case .some(var buffer):
+            return try self.decode(from: &buffer, type: type, format: format, context: context)
+        case .none:
+            throw PSQLCastingError.Code.missingData
+        }
+    }
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format

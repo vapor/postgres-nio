@@ -30,7 +30,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int16(4)) // out of bounds
 
         XCTAssertThrowsError(try MyRawRepresentable.decode(from: &buffer, type: Int16.psqlArrayElementType, format: .binary, context: .forTests())) {
-            XCTAssert(($0 as? PSQLCastingError)?.targetType == MyRawRepresentable.self)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
     
@@ -39,7 +39,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(1)) // out of bounds
 
         XCTAssertThrowsError(try MyRawRepresentable.decode(from: &buffer, type: Int32.psqlArrayElementType, format: .binary, context: .forTests())) {
-            XCTAssert(($0 as? PSQLCastingError)?.targetType == MyRawRepresentable.self)
+            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
         }
     }
     

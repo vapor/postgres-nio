@@ -1,12 +1,29 @@
 import NIOCore
 
-extension Optional: PSQLDecodable where Wrapped: PSQLDecodable {
-    static func decode(from buffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self {
-        preconditionFailure("This code path should never be hit.")
-        // The code path for decoding an optional should be:
-        //  -> PSQLData.decode(as: String?.self)
-        //       -> PSQLData.decodeIfPresent(String.self)
-        //            -> String.decode(from: type:)
+extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.DecodableType == Wrapped {
+    typealias DecodableType = Wrapped
+
+    static func decode(
+        from byteBuffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PSQLDecodingContext
+    ) throws -> Optional<Wrapped> {
+        preconditionFailure("This should not be called")
+    }
+
+    static func decodeRaw(
+        from byteBuffer: inout ByteBuffer?,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PSQLDecodingContext
+    ) throws -> Self {
+        switch byteBuffer {
+        case .some(var buffer):
+            return try DecodableType.decode(from: &buffer, type: type, format: format, context: context)
+        case .none:
+            return nil
+        }
     }
 }
 
@@ -43,6 +60,6 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
     }
 }
 
-extension Optional: PSQLCodable where Wrapped: PSQLCodable {
+extension Optional: PSQLCodable where Wrapped: PSQLCodable, Wrapped.DecodableType == Wrapped {
     
 }
