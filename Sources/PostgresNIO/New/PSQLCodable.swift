@@ -55,7 +55,7 @@ extension PSQLEncodable {
 }
 
 struct PSQLEncodingContext {
-    let jsonEncoder: PSQLJSONEncoder
+    let jsonEncoder: PostgresJSONEncoder
 }
 
 struct PSQLDecodingContext {

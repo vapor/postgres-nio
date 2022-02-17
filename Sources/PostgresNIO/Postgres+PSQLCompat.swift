@@ -1,18 +1,5 @@
 import NIOCore
 
-struct PostgresJSONEncoderWrapper: PSQLJSONEncoder {
-    let downstream: PostgresJSONEncoder
-    
-    init(_ downstream: PostgresJSONEncoder) {
-        self.downstream = downstream
-    }
-    
-    func encode<T>(_ value: T, into buffer: inout ByteBuffer) throws where T : Encodable {
-        let data = try self.downstream.encode(value)
-        buffer.writeData(data)
-    }
-}
-
 extension PostgresData: PSQLEncodable {
     var psqlType: PostgresDataType {
         self.type
