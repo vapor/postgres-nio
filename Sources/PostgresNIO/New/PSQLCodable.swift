@@ -33,21 +33,31 @@ protocol PSQLDecodable {
     ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
+    static func decode<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format.
     /// This method has a default implementation and may be overriden
     /// only for special cases, like `Optional`s.
-    static func decodeRaw(from byteBuffer: inout ByteBuffer?, type: PostgresDataType, format: PostgresFormat, context: PSQLDecodingContext) throws -> Self
+    static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer?,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Self
 }
 
 extension PSQLDecodable {
     @inlinable
-    public static func decodeRaw(
+    static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
-        context: PSQLDecodingContext
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard var buffer = byteBuffer else {
             throw PostgresCastingError.Code.missingData
@@ -79,22 +89,10 @@ struct PSQLEncodingContext {
     let jsonEncoder: PostgresJSONEncoder
 }
 
-struct PSQLDecodingContext {
+struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
+    let jsonDecoder: JSONDecoder
     
-    let jsonDecoder: PostgresJSONDecoder
-    
-    let columnIndex: Int
-    let columnName: String
-    
-    let file: String
-    let line: Int
-    
-    init(jsonDecoder: PostgresJSONDecoder, columnName: String, columnIndex: Int, file: String, line: Int) {
+    init(jsonDecoder: JSONDecoder) {
         self.jsonDecoder = jsonDecoder
-        self.columnName = columnName
-        self.columnIndex = columnIndex
-        
-        self.file = file
-        self.line = line
     }
 }
