@@ -170,7 +170,7 @@ class PSQLRowStreamTests: XCTestCase {
         // attach consumer
         var counter = 0
         let future = stream.onRow { row in
-            XCTAssertEqual(try row.decode(column: 0, as: String.self), "\(counter)")
+            XCTAssertEqual(try row.decode(String.self, context: .forTests()), "\(counter)")
             counter += 1
         }
         XCTAssertEqual(counter, 2)
@@ -214,7 +214,7 @@ class PSQLRowStreamTests: XCTestCase {
         // attach consumer
         var counter = 0
         let future = stream.onRow { row in
-            XCTAssertEqual(try row.decode(column: 0, as: String.self), "\(counter)")
+            XCTAssertEqual(try row.decode(String.self, context: .forTests()), "\(counter)")
             if counter == 1 {
                 throw OnRowError(row: counter)
             }
@@ -261,7 +261,7 @@ class PSQLRowStreamTests: XCTestCase {
         // attach consumer
         var counter = 0
         let future = stream.onRow { row in
-            XCTAssertEqual(try row.decode(column: 0, as: String.self), "\(counter)")
+            XCTAssertEqual(try row.decode(String.self, context: .forTests()), "\(counter)")
             counter += 1
         }
         XCTAssertEqual(counter, 2)
