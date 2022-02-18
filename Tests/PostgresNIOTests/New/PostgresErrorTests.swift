@@ -31,4 +31,20 @@ final class PostgresCastingErrorTests: XCTestCase {
         let error3 = error1
         XCTAssertEqual(error1, error3)
     }
+
+    func testPostgresCastingErrorDescription() {
+        let error = PostgresCastingError(
+            code: .typeMismatch,
+            columnName: "column",
+            columnIndex: 0,
+            targetType: String.self,
+            postgresType: .text,
+            postgresFormat: .binary,
+            postgresData: ByteBuffer(string: "hello world"),
+            file: "foo.swift",
+            line: 123
+        )
+
+        XCTAssertNotEqual("\(error)", "Database error")
+    }
 }

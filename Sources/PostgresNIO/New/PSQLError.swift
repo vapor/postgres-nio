@@ -122,31 +122,10 @@ struct PostgresCastingError: Error, Equatable {
     let line: Int
     
     var description: String {
-        switch self.code.base {
-        case .missingData:
-            return """
-                Failed to cast Postgres cell from column "\(self.columnName)" (index: \(self.columnIndex)) \
-                with Postgres type \(self.postgresType.description) in format \
-                \(self.postgresFormat.description) to Swift type \(self.targetType) \
-                because of missing data. Casting location: \(self.file):\(self.line)
-                """
-
-        case .typeMismatch:
-            return """
-                Failed to cast Postgres cell from column "\(self.columnName)" (index: \(self.columnIndex)) \
-                with Postgres type \(self.postgresType.description) in format \
-                \(self.postgresFormat.description) to Swift type \(self.targetType) \
-                because of a type mismatch. Casting location: \(self.file):\(self.line)
-                """
-
-        case .failure:
-            return """
-                Failed to cast Postgres cell from column "\(self.columnName)" (index: \(self.columnIndex)) \
-                with Postgres type \(self.postgresType.description) in format \
-                \(self.postgresFormat.description) to Swift type \(self.targetType) \
-                because of a casting failure. Casting location: \(self.file):\(self.line)
-                """
-        }
+        // This may seem very odd... But we are afraid that users might accidentally send the
+        // unfiltered errors out to end-users. This may leak security relevant information. For this
+        // reason we overwrite the error description by default to this generic "Database error"
+        "Database error"
     }
     
     static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
