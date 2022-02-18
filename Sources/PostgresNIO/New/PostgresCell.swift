@@ -1,12 +1,12 @@
 import NIOCore
 
-struct PostgresCell: Equatable {
-    var bytes: ByteBuffer?
-    var dataType: PostgresDataType
-    var format: PostgresFormat
+public struct PostgresCell: Equatable {
+    public var bytes: ByteBuffer?
+    public var dataType: PostgresDataType
+    public var format: PostgresFormat
 
-    var columnName: String
-    var columnIndex: Int
+    public var columnName: String
+    public var columnIndex: Int
 
     init(bytes: ByteBuffer?, dataType: PostgresDataType, format: PostgresFormat, columnName: String, columnIndex: Int) {
         self.bytes = bytes
