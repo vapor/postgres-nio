@@ -80,6 +80,7 @@ struct PSQLError: Error {
     }
 }
 
+/// An error that may happen when a ``PostgresRow`` or ``PostgresCell`` is decoded to native Swift types.
 struct PostgresCastingError: Error, Equatable {
     struct Code: Hashable, Error {
         enum Base {
@@ -99,31 +100,53 @@ struct PostgresCastingError: Error, Equatable {
         static let failure = Self.init(.failure)
     }
 
+    /// The casting error code
     let code: Code
-    
+
+    /// The cell's column name for which the casting failed
     let columnName: String
+    /// The cell's column index for which the casting failed
     let columnIndex: Int
+    /// The swift type the cell should have been casted into
     let targetType: Any.Type
+    /// The cell's postgres data type for which the casting failed
     let postgresType: PostgresDataType
+    /// The cell's postgres format for which the casting failed
+    let postgresFormat: PostgresFormat
+    /// A copy of the cell data which was attempted to be casted
     let postgresData: ByteBuffer?
+
+    /// The file the casting/decoding was attempted in
+    let file: String
+    /// The line the casting/decoding was attempted in
+    let line: Int
     
     var description: String {
         switch self.code.base {
         case .missingData:
             return """
-                Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType) \
-                because of missing data.
+                Failed to cast Postgres cell from column "\(self.columnName)" (index: \(self.columnIndex)) \
+                with Postgres type \(self.postgresType.description) in format \
+                \(self.postgresFormat.description) to Swift type \(self.targetType) \
+                because of missing data. Casting location: \(self.file):\(self.line)
                 """
 
         case .typeMismatch:
-            preconditionFailure()
+            return """
+                Failed to cast Postgres cell from column "\(self.columnName)" (index: \(self.columnIndex)) \
+                with Postgres type \(self.postgresType.description) in format \
+                \(self.postgresFormat.description) to Swift type \(self.targetType) \
+                because of a type mismatch. Casting location: \(self.file):\(self.line)
+                """
 
         case .failure:
             return """
-                Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType).
+                Failed to cast Postgres cell from column "\(self.columnName)" (index: \(self.columnIndex)) \
+                with Postgres type \(self.postgresType.description) in format \
+                \(self.postgresFormat.description) to Swift type \(self.targetType) \
+                because of a casting failure. Casting location: \(self.file):\(self.line)
                 """
         }
-
     }
     
     static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
@@ -132,7 +155,10 @@ struct PostgresCastingError: Error, Equatable {
             && lhs.columnIndex == rhs.columnIndex
             && lhs.targetType == rhs.targetType
             && lhs.postgresType == rhs.postgresType
+            && lhs.postgresFormat == rhs.postgresFormat
             && lhs.postgresData == rhs.postgresData
+            && lhs.file == rhs.file
+            && lhs.line == rhs.line
     }
 }
 
