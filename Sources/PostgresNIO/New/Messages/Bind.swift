@@ -10,7 +10,7 @@ extension PSQLFrontendMessage {
         var preparedStatementName: String
 
         /// The number of parameter values that follow (possibly zero). This must match the number of parameters needed by the query.
-        var bind: PSQLBindings
+        var bind: PostgresBindings
         
         func encode(into buffer: inout ByteBuffer) {
             buffer.writeNullTerminatedString(self.portalName)

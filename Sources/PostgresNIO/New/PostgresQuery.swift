@@ -1,26 +1,26 @@
-public struct PSQLQuery: Hashable {
+public struct PostgresQuery: Hashable {
     /// The query string
-    public var query: String
+    public var sql: String
     /// The query binds
-    public var binds: PSQLBindings
+    public var binds: PostgresBindings
 
-    init(_ query: String, binds: PSQLBindings) {
-        self.query = query
+    init(unsafeSQL sql: String, binds: PostgresBindings = PostgresBindings()) {
+        self.sql = sql
         self.binds = binds
     }
 }
 
-extension PSQLQuery: ExpressibleByStringInterpolation {
+extension PostgresQuery: ExpressibleByStringInterpolation {
     public typealias StringInterpolation = Interpolation
 
     public init(stringInterpolation: Interpolation) {
-        self.query = stringInterpolation.query
+        self.sql = stringInterpolation.sql
         self.binds = stringInterpolation.binds
     }
 
     public init(stringLiteral value: String) {
-        self.query = value
-        self.binds = PSQLBindings()
+        self.sql = value
+        self.binds = PostgresBindings()
     }
 
     public mutating func appendBinding<Value: PSQLEncodable, JSONEncoder: PSQLJSONEncoder>(
@@ -31,30 +31,30 @@ extension PSQLQuery: ExpressibleByStringInterpolation {
     }
 }
 
-extension PSQLQuery {
+extension PostgresQuery {
     public struct Interpolation: StringInterpolationProtocol {
         public typealias StringLiteralType = String
 
-        var query: String
-        var binds: PSQLBindings
+        var sql: String
+        var binds: PostgresBindings
 
         public init(literalCapacity: Int, interpolationCount: Int) {
-            self.query = ""
-            self.binds = PSQLBindings()
+            self.sql = ""
+            self.binds = PostgresBindings()
         }
 
         public mutating func appendLiteral(_ literal: String) {
-            self.query.append(contentsOf: literal)
+            self.sql.append(contentsOf: literal)
         }
 
         public mutating func appendInterpolation<Value: PSQLEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
-            self.query.append(contentsOf: "$\(self.binds.count)")
+            self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         public mutating func appendInterpolation<Value: PSQLEncodable>(_ value: Optional<Value>) throws {
             try self.binds.append(value, context: .default)
-            self.query.append(contentsOf: "$\(self.binds.count)")
+            self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         public mutating func appendInterpolation<Value: PSQLEncodable & Encodable, JSONEncoder: PSQLJSONEncoder>(
@@ -62,7 +62,7 @@ extension PSQLQuery {
             context: PSQLEncodingContext<JSONEncoder>
         ) throws {
             try self.binds.append(value, context: context)
-            self.query.append(contentsOf: "$\(self.binds.count)")
+            self.sql.append(contentsOf: "$\(self.binds.count)")
         }
     }
 }
@@ -71,12 +71,12 @@ public struct PSQLExecuteStatement {
     /// The statements name
     public var name: String
     /// The binds
-    public var binds: PSQLBindings
+    public var binds: PostgresBindings
 
     var rowDescription: RowDescription?
 }
 
-public struct PSQLBindings: Hashable {
+public struct PostgresBindings: Hashable {
     struct Metadata: Hashable {
         var dataType: PostgresDataType
         var format: PostgresFormat

@@ -128,7 +128,7 @@ class ConnectionStateMachineTests: XCTestCase {
 
         var state = ConnectionStateMachine()
         let extendedQueryContext = ExtendedQueryContext(
-            query: .init("Select version()", binds: .init()),
+            query: PostgresQuery(unsafeSQL: "Select version()"),
             logger: .psqlTest,
             promise: queryPromise)
 

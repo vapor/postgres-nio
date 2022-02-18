@@ -8,11 +8,11 @@ final class PostgresQueryTests: XCTestCase {
         let null: UUID? = nil
         let uuid: UUID? = UUID()
 
-        let query: PSQLQuery = try """
+        let query: PostgresQuery = try """
             INSERT INTO foo (id, title, something) SET (\(uuid), \(string), \(null));
             """
 
-        XCTAssertEqual(query.query, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
+        XCTAssertEqual(query.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
 
         var expected = ByteBuffer()
         expected.writeInteger(Int32(16))

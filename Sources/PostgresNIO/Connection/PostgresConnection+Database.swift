@@ -65,7 +65,7 @@ extension PostgresConnection: PostgresDatabase {
                 request.prepared = PreparedQuery(underlying: $0, database: self)
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
-            var psqlBinds = PSQLBindings()
+            var psqlBinds = PostgresBindings()
             do {
                 try binds.forEach {
                     try psqlBinds.append($0, context: .default)

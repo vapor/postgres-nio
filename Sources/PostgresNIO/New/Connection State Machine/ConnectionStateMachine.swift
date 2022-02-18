@@ -84,7 +84,7 @@ struct ConnectionStateMachine {
         // Connection Actions
         
         // --- general actions
-        case sendParseDescribeBindExecuteSync(PSQLQuery)
+        case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendBindExecuteSync(PSQLExecuteStatement)
         case failQuery(ExtendedQueryContext, with: PSQLError, cleanupContext: CleanUpContext?)
         case succeedQuery(ExtendedQueryContext, columns: [RowDescription.Column])

@@ -23,7 +23,7 @@ struct ExtendedQueryStateMachine {
     }
     
     enum Action {
-        case sendParseDescribeBindExecuteSync(PSQLQuery)
+        case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendBindExecuteSync(PSQLExecuteStatement)
         
         // --- general actions

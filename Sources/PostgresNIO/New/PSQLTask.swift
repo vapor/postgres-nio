@@ -20,7 +20,7 @@ enum PSQLTask {
 
 final class ExtendedQueryContext {
     enum Query {
-        case unnamed(PSQLQuery)
+        case unnamed(PostgresQuery)
         case preparedStatement(PSQLExecuteStatement)
     }
     
@@ -29,7 +29,7 @@ final class ExtendedQueryContext {
 
     let promise: EventLoopPromise<PSQLRowStream>
     
-    init(query: PSQLQuery,
+    init(query: PostgresQuery,
          logger: Logger,
          promise: EventLoopPromise<PSQLRowStream>)
     {

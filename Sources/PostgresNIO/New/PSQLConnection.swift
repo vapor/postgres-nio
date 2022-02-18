@@ -113,7 +113,7 @@ public final class PSQLConnection {
             return self.channel.eventLoop.makeFailedFuture(PSQLError(.tooManyParameters))
         }
 
-        var psqlQuery = PSQLQuery(query, binds: .init())
+        var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init())
         do {
             try bind.forEach {
                 try psqlQuery.binds._append($0, context: .default)

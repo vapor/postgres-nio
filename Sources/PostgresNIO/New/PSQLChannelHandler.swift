@@ -420,14 +420,14 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
     
     private func sendParseDescribeBindExecuteAndSyncMessage(
-        query: PSQLQuery,
+        query: PostgresQuery,
         context: ChannelHandlerContext)
     {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
         let unnamedStatementName = ""
         let parse = PSQLFrontendMessage.Parse(
             preparedStatementName: unnamedStatementName,
-            query: query.query,
+            query: query.sql,
             parameters: query.binds.metadata.map(\.dataType))
         let bind = PSQLFrontendMessage.Bind(
             portalName: "",

@@ -54,17 +54,17 @@ class PSQLFrontendMessageTests: XCTestCase {
 
 }
 
-extension PSQLBindings: ExpressibleByArrayLiteral {
+extension PostgresBindings: ExpressibleByArrayLiteral {
     public typealias ArrayLiteralElement = PSQLEncodable
 
     public init(arrayLiteral elements: PSQLEncodable...) {
-        self = PSQLBindings()
+        self = PostgresBindings()
         do {
             try elements.forEach {
                 try self._append($0, context: .default)
             }
         } catch {
-            preconditionFailure("Can not create PSQLBindings")
+            preconditionFailure("Can not create PostgresBindings")
         }
     }
 }
