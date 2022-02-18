@@ -11,7 +11,7 @@ function gen() {
         echo ""
     fi
 
-    echo "    @inlinable"
+    #echo "    @inlinable"
     #echo "    @_alwaysEmitIntoClient"
     echo -n "    func decode<T0: PSQLDecodable"
     for ((n = 1; n<$how_many; n +=1)); do
@@ -92,7 +92,7 @@ cat <<"EOF"
 EOF
 echo
 
-echo "extension PSQLRow {"
+echo "extension PostgresRow {"
 
 # note:
 # - widening the inverval below (eg. going from {1..15} to {1..25}) is Semver minor
