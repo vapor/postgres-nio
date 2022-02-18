@@ -4,10 +4,10 @@ import Foundation
 /// A type that can encode itself to a postgres wire binary representation.
 public protocol PSQLEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
-    var psqlType: PSQLDataType { get }
+    var psqlType: PostgresDataType { get }
     
     /// identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
-    var psqlFormat: PSQLFormat { get }
+    var psqlFormat: PostgresFormat { get }
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the default `encodeRaw` implementation.
@@ -31,26 +31,39 @@ public protocol PSQLDecodable {
     ///   - type: The postgres data type. Depending on this type the `byteBuffer`'s bytes need to be interpreted
     ///           in different ways.
     ///   - format: The postgres wire format. Can be `.text` or `.binary`
-    ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
+    ///   - context: A `PostgresDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self
+    static func decode<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format.
     /// This method has a default implementation and may be overriden
     /// only for special cases, like `Optional`s.
-    static func decodeRaw<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self
+    static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer?,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Self
 }
 
 extension PSQLDecodable {
     @inlinable
-    public static func decodeRaw<JSONDecoder: PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer?, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Self {
-        switch byteBuffer {
-        case .some(var buffer):
-            return try self.decode(from: &buffer, type: type, format: format, context: context)
-        case .none:
-            throw PSQLCastingError.Code.missingData
+    public static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer?,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Self {
+        guard var buffer = byteBuffer else {
+            throw PostgresCastingError.Code.missingData
         }
+        return try self.decode(from: &buffer, type: type, format: format, context: context)
     }
 }
 
@@ -82,16 +95,16 @@ public struct PSQLEncodingContext<Encoder: PSQLJSONEncoder> {
     }
 }
 
-public struct PSQLDecodingContext<Decoder: PSQLJSONDecoder> {
-    public let jsonDecoder: Decoder
+public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
+    public let jsonDecoder: JSONDecoder
     
-    public init(jsonDecoder: Decoder) {
+    init(jsonDecoder: JSONDecoder) {
         self.jsonDecoder = jsonDecoder
     }
 }
 
-extension PSQLDecodingContext where Decoder == Foundation.JSONDecoder {
-    public static let `default` = PSQLDecodingContext(jsonDecoder: JSONDecoder())
+extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
+    public static let `default` = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
 }
 
 extension PSQLEncodingContext where Encoder == Foundation.JSONEncoder {

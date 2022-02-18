@@ -24,7 +24,7 @@ extension PostgresConnection: PostgresDatabase {
                         dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
                         dataTypeSize: column.dataTypeSize,
                         dataTypeModifier: column.dataTypeModifier,
-                        formatCode: .init(psqlFormatCode: column.format)
+                        formatCode: column.format
                     )
                 }
                 
@@ -43,7 +43,7 @@ extension PostgresConnection: PostgresDatabase {
                         dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
                         dataTypeSize: column.dataTypeSize,
                         dataTypeModifier: column.dataTypeModifier,
-                        formatCode: .init(psqlFormatCode: column.format)
+                        formatCode: column.format
                     )
                 }
                 

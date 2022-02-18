@@ -1,28 +1,28 @@
 import NIOCore
 
 extension Bool: PSQLCodable {
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         .bool
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
     
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard type == .bool else {
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
         
         switch format {
         case .binary:
             guard buffer.readableBytes == 1 else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             switch buffer.readInteger(as: UInt8.self) {
@@ -31,11 +31,11 @@ extension Bool: PSQLCodable {
             case .some(1):
                 return true
             default:
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
         case .text:
             guard buffer.readableBytes == 1 else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             switch buffer.readInteger(as: UInt8.self) {
@@ -44,7 +44,7 @@ extension Bool: PSQLCodable {
             case .some(UInt8(ascii: "t")):
                 return true
             default:
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
         }
     }

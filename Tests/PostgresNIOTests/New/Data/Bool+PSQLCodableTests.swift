@@ -41,7 +41,7 @@ class Bool_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int64(1))
 
         XCTAssertThrowsError(try Bool.decode(from: &buffer, type: .bool, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
     
@@ -50,7 +50,7 @@ class Bool_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(UInt8(13))
 
         XCTAssertThrowsError(try Bool.decode(from: &buffer, type: .bool, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
 
@@ -83,7 +83,7 @@ class Bool_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(UInt8(13))
 
         XCTAssertThrowsError(try Bool.decode(from: &buffer, type: .bool, format: .text, context: .default)) {
-            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
 }

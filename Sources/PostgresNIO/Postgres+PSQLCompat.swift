@@ -1,38 +1,11 @@
 import NIOCore
 
-struct PostgresJSONDecoderWrapper: PSQLJSONDecoder {
-    let downstream: PostgresJSONDecoder
-    
-    init(_ downstream: PostgresJSONDecoder) {
-        self.downstream = downstream
-    }
-    
-    func decode<T>(_ type: T.Type, from buffer: ByteBuffer) throws -> T where T : Decodable {
-        var buffer = buffer
-        let data = buffer.readData(length: buffer.readableBytes)!
-        return try self.downstream.decode(T.self, from: data)
-    }
-}
-
-struct PostgresJSONEncoderWrapper: PSQLJSONEncoder {
-    let downstream: PostgresJSONEncoder
-    
-    init(_ downstream: PostgresJSONEncoder) {
-        self.downstream = downstream
-    }
-    
-    func encode<T>(_ value: T, into buffer: inout ByteBuffer) throws where T : Encodable {
-        let data = try self.downstream.encode(value)
-        buffer.writeData(data)
-    }
-}
-
 extension PostgresData: PSQLEncodable {
-    public var psqlType: PSQLDataType {
-        PSQLDataType(Int32(self.type.rawValue))
+    public var psqlType: PostgresDataType {
+        self.type
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -51,6 +24,21 @@ extension PostgresData: PSQLEncodable {
         }
     }
 }
+
+extension PostgresData: PSQLDecodable {
+    public static func decode<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Self {
+        let myBuffer = buffer.readSlice(length: buffer.readableBytes)!
+        
+        return PostgresData(type: PostgresDataType(UInt32(type.rawValue)), typeModifier: nil, formatCode: .binary, value: myBuffer)
+    }
+}
+
+extension PostgresData: PSQLCodable {}
 
 extension PSQLError {
     func toPostgresError() -> Error {
@@ -86,17 +74,6 @@ extension PSQLError {
             return self.underlying ?? self
         case .uncleanShutdown:
             return PostgresError.protocol("Unexpected connection close")
-        }
-    }
-}
-
-extension PostgresFormatCode {
-    init(psqlFormatCode: PSQLFormat) {
-        switch psqlFormatCode {
-        case .binary:
-            self = .binary
-        case .text:
-            self = .text
         }
     }
 }

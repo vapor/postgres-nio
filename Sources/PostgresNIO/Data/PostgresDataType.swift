@@ -1,11 +1,14 @@
-/// The format code being used for the field.
-/// Currently will be zero (text) or one (binary).
-/// In a RowDescription returned from the statement variant of Describe,
-/// the format code is not yet known and will always be zero.
-public enum PostgresFormatCode: Int16, Codable, CustomStringConvertible {
+/// The format the postgres types are encoded in on the wire.
+///
+/// Currently there a two wire formats supported:
+///  - text
+///  - binary
+public enum PostgresFormat: Int16 {
     case text = 0
     case binary = 1
-    
+}
+
+extension PostgresFormat: CustomStringConvertible {
     public var description: String {
         switch self {
         case .text: return "text"
@@ -14,9 +17,16 @@ public enum PostgresFormatCode: Int16, Codable, CustomStringConvertible {
     }
 }
 
+// TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
+extension PostgresFormat: Codable {}
+
+// TODO: Renamed during 1.x. Remove this with next major break.
+@available(*, deprecated, renamed: "PostgresFormat")
+public typealias PostgresFormatCode = PostgresFormat
+
 /// The data type's raw object ID.
 /// Use `select * from pg_type where oid = <idhere>;` to lookup more information.
-public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral, CustomStringConvertible, RawRepresentable {
+public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConvertible {
     /// `0`
     public static let null = PostgresDataType(0)
     /// `16`
@@ -115,12 +125,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public var isUserDefined: Bool {
         self.rawValue >= 1 << 14
     }
-    
-    /// See `ExpressibleByIntegerLiteral.init(integerLiteral:)`
-    public init(integerLiteral value: UInt32) {
-        self.init(value)
-    }
-    
+
     public init(_ rawValue: UInt32) {
         self.rawValue = rawValue
     }
@@ -128,7 +133,7 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     public init?(rawValue: UInt32) {
         self.init(rawValue)
     }
-    
+
     /// Returns the known SQL name, if one exists.
     /// Note: This only supports a limited subset of all PSQL types and is meant for convenience only.
     public var knownSQLName: String? {
@@ -225,5 +230,15 @@ public struct PostgresDataType: Codable, Equatable, ExpressibleByIntegerLiteral,
     /// See `CustomStringConvertible`.
     public var description: String {
         return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"
+    }
+}
+
+// TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
+extension PostgresDataType: Codable {}
+
+// TODO: The ExpressibleByIntegerLiteral conformance does not make any sense and is not used anywhere. Remove with next major break.
+extension PostgresDataType: ExpressibleByIntegerLiteral {
+    public init(integerLiteral value: UInt32) {
+        self.init(value)
     }
 }

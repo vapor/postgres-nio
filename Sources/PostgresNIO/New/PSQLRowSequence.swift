@@ -2,6 +2,9 @@ import NIOCore
 import NIOConcurrencyHelpers
 
 #if swift(>=5.5) && canImport(_Concurrency)
+/// An async sequence of ``PSQLRow``s.
+///
+/// - Note: This is a struct to allow us to move to a move only type easily once they become available.
 public struct PSQLRowSequence: AsyncSequence {
     public typealias Element = PSQLRow
     public typealias AsyncIterator = Iterator
@@ -29,7 +32,7 @@ public struct PSQLRowSequence: AsyncSequence {
     init(_ consumer: AsyncStreamConsumer) {
         self._internal = .init(consumer: consumer)
     }
-    
+
     public func makeAsyncIterator() -> Iterator {
         self._internal.makeAsyncIterator()
     }
@@ -44,7 +47,7 @@ extension PSQLRowSequence {
         init(consumer: AsyncStreamConsumer) {
             self._internal = _Internal(consumer: consumer)
         }
-        
+
         public mutating func next() async throws -> PSQLRow? {
             try await self._internal.next()
         }
@@ -231,41 +234,47 @@ extension AsyncStreamConsumer {
             /// `.streaming` or `.finished` state.
             case modifying
         }
-        
+
         private enum DownstreamState {
             case sequenceCreated
             case iteratorCreated
         }
+
+        private var upstreamState = UpstreamState.initialized
+        private var downstreamState = DownstreamState.sequenceCreated
         
-        private var upstreamState: UpstreamState
-        private var downstreamState: DownstreamState
-        
-        init() {
-            self.upstreamState = .initialized
-            self.downstreamState = .sequenceCreated
-        }
+        init() {}
         
         mutating func buffered(_ buffer: CircularBuffer<DataRow>, upstream: PSQLRowStream) {
-            guard case .initialized = self.upstreamState else {
+            switch self.upstreamState {
+            case .initialized:
+                let adaptive = AdaptiveRowBuffer(buffer)
+                self.upstreamState = .streaming(adaptive, upstream, buffer.isEmpty ? .waitingForMore(nil) : .canAskForMore)
+
+            case .streaming, .finished, .failed, .consumed, .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
-            let adaptive = AdaptiveRowBuffer(buffer)
-            self.upstreamState = .streaming(adaptive, upstream, buffer.isEmpty ? .waitingForMore(nil) : .canAskForMore)
         }
         
         mutating func finished(_ buffer: CircularBuffer<DataRow>, commandTag: String) {
-            guard case .initialized = self.upstreamState else {
+            switch self.upstreamState {
+            case .initialized:
+                let adaptive = AdaptiveRowBuffer(buffer)
+                self.upstreamState = .finished(adaptive, commandTag)
+
+            case .streaming, .finished, .failed, .consumed, .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
-            let adaptive = AdaptiveRowBuffer(buffer)
-            self.upstreamState = .finished(adaptive, commandTag)
         }
         
         mutating func failed(_ error: Error) {
-            guard case .initialized = self.upstreamState else {
+            switch self.upstreamState {
+            case .initialized:
+                self.upstreamState = .failed(error)
+
+            case .streaming, .finished, .failed, .consumed, .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
-            self.upstreamState = .failed(error)
         }
         
         mutating func createAsyncIterator() {

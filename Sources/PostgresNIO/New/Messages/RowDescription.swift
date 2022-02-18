@@ -30,7 +30,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
         
         /// The object ID of the field's data type.
         @usableFromInline
-        var dataType: PSQLDataType
+        var dataType: PostgresDataType
         
         /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
         @usableFromInline
@@ -43,7 +43,7 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
         /// The format being used for the field. Currently will be text or binary. In a RowDescription returned
         /// from the statement variant of Describe, the format code is not yet known and will always be text.
         @usableFromInline
-        var format: PSQLFormat
+        var format: PostgresFormat
     }
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
@@ -61,21 +61,21 @@ struct RowDescription: PSQLBackendMessage.PayloadDecodable, Equatable {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
             }
             
-            let hextuple = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int16, Int32, Int16, Int32, Int16).self)
+            let hextuple = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int16, UInt32, Int16, Int32, Int16).self)
             
             guard let (tableOID, columnAttributeNumber, dataType, dataTypeSize, dataTypeModifier, formatCodeInt16) = hextuple else {
                 throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(18, actual: buffer.readableBytes)
             }
             
-            guard let format = PSQLFormat(rawValue: formatCodeInt16) else {
-                throw PSQLPartialDecodingError.valueNotRawRepresentable(value: formatCodeInt16, asType: PSQLFormat.self)
+            guard let format = PostgresFormat(rawValue: formatCodeInt16) else {
+                throw PSQLPartialDecodingError.valueNotRawRepresentable(value: formatCodeInt16, asType: PostgresFormat.self)
             }
             
             let field = Column(
                 name: name,
                 tableOID: tableOID,
                 columnAttributeNumber: columnAttributeNumber,
-                dataType: PSQLDataType(rawValue: dataType),
+                dataType: PostgresDataType(dataType),
                 dataTypeSize: dataTypeSize,
                 dataTypeModifier: dataTypeModifier,
                 format: format)

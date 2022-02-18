@@ -19,7 +19,7 @@ class String_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeString(expected)
         
-        let dataTypes: [PSQLDataType] = [
+        let dataTypes: [PostgresDataType] = [
             .text, .varchar, .name
         ]
         
@@ -33,12 +33,12 @@ class String_PSQLCodableTests: XCTestCase {
     
     func testDecodeFailureFromInvalidType() {
         let buffer = ByteBuffer()
-        let dataTypes: [PSQLDataType] = [.bool, .float4Array, .float8Array, .bpchar]
+        let dataTypes: [PostgresDataType] = [.bool, .float4Array, .float8Array, .bpchar]
         
         for dataType in dataTypes {
             var loopBuffer = buffer
             XCTAssertThrowsError(try String.decode(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
-                XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
+                XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
             }
         }
     }
@@ -61,7 +61,7 @@ class String_PSQLCodableTests: XCTestCase {
         buffer.moveReaderIndex(forwardBy: 1)
         
         XCTAssertThrowsError(try String.decode(from: &buffer, type: .uuid, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
 }

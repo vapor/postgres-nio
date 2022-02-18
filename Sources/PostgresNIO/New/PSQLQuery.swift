@@ -73,10 +73,10 @@ public struct PSQLExecuteStatement {
 
 public struct PSQLBindings: Hashable {
     struct Metadata: Hashable {
-        var dataType: PSQLDataType
-        var format: PSQLFormat
+        var dataType: PostgresDataType
+        var format: PostgresFormat
 
-        init(dataType: PSQLDataType, format: PSQLFormat) {
+        init(dataType: PostgresDataType, format: PostgresFormat) {
             self.dataType = dataType
             self.format = format
         }

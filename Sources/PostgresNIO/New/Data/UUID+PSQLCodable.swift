@@ -4,11 +4,11 @@ import typealias Foundation.uuid_t
 
 extension UUID: PSQLCodable {
     
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         .uuid
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -23,16 +23,16 @@ extension UUID: PSQLCodable {
     }
 
     @inlinable
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> UUID {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return uuid
         case (.binary, .varchar),
@@ -41,15 +41,15 @@ extension UUID: PSQLCodable {
              (.text, .text),
              (.text, .varchar):
             guard buffer.readableBytes == 36 else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             
             guard let uuid = buffer.readString(length: 36).flatMap({ UUID(uuidString: $0) }) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return uuid
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 }

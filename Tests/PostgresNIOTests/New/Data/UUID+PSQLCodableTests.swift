@@ -40,7 +40,7 @@ class UUID_PSQLCodableTests: XCTestCase {
     }
     
     func testDecodeFromString() {
-        let options: [(PSQLFormat, PSQLDataType)] = [
+        let options: [(PostgresFormat, PostgresDataType)] = [
             (.binary, .text),
             (.binary, .varchar),
             (.text, .uuid),
@@ -83,7 +83,7 @@ class UUID_PSQLCodableTests: XCTestCase {
         buffer.moveReaderIndex(forwardBy: 1)
         
         XCTAssertThrowsError(try UUID.decode(from: &buffer, type: .uuid, format: .binary, context: .default)) { error in
-            XCTAssertEqual(error as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual(error as? PostgresCastingError.Code, .failure)
         }
     }
     
@@ -94,12 +94,12 @@ class UUID_PSQLCodableTests: XCTestCase {
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
         
-        let dataTypes: [PSQLDataType] = [.varchar, .text]
+        let dataTypes: [PostgresDataType] = [.varchar, .text]
         
         for dataType in dataTypes {
             var loopBuffer = buffer
             XCTAssertThrowsError(try UUID.decode(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
-                XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+                XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
             }
         }
     }
@@ -109,12 +109,12 @@ class UUID_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeString(uuid.uuidString)
         
-        let dataTypes: [PSQLDataType] = [.bool, .int8, .int2, .int4Array]
+        let dataTypes: [PostgresDataType] = [.bool, .int8, .int2, .int4Array]
         
         for dataType in dataTypes {
             var copy = buffer            
             XCTAssertThrowsError(try UUID.decode(from: &copy, type: dataType, format: .binary, context: .default)) {
-                XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
+                XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
             }
         }
     }

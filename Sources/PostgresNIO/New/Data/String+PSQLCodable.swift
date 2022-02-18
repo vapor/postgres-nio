@@ -2,11 +2,11 @@ import NIOCore
 import struct Foundation.UUID
 
 extension String: PSQLCodable {
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         .text
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -15,11 +15,11 @@ extension String: PSQLCodable {
     }
 
     @inlinable
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> String {
         switch (format, type) {
         case (_, .varchar),
@@ -30,11 +30,11 @@ extension String: PSQLCodable {
             return buffer.readString(length: buffer.readableBytes)!
         case (_, .uuid):
             guard let uuid = try? UUID.decode(from: &buffer, type: .uuid, format: format, context: context) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             return uuid.uuidString
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
 }

@@ -31,7 +31,7 @@ class ParameterDescriptionTests: XCTestCase {
     }
     
     func testDecodeWithNegativeCount() {
-        let dataTypes: [PSQLDataType] = [.bool, .varchar, .uuid, .json, .jsonbArray]
+        let dataTypes: [PostgresDataType] = [.bool, .varchar, .uuid, .json, .jsonbArray]
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .parameterDescription) { buffer in
             buffer.writeInteger(Int16(-4))
@@ -49,7 +49,7 @@ class ParameterDescriptionTests: XCTestCase {
     }
     
     func testDecodeColumnCountDoesntMatchMessageLength() {
-        let dataTypes: [PSQLDataType] = [.bool, .varchar, .uuid, .json, .jsonbArray]
+        let dataTypes: [PostgresDataType] = [.bool, .varchar, .uuid, .json, .jsonbArray]
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .parameterDescription) { buffer in
             // means three columns comming, but 5 are in the buffer actually.

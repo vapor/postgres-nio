@@ -18,11 +18,11 @@ function gen() {
         echo -n ", T$(($n)): PSQLDecodable"
     done
 
-    echo -n ", JSONDecoder: PSQLJSONDecoder>(_: (T0"
+    echo -n ", JSONDecoder: PostgresJSONDecoder>(_: (T0"
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n))"
     done
-    echo -n ").Type, context: PSQLDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws"
+    echo -n ").Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: UInt = #line) throws"
 
     echo -n " -> (T0"
     for ((n = 1; n<$how_many; n +=1)); do
@@ -65,8 +65,8 @@ function gen() {
         echo -n ", r$(($n))"
     done
     echo ")"
-    echo "        } catch let code as PSQLCastingError.Code {"
-    echo "            throw PSQLCastingError("
+    echo "        } catch let code as PostgresCastingError.Code {"
+    echo "            throw PostgresCastingError("
     echo "                code: code,"
     echo "                columnName: column.name,"
     echo "                columnIndex: columnIndex,"

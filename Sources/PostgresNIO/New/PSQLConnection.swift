@@ -10,7 +10,6 @@ import Logging
 public final class PSQLConnection {
     
     public struct Configuration {
-        
         public struct Authentication {
             public var username: String
             public var database: String? = nil

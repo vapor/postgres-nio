@@ -96,7 +96,7 @@ public struct PSQLError: Error {
 }
 
 @usableFromInline
-struct PSQLCastingError: Error, Equatable {
+struct PostgresCastingError: Error, Equatable {
     @usableFromInline
     struct Code: Hashable, Error {
         @usableFromInline
@@ -127,7 +127,7 @@ struct PSQLCastingError: Error, Equatable {
     let columnIndex: Int
     
     let targetType: Any.Type
-    let postgresType: PSQLDataType
+    let postgresType: PostgresDataType
     let postgresData: ByteBuffer?
 
     let file: String
@@ -139,7 +139,7 @@ struct PSQLCastingError: Error, Equatable {
         columnName: String,
         columnIndex: Int,
         targetType: Any.Type,
-        postgresType: PSQLDataType,
+        postgresType: PostgresDataType,
         postgresData: ByteBuffer?,
         file: String,
         line: UInt
@@ -171,11 +171,15 @@ struct PSQLCastingError: Error, Equatable {
                 Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType).
                 """
         }
-
     }
 
     @usableFromInline
-    static func ==(lhs: PSQLCastingError, rhs: PSQLCastingError) -> Bool {
-        lhs.targetType == rhs.targetType
+    static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
+        return lhs.code == rhs.code
+            && lhs.columnName == rhs.columnName
+            && lhs.columnIndex == rhs.columnIndex
+            && lhs.targetType == rhs.targetType
+            && lhs.postgresType == rhs.postgresType
+            && lhs.postgresData == rhs.postgresData
     }
 }

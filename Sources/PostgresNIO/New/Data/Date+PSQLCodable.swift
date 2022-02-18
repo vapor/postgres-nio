@@ -2,36 +2,36 @@ import NIOCore
 import struct Foundation.Date
 
 extension Date: PSQLCodable {
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         .timestamptz
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
 
     @inlinable
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         switch type {
         case .timestamp, .timestamptz:
             guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             let seconds = Double(microseconds) / Double(_microsecondsPerSecond)
             return Date(timeInterval: seconds, since: _psqlDateStart)
         case .date:
             guard buffer.readableBytes == 4, let days = buffer.readInteger(as: Int32.self) else {
-                throw PSQLCastingError.Code.failure
+                throw PostgresCastingError.Code.failure
             }
             let seconds = Int64(days) * _secondsInDay
             return Date(timeInterval: Double(seconds), since: _psqlDateStart)
         default:
-            throw PSQLCastingError.Code.typeMismatch
+            throw PostgresCastingError.Code.typeMismatch
         }
     }
     

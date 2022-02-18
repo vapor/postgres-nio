@@ -3,11 +3,11 @@ import NIOCore
 import NIOFoundationCompat
 
 extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
-    var psqlType: PSQLDataType {
+    var psqlType: PostgresDataType {
         .bytea
     }
     
-    var psqlFormat: PSQLFormat {
+    var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -17,11 +17,11 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
 }
 
 extension ByteBuffer: PSQLCodable {
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         .bytea
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -30,22 +30,22 @@ extension ByteBuffer: PSQLCodable {
         buffer.writeBuffer(&copyOfSelf)
     }
     
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> ByteBuffer {
         return buffer
     }
 }
 
 extension Data: PSQLCodable {
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         .bytea
     }
 
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         .binary
     }
 
@@ -53,11 +53,11 @@ extension Data: PSQLCodable {
         buffer.writeBytes(self)
     }
 
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         return buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }

@@ -36,7 +36,7 @@ class JSON_PSQLCodableTests: XCTestCase {
     }
     
     func testDecodeFromJSONAsText() {
-        let combinations : [(PSQLFormat, PSQLDataType)] = [
+        let combinations : [(PostgresFormat, PostgresDataType)] = [
             (.text, .json), (.text, .jsonb),
         ]
         var buffer = ByteBuffer()
@@ -55,7 +55,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PSQLCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
     
@@ -64,7 +64,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .text, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PSQLCastingError.Code, .typeMismatch)
+            XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
         }
     }
     

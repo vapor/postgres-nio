@@ -10,7 +10,6 @@ extension PostgresConnection {
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
-
         let configuration = PSQLConnection.Configuration(
             connection: .resolved(address: socketAddress, serverName: serverHostname),
             authentication: nil,

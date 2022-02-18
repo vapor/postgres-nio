@@ -3,16 +3,16 @@ import NIOCore
 extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.DecodableType == Wrapped {
     public typealias DecodableType = Wrapped
 
-    public static func decode<JSONDecoder : PSQLJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PSQLDataType, format: PSQLFormat, context: PSQLDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
+    public static func decode<JSONDecoder : PostgresJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PostgresDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")
     }
 
     @inlinable
-    public static func decodeRaw<JSONDecoder : PSQLJSONDecoder>(
+    public static func decodeRaw<JSONDecoder : PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
-        type: PSQLDataType,
-        format: PSQLFormat,
-        context: PSQLDecodingContext<JSONDecoder>
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Optional<Wrapped> {
         switch byteBuffer {
         case .some(var buffer):
@@ -24,7 +24,7 @@ extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.Decodabl
 }
 
 extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
-    public var psqlType: PSQLDataType {
+    public var psqlType: PostgresDataType {
         switch self {
         case .some(let value):
             return value.psqlType
@@ -33,7 +33,7 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    public var psqlFormat: PSQLFormat {
+    public var psqlFormat: PostgresFormat {
         switch self {
         case .some(let value):
             return value.psqlFormat
