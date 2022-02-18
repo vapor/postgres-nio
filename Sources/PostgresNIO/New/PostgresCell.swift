@@ -8,7 +8,6 @@ struct PostgresCell: Equatable {
     var columnName: String
     var columnIndex: Int
 
-    /// use this only for testing
     init(bytes: ByteBuffer?, dataType: PostgresDataType, format: PostgresFormat, columnName: String, columnIndex: Int) {
         self.bytes = bytes
         self.dataType = dataType
