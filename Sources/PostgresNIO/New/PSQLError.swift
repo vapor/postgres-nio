@@ -96,6 +96,7 @@ public struct PSQLError: Error {
 }
 
 @usableFromInline
+/// An error that may happen when a ``PostgresRow`` or ``PostgresCell`` is decoded to native Swift types.
 struct PostgresCastingError: Error, Equatable {
     @usableFromInline
     struct Code: Hashable, Error {
@@ -121,17 +122,34 @@ struct PostgresCastingError: Error, Equatable {
         static let failure = Self.init(.failure)
     }
 
-    var code: Code
-    
+    /// The casting error code
+    let code: Code
+
+    /// The cell's column name for which the casting failed
     let columnName: String
+    /// The cell's column index for which the casting failed
     let columnIndex: Int
-    
+
+    /// The swift type the cell should have been casted into
     let targetType: Any.Type
+    /// The cell's postgres data type for which the casting failed
     let postgresType: PostgresDataType
+    /// The cell's postgres format for which the casting failed
+    let postgresFormat: PostgresFormat
+    /// A copy of the cell data which was attempted to be casted
     let postgresData: ByteBuffer?
 
+    /// The file the casting/decoding was attempted in
     let file: String
-    let line: UInt
+    /// The line the casting/decoding was attempted in
+    let line: Int
+    
+    var description: String {
+        // This may seem very odd... But we are afraid that users might accidentally send the
+        // unfiltered errors out to end-users. This may leak security relevant information. For this
+        // reason we overwrite the error description by default to this generic "Database error"
+        "Database error"
+    }
 
     @usableFromInline
     init(
@@ -140,37 +158,21 @@ struct PostgresCastingError: Error, Equatable {
         columnIndex: Int,
         targetType: Any.Type,
         postgresType: PostgresDataType,
+        postgresFormat: PostgresFormat,
         postgresData: ByteBuffer?,
         file: String,
-        line: UInt
+        line: Int
     ) {
         self.code = code
         self.columnName = columnName
         self.columnIndex = columnIndex
         self.targetType = targetType
         self.postgresType = postgresType
+        self.postgresFormat = postgresFormat
         self.postgresData = postgresData
 
         self.file = file
         self.line = line
-    }
-    
-    var description: String {
-        switch self.code.base {
-        case .missingData:
-            return """
-                Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType) \
-                because of missing data.
-                """
-
-        case .typeMismatch:
-            preconditionFailure()
-
-        case .failure:
-            return """
-                Failed to cast Postgres data type \(self.postgresType.description) to Swift type \(self.targetType).
-                """
-        }
     }
 
     @usableFromInline
@@ -180,6 +182,9 @@ struct PostgresCastingError: Error, Equatable {
             && lhs.columnIndex == rhs.columnIndex
             && lhs.targetType == rhs.targetType
             && lhs.postgresType == rhs.postgresType
+            && lhs.postgresFormat == rhs.postgresFormat
             && lhs.postgresData == rhs.postgresData
+            && lhs.file == rhs.file
+            && lhs.line == rhs.line
     }
 }
