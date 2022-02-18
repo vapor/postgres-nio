@@ -44,11 +44,14 @@ final class PostgresCellTests: XCTestCase {
                 return XCTFail("Unexpected error")
             }
 
+            XCTAssertEqual(error.file, #file)
+            XCTAssertEqual(error.line, #line - 6)
             XCTAssertEqual(error.code, .typeMismatch)
             XCTAssertEqual(error.columnName, "hello")
             XCTAssertEqual(error.columnIndex, 1)
             XCTAssert(error.targetType == Int?.self)
             XCTAssertEqual(error.postgresType, .text)
+            XCTAssertEqual(error.postgresFormat, .binary)
         }
     }
 }

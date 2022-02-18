@@ -22,7 +22,9 @@ extension PostgresCell {
 
     func decode<T: PSQLDecodable, JSONDecoder: PostgresJSONDecoder>(
         _: T.Type,
-        context: PostgresDecodingContext<JSONDecoder>
+        context: PostgresDecodingContext<JSONDecoder>,
+        file: String = #file,
+        line: Int = #line
     ) throws -> T {
         var copy = self.bytes
         do {
@@ -39,7 +41,10 @@ extension PostgresCell {
                 columnIndex: self.columnIndex,
                 targetType: T.self,
                 postgresType: self.dataType,
-                postgresData: copy
+                postgresFormat: self.format,
+                postgresData: copy,
+                file: file,
+                line: line
             )
         }
     }
