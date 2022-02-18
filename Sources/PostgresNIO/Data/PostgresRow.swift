@@ -182,7 +182,7 @@ extension PostgresRandomAccessRow {
         file: String = #file, line: Int = #line
     ) throws -> T {
         guard let index = self.lookupTable[column] else {
-            preconditionFailure("A column '\(column)' does not exist.")
+            fatalError(#"A column "\#(column)" does not exist."#)
         }
 
         return try self.decode(column: index, as: type, context: context, file: file, line: line)
@@ -221,19 +221,5 @@ extension PostgresRandomAccessRow {
                 line: line
             )
         }
-    }
-}
-
-extension PostgresRandomAccessRow {
-    // TODO: Remove this function. Only here to keep the tests running as of today.
-    func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
-        let context = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
-        return try self.decode(column: column, as: type, context: context, file: file, line: line)
-    }
-
-    // TODO: Remove this function. Only here to keep the tests running as of today.
-    func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
-        let context = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
-        return try self.decode(column: index, as: type, context: context, file: file, line: line)
     }
 }
