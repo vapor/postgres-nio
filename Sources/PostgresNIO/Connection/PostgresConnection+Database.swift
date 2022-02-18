@@ -65,7 +65,18 @@ extension PostgresConnection: PostgresDatabase {
                 request.prepared = PreparedQuery(underlying: $0, database: self)
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
-            resultFuture = self.underlying.execute(preparedQuery.underlying, binds, logger: logger).flatMap { rows in
+            var bindings = PostgresBindings()
+            binds.forEach { data in
+                try! bindings._append(data, context: .default)
+            }
+
+            let statement = PSQLExecuteStatement(
+                name: preparedQuery.underlying.name,
+                binds: bindings,
+                rowDescription: preparedQuery.underlying.rowDescription
+            )
+
+            resultFuture = self.underlying.execute(statement, logger: logger).flatMap { rows in
                 guard let lookupTable = preparedQuery.lookupTable else {
                     return self.eventLoop.makeSucceededFuture(())
                 }

@@ -5,10 +5,10 @@ import NIOCore
 class DescribeTests: XCTestCase {
     
     func testEncodeDescribePortal() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let message = PSQLFrontendMessage.describe(.portal("Hello"))
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 12)
         XCTAssertEqual(PSQLFrontendMessage.ID.describe.rawValue, byteBuffer.readInteger(as: UInt8.self))
@@ -19,10 +19,10 @@ class DescribeTests: XCTestCase {
     }
     
     func testEncodeDescribeUnnamedStatement() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let message = PSQLFrontendMessage.describe(.preparedStatement(""))
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 7)
         XCTAssertEqual(PSQLFrontendMessage.ID.describe.rawValue, byteBuffer.readInteger(as: UInt8.self))
