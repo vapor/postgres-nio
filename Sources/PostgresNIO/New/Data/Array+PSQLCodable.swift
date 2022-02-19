@@ -100,7 +100,7 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
     }
 }
 
-extension Array: PSQLDecodable where Element: PSQLArrayElement {
+extension Array: PostgresDecodable where Element: PSQLArrayElement {
     static func decode<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,

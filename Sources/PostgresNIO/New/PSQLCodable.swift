@@ -19,8 +19,8 @@ protocol PSQLEncodable {
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
-protocol PSQLDecodable {
-    associatedtype DecodableType: PSQLDecodable = Self
+protocol PostgresDecodable {
+    associatedtype DecodableType: PostgresDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -51,7 +51,7 @@ protocol PSQLDecodable {
     ) throws -> Self
 }
 
-extension PSQLDecodable {
+extension PostgresDecodable {
     @inlinable
     static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
@@ -67,7 +67,7 @@ extension PSQLDecodable {
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
+protocol PSQLCodable: PSQLEncodable, PostgresDecodable {}
 
 extension PSQLEncodable {
     func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {

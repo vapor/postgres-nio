@@ -27,9 +27,9 @@ extension PSQLRow {
     /// - Parameters:
     ///   - column: The column name to read the data from
     ///   - type: The type to decode the data into
-    /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
+    /// - Throws: The error of the decoding implementation. See also `PostgresDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
-    func decode<T: PSQLDecodable, JSONDecoder: PostgresJSONDecoder>(column: String, as type: T.Type, jsonDecoder: JSONDecoder, file: String = #file, line: Int = #line) throws -> T {
+    func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(column: String, as type: T.Type, jsonDecoder: JSONDecoder, file: String = #file, line: Int = #line) throws -> T {
         guard let index = self.lookupTable[column] else {
             preconditionFailure("A column '\(column)' does not exist.")
         }
@@ -42,9 +42,9 @@ extension PSQLRow {
     /// - Parameters:
     ///   - column: The column index to read the data from
     ///   - type: The type to decode the data into
-    /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
+    /// - Throws: The error of the decoding implementation. See also `PostgresDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
-    func decode<T: PSQLDecodable, JSONDecoder: PostgresJSONDecoder>(column index: Int, as type: T.Type, jsonDecoder: JSONDecoder, file: String = #file, line: Int = #line) throws -> T {
+    func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(column index: Int, as type: T.Type, jsonDecoder: JSONDecoder, file: String = #file, line: Int = #line) throws -> T {
         precondition(index < self.data.columnCount)
         
         let column = self.columns[index]
@@ -59,12 +59,12 @@ extension PSQLRow {
 
 extension PSQLRow {
     // TODO: Remove this function. Only here to keep the tests running as of today.
-    func decode<T: PSQLDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
+    func decode<T: PostgresDecodable>(column: String, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
         try self.decode(column: column, as: type, jsonDecoder: JSONDecoder(), file: file, line: line)
     }
 
     // TODO: Remove this function. Only here to keep the tests running as of today.
-    func decode<T: PSQLDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
+    func decode<T: PostgresDecodable>(column index: Int, as type: T.Type, file: String = #file, line: Int = #line) throws -> T {
         try self.decode(column: index, as: type, jsonDecoder: JSONDecoder(), file: file, line: line)
     }
 }
