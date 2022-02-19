@@ -117,12 +117,4 @@ struct PostgresBindings: Hashable {
         try value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value))
     }
-
-    mutating func _append<JSONEncoder: PostgresJSONEncoder>(
-        _ value: PSQLEncodable,
-        context: PSQLEncodingContext<JSONEncoder>
-    ) throws {
-        try value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(dataType: value.psqlType, format: value.psqlFormat))
-    }
 }
