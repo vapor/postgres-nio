@@ -57,7 +57,7 @@ extension PostgresQuery {
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        mutating func appendInterpolation<Value: PSQLEncodable & Encodable, JSONEncoder: PostgresJSONEncoder>(
+        mutating func appendInterpolation<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PSQLEncodingContext<JSONEncoder>
         ) throws {
