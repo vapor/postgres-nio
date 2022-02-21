@@ -4,7 +4,7 @@ import NIOCore
 
 class JSON_PSQLCodableTests: XCTestCase {
     
-    struct Hello: Equatable, Codable, PSQLCodable {
+    struct Hello: Equatable, Codable, PostgresCodable {
         let hello: String
         
         init(name: String) {

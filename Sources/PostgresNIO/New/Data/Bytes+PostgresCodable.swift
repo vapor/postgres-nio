@@ -2,7 +2,7 @@ import struct Foundation.Data
 import NIOCore
 import NIOFoundationCompat
 
-extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
+extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -19,7 +19,7 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
     }
 }
 
-extension ByteBuffer: PSQLCodable {
+extension ByteBuffer: PostgresCodable {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -46,7 +46,7 @@ extension ByteBuffer: PSQLCodable {
     }
 }
 
-extension Data: PSQLCodable {
+extension Data: PostgresCodable {
     var psqlType: PostgresDataType {
         .bytea
     }

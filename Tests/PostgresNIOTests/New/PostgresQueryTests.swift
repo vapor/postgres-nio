@@ -31,7 +31,7 @@ final class PostgresQueryTests: XCTestCase {
     }
 
     func testStringInterpolationWithCustomJSONEncoder() throws {
-        struct Foo: Codable, PSQLCodable {
+        struct Foo: Codable, PostgresCodable {
             var helloWorld: String
         }
 
@@ -55,7 +55,7 @@ final class PostgresQueryTests: XCTestCase {
     }
 
     func testAllowUsersToGenerateLotsOfRows() throws {
-        struct Foo: Codable, PSQLCodable {
+        struct Foo: Codable, PostgresCodable {
             var helloWorld: String
         }
 

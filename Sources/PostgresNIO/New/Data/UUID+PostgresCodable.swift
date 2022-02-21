@@ -2,7 +2,7 @@ import NIOCore
 import struct Foundation.UUID
 import typealias Foundation.uuid_t
 
-extension UUID: PSQLCodable {
+extension UUID: PostgresCodable {
     
     var psqlType: PostgresDataType {
         .uuid
