@@ -26,7 +26,7 @@ public typealias PostgresFormatCode = PostgresFormat
 
 /// The data type's raw object ID.
 /// Use `select * from pg_type where oid = <idhere>;` to lookup more information.
-public struct PostgresDataType: RawRepresentable, Equatable, CustomStringConvertible {
+public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConvertible {
     /// `0`
     public static let null = PostgresDataType(0)
     /// `16`

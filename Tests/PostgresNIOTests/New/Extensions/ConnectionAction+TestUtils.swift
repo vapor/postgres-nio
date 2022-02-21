@@ -21,43 +21,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhs == rhs
         case (.sendPasswordMessage(let lhsMethod, let lhsAuthContext), sendPasswordMessage(let rhsMethod, let rhsAuthContext)):
             return lhsMethod == rhsMethod && lhsAuthContext == rhsAuthContext
-        case (.sendParseDescribeBindExecuteSync(let lquery, let lbinds), sendParseDescribeBindExecuteSync(let rquery, let rbinds)):
-            guard lquery == rquery else {
-                return false
-            }
-
-            guard lbinds.count == rbinds.count else {
-                return false
-            }
-
-            var lhsIterator = lbinds.makeIterator()
-            var rhsIterator = rbinds.makeIterator()
-
-            for _ in 0..<lbinds.count {
-                let lhs = lhsIterator.next()!
-                let rhs = rhsIterator.next()!
-
-                guard lhs.psqlType == rhs.psqlType else {
-                    return false
-                }
-                
-                var lhsbuffer = ByteBuffer()
-                var rhsbuffer = ByteBuffer()
-                let encodingContext = PSQLEncodingContext(jsonEncoder: JSONEncoder())
-                
-                do {
-                    try lhs.encodeRaw(into: &lhsbuffer, context: encodingContext)
-                    try rhs.encodeRaw(into: &rhsbuffer, context: encodingContext)
-                } catch {
-                    return false
-                }
-                
-                guard lhsbuffer == rhsbuffer else {
-                    return false
-                }
-            }
-            
-            return true
+        case (.sendParseDescribeBindExecuteSync(let lquery), sendParseDescribeBindExecuteSync(let rquery)):
+            return lquery == rquery
         case (.fireEventReadyForQuery, .fireEventReadyForQuery):
             return true
         

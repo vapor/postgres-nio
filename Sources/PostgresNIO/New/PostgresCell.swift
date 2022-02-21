@@ -20,7 +20,7 @@ public struct PostgresCell: Equatable {
 
 extension PostgresCell {
 
-    func decode<T: PSQLDecodable, JSONDecoder: PostgresJSONDecoder>(
+    func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(
         _: T.Type,
         context: PostgresDecodingContext<JSONDecoder>,
         file: String = #file,
