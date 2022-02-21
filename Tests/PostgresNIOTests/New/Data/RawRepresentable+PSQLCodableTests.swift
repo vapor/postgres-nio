@@ -4,7 +4,7 @@ import NIOCore
 
 class RawRepresentable_PSQLCodableTests: XCTestCase {
     
-    enum MyRawRepresentable: Int16, PSQLCodable {
+    enum MyRawRepresentable: Int16, PostgresCodable {
         case testing = 1
         case staging = 2
         case production = 3
