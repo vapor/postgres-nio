@@ -15,7 +15,14 @@ extension PostgresConnection: PostgresDatabase {
         
         switch command {
         case .query(let query, let binds, let onMetadata, let onRow):
-            resultFuture = self.underlying.query(query, binds, logger: logger).flatMap { stream in
+            var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init(capacity: binds.count))
+            binds.forEach {
+                // We can bang the try here as encoding PostgresData does not throw. The throw
+                // is just an option for the protocol.
+                try! psqlQuery.appendBinding($0, context: .default)
+            }
+
+            resultFuture = self.underlying.query(psqlQuery, logger: logger).flatMap { stream in
                 let fields = stream.rowDescription.map { column in
                     PostgresMessage.RowDescription.Field(
                         name: column.name,
@@ -34,7 +41,14 @@ extension PostgresConnection: PostgresDatabase {
                 }
             }
         case .queryAll(let query, let binds, let onResult):
-            resultFuture = self.underlying.query(query, binds, logger: logger).flatMap { rows in
+            var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init(capacity: binds.count))
+            binds.forEach {
+                // We can bang the try here as encoding PostgresData does not throw. The throw
+                // is just an option for the protocol.
+                try! psqlQuery.appendBinding($0, context: .default)
+            }
+
+            resultFuture = self.underlying.query(psqlQuery, logger: logger).flatMap { rows in
                 let fields = rows.rowDescription.map { column in
                     PostgresMessage.RowDescription.Field(
                         name: column.name,
@@ -65,7 +79,18 @@ extension PostgresConnection: PostgresDatabase {
                 request.prepared = PreparedQuery(underlying: $0, database: self)
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
-            resultFuture = self.underlying.execute(preparedQuery.underlying, binds, logger: logger).flatMap { rows in
+            var bindings = PostgresBindings()
+            binds.forEach { data in
+                try! bindings.append(data, context: .default)
+            }
+
+            let statement = PSQLExecuteStatement(
+                name: preparedQuery.underlying.name,
+                binds: bindings,
+                rowDescription: preparedQuery.underlying.rowDescription
+            )
+
+            resultFuture = self.underlying.execute(statement, logger: logger).flatMap { rows in
                 guard let lookupTable = preparedQuery.lookupTable else {
                     return self.eventLoop.makeSucceededFuture(())
                 }

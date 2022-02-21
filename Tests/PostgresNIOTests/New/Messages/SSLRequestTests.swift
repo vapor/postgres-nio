@@ -5,11 +5,11 @@ import NIOCore
 class SSLRequestTests: XCTestCase {
     
     func testSSLRequest() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let request = PSQLFrontendMessage.SSLRequest()
         let message = PSQLFrontendMessage.sslRequest(request)
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         let byteBufferLength = Int32(byteBuffer.readableBytes)
         XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())

@@ -10,7 +10,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "INSERT INTO foo bar;", bind: [], logger: logger, promise: promise
+            query: "INSERT INTO foo bar;", logger: logger, promise: promise
         )
         
         let stream = PSQLRowStream(
@@ -31,7 +31,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", bind: [], logger: logger, promise: promise
+            query: "SELECT * FROM test;", logger: logger, promise: promise
         )
         
         let stream = PSQLRowStream(
@@ -53,7 +53,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", bind: [], logger: logger, promise: promise
+            query: "SELECT * FROM test;", logger: logger, promise: promise
         )
         
         let dataSource = CountingDataSource()
@@ -92,7 +92,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", bind: [], logger: logger, promise: promise)
+            query: "SELECT * FROM test;", logger: logger, promise: promise)
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             rowDescription: [
@@ -142,7 +142,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", bind: [], logger: logger, promise: promise
+            query: "SELECT * FROM test;", logger: logger, promise: promise
         )
         
         let dataSource = CountingDataSource()
@@ -186,7 +186,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", bind: [], logger: logger, promise: promise
+            query: "SELECT * FROM test;", logger: logger, promise: promise
         )
         
         let dataSource = CountingDataSource()
@@ -235,7 +235,7 @@ class PSQLRowStreamTests: XCTestCase {
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
         
         let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", bind: [], logger: logger, promise: promise
+            query: "SELECT * FROM test;", logger: logger, promise: promise
         )
         
         let dataSource = CountingDataSource()
