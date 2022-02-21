@@ -44,11 +44,17 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) throws {
         switch self {
         case .none:
             byteBuffer.writeInteger(-1, as: Int32.self)

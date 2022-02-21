@@ -5,11 +5,11 @@ import NIOCore
 class PasswordTests: XCTestCase {
     
     func testEncodePassword() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         // md522d085ed8dc3377968dc1c1a40519a2a = "abc123" with salt 1, 2, 3, 4
         let message = PSQLFrontendMessage.password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a"))
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         let expectedLength = 41 // 1 (id) + 4 (length) + 35 (string) + 1 (null termination)
         

@@ -5,12 +5,12 @@ import NIOCore
 class SASLInitialResponseTests: XCTestCase {
 
     func testEncodeWithData() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let sasl = PSQLFrontendMessage.SASLInitialResponse(
             saslMechanism: "hello", initialData: [0, 1, 2, 3, 4, 5, 6, 7])
         let message = PSQLFrontendMessage.saslInitialResponse(sasl)
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         let length: Int = 1 + 4 + (sasl.saslMechanism.count + 1) + 4 + sasl.initialData.count
 
@@ -30,12 +30,12 @@ class SASLInitialResponseTests: XCTestCase {
     }
     
     func testEncodeWithoutData() {
-        let encoder = PSQLFrontendMessageEncoder.forTests
+        let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         let sasl = PSQLFrontendMessage.SASLInitialResponse(
             saslMechanism: "hello", initialData: [])
         let message = PSQLFrontendMessage.saslInitialResponse(sasl)
-        XCTAssertNoThrow(try encoder.encode(data: message, out: &byteBuffer))
+        encoder.encode(data: message, out: &byteBuffer)
         
         let length: Int = 1 + 4 + (sasl.saslMechanism.count + 1) + 4 + sasl.initialData.count
 

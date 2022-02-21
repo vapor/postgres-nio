@@ -20,40 +20,32 @@ enum PSQLTask {
 
 final class ExtendedQueryContext {
     enum Query {
-        case unnamed(String)
-        case preparedStatement(name: String, rowDescription: RowDescription?)
+        case unnamed(PostgresQuery)
+        case preparedStatement(PSQLExecuteStatement)
     }
     
     let query: Query
-    let bind: [PSQLEncodable]
     let logger: Logger
-    
+
     let promise: EventLoopPromise<PSQLRowStream>
     
-    init(query: String,
-         bind: [PSQLEncodable],
+    init(query: PostgresQuery,
          logger: Logger,
          promise: EventLoopPromise<PSQLRowStream>)
     {
         self.query = .unnamed(query)
-        self.bind = bind
         self.logger = logger
         self.promise = promise
     }
     
-    init(preparedStatement: PSQLPreparedStatement,
-         bind: [PSQLEncodable],
+    init(executeStatement: PSQLExecuteStatement,
          logger: Logger,
          promise: EventLoopPromise<PSQLRowStream>)
     {
-        self.query = .preparedStatement(
-            name: preparedStatement.name,
-            rowDescription: preparedStatement.rowDescription)
-        self.bind = bind
+        self.query = .preparedStatement(executeStatement)
         self.logger = logger
         self.promise = promise
     }
-
 }
 
 final class PrepareStatementContext {
@@ -75,7 +67,6 @@ final class PrepareStatementContext {
 }
 
 final class CloseCommandContext {
-    
     let target: CloseTarget
     let logger: Logger
     let promise: EventLoopPromise<Void>

@@ -33,7 +33,7 @@ class ConnectionStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine()
         XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
         XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
-        let failError: PSQLError = .failedToAddSSLHandler(underlying: SSLHandlerAddError())
+        let failError = PSQLError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
         XCTAssertEqual(state.errorHappened(failError), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }
     
@@ -42,7 +42,7 @@ class ConnectionStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
         XCTAssertEqual(state.sslUnsupportedReceived(),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .sslUnsupported, closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.sslUnsupported, closePromise: nil)))
     }
         
     func testParameterStatusReceivedAndBackendKeyAfterAuthenticated() {
@@ -100,14 +100,14 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "standard_conforming_strings", value: "on")), .wait)
         
         XCTAssertEqual(state.readyForQueryReceived(.idle),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
     }
     
     func testErrorIsIgnoredWhenClosingConnection() {
         // test ignore unclean shutdown when closing connection
         var stateIgnoreChannelError = ConnectionStateMachine(.closing)
         
-        XCTAssertEqual(stateIgnoreChannelError.errorHappened(.channel(underlying: NIOSSLError.uncleanShutdown)), .wait)
+        XCTAssertEqual(stateIgnoreChannelError.errorHappened(PSQLError.channel(underlying: NIOSSLError.uncleanShutdown)), .wait)
         XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
         
         // test ignore any other error when closing connection
@@ -129,7 +129,6 @@ class ConnectionStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine()
         let extendedQueryContext = ExtendedQueryContext(
             query: "Select version()",
-            bind: [],
             logger: .psqlTest,
             promise: queryPromise)
 
