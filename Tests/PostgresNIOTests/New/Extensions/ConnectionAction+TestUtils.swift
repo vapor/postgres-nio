@@ -23,10 +23,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsMethod == rhsMethod && lhsAuthContext == rhsAuthContext
         case (.sendParseDescribeBindExecuteSync(let lquery), sendParseDescribeBindExecuteSync(let rquery)):
             return lquery == rquery
-
         case (.fireEventReadyForQuery, .fireEventReadyForQuery):
             return true
-        
         case (.succeedQueryNoRowsComming(let lhsContext, let lhsCommandTag), .succeedQueryNoRowsComming(let rhsContext, let rhsCommandTag)):
             return lhsContext === rhsContext && lhsCommandTag == rhsCommandTag
         case (.succeedQuery(let lhsContext, let lhsRowDescription), .succeedQuery(let rhsContext, let rhsRowDescription)):

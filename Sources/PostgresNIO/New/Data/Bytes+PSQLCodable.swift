@@ -10,9 +10,12 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
     var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeBytes(self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeBytes(self)
     }
 }
 
@@ -24,8 +27,11 @@ extension ByteBuffer: PSQLCodable {
     public var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
         var copyOfSelf = self // dirty hack
         buffer.writeBuffer(&copyOfSelf)
     }
@@ -49,8 +55,11 @@ extension Data: PSQLCodable {
         .binary
     }
 
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeBytes(self)
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeBytes(self)
     }
 
     public static func decode<JSONDecoder : PostgresJSONDecoder>(

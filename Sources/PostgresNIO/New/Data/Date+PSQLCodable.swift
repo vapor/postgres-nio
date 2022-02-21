@@ -34,10 +34,13 @@ extension Date: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
         let seconds = self.timeIntervalSince(Self._psqlDateStart) * Double(Self._microsecondsPerSecond)
-        buffer.writeInteger(Int64(seconds))
+        byteBuffer.writeInteger(Int64(seconds))
     }
     
     // MARK: Private Constants

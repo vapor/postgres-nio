@@ -31,8 +31,11 @@ extension Decimal: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
         let numeric = PostgresNumeric(decimal: self)
         buffer.writeInteger(numeric.ndigits)
         buffer.writeInteger(numeric.weight)

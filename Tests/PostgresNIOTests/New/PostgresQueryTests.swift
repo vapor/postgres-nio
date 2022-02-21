@@ -3,7 +3,7 @@ import XCTest
 
 final class PostgresQueryTests: XCTestCase {
 
-    func testStringInterpolation() throws {
+    func testStringInterpolationWithOptional() throws {
         let string = "Hello World"
         let null: UUID? = nil
         let uuid: UUID? = UUID()
@@ -26,6 +26,56 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(Int32(string.utf8.count))
         expected.writeString(string)
         expected.writeInteger(Int32(-1))
+
+        XCTAssertEqual(query.binds.bytes, expected)
+    }
+
+    func testStringInterpolationWithCustomJSONEncoder() throws {
+        struct Foo: Codable, PSQLCodable {
+            var helloWorld: String
+        }
+
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
+
+        let query: PostgresQuery = try """
+            INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
+            """
+
+        XCTAssertEqual(query.sql, "INSERT INTO test (foo) SET ($1);")
+
+        let expectedJSON = #"{"hello_world":"bar"}"#
+
+        var expected = ByteBuffer()
+        expected.writeInteger(Int32(expectedJSON.utf8.count + 1))
+        expected.writeInteger(UInt8(0x01))
+        expected.writeString(expectedJSON)
+
+        XCTAssertEqual(query.binds.bytes, expected)
+    }
+
+    func testAllowUsersToGenerateLotsOfRows() throws {
+        struct Foo: Codable, PSQLCodable {
+            var helloWorld: String
+        }
+
+        let jsonEncoder = JSONEncoder()
+        jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
+
+        let sql = "INSERT INTO test (id) SET (\((1...5).map({"$\($0)"}).joined(separator: ", ")));"
+
+        var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
+        for value in 1...5 {
+            XCTAssertNoThrow(try query.appendBinding(Int(value), context: .default))
+        }
+
+        XCTAssertEqual(query.sql, "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")
+
+        var expected = ByteBuffer()
+        for value in 1...5 {
+            expected.writeInteger(UInt32(8))
+            expected.writeInteger(value)
+        }
 
         XCTAssertEqual(query.binds.bytes, expected)
     }

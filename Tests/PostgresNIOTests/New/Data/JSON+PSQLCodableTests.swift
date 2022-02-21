@@ -69,8 +69,12 @@ class JSON_PSQLCodableTests: XCTestCase {
     }
     
     func testCustomEncoderIsUsed() {
-        class TestEncoder: PSQLJSONEncoder {
+        class TestEncoder: PostgresJSONEncoder {
             var encodeHits = 0
+
+            func encode<T>(_ value: T) throws -> Data where T : Encodable {
+                preconditionFailure("Should never be called")
+            }
             
             func encode<T>(_ value: T, into buffer: inout ByteBuffer) throws where T : Encodable {
                 self.encodeHits += 1

@@ -8,7 +8,7 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "INSERT INTO foo bar;", binds: [])
+        let query: PostgresQuery = "INSERT INTO foo bar;"
 
         let queryContext = ExtendedQueryContext(
             query: query, logger: logger, promise: promise
@@ -30,7 +30,7 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "SELECT * FROM test;", binds: [])
+        let query: PostgresQuery = "SELECT * FROM test;"
         
         let queryContext = ExtendedQueryContext(
             query: query, logger: logger, promise: promise
@@ -53,7 +53,7 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "SELECT * FROM test;", binds: [])
+        let query: PostgresQuery = "SELECT * FROM test;"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
         let dataSource = CountingDataSource()
@@ -90,9 +90,9 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "SELECT * FROM test;", binds: [])
+        let query: PostgresQuery = "SELECT * FROM test;"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
-        
+
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             rowDescription: [
@@ -140,7 +140,7 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "SELECT * FROM test;", binds: [])
+        let query: PostgresQuery = "SELECT * FROM test;"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
         let dataSource = CountingDataSource()
@@ -182,7 +182,7 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "SELECT * FROM test;", binds: [])
+        let query: PostgresQuery = "SELECT * FROM test;"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
         let dataSource = CountingDataSource()
@@ -229,7 +229,7 @@ class PSQLRowStreamTests: XCTestCase {
         let logger = Logger(label: "test")
         let eventLoop = EmbeddedEventLoop()
         let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let query = PostgresQuery(unsafeSQL: "SELECT * FROM test;", binds: [])
+        let query: PostgresQuery = "SELECT * FROM test;"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
         let dataSource = CountingDataSource()

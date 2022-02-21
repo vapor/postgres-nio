@@ -4,7 +4,7 @@ import NIOCore
 ///
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
-enum PSQLFrontendMessage {
+enum PSQLFrontendMessage: Equatable {
     case bind(Bind)
     case cancel(Cancel)
     case close(Close)

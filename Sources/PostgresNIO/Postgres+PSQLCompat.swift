@@ -8,13 +8,19 @@ extension PostgresData: PSQLEncodable {
     public var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
     // encoding
-    public func encodeRaw<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+    public func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
         switch self.value {
         case .none:
             buffer.writeInteger(-1, as: Int32.self)
@@ -25,7 +31,7 @@ extension PostgresData: PSQLEncodable {
     }
 }
 
-extension PostgresData: PSQLDecodable {
+extension PostgresData: PostgresDecodable {
     public static func decode<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,

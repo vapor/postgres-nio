@@ -106,7 +106,7 @@ class ConnectionStateMachineTests: XCTestCase {
     func testErrorIsIgnoredWhenClosingConnection() {
         // test ignore unclean shutdown when closing connection
         var stateIgnoreChannelError = ConnectionStateMachine(.closing)
-        
+
         XCTAssertEqual(stateIgnoreChannelError.errorHappened(PSQLError(.channel, underlying: NIOSSLError.uncleanShutdown)), .wait)
         XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
         
@@ -128,7 +128,7 @@ class ConnectionStateMachineTests: XCTestCase {
 
         var state = ConnectionStateMachine()
         let extendedQueryContext = ExtendedQueryContext(
-            query: PostgresQuery(unsafeSQL: "Select version()"),
+            query: "Select version()",
             logger: .psqlTest,
             promise: queryPromise)
 

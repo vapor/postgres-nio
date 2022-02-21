@@ -23,7 +23,7 @@ extension PostgresQuery: ExpressibleByStringInterpolation {
         self.binds = PostgresBindings()
     }
 
-    public mutating func appendBinding<Value: PSQLEncodable, JSONEncoder: PSQLJSONEncoder>(
+    public mutating func appendBinding<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PSQLEncodingContext<JSONEncoder>
     ) throws {
@@ -40,7 +40,7 @@ extension PostgresQuery {
 
         public init(literalCapacity: Int, interpolationCount: Int) {
             self.sql = ""
-            self.binds = PostgresBindings()
+            self.binds = PostgresBindings(capacity: interpolationCount)
         }
 
         public mutating func appendLiteral(_ literal: String) {
@@ -57,7 +57,7 @@ extension PostgresQuery {
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        public mutating func appendInterpolation<Value: PSQLEncodable & Encodable, JSONEncoder: PSQLJSONEncoder>(
+        public mutating func appendInterpolation<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PSQLEncodingContext<JSONEncoder>
         ) throws {
@@ -103,19 +103,18 @@ public struct PostgresBindings: Hashable {
         self.bytes = ByteBuffer()
     }
 
-    public mutating func append<Value: PSQLEncodable, JSONEncoder: PSQLJSONEncoder>(
+    init(capacity: Int) {
+        self.metadata = []
+        self.metadata.reserveCapacity(capacity)
+        self.bytes = ByteBuffer()
+        self.bytes.reserveCapacity(128 * capacity)
+    }
+
+    public mutating func append<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PSQLEncodingContext<JSONEncoder>
     ) throws {
         try value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value))
-    }
-
-    public mutating func _append<JSONEncoder: PSQLJSONEncoder>(
-        _ value: PSQLEncodable,
-        context: PSQLEncodingContext<JSONEncoder>
-    ) throws {
-        try value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(dataType: value.psqlType, format: value.psqlFormat))
     }
 }

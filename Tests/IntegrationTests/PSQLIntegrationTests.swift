@@ -121,7 +121,7 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
         
         var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("SELECT $1::TEXT as foo", ["hello"], logger: .psqlTest).wait())
+        XCTAssertNoThrow(stream = try conn?.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).wait())
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
         var foo: String?
@@ -182,7 +182,7 @@ final class IntegrationTests: XCTestCase {
         
         var stream: PSQLRowStream?
         let array: [Int64] = [1, 2, 3]
-        XCTAssertNoThrow(stream = try conn?.query("SELECT $1::int8[] as array", [array], logger: .psqlTest).wait())
+        XCTAssertNoThrow(stream = try conn?.query("SELECT \(array)::int8[] as array", logger: .psqlTest).wait())
         
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
@@ -219,7 +219,7 @@ final class IntegrationTests: XCTestCase {
         
         var stream: PSQLRowStream?
         let doubles: [Double] = [3.14, 42]
-        XCTAssertNoThrow(stream = try conn?.query("SELECT $1::double precision[] as doubles", [doubles], logger: .psqlTest).wait())
+        XCTAssertNoThrow(stream = try conn?.query("SELECT \(doubles)::double precision[] as doubles", logger: .psqlTest).wait())
         
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
@@ -268,9 +268,9 @@ final class IntegrationTests: XCTestCase {
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("""
             SELECT
-                $1::numeric     as numeric,
-                $2::numeric     as numeric_negative
-            """, [Decimal(string: "123456.789123")!, Decimal(string: "-123456.789123")!], logger: .psqlTest).wait())
+                \(Decimal(string: "123456.789123")!)::numeric     as numeric,
+                \(Decimal(string: "-123456.789123")!)::numeric     as numeric_negative
+            """, logger: .psqlTest).wait())
         
         var rows: [PSQLRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
@@ -320,8 +320,8 @@ final class IntegrationTests: XCTestCase {
         do {
             var stream: PSQLRowStream?
             XCTAssertNoThrow(stream = try conn?.query("""
-                select $1::jsonb as jsonb
-                """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
+                select \(Object(foo: 1, bar: 2))::jsonb as jsonb
+                """, logger: .psqlTest).wait())
             
             var rows: [PSQLRow]?
             XCTAssertNoThrow(rows = try stream?.all().wait())
@@ -335,8 +335,8 @@ final class IntegrationTests: XCTestCase {
         do {
             var stream: PSQLRowStream?
             XCTAssertNoThrow(stream = try conn?.query("""
-                select $1::json as json
-                """, [Object(foo: 1, bar: 2)], logger: .psqlTest).wait())
+                select \(Object(foo: 1, bar: 2))::json as json
+                """, logger: .psqlTest).wait())
             
             var rows: [PSQLRow]?
             XCTAssertNoThrow(rows = try stream?.all().wait())

@@ -75,8 +75,11 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
     public var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) throws {
         // 0 if empty, 1 if not
         buffer.writeInteger(self.isEmpty ? 0 : 1, as: UInt32.self)
         // b
@@ -100,9 +103,8 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
     }
 }
 
-extension Array: PSQLDecodable where Element: PSQLArrayElement {
-    
-    public static func decode<JSONDecoder : PostgresJSONDecoder>(
+extension Array: PostgresDecodable where Element: PSQLArrayElement {
+    public static func decode<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

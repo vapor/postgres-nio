@@ -14,13 +14,16 @@ extension PSQLEncodable where Self: Encodable {
         .binary
     }
     
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(JSONBVersionByte)
-        try context.jsonEncoder.encode(self, into: &buffer)
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) throws {
+        byteBuffer.writeInteger(JSONBVersionByte)
+        try context.jsonEncoder.encode(self, into: &byteBuffer)
     }
 }
 
-extension PSQLDecodable where Self: Decodable {
+extension PostgresDecodable where Self: Decodable {
     static func decode<JSONDecoder : PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,

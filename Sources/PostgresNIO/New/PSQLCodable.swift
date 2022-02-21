@@ -11,7 +11,7 @@ public protocol PSQLEncodable {
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the default `encodeRaw` implementation.
-    func encode<JSONEncoder: PSQLJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
+    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format including its
     /// leading byte count. This method has a default implementation and may be overriden
@@ -20,8 +20,8 @@ public protocol PSQLEncodable {
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
-public protocol PSQLDecodable {
-    associatedtype DecodableType: PSQLDecodable = Self
+public protocol PostgresDecodable {
+    associatedtype DecodableType: PostgresDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -52,7 +52,7 @@ public protocol PSQLDecodable {
     ) throws -> Self
 }
 
-extension PSQLDecodable {
+extension PostgresDecodable {
     @inlinable
     public static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
@@ -68,11 +68,14 @@ extension PSQLDecodable {
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-public protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
+public protocol PSQLCodable: PSQLEncodable, PostgresDecodable {}
 
 extension PSQLEncodable {
     @inlinable
-    public func encodeRaw<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
+    public func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
         let lengthIndex = buffer.writerIndex
@@ -87,12 +90,16 @@ extension PSQLEncodable {
     }
 }
 
-public struct PSQLEncodingContext<Encoder: PSQLJSONEncoder> {
-    public let jsonEncoder: Encoder
+public struct PSQLEncodingContext<JSONEncoder: PostgresJSONEncoder> {
+    public let jsonEncoder: JSONEncoder
 
-    public init(jsonEncoder: Encoder) {
+    public init(jsonEncoder: JSONEncoder) {
         self.jsonEncoder = jsonEncoder
     }
+}
+
+extension PSQLEncodingContext where JSONEncoder == Foundation.JSONEncoder {
+    static let `default` = PSQLEncodingContext(jsonEncoder: JSONEncoder())
 }
 
 public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
@@ -105,8 +112,4 @@ public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
 
 extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
     public static let `default` = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
-}
-
-extension PSQLEncodingContext where Encoder == Foundation.JSONEncoder {
-    public static let `default` = PSQLEncodingContext(jsonEncoder: JSONEncoder())
 }

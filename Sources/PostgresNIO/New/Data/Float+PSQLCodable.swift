@@ -37,8 +37,11 @@ extension Float: PSQLCodable {
         }
     }
 
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
-        buffer.psqlWriteFloat(self)
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.psqlWriteFloat(self)
     }
 }
 
@@ -77,9 +80,12 @@ extension Double: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
-        buffer.psqlWriteDouble(self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.psqlWriteDouble(self)
     }
 }
 

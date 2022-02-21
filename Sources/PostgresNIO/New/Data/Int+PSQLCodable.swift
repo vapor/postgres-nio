@@ -28,10 +28,12 @@ extension UInt8: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    // encoding
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(self, as: UInt8.self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeInteger(self, as: UInt8.self)
     }
 }
 
@@ -67,10 +69,12 @@ extension Int16: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    // encoding
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(self, as: Int16.self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeInteger(self, as: Int16.self)
     }
 }
 
@@ -110,10 +114,12 @@ extension Int32: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    // encoding
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(self, as: Int32.self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeInteger(self, as: Int32.self)
     }
 }
 
@@ -158,10 +164,12 @@ extension Int64: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    // encoding
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(self, as: Int64.self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeInteger(self, as: Int64.self)
     }
 }
 
@@ -213,9 +221,11 @@ extension Int: PSQLCodable {
             throw PostgresCastingError.Code.typeMismatch
         }
     }
-    
-    // encoding
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        buffer.writeInteger(self, as: Int.self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeInteger(self, as: Int.self)
     }
 }

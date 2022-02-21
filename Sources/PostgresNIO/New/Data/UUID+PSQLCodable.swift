@@ -11,8 +11,11 @@ extension UUID: PSQLCodable {
     public var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
         let uuid = self.uuid
         buffer.writeBytes([
             uuid.0, uuid.1, uuid.2, uuid.3,

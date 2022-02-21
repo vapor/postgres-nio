@@ -9,9 +9,12 @@ extension String: PSQLCodable {
     public var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) {
-        buffer.writeString(self)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) {
+        byteBuffer.writeString(self)
     }
 
     @inlinable

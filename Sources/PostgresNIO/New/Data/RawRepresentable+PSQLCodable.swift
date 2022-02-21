@@ -22,8 +22,11 @@ extension PSQLCodable where Self: RawRepresentable, RawValue: PSQLCodable {
         
         return selfValue
     }
-    
-    public func encode<JSONEncoder: PSQLJSONEncoder>(into buffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws {
-        try rawValue.encode(into: &buffer, context: context)
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PSQLEncodingContext<JSONEncoder>
+    ) throws {
+        try rawValue.encode(into: &byteBuffer, context: context)
     }
 }

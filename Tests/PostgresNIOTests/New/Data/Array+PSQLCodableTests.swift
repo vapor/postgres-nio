@@ -104,7 +104,7 @@ class Array_PSQLCodableTests: XCTestCase {
     func testDecodeFailureTriesDecodeInt8() {
         let value: Int64 = 1 << 32
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try value.encode(into: &buffer, context: .default))
+        value.encode(into: &buffer, context: .default)
 
         XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
