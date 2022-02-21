@@ -298,7 +298,7 @@ final class IntegrationTests: XCTestCase {
     }
     
     func testRoundTripJSONB() {
-        struct Object: Codable, PSQLCodable {
+        struct Object: Codable, PostgresCodable {
             let foo: Int
             let bar: Int
         }

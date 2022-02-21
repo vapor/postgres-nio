@@ -5,7 +5,7 @@ import class Foundation.JSONDecoder
 
 private let JSONBVersionByte: UInt8 = 0x01
 
-extension PSQLCodable where Self: Codable {
+extension PostgresCodable where Self: Codable {
     var psqlType: PostgresDataType {
         .jsonb
     }
