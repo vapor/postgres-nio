@@ -31,7 +31,7 @@ extension PostgresData: PSQLEncodable {
     }
 }
 
-extension PostgresData: PSQLDecodable {
+extension PostgresData: PostgresDecodable {
     static func decode<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,

@@ -1,6 +1,6 @@
 import NIOCore
 
-extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.DecodableType == Wrapped {
+extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.DecodableType == Wrapped {
     typealias DecodableType = Wrapped
 
     static func decode<JSONDecoder: PostgresJSONDecoder>(

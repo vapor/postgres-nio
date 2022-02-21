@@ -13,9 +13,9 @@ function gen() {
 
     echo "    @inlinable"
     #echo "    @_alwaysEmitIntoClient"
-    echo -n "    func decode<T0: PSQLDecodable"
+    echo -n "    func decode<T0: PostgresDecodable"
     for ((n = 1; n<$how_many; n +=1)); do
-        echo -n ", T$(($n)): PSQLDecodable"
+        echo -n ", T$(($n)): PostgresDecodable"
     done
 
     echo -n ", JSONDecoder: PostgresJSONDecoder>(_: (T0"
