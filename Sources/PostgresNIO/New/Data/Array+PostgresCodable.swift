@@ -2,7 +2,7 @@ import NIOCore
 import struct Foundation.UUID
 
 /// A type, of which arrays can be encoded into and decoded from a postgres binary format
-public protocol PSQLArrayElement: PSQLCodable {
+public protocol PSQLArrayElement: PostgresCodable {
     static var psqlArrayType: PostgresDataType { get }
     static var psqlArrayElementType: PostgresDataType { get }
 }
@@ -67,7 +67,7 @@ extension UUID: PSQLArrayElement {
     public static var psqlArrayElementType: PostgresDataType { .uuid }
 }
 
-extension Array: PSQLEncodable where Element: PSQLArrayElement {
+extension Array: PostgresEncodable where Element: PSQLArrayElement {
     public var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
@@ -155,6 +155,6 @@ extension Array: PostgresDecodable where Element: PSQLArrayElement {
     }
 }
 
-extension Array: PSQLCodable where Element: PSQLArrayElement {
+extension Array: PostgresCodable where Element: PSQLArrayElement {
 
 }

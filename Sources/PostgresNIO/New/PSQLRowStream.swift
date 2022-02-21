@@ -64,7 +64,7 @@ final class PSQLRowStream {
     // MARK: Async Sequence
     
     #if swift(>=5.5) && canImport(_Concurrency)
-    func asyncSequence() -> PSQLRowSequence {
+    func asyncSequence() -> PostgresRowSequence {
         self.eventLoop.preconditionInEventLoop()
 
         guard case .waitingForConsumer(let bufferState) = self.downstreamState else {
@@ -90,7 +90,7 @@ final class PSQLRowStream {
             self.downstreamState = .consumed(.failure(error))
         }
         
-        return PSQLRowSequence(consumer)
+        return PostgresRowSequence(consumer)
     }
     
     func demand() {

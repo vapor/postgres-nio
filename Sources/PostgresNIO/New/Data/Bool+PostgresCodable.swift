@@ -1,6 +1,6 @@
 import NIOCore
 
-extension Bool: PSQLCodable {
+extension Bool: PostgresCodable {
     public var psqlType: PostgresDataType {
         .bool
     }

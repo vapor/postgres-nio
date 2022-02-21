@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.Decimal
 
-extension Decimal: PSQLCodable {
+extension Decimal: PostgresCodable {
     public var psqlType: PostgresDataType {
         .numeric
     }

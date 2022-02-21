@@ -1,6 +1,6 @@
 import NIOCore
 
-extension UInt8: PSQLCodable {
+extension UInt8: PostgresCodable {
     public var psqlType: PostgresDataType {
         .char
     }
@@ -37,7 +37,7 @@ extension UInt8: PSQLCodable {
     }
 }
 
-extension Int16: PSQLCodable {
+extension Int16: PostgresCodable {
     
     public var psqlType: PostgresDataType {
         .int2
@@ -78,7 +78,7 @@ extension Int16: PSQLCodable {
     }
 }
 
-extension Int32: PSQLCodable {
+extension Int32: PostgresCodable {
     public var psqlType: PostgresDataType {
         .int4
     }
@@ -123,7 +123,7 @@ extension Int32: PSQLCodable {
     }
 }
 
-extension Int64: PSQLCodable {
+extension Int64: PostgresCodable {
     public var psqlType: PostgresDataType {
         .int8
     }
@@ -173,7 +173,7 @@ extension Int64: PSQLCodable {
     }
 }
 
-extension Int: PSQLCodable {
+extension Int: PostgresCodable {
     public var psqlType: PostgresDataType {
         switch self.bitWidth {
         case Int32.bitWidth:

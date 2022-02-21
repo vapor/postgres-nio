@@ -23,7 +23,7 @@ extension PostgresQuery: ExpressibleByStringInterpolation {
         self.binds = PostgresBindings()
     }
 
-    public mutating func appendBinding<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
+    public mutating func appendBinding<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PSQLEncodingContext<JSONEncoder>
     ) throws {
@@ -47,17 +47,17 @@ extension PostgresQuery {
             self.sql.append(contentsOf: literal)
         }
 
-        public mutating func appendInterpolation<Value: PSQLEncodable>(_ value: Value) throws {
+        public mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        public mutating func appendInterpolation<Value: PSQLEncodable>(_ value: Optional<Value>) throws {
+        public mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Optional<Value>) throws {
             try self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        public mutating func appendInterpolation<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
+        public mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PSQLEncodingContext<JSONEncoder>
         ) throws {
@@ -86,7 +86,7 @@ public struct PostgresBindings: Hashable {
             self.format = format
         }
 
-        init<Value: PSQLEncodable>(value: Value) {
+        init<Value: PostgresEncodable>(value: Value) {
             self.init(dataType: value.psqlType, format: value.psqlFormat)
         }
     }
@@ -110,7 +110,7 @@ public struct PostgresBindings: Hashable {
         self.bytes.reserveCapacity(128 * capacity)
     }
 
-    public mutating func append<Value: PSQLEncodable, JSONEncoder: PostgresJSONEncoder>(
+    public mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PSQLEncodingContext<JSONEncoder>
     ) throws {

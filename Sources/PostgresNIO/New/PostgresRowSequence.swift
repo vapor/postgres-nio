@@ -5,7 +5,7 @@ import NIOConcurrencyHelpers
 /// An async sequence of ``PSQLRow``s.
 ///
 /// - Note: This is a struct to allow us to move to a move only type easily once they become available.
-public struct PSQLRowSequence: AsyncSequence {
+public struct PostgresRowSequence: AsyncSequence {
     public typealias Element = PSQLRow
     public typealias AsyncIterator = Iterator
     
@@ -38,7 +38,7 @@ public struct PSQLRowSequence: AsyncSequence {
     }
 }
 
-extension PSQLRowSequence {
+extension PostgresRowSequence {
     public struct Iterator: AsyncIteratorProtocol {
         public typealias Element = PSQLRow
         
@@ -155,11 +155,11 @@ final class AsyncStreamConsumer {
         }
     }
     
-    func makeAsyncIterator() -> PSQLRowSequence.Iterator {
+    func makeAsyncIterator() -> PostgresRowSequence.Iterator {
         self.lock.withLock {
             self.state.createAsyncIterator()
         }
-        let iterator = PSQLRowSequence.Iterator(consumer: self)
+        let iterator = PostgresRowSequence.Iterator(consumer: self)
         return iterator
     }
 
@@ -532,7 +532,7 @@ extension AsyncStreamConsumer {
     }
 }
 
-extension PSQLRowSequence {
+extension PostgresRowSequence {
     func collect() async throws -> [PSQLRow] {
         var result = [PSQLRow]()
         for try await row in self {

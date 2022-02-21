@@ -24,7 +24,7 @@ function gen() {
     done
     echo -n ").Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) "
 
-    echo -n "-> AsyncThrowingMapSequence<PSQLRowSequence, (T0"
+    echo -n "-> AsyncThrowingMapSequence<PostgresRowSequence, (T0"
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n))"
     done
@@ -60,7 +60,7 @@ EOF
 echo
 
 echo "#if swift(>=5.5) && canImport(_Concurrency)"
-echo "extension PSQLRowSequence {"
+echo "extension PostgresRowSequence {"
 
 # note:
 # - widening the inverval below (eg. going from {1..15} to {1..25}) is Semver minor

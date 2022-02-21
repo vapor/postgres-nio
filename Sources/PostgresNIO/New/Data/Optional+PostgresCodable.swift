@@ -23,7 +23,7 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
     }
 }
 
-extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
+extension Optional: PostgresEncodable where Wrapped: PostgresEncodable {
     public var psqlType: PostgresDataType {
         switch self {
         case .some(let value):
@@ -62,6 +62,6 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
     }
 }
 
-extension Optional: PSQLCodable where Wrapped: PSQLCodable, Wrapped.DecodableType == Wrapped {
+extension Optional: PostgresCodable where Wrapped: PostgresCodable, Wrapped.DecodableType == Wrapped {
 
 }

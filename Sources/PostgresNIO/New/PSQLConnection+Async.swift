@@ -24,7 +24,7 @@ extension PSQLConnection {
         try await self.close().get()
     }
 
-    public func query(_ query: PostgresQuery, logger: Logger, file: String = #file, line: UInt = #line) async throws -> PSQLRowSequence {
+    public func query(_ query: PostgresQuery, logger: Logger, file: String = #file, line: UInt = #line) async throws -> PostgresRowSequence {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.connectionID)"
 
