@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PostgresData: PSQLEncodable {
+extension PostgresData: PostgresEncodable {
     var psqlType: PostgresDataType {
         self.type
     }
@@ -44,7 +44,7 @@ extension PostgresData: PostgresDecodable {
     }
 }
 
-extension PostgresData: PSQLCodable {}
+extension PostgresData: PostgresCodable {}
 
 extension PSQLError {
     func toPostgresError() -> Error {

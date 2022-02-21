@@ -35,7 +35,7 @@ class Optional_PSQLCodableTests: XCTestCase {
     
     func testRoundTripSomeUUIDAsPSQLEncodable() {
         let value: Optional<UUID> = UUID()
-        let encodable: PSQLEncodable = value
+        let encodable: PostgresEncodable = value
         
         var buffer = ByteBuffer()
         XCTAssertEqual(encodable.psqlType, .uuid)
@@ -51,7 +51,7 @@ class Optional_PSQLCodableTests: XCTestCase {
     
     func testRoundTripNoneUUIDAsPSQLEncodable() {
         let value: Optional<UUID> = .none
-        let encodable: PSQLEncodable = value
+        let encodable: PostgresEncodable = value
         
         var buffer = ByteBuffer()
         XCTAssertEqual(encodable.psqlType, .null)

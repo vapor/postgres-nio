@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLCodable where Self: RawRepresentable, RawValue: PSQLCodable {
+extension PostgresCodable where Self: RawRepresentable, RawValue: PostgresCodable {
     var psqlType: PostgresDataType {
         self.rawValue.psqlType
     }

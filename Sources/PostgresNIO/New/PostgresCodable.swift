@@ -2,7 +2,7 @@ import NIOCore
 import Foundation
 
 /// A type that can encode itself to a postgres wire binary representation.
-protocol PSQLEncodable {
+protocol PostgresEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     var psqlType: PostgresDataType { get }
     
@@ -68,9 +68,9 @@ extension PostgresDecodable {
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-protocol PSQLCodable: PSQLEncodable, PostgresDecodable {}
+protocol PostgresCodable: PostgresEncodable, PostgresDecodable {}
 
-extension PSQLEncodable {
+extension PostgresEncodable {
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
         context: PSQLEncodingContext<JSONEncoder>
