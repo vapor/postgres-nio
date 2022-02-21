@@ -1,13 +1,12 @@
 import NIOCore
 import class Foundation.JSONDecoder
 
-/// `PostgresRow` represents a single table row that is received from the server for a query or prepared statement.
+/// `PostgresRow` represents a single table row that is received from the server for a query or a prepared statement.
 /// Its element type is ``PostgresCell``.
 ///
-/// Please note that the ``PostgresRow`` only implements the ``Swift/Collection`` protocol, but not the
-/// ``Swift/RandomAccessCollection`` protocol. This means that access to a random cell is *O(n)* and not *O(1)*.
-/// If you want to randomly access cells from the ``PostgresRow`` create a new ``PostgresRandomAccessRow``
-/// and query it instead.
+/// - Warning: Please note that access to cells in a ``PostgresRow`` has O(n) time complexity. If you require
+///            random access to cells in O(1) create a new ``PostgresRandomAccessRow`` with the given row and
+///            access it instead.
 public struct PostgresRow {
     let lookupTable: [String: Int]
     let data: DataRow
@@ -59,113 +58,79 @@ extension PostgresRow: Equatable {
     }
 }
 
-/// A random access row of ``PostgresCell``s. Its initialization is *O(n)* where *n* is the number of columns
-/// in the row. All subsequent cell access are *O(1)*.
-struct PostgresRandomAccessRow {
+/// A random access row of ``PostgresCell``s. Its initialization is O(n) where n is the number of columns
+/// in the row. All subsequent cell access are O(1).
+public struct PostgresRandomAccessRow {
     let columns: [RowDescription.Column]
     let cells: [ByteBuffer?]
     let lookupTable: [String: Int]
 
     init(_ row: PostgresRow) {
-        self.cells = row.data.map { $0 }
+        self.cells = [ByteBuffer?](row.data)
         self.columns = row.columns
         self.lookupTable = row.lookupTable
     }
 }
 
 extension PostgresRandomAccessRow: RandomAccessCollection {
-    typealias Element = PostgresCell
-    typealias Index = Int
+    public typealias Element = PostgresCell
+    public typealias Index = Int
 
-    var startIndex: Int {
+    public var startIndex: Int {
         0
     }
 
-    var endIndex: Int {
+    public var endIndex: Int {
         self.columns.count
     }
 
-    var count: Int {
+    public var count: Int {
         self.columns.count
     }
 
-    func index(after index: Int) -> Int {
+    public func index(after index: Int) -> Int {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
         }
         return index + 1
     }
 
-    subscript(index: Int) -> PostgresCell {
+    public subscript(index: Int) -> PostgresCell {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
         }
-
+        let column = self.columns[index]
         return PostgresCell(
             bytes: self.cells[index],
-            dataType: self.columns[index].dataType,
-            format: self.columns[index].format,
-            columnName: self.columns[index].name,
+            dataType: column.dataType,
+            format: column.format,
+            columnName: column.name,
             columnIndex: index
         )
     }
 }
 
-// MARK: Deprecated API
-
-extension PostgresRow {
-    public var rowDescription: PostgresMessage.RowDescription {
-        let fields = self.columns.map { column in
-            PostgresMessage.RowDescription.Field(
-                name: column.name,
-                tableOID: UInt32(column.tableOID),
-                columnAttributeNumber: column.columnAttributeNumber,
-                dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
-                dataTypeSize: column.dataTypeSize,
-                dataTypeModifier: column.dataTypeModifier,
-                formatCode: .init(psqlFormatCode: column.format)
-            )
+extension PostgresRandomAccessRow {
+    public subscript(data index: Int) -> PostgresData {
+        guard index < self.endIndex else {
+            preconditionFailure("index out of bounds")
         }
-        return PostgresMessage.RowDescription(fields: fields)
-    }
-
-    public var dataRow: PostgresMessage.DataRow {
-        let columns = self.data.map {
-            PostgresMessage.DataRow.Column(value: $0)
-        }
-        return PostgresMessage.DataRow(columns: columns)
-    }
-
-    @available(*, deprecated, message: """
-        This call is O(n) where n is the number of cells in the row. For random access to cells
-        in a row create a PostgresRandomAccessCollection from the row first and use its subscript
-        methods.
-        """)
-    public func column(_ column: String) -> PostgresData? {
-        guard let index = self.lookupTable[column] else {
-            return nil
-        }
-
+        let column = self.columns[index]
         return PostgresData(
-            type: self.columns[index].dataType,
-            typeModifier: self.columns[index].dataTypeModifier,
-            formatCode: .binary,
-            value: self.data[column: index]
+            type: column.dataType,
+            typeModifier: column.dataTypeModifier,
+            formatCode: column.format,
+            value: self.cells[index]
         )
     }
-}
 
-extension PostgresRow: CustomStringConvertible {
-    public var description: String {
-        var row: [String: PostgresData] = [:]
-        for field in self.rowDescription.fields {
-            row[field.name] = self.column(field.name)
+    public subscript(data column: String) -> PostgresData {
+        guard let index = self.lookupTable[column] else {
+            fatalError(#"A column "\#(column)" does not exist."#)
         }
-        return row.description
+        return self[data: index]
     }
 }
-
-// MARK: Fill in API (remove as soon as we have real decode methods)
 
 extension PostgresRandomAccessRow {
     /// Access the data in the provided column and decode it into the target type.
@@ -221,5 +186,59 @@ extension PostgresRandomAccessRow {
                 line: line
             )
         }
+    }
+}
+
+// MARK: Deprecated API
+
+extension PostgresRow {
+    public var rowDescription: PostgresMessage.RowDescription {
+        let fields = self.columns.map { column in
+            PostgresMessage.RowDescription.Field(
+                name: column.name,
+                tableOID: UInt32(column.tableOID),
+                columnAttributeNumber: column.columnAttributeNumber,
+                dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
+                dataTypeSize: column.dataTypeSize,
+                dataTypeModifier: column.dataTypeModifier,
+                formatCode: .init(psqlFormatCode: column.format)
+            )
+        }
+        return PostgresMessage.RowDescription(fields: fields)
+    }
+
+    public var dataRow: PostgresMessage.DataRow {
+        let columns = self.data.map {
+            PostgresMessage.DataRow.Column(value: $0)
+        }
+        return PostgresMessage.DataRow(columns: columns)
+    }
+
+    @available(*, deprecated, message: """
+        This call is O(n) where n is the number of cells in the row. For random access to cells
+        in a row create a PostgresRandomAccessCollection from the row first and use its subscript
+        methods.
+        """)
+    public func column(_ column: String) -> PostgresData? {
+        guard let index = self.lookupTable[column] else {
+            return nil
+        }
+
+        return PostgresData(
+            type: self.columns[index].dataType,
+            typeModifier: self.columns[index].dataTypeModifier,
+            formatCode: .binary,
+            value: self.data[column: index]
+        )
+    }
+}
+
+extension PostgresRow: CustomStringConvertible {
+    public var description: String {
+        var row: [String: PostgresData] = [:]
+        for field in self.rowDescription.fields {
+            row[field.name] = self.column(field.name)
+        }
+        return row.description
     }
 }
