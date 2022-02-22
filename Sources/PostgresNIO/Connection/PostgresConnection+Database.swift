@@ -17,9 +17,7 @@ extension PostgresConnection: PostgresDatabase {
         case .query(let query, let binds, let onMetadata, let onRow):
             var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init(capacity: binds.count))
             binds.forEach {
-                // We can bang the try here as encoding PostgresData does not throw. The throw
-                // is just an option for the protocol.
-                try! psqlQuery.appendBinding($0, context: .default)
+                psqlQuery.binds.append($0)
             }
 
             resultFuture = self.underlying.query(psqlQuery, logger: logger).flatMap { stream in
@@ -43,9 +41,7 @@ extension PostgresConnection: PostgresDatabase {
         case .queryAll(let query, let binds, let onResult):
             var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init(capacity: binds.count))
             binds.forEach {
-                // We can bang the try here as encoding PostgresData does not throw. The throw
-                // is just an option for the protocol.
-                try! psqlQuery.appendBinding($0, context: .default)
+                psqlQuery.binds.append($0)
             }
 
             resultFuture = self.underlying.query(psqlQuery, logger: logger).flatMap { rows in
@@ -80,12 +76,8 @@ extension PostgresConnection: PostgresDatabase {
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
             var psqlBinds = PostgresBindings()
-            do {
-                try binds.forEach {
-                    try psqlBinds.append($0, context: .default)
-                }
-            } catch {
-                return self.eventLoop.makeFailedFuture(error)
+            binds.forEach {
+                psqlBinds.append($0)
             }
 
             let statement = PSQLExecuteStatement(

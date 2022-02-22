@@ -28,7 +28,7 @@ extension PostgresCell {
     ) throws -> T {
         var copy = self.bytes
         do {
-            return try T.decodeRaw(
+            return try T._decodeRaw(
                 from: &copy,
                 type: self.dataType,
                 format: self.format,
