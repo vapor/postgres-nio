@@ -23,7 +23,10 @@ extension PostgresDatabase {
         onMetadata: @escaping (PostgresQueryMetadata) -> () = { _ in },
         onRow: @escaping (PostgresRow) throws -> ()
     ) -> EventLoopFuture<Void> {
-        let request = PostgresCommands.query(query: string, binds: binds, onMetadata: onMetadata, onRow: onRow)
+        var bindings = PostgresBindings(capacity: binds.count)
+        binds.forEach { bindings.append($0) }
+        let query = PostgresQuery(unsafeSQL: string, binds: bindings)
+        let request = PostgresCommands.query(query, onMetadata: onMetadata, onRow: onRow)
         
         return self.send(request, logger: logger)
     }
