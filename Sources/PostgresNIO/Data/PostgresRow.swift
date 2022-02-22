@@ -58,6 +58,14 @@ extension PostgresRow: Equatable {
     }
 }
 
+extension PostgresRow {
+
+    public func makeRandomAccess() -> PostgresRandomAccessRow {
+        PostgresRandomAccessRow(self)
+    }
+
+}
+
 /// A random access row of ``PostgresCell``s. Its initialization is O(n) where n is the number of columns
 /// in the row. All subsequent cell access are O(1).
 public struct PostgresRandomAccessRow {
@@ -119,7 +127,7 @@ extension PostgresRandomAccessRow {
         return PostgresData(
             type: column.dataType,
             typeModifier: column.dataTypeModifier,
-            formatCode: column.format,
+            formatCode: .binary,
             value: self.cells[index]
         )
     }

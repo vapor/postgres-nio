@@ -40,7 +40,7 @@ extension PostgresData: PostgresDecodable {
     ) throws -> Self {
         let myBuffer = buffer.readSlice(length: buffer.readableBytes)!
         
-        return PostgresData(type: PostgresDataType(UInt32(type.rawValue)), typeModifier: nil, formatCode: .binary, value: myBuffer)
+        return PostgresData(type: type, typeModifier: nil, formatCode: .binary, value: myBuffer)
     }
 }
 
