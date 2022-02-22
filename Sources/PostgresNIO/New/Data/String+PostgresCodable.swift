@@ -12,7 +12,7 @@ extension String: PostgresCodable {
     
     func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeString(self)
     }
