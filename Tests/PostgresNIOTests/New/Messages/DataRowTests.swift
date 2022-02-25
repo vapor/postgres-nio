@@ -119,7 +119,7 @@ extension DataRow: ExpressibleByArrayLiteral {
     public init(arrayLiteral elements: PostgresEncodable...) {
         
         var buffer = ByteBuffer()
-        let encodingContext = PSQLEncodingContext(jsonEncoder: JSONEncoder())
+        let encodingContext = PostgresEncodingContext(jsonEncoder: JSONEncoder())
         elements.forEach { element in
             try! element.encodeRaw(into: &buffer, context: encodingContext)
         }

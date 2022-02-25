@@ -11,12 +11,12 @@ protocol PostgresEncodable {
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the default `encodeRaw` implementation.
-    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
+    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format including its
     /// leading byte count. This method has a default implementation and may be overriden
     /// only for special cases, like `Optional`s.
-    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
@@ -73,7 +73,7 @@ protocol PostgresCodable: PostgresEncodable, PostgresDecodable {}
 extension PostgresEncodable {
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
@@ -89,7 +89,7 @@ extension PostgresEncodable {
     }
 }
 
-struct PSQLEncodingContext<JSONEncoder: PostgresJSONEncoder> {
+struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder> {
     let jsonEncoder: JSONEncoder
 
     init(jsonEncoder: JSONEncoder) {
@@ -97,8 +97,8 @@ struct PSQLEncodingContext<JSONEncoder: PostgresJSONEncoder> {
     }
 }
 
-extension PSQLEncodingContext where JSONEncoder == Foundation.JSONEncoder {
-    static let `default` = PSQLEncodingContext(jsonEncoder: JSONEncoder())
+extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
+    static let `default` = PostgresEncodingContext(jsonEncoder: JSONEncoder())
 }
 
 struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
