@@ -180,7 +180,7 @@ extension PostgresRandomAccessRow {
 
         var cellSlice = self.cells[index]
         do {
-            return try T.decodeRaw(from: &cellSlice, type: column.dataType, format: column.format, context: context)
+            return try T._decodeRaw(from: &cellSlice, type: column.dataType, format: column.format, context: context)
         } catch let code as PostgresCastingError.Code {
             throw PostgresCastingError(
                 code: code,

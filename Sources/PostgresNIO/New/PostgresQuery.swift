@@ -22,13 +22,6 @@ extension PostgresQuery: ExpressibleByStringInterpolation {
         self.sql = value
         self.binds = PostgresBindings()
     }
-
-    mutating func appendBinding<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
-        _ value: Value,
-        context: PostgresEncodingContext<JSONEncoder>
-    ) throws {
-        try self.binds.append(value, context: context)
-    }
 }
 
 extension PostgresQuery {
@@ -53,7 +46,13 @@ extension PostgresQuery {
         }
 
         mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Optional<Value>) throws {
-            try self.binds.append(value, context: .default)
+            switch value {
+            case .none:
+                self.binds.appendNull()
+            case .some(let value):
+                try self.binds.append(value, context: .default)
+            }
+
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
@@ -108,6 +107,22 @@ struct PostgresBindings: Hashable {
         self.metadata.reserveCapacity(capacity)
         self.bytes = ByteBuffer()
         self.bytes.reserveCapacity(128 * capacity)
+    }
+
+    mutating func appendNull() {
+        self.bytes.writeInteger(-1, as: Int32.self)
+        self.metadata.append(.init(dataType: .null, format: .binary))
+    }
+
+    mutating func append(_ postgresData: PostgresData) {
+        switch postgresData.value {
+        case .none:
+            self.bytes.writeInteger(-1, as: Int32.self)
+        case .some(var input):
+            self.bytes.writeInteger(Int32(input.readableBytes))
+            self.bytes.writeBuffer(&input)
+        }
+        self.metadata.append(.init(dataType: postgresData.type, format: .binary))
     }
 
     mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(

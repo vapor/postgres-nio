@@ -11,7 +11,7 @@ extension PostgresRow {
         let swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0)
         } catch let code as PostgresCastingError.Code {
@@ -39,13 +39,13 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1)
         } catch let code as PostgresCastingError.Code {
@@ -73,19 +73,19 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2)
         } catch let code as PostgresCastingError.Code {
@@ -113,25 +113,25 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3)
         } catch let code as PostgresCastingError.Code {
@@ -159,31 +159,31 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4)
         } catch let code as PostgresCastingError.Code {
@@ -211,37 +211,37 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5)
         } catch let code as PostgresCastingError.Code {
@@ -269,43 +269,43 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6)
         } catch let code as PostgresCastingError.Code {
@@ -333,49 +333,49 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7)
         } catch let code as PostgresCastingError.Code {
@@ -403,55 +403,55 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8)
         } catch let code as PostgresCastingError.Code {
@@ -479,61 +479,61 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
-            let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9)
         } catch let code as PostgresCastingError.Code {
@@ -561,67 +561,67 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
-            let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
-            let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10)
         } catch let code as PostgresCastingError.Code {
@@ -649,73 +649,73 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
-            let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
-            let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
-            let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r11 = try T11._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11)
         } catch let code as PostgresCastingError.Code {
@@ -743,79 +743,79 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
-            let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
-            let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
-            let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r11 = try T11._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 12
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T12.self
-            let r12 = try T12.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r12 = try T12._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)
         } catch let code as PostgresCastingError.Code {
@@ -843,85 +843,85 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
-            let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
-            let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
-            let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r11 = try T11._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 12
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T12.self
-            let r12 = try T12.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r12 = try T12._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 13
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T13.self
-            let r13 = try T13.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r13 = try T13._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13)
         } catch let code as PostgresCastingError.Code {
@@ -949,91 +949,91 @@ extension PostgresRow {
         var swiftTargetType: Any.Type = T0.self
 
         do {
-            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 1
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T1.self
-            let r1 = try T1.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 2
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T2.self
-            let r2 = try T2.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 3
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T3.self
-            let r3 = try T3.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 4
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T4.self
-            let r4 = try T4.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 5
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T5.self
-            let r5 = try T5.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 6
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T6.self
-            let r6 = try T6.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 7
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T7.self
-            let r7 = try T7.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 8
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T8.self
-            let r8 = try T8.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 9
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T9.self
-            let r9 = try T9.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 10
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T10.self
-            let r10 = try T10.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 11
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T11.self
-            let r11 = try T11.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r11 = try T11._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 12
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T12.self
-            let r12 = try T12.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r12 = try T12._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 13
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T13.self
-            let r13 = try T13.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r13 = try T13._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             columnIndex = 14
             cellData = cellIterator.next().unsafelyUnwrapped
             column = columnIterator.next().unsafelyUnwrapped
             swiftTargetType = T14.self
-            let r14 = try T14.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
+            let r14 = try T14._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14)
         } catch let code as PostgresCastingError.Code {

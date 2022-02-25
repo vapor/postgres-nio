@@ -66,7 +66,7 @@ final class PostgresQueryTests: XCTestCase {
 
         var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
         for value in 1...5 {
-            XCTAssertNoThrow(try query.appendBinding(Int(value), context: .default))
+            XCTAssertNoThrow(try query.binds.append(Int(value), context: .default))
         }
 
         XCTAssertEqual(query.sql, "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")

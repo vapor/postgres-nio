@@ -2,6 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message as a Close command.
+    @available(*, deprecated, message: "Will be removed from public API")
     public struct CommandComplete: PostgresMessageType {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> CommandComplete {
