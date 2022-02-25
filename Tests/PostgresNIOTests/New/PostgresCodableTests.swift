@@ -4,7 +4,7 @@ import XCTest
 final class PostgresCodableTests: XCTestCase {
 
     func testDecodeAnOptionalFromARow() {
-        let row = PSQLRow(
+        let row = PostgresRow(
             data: .makeTestDataRow(nil, ByteBuffer(string: "Hello world!")),
             lookupTable: ["id": 0, "name": 1],
             columns: [
@@ -36,7 +36,7 @@ final class PostgresCodableTests: XCTestCase {
     }
 
     func testDecodeMissingValueError() {
-        let row = PSQLRow(
+        let row = PostgresRow(
             data: .makeTestDataRow(nil),
             lookupTable: ["name": 0],
             columns: [
