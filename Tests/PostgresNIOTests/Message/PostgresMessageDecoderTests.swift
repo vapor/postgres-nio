@@ -3,6 +3,7 @@ import XCTest
 import NIOTestUtils
 
 class PostgresMessageDecoderTests: XCTestCase {
+    @available(*, deprecated, message: "Tests deprecated API")
     func testMessageDecoder() {
         let sample: [UInt8] = [
             0x52, // R - authentication

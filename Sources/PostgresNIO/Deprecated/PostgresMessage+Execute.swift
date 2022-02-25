@@ -2,6 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message as an Execute command.
+    @available(*, deprecated, message: "Will be removed from public API")
     public struct Execute: PostgresMessageType {
         public static var identifier: PostgresMessage.Identifier {
             return .execute

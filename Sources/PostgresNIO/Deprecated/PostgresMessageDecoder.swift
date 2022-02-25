@@ -1,6 +1,7 @@
 import NIOCore
 import Logging
 
+@available(*, deprecated, message: "Will be removed from public API")
 public final class PostgresMessageDecoder: ByteToMessageDecoder {
     /// See `ByteToMessageDecoder`.
     public typealias InboundOut = PostgresMessage
