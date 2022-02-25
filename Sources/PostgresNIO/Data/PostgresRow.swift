@@ -152,13 +152,6 @@ extension PostgresRandomAccessRow: RandomAccessCollection {
         self.columns.count
     }
 
-    public func index(after index: Int) -> Int {
-        guard index < self.endIndex else {
-            preconditionFailure("index out of bounds")
-        }
-        return index + 1
-    }
-
     public subscript(index: Int) -> PostgresCell {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
@@ -171,6 +164,13 @@ extension PostgresRandomAccessRow: RandomAccessCollection {
             columnName: column.name,
             columnIndex: index
         )
+    }
+
+    public subscript(name: String) -> PostgresCell {
+        guard let index = self.lookupTable[name] else {
+            fatalError(#"A column "\#(name)" does not exist."#)
+        }
+        return self[index]
     }
 }
 
