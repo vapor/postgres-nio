@@ -46,14 +46,14 @@ extension Optional: PostgresEncodable where Wrapped: PostgresEncodable {
     
     func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         switch self {
         case .none:

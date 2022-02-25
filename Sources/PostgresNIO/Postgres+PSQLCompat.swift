@@ -11,7 +11,7 @@ extension PostgresData: PostgresEncodable {
 
     func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
@@ -19,7 +19,7 @@ extension PostgresData: PostgresEncodable {
     // encoding
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         switch self.value {
         case .none:
