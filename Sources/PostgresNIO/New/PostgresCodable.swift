@@ -10,18 +10,19 @@ protocol PostgresEncodable {
     var psqlFormat: PostgresFormat { get }
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
-    /// the byte count. This method is called from the default `encodeRaw` implementation.
+    /// the byte count. This method is called from the ``PostgresBindings``.
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
-    
-    /// Encode the entity into the `byteBuffer` in Postgres binary format including its
-    /// leading byte count. This method has a default implementation and may be overriden
-    /// only for special cases, like `Optional`s.
-    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
+///
+/// If you want to conform a type to PostgresDecodable you must implement the decode method.
 protocol PostgresDecodable {
-    associatedtype DecodableType: PostgresDecodable = Self
+    /// A type definition of the type that actually implements the PostgresDecodable protocol. This is an escape hatch to
+    /// prevent a cycle in the conformace of the Optional type to PostgresDecodable.
+    ///
+    /// String? should be PostgresDecodable, String?? should not be PostgresDecodable
+    associatedtype _DecodableType: PostgresDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -41,10 +42,9 @@ protocol PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self
 
-    /// Decode an entity from the `byteBuffer` in postgres wire format.
-    /// This method has a default implementation and may be overriden
-    /// only for special cases, like `Optional`s.
-    static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
+    /// Decode an entity from the `byteBuffer` in postgres wire format. This method has a default implementation and
+    /// is only overwritten for `Optional`s. Other than in the
+    static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -54,7 +54,7 @@ protocol PostgresDecodable {
 
 extension PostgresDecodable {
     @inlinable
-    static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
+    static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -106,5 +106,31 @@ struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
     
     init(jsonDecoder: JSONDecoder) {
         self.jsonDecoder = jsonDecoder
+    }
+}
+
+extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
+    static let `default` = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
+}
+
+extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped._DecodableType == Wrapped {
+    typealias _DecodableType = Wrapped
+
+    static func decode<JSONDecoder : PostgresJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PostgresDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
+        preconditionFailure("This should not be called")
+    }
+
+    static func _decodeRaw<JSONDecoder : PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer?,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws -> Optional<Wrapped> {
+        switch byteBuffer {
+        case .some(var buffer):
+            return try Wrapped.decode(from: &buffer, type: type, format: format, context: context)
+        case .none:
+            return .none
+        }
     }
 }

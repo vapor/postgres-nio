@@ -106,15 +106,8 @@ extension PostgresConnection: PostgresDatabase {
         let resultFuture: EventLoopFuture<Void>
 
         switch command {
-        case .query(let query, let binds, let onMetadata, let onRow):
-            var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init(capacity: binds.count))
-            binds.forEach {
-                // We can bang the try here as encoding PostgresData does not throw. The throw
-                // is just an option for the protocol.
-                try! psqlQuery.appendBinding($0, context: .default)
-            }
-
-            resultFuture = self.underlying.query(psqlQuery, logger: logger).flatMap { stream in
+        case .query(let query, let onMetadata, let onRow):
+            resultFuture = self.underlying.query(query, logger: logger).flatMap { stream in
                 let fields = stream.rowDescription.map { column in
                     PostgresMessage.RowDescription.Field(
                         name: column.name,
@@ -132,15 +125,8 @@ extension PostgresConnection: PostgresDatabase {
                     onMetadata(PostgresQueryMetadata(string: stream.commandTag)!)
                 }
             }
-        case .queryAll(let query, let binds, let onResult):
-            var psqlQuery = PostgresQuery(unsafeSQL: query, binds: .init(capacity: binds.count))
-            binds.forEach {
-                // We can bang the try here as encoding PostgresData does not throw. The throw
-                // is just an option for the protocol.
-                try! psqlQuery.appendBinding($0, context: .default)
-            }
-
-            resultFuture = self.underlying.query(psqlQuery, logger: logger).flatMap { rows in
+        case .queryAll(let query, let onResult):
+            resultFuture = self.underlying.query(query, logger: logger).flatMap { rows in
                 let fields = rows.rowDescription.map { column in
                     PostgresMessage.RowDescription.Field(
                         name: column.name,
@@ -171,10 +157,8 @@ extension PostgresConnection: PostgresDatabase {
                 request.prepared = PreparedQuery(underlying: $0, database: self)
             }
         case .executePreparedStatement(let preparedQuery, let binds, let onRow):
-            var bindings = PostgresBindings()
-            binds.forEach { data in
-                try! bindings.append(data, context: .default)
-            }
+            var bindings = PostgresBindings(capacity: binds.count)
+            binds.forEach { bindings.append($0) }
 
             let statement = PSQLExecuteStatement(
                 name: preparedQuery.underlying.name,
@@ -202,13 +186,10 @@ extension PostgresConnection: PostgresDatabase {
 }
 
 internal enum PostgresCommands: PostgresRequest {
-    case query(query: String,
-               binds: [PostgresData],
+    case query(PostgresQuery,
                onMetadata: (PostgresQueryMetadata) -> () = { _ in },
                onRow: (PostgresRow) throws -> ())
-    case queryAll(query: String,
-                  binds: [PostgresData],
-                  onResult: (PostgresQueryResult) -> ())
+    case queryAll(PostgresQuery, onResult: (PostgresQueryResult) -> ())
     case prepareQuery(request: PrepareQueryRequest)
     case executePreparedStatement(query: PreparedQuery, binds: [PostgresData], onRow: (PostgresRow) throws -> ())
 

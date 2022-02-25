@@ -49,14 +49,14 @@ function gen() {
 
     echo
     echo "        do {"
-    echo "            let r0 = try T0.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)"
+    echo "            let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)"
     echo
     for ((n = 1; n<$how_many; n +=1)); do
         echo "            columnIndex = $n"
         echo "            cellData = cellIterator.next().unsafelyUnwrapped"
         echo "            column = columnIterator.next().unsafelyUnwrapped"
         echo "            swiftTargetType = T$n.self"
-        echo "            let r$n = try T$n.decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)"
+        echo "            let r$n = try T$n._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)"
         echo
     done
 
