@@ -241,7 +241,6 @@ final class PostgresRowSequenceTests: XCTestCase {
 
         let row1 = try await rowIterator.next()
         XCTAssertEqual(try row1?.decode(Int.self, context: .default), 0)
-
         DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
             stream.receive(completion: .success("SELECT 1"))
         }

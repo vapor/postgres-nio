@@ -37,7 +37,7 @@ extension Date: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         let seconds = self.timeIntervalSince(Self._psqlDateStart) * Double(Self._microsecondsPerSecond)
         byteBuffer.writeInteger(Int64(seconds))

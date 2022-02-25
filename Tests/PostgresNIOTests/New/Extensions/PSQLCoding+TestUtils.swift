@@ -6,3 +6,9 @@ extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
         Self(jsonDecoder: JSONDecoder())
     }
 }
+
+extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
+    static func forTests(jsonEncoder: JSONEncoder = JSONEncoder()) -> Self {
+        Self(jsonEncoder: jsonEncoder)
+    }
+}

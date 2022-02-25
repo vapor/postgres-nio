@@ -92,7 +92,7 @@ cat <<"EOF"
 EOF
 echo
 
-echo "extension PSQLRow {"
+echo "extension PostgresRow {"
 
 # note:
 # - widening the inverval below (eg. going from {1..15} to {1..25}) is Semver minor

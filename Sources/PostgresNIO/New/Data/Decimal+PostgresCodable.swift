@@ -34,7 +34,7 @@ extension Decimal: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         let numeric = PostgresNumeric(decimal: self)
         buffer.writeInteger(numeric.ndigits)

@@ -2,6 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// Authentication request returned by the server.
+    @available(*, deprecated, message: "Will be removed from public API")
     public enum Authentication: PostgresMessageType {
         public static var identifier: PostgresMessage.Identifier {
             return .authentication

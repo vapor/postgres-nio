@@ -2,6 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message type. ReadyForQuery is sent whenever the backend is ready for a new query cycle.
+    @available(*, deprecated, message: "Will be removed from public API")
     public struct ReadyForQuery: CustomStringConvertible {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> ReadyForQuery {

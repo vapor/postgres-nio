@@ -14,7 +14,7 @@ extension UUID: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         let uuid = self.uuid
         buffer.writeBytes([

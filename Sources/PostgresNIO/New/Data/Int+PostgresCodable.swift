@@ -31,7 +31,7 @@ extension UInt8: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeInteger(self, as: UInt8.self)
     }
@@ -72,7 +72,7 @@ extension Int16: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeInteger(self, as: Int16.self)
     }
@@ -117,7 +117,7 @@ extension Int32: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeInteger(self, as: Int32.self)
     }
@@ -167,7 +167,7 @@ extension Int64: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeInteger(self, as: Int64.self)
     }
@@ -224,7 +224,7 @@ extension Int: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeInteger(self, as: Int.self)
     }

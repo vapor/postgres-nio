@@ -39,7 +39,7 @@ extension Float: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.psqlWriteFloat(self)
     }
@@ -83,7 +83,7 @@ extension Double: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.psqlWriteDouble(self)
     }

@@ -2,6 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message as a Describe command.
+    @available(*, deprecated, message: "Will be removed from public API")
     public struct Describe: PostgresMessageType {
         public static var identifier: PostgresMessage.Identifier {
             return .describe

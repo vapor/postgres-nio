@@ -2,7 +2,7 @@ import XCTest
 import Logging
 import NIOCore
 import NIOPosix
-import PostgresNIO
+@testable import PostgresNIO
 import NIOTestUtils
 
 final class PerformanceTests: XCTestCase {
@@ -38,7 +38,7 @@ final class PerformanceTests: XCTestCase {
             do {
                 for _ in 0..<5 {
                     try conn.query("SELECT * FROM generate_series(1, 10000) num") { row in
-                        _ = row.column("num")?.int
+                        _ = try row.decode(Int.self, context: .default)
                     }.wait()
                 }
             } catch {
@@ -65,8 +65,8 @@ final class PerformanceTests: XCTestCase {
         measure {
             do {
                 try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
-                    _ = row.column("int")?.int
-                    }.wait()
+                    _ = try row.decode(Int.self, context: .default)
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }
@@ -101,12 +101,13 @@ final class PerformanceTests: XCTestCase {
 
         measure {
             do {
-                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
-                    _ = row.column("id")?.int
-                    _ = row.column("string")?.string
-                    _ = row.column("int")?.int
-                    _ = row.column("date")?.date
-                    _ = row.column("uuid")?.uuid
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") {
+                    let row = $0.makeRandomAccess()
+                    _ = row[data: "id"].int
+                    _ = row[data: "string"].string
+                    _ = row[data: "int"].int
+                    _ = row[data: "date"].date
+                    _ = row[data: "uuid"].uuid
                     }.wait()
             } catch {
                 XCTFail("\(error)")
@@ -174,28 +175,29 @@ final class PerformanceTests: XCTestCase {
 
         measure {
             do {
-                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
-                    _ = row.column("id")?.int
-                    _ = row.column("string1")?.string
-                    _ = row.column("string2")?.string
-                    _ = row.column("string3")?.string
-                    _ = row.column("string4")?.string
-                    _ = row.column("string5")?.string
-                    _ = row.column("int1")?.int
-                    _ = row.column("int2")?.int
-                    _ = row.column("int3")?.int
-                    _ = row.column("int4")?.int
-                    _ = row.column("int5")?.int
-                    _ = row.column("date1")?.date
-                    _ = row.column("date2")?.date
-                    _ = row.column("date3")?.date
-                    _ = row.column("date4")?.date
-                    _ = row.column("date5")?.date
-                    _ = row.column("uuid1")?.uuid
-                    _ = row.column("uuid2")?.uuid
-                    _ = row.column("uuid3")?.uuid
-                    _ = row.column("uuid4")?.uuid
-                    _ = row.column("uuid5")?.uuid
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") {
+                    let row = $0.makeRandomAccess()
+                    _ = row[data: "id"].int
+                    _ = row[data: "string1"].string
+                    _ = row[data: "string2"].string
+                    _ = row[data: "string3"].string
+                    _ = row[data: "string4"].string
+                    _ = row[data: "string5"].string
+                    _ = row[data: "int1"].int
+                    _ = row[data: "int2"].int
+                    _ = row[data: "int3"].int
+                    _ = row[data: "int4"].int
+                    _ = row[data: "int5"].int
+                    _ = row[data: "date1"].date
+                    _ = row[data: "date2"].date
+                    _ = row[data: "date3"].date
+                    _ = row[data: "date4"].date
+                    _ = row[data: "date5"].date
+                    _ = row[data: "uuid1"].uuid
+                    _ = row[data: "uuid2"].uuid
+                    _ = row[data: "uuid3"].uuid
+                    _ = row[data: "uuid4"].uuid
+                    _ = row[data: "uuid5"].uuid
                 }.wait()
             } catch {
                 XCTFail("\(error)")
@@ -219,10 +221,11 @@ final class PerformanceTests: XCTestCase {
 
         measure {
             do {
-                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
-                    _ = row.column("id")?.int
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") {
+                    let row = $0.makeRandomAccess()
+                    _ = row[data: "id"].int
                     for fieldName in fieldNames {
-                        _ = row.column(fieldName)?.int
+                        _ = row[data: fieldName].int
                     }
                 }.wait()
             } catch {
@@ -247,10 +250,11 @@ final class PerformanceTests: XCTestCase {
 
         measure {
             do {
-                try conn.query("SELECT * FROM \"measureSelectPerformance\"") { row in
-                    _ = row.column("id")?.int
+                try conn.query("SELECT * FROM \"measureSelectPerformance\"") {
+                    let row = $0.makeRandomAccess()
+                    _ = row[data: "id"].int
                     for fieldName in fieldNames {
-                        _ = row.column(fieldName)?.int
+                        _ = row[data: fieldName].int
                     }
                 }.wait()
             } catch {

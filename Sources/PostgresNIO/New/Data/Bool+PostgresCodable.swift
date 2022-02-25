@@ -51,7 +51,7 @@ extension Bool: PostgresCodable {
 
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) {
         byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }

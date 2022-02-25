@@ -11,12 +11,18 @@ public protocol PostgresEncodable {
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the default `encodeRaw` implementation.
-    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext<JSONEncoder>) throws
+    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
+///
+/// If you want to conform a type to PostgresDecodable you must implement the decode method.
 public protocol PostgresDecodable {
-    associatedtype DecodableType: PostgresDecodable = Self
+    /// A type definition of the type that actually implements the PostgresDecodable protocol. This is an escape hatch to
+    /// prevent a cycle in the conformace of the Optional type to PostgresDecodable.
+    ///
+    /// String? should be PostgresDecodable, String?? should not be PostgresDecodable
+    associatedtype _DecodableType: PostgresDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -36,9 +42,8 @@ public protocol PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self
 
-    /// Decode an entity from the `byteBuffer` in postgres wire format.
-    /// This method has a default implementation and may be overriden
-    /// only for special cases, like `Optional`s.
+    /// Decode an entity from the `byteBuffer` in postgres wire format. This method has a default implementation and
+    /// is only overwritten for `Optional`s.
     static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
@@ -68,7 +73,7 @@ public protocol PostgresCodable: PostgresEncodable, PostgresDecodable {}
 extension PostgresEncodable {
     public func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
@@ -84,7 +89,7 @@ extension PostgresEncodable {
     }
 }
 
-public struct PSQLEncodingContext<JSONEncoder: PostgresJSONEncoder> {
+public struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder> {
     public let jsonEncoder: JSONEncoder
 
     public init(jsonEncoder: JSONEncoder) {
@@ -92,8 +97,8 @@ public struct PSQLEncodingContext<JSONEncoder: PostgresJSONEncoder> {
     }
 }
 
-extension PSQLEncodingContext where JSONEncoder == Foundation.JSONEncoder {
-    static let `default` = PSQLEncodingContext(jsonEncoder: JSONEncoder())
+extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
+    public static let `default` = PostgresEncodingContext(jsonEncoder: JSONEncoder())
 }
 
 public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
@@ -108,8 +113,8 @@ extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
     public static let `default` = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
 }
 
-extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.DecodableType == Wrapped {
-    public typealias DecodableType = Wrapped
+extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped._DecodableType == Wrapped {
+    public typealias _DecodableType = Wrapped
 
     public static func decode<JSONDecoder : PostgresJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PostgresDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
         preconditionFailure("This should not be called")

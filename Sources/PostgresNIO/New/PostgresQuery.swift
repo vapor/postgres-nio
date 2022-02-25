@@ -57,7 +57,7 @@ extension PostgresQuery {
 
         public mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
-            context: PSQLEncodingContext<JSONEncoder>
+            context: PostgresEncodingContext<JSONEncoder>
         ) throws {
             try self.binds.append(value, context: context)
             self.sql.append(contentsOf: "$\(self.binds.count)")
@@ -126,7 +126,7 @@ public struct PostgresBindings: Hashable {
 
     public mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
-        context: PSQLEncodingContext<JSONEncoder>
+        context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         try value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value))
