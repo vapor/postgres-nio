@@ -1,6 +1,6 @@
 import NIOCore
 
-extension UInt8: PSQLCodable {
+extension UInt8: PostgresCodable {
     var psqlType: PostgresDataType {
         .char
     }
@@ -27,12 +27,15 @@ extension UInt8: PSQLCodable {
         }
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeInteger(self, as: UInt8.self)
     }
 }
 
-extension Int16: PSQLCodable {
+extension Int16: PostgresCodable {
     
     var psqlType: PostgresDataType {
         .int2
@@ -64,12 +67,15 @@ extension Int16: PSQLCodable {
         }
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeInteger(self, as: Int16.self)
     }
 }
 
-extension Int32: PSQLCodable {
+extension Int32: PostgresCodable {
     var psqlType: PostgresDataType {
         .int4
     }
@@ -105,12 +111,15 @@ extension Int32: PSQLCodable {
         }
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeInteger(self, as: Int32.self)
     }
 }
 
-extension Int64: PSQLCodable {
+extension Int64: PostgresCodable {
     var psqlType: PostgresDataType {
         .int8
     }
@@ -151,12 +160,15 @@ extension Int64: PSQLCodable {
         }
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeInteger(self, as: Int64.self)
     }
 }
 
-extension Int: PSQLCodable {
+extension Int: PostgresCodable {
     var psqlType: PostgresDataType {
         switch self.bitWidth {
         case Int32.bitWidth:
@@ -204,7 +216,10 @@ extension Int: PSQLCodable {
         }
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeInteger(self, as: Int.self)
     }
 }

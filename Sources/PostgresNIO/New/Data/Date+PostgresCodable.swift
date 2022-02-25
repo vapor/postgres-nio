@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.Date
 
-extension Date: PSQLCodable {
+extension Date: PostgresCodable {
     var psqlType: PostgresDataType {
         .timestamptz
     }
@@ -34,9 +34,12 @@ extension Date: PSQLCodable {
         }
     }
     
-    func encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         let seconds = self.timeIntervalSince(Self._psqlDateStart) * Double(Self._microsecondsPerSecond)
-        buffer.writeInteger(Int64(seconds))
+        byteBuffer.writeInteger(Int64(seconds))
     }
     
     // MARK: Private Constants

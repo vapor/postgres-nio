@@ -1,6 +1,6 @@
 import NIOCore
 
-extension Bool: PSQLCodable {
+extension Bool: PostgresCodable {
     var psqlType: PostgresDataType {
         .bool
     }
@@ -49,7 +49,10 @@ extension Bool: PSQLCodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }
 }

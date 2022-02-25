@@ -1,6 +1,6 @@
 import NIOCore
 
-struct BufferedMessageEncoder<Encoder: MessageToByteEncoder> {
+struct BufferedMessageEncoder {
     private enum State {
         case flushed
         case writable
@@ -8,14 +8,14 @@ struct BufferedMessageEncoder<Encoder: MessageToByteEncoder> {
     
     private var buffer: ByteBuffer
     private var state: State = .writable
-    private var encoder: Encoder
+    private var encoder: PSQLFrontendMessageEncoder
     
-    init(buffer: ByteBuffer, encoder: Encoder) {
+    init(buffer: ByteBuffer, encoder: PSQLFrontendMessageEncoder) {
         self.buffer = buffer
         self.encoder = encoder
     }
     
-    mutating func encode(_ message: Encoder.OutboundIn) throws {
+    mutating func encode(_ message: PSQLFrontendMessage) {
         switch self.state {
         case .flushed:
             self.state = .writable
@@ -25,7 +25,7 @@ struct BufferedMessageEncoder<Encoder: MessageToByteEncoder> {
             break
         }
         
-        try self.encoder.encode(data: message, out: &self.buffer)
+        self.encoder.encode(data: message, out: &self.buffer)
     }
     
     mutating func flush() -> ByteBuffer? {

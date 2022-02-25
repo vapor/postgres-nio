@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PostgresData: PSQLEncodable {
+extension PostgresData: PostgresEncodable {
     var psqlType: PostgresDataType {
         self.type
     }
@@ -8,13 +8,19 @@ extension PostgresData: PSQLEncodable {
     var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
     // encoding
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         switch self.value {
         case .none:
             byteBuffer.writeInteger(-1, as: Int32.self)
@@ -25,7 +31,7 @@ extension PostgresData: PSQLEncodable {
     }
 }
 
-extension PostgresData: PSQLDecodable {
+extension PostgresData: PostgresDecodable {
     static func decode<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
@@ -38,7 +44,7 @@ extension PostgresData: PSQLDecodable {
     }
 }
 
-extension PostgresData: PSQLCodable {}
+extension PostgresData: PostgresCodable {}
 
 extension PSQLError {
     func toPostgresError() -> Error {

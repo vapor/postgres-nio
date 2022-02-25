@@ -1,6 +1,6 @@
 import NIOCore
 
-extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.DecodableType == Wrapped {
+extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.DecodableType == Wrapped {
     typealias DecodableType = Wrapped
 
     static func decode<JSONDecoder: PostgresJSONDecoder>(
@@ -25,7 +25,7 @@ extension Optional: PSQLDecodable where Wrapped: PSQLDecodable, Wrapped.Decodabl
     }
 }
 
-extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
+extension Optional: PostgresEncodable where Wrapped: PostgresEncodable {
     var psqlType: PostgresDataType {
         switch self {
         case .some(let value):
@@ -44,11 +44,17 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         preconditionFailure("Should never be hit, since `encodeRaw` is implemented.")
     }
     
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
         switch self {
         case .none:
             byteBuffer.writeInteger(-1, as: Int32.self)
@@ -58,6 +64,6 @@ extension Optional: PSQLEncodable where Wrapped: PSQLEncodable {
     }
 }
 
-extension Optional: PSQLCodable where Wrapped: PSQLCodable, Wrapped.DecodableType == Wrapped {
+extension Optional: PostgresCodable where Wrapped: PostgresCodable, Wrapped.DecodableType == Wrapped {
     
 }

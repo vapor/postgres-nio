@@ -2,7 +2,7 @@ import NIOCore
 import struct Foundation.UUID
 
 /// A type, of which arrays can be encoded into and decoded from a postgres binary format
-protocol PSQLArrayElement: PSQLCodable {
+protocol PSQLArrayElement: PostgresCodable {
     static var psqlArrayType: PostgresDataType { get }
     static var psqlArrayElementType: PostgresDataType { get }
 }
@@ -67,7 +67,7 @@ extension UUID: PSQLArrayElement {
     static var psqlArrayElementType: PostgresDataType { .uuid }
 }
 
-extension Array: PSQLEncodable where Element: PSQLArrayElement {
+extension Array: PostgresEncodable where Element: PSQLArrayElement {
     var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
@@ -76,7 +76,10 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
         .binary
     }
     
-    func encode(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
         // 0 if empty, 1 if not
         buffer.writeInteger(self.isEmpty ? 0 : 1, as: UInt32.self)
         // b
@@ -100,7 +103,7 @@ extension Array: PSQLEncodable where Element: PSQLArrayElement {
     }
 }
 
-extension Array: PSQLDecodable where Element: PSQLArrayElement {
+extension Array: PostgresDecodable where Element: PSQLArrayElement {
     static func decode<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
@@ -152,6 +155,6 @@ extension Array: PSQLDecodable where Element: PSQLArrayElement {
     }
 }
 
-extension Array: PSQLCodable where Element: PSQLArrayElement {
+extension Array: PostgresCodable where Element: PSQLArrayElement {
 
 }

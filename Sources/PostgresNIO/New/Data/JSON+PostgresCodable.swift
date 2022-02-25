@@ -5,7 +5,7 @@ import class Foundation.JSONDecoder
 
 private let JSONBVersionByte: UInt8 = 0x01
 
-extension PSQLCodable where Self: Codable {
+extension PostgresCodable where Self: Codable {
     var psqlType: PostgresDataType {
         .jsonb
     }
@@ -33,7 +33,10 @@ extension PSQLCodable where Self: Codable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
         byteBuffer.writeInteger(JSONBVersionByte)
         try context.jsonEncoder.encode(self, into: &byteBuffer)
     }

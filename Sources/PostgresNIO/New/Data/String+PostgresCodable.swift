@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.UUID
 
-extension String: PSQLCodable {
+extension String: PostgresCodable {
     var psqlType: PostgresDataType {
         .text
     }
@@ -10,7 +10,10 @@ extension String: PSQLCodable {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeString(self)
     }
     

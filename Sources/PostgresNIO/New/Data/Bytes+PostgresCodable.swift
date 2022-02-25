@@ -2,7 +2,7 @@ import struct Foundation.Data
 import NIOCore
 import NIOFoundationCompat
 
-extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
+extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -11,12 +11,15 @@ extension PSQLEncodable where Self: Sequence, Self.Element == UInt8 {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeBytes(self)
     }
 }
 
-extension ByteBuffer: PSQLCodable {
+extension ByteBuffer: PostgresCodable {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -25,7 +28,10 @@ extension ByteBuffer: PSQLCodable {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         var copyOfSelf = self // dirty hack
         byteBuffer.writeBuffer(&copyOfSelf)
     }
@@ -40,7 +46,7 @@ extension ByteBuffer: PSQLCodable {
     }
 }
 
-extension Data: PSQLCodable {
+extension Data: PostgresCodable {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -49,7 +55,10 @@ extension Data: PSQLCodable {
         .binary
     }
 
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         byteBuffer.writeBytes(self)
     }
 

@@ -29,7 +29,7 @@ class Bytes_PSQLCodableTests: XCTestCase {
     }
     
     func testEncodeSequenceWhereElementUInt8() {
-        struct ByteSequence: Sequence, PSQLEncodable {
+        struct ByteSequence: Sequence, PostgresEncodable {
             typealias Element = UInt8
             typealias Iterator = Array<UInt8>.Iterator
             

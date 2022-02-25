@@ -4,7 +4,7 @@ import NIOCore
 
 class JSON_PSQLCodableTests: XCTestCase {
     
-    struct Hello: Equatable, Codable, PSQLCodable {
+    struct Hello: Equatable, Codable, PostgresCodable {
         let hello: String
         
         init(name: String) {
@@ -84,7 +84,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         let hello = Hello(name: "world")
         let encoder = TestEncoder()
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .forTests(jsonEncoder: encoder)))
+        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .init(jsonEncoder: encoder)))
         XCTAssertEqual(encoder.encodeHits, 1)
     }
 }

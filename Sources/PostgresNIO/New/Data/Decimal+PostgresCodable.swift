@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.Decimal
 
-extension Decimal: PSQLCodable {
+extension Decimal: PostgresCodable {
     var psqlType: PostgresDataType {
         .numeric
     }
@@ -32,7 +32,10 @@ extension Decimal: PSQLCodable {
         }
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         let numeric = PostgresNumeric(decimal: self)
         byteBuffer.writeInteger(numeric.ndigits)
         byteBuffer.writeInteger(numeric.weight)

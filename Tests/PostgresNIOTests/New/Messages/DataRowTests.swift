@@ -114,12 +114,12 @@ class DataRowTests: XCTestCase {
 }
 
 extension DataRow: ExpressibleByArrayLiteral {
-    public typealias ArrayLiteralElement = PSQLEncodable
+    public typealias ArrayLiteralElement = PostgresEncodable
 
-    public init(arrayLiteral elements: PSQLEncodable...) {
+    public init(arrayLiteral elements: PostgresEncodable...) {
         
         var buffer = ByteBuffer()
-        let encodingContext = PSQLEncodingContext(jsonEncoder: JSONEncoder())
+        let encodingContext = PostgresEncodingContext(jsonEncoder: JSONEncoder())
         elements.forEach { element in
             try! element.encodeRaw(into: &buffer, context: encodingContext)
         }

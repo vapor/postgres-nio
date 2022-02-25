@@ -2,7 +2,7 @@ import NIOCore
 import struct Foundation.UUID
 import typealias Foundation.uuid_t
 
-extension UUID: PSQLCodable {
+extension UUID: PostgresCodable {
     
     var psqlType: PostgresDataType {
         .uuid
@@ -12,7 +12,10 @@ extension UUID: PSQLCodable {
         .binary
     }
     
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) {
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
         let uuid = self.uuid
         byteBuffer.writeBytes([
             uuid.0, uuid.1, uuid.2, uuid.3,

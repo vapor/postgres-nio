@@ -1,7 +1,8 @@
 import NIOCore
+import Foundation
 
 /// A type that can encode itself to a postgres wire binary representation.
-protocol PSQLEncodable {
+protocol PostgresEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     var psqlType: PostgresDataType { get }
     
@@ -10,17 +11,17 @@ protocol PSQLEncodable {
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the default `encodeRaw` implementation.
-    func encode(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws
+    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
     
     /// Encode the entity into the `byteBuffer` in Postgres binary format including its
     /// leading byte count. This method has a default implementation and may be overriden
     /// only for special cases, like `Optional`s.
-    func encodeRaw(into byteBuffer: inout ByteBuffer, context: PSQLEncodingContext) throws
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
-protocol PSQLDecodable {
-    associatedtype DecodableType: PSQLDecodable = Self
+protocol PostgresDecodable {
+    associatedtype DecodableType: PostgresDecodable = Self
 
     /// Decode an entity from the `byteBuffer` in postgres wire format
     ///
@@ -51,7 +52,7 @@ protocol PSQLDecodable {
     ) throws -> Self
 }
 
-extension PSQLDecodable {
+extension PostgresDecodable {
     @inlinable
     static func decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
@@ -67,10 +68,13 @@ extension PSQLDecodable {
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-protocol PSQLCodable: PSQLEncodable, PSQLDecodable {}
+protocol PostgresCodable: PostgresEncodable, PostgresDecodable {}
 
-extension PSQLEncodable {
-    func encodeRaw(into buffer: inout ByteBuffer, context: PSQLEncodingContext) throws {
+extension PostgresEncodable {
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
         // The length of the parameter value, in bytes (this count does not include
         // itself). Can be zero.
         let lengthIndex = buffer.writerIndex
@@ -85,8 +89,16 @@ extension PSQLEncodable {
     }
 }
 
-struct PSQLEncodingContext {
-    let jsonEncoder: PostgresJSONEncoder
+struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder> {
+    let jsonEncoder: JSONEncoder
+
+    init(jsonEncoder: JSONEncoder) {
+        self.jsonEncoder = jsonEncoder
+    }
+}
+
+extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
+    static let `default` = PostgresEncodingContext(jsonEncoder: JSONEncoder())
 }
 
 struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
