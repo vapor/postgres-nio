@@ -12,7 +12,7 @@ final class PostgresCellTests: XCTestCase {
         )
 
         var result: String?
-        XCTAssertNoThrow(result = try cell.decode(String.self, context: .forTests()))
+        XCTAssertNoThrow(result = try cell.decode(String.self, context: .default))
         XCTAssertEqual(result, "Hello world")
     }
 
@@ -26,7 +26,7 @@ final class PostgresCellTests: XCTestCase {
         )
 
         var result: String? = "test"
-        XCTAssertNoThrow(result = try cell.decode(String?.self, context: .forTests()))
+        XCTAssertNoThrow(result = try cell.decode(String?.self, context: .default))
         XCTAssertNil(result)
     }
 
@@ -39,7 +39,7 @@ final class PostgresCellTests: XCTestCase {
             columnIndex: 1
         )
 
-        XCTAssertThrowsError(try cell.decode(Int?.self, context: .forTests())) {
+        XCTAssertThrowsError(try cell.decode(Int?.self, context: .default)) {
             guard let error = $0 as? PostgresCastingError else {
                 return XCTFail("Unexpected error")
             }

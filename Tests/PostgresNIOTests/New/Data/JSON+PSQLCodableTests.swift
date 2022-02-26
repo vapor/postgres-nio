@@ -15,14 +15,14 @@ class JSON_PSQLCodableTests: XCTestCase {
     func testRoundTrip() {
         var buffer = ByteBuffer()
         let hello = Hello(name: "world")
-        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .forTests()))
+        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .default))
         XCTAssertEqual(hello.psqlType, .jsonb)
         
         // verify jsonb prefix byte
         XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 1)
 
         var result: Hello?
-        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .default))
         XCTAssertEqual(result, hello)
     }
     
@@ -31,7 +31,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         var result: Hello?
-        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .json, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try Hello.decode(from: &buffer, type: .json, format: .binary, context: .default))
         XCTAssertEqual(result, Hello(name: "world"))
     }
     
@@ -45,7 +45,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         for (format, dataType) in combinations {
             var loopBuffer = buffer
             var result: Hello?
-            XCTAssertNoThrow(result = try Hello.decode(from: &loopBuffer, type: dataType, format: format, context: .forTests()))
+            XCTAssertNoThrow(result = try Hello.decode(from: &loopBuffer, type: dataType, format: format, context: .default))
             XCTAssertEqual(result, Hello(name: "world"))
         }
     }
@@ -54,7 +54,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
 
-        XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .jsonb, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
@@ -63,7 +63,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
 
-        XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .text, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try Hello.decode(from: &buffer, type: .text, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
         }
     }
