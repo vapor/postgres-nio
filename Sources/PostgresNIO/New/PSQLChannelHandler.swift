@@ -229,18 +229,18 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             break
         case .sendStartupMessage(let authContext):
             self.encoder.encode(.startup(.versionThree(parameters: authContext.toStartupParameters())))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
         case .sendSSLRequest:
             self.encoder.encode(.sslRequest(.init()))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
         case .sendPasswordMessage(let mode, let authContext):
             self.sendPasswordMessage(mode: mode, authContext: authContext, context: context)
         case .sendSaslInitialResponse(let name, let initialResponse):
             self.encoder.encode(.saslInitialResponse(.init(saslMechanism: name, initialData: initialResponse)))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
         case .sendSaslResponse(let bytes):
             self.encoder.encode(.saslResponse(.init(data: bytes)))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
         case .closeConnectionAndCleanup(let cleanupContext):
             self.closeConnectionAndCleanup(cleanupContext, context: context)
         case .fireChannelInactive:
@@ -304,7 +304,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
                 // message and immediately closes the connection. On receipt of this message, the
                 // backend closes the connection and terminates.
                 self.encoder.encode(.terminate)
-                context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+                context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
             }
             context.close(mode: .all, promise: promise)
         case .succeedPreparedStatementCreation(let preparedContext, with: let rowDescription):
@@ -369,11 +369,11 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
             let hash = Insecure.MD5.hash(data: hash2).md5PrefixHexdigest()
             
             self.encoder.encode(.password(.init(value: hash)))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
 
         case .cleartext:
             self.encoder.encode(.password(.init(value: authContext.password ?? "")))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
         }
     }
     
@@ -382,12 +382,12 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         case .preparedStatement(let name):
             self.encoder.encode(.close(.preparedStatement(name)))
             self.encoder.encode(.sync)
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
             
         case .portal(let name):
             self.encoder.encode(.close(.portal(name)))
             self.encoder.encode(.sync)
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
         }
     }
     
@@ -405,7 +405,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.encoder.encode(.parse(parse))
         self.encoder.encode(.describe(.preparedStatement(statementName)))
         self.encoder.encode(.sync)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
     }
     
     private func sendBindExecuteAndSyncMessage(
@@ -420,7 +420,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.encoder.encode(.bind(bind))
         self.encoder.encode(.execute(.init(portalName: "")))
         self.encoder.encode(.sync)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
     }
     
     private func sendParseDescribeBindExecuteAndSyncMessage(
@@ -443,7 +443,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.encoder.encode(.bind(bind))
         self.encoder.encode(.execute(.init(portalName: "")))
         self.encoder.encode(.sync)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()!), promise: nil)
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
     }
     
     private func succeedQueryWithRowStream(
