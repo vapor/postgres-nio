@@ -61,10 +61,10 @@ class Array_PSQLCodableTests: XCTestCase {
         let values = ["foo", "bar", "hello", "world"]
         
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try values.encode(into: &buffer, context: .forTests()))
+        XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
         
         var result: [String]?
-        XCTAssertNoThrow(result = try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default))
         XCTAssertEqual(values, result)
     }
     
@@ -72,10 +72,10 @@ class Array_PSQLCodableTests: XCTestCase {
         let values: [String] = []
         
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try values.encode(into: &buffer, context: .forTests()))
+        XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
         
         var result: [String]?
-        XCTAssertNoThrow(result = try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests()))
+        XCTAssertNoThrow(result = try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default))
         XCTAssertEqual(values, result)
     }
     
@@ -85,7 +85,7 @@ class Array_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(0))
         buffer.writeInteger(String.psqlArrayElementType.rawValue)
         
-        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
@@ -96,7 +96,7 @@ class Array_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(1)) // invalid value, must always be 0
         buffer.writeInteger(String.psqlArrayElementType.rawValue)
         
-        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
@@ -104,9 +104,9 @@ class Array_PSQLCodableTests: XCTestCase {
     func testDecodeFailureTriesDecodeInt8() {
         let value: Int64 = 1 << 32
         var buffer = ByteBuffer()
-        value.encode(into: &buffer, context: .forTests())
+        value.encode(into: &buffer, context: .default)
 
-        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
@@ -119,7 +119,7 @@ class Array_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(-123)) // expected element count
         buffer.writeInteger(Int32(1)) // dimensions... must be one
 
-        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
@@ -132,7 +132,7 @@ class Array_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(1)) // expected element count
         buffer.writeInteger(Int32(2)) // dimensions... must be one
         
-        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &buffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }
@@ -146,7 +146,7 @@ class Array_PSQLCodableTests: XCTestCase {
         unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // dimensions
         unexpectedEndInElementLengthBuffer.writeInteger(Int16(1)) // length of element, must be Int32
         
-        XCTAssertThrowsError(try [String].decode(from: &unexpectedEndInElementLengthBuffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &unexpectedEndInElementLengthBuffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
         
@@ -159,7 +159,7 @@ class Array_PSQLCodableTests: XCTestCase {
         unexpectedEndInElementBuffer.writeInteger(Int32(12)) // length of element, must be Int32
         unexpectedEndInElementBuffer.writeString("Hello World") // only 11 bytes, 12 needed!
         
-        XCTAssertThrowsError(try [String].decode(from: &unexpectedEndInElementBuffer, type: .textArray, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try [String].decode(from: &unexpectedEndInElementBuffer, type: .textArray, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }

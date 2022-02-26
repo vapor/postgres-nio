@@ -9,11 +9,11 @@ class Decimal_PSQLCodableTests: XCTestCase {
         
         for value in values {
             var buffer = ByteBuffer()
-            value.encode(into: &buffer, context: .forTests())
+            value.encode(into: &buffer, context: .default)
             XCTAssertEqual(value.psqlType, .numeric)
 
             var result: Decimal?
-            XCTAssertNoThrow(result = try Decimal.decode(from: &buffer, type: .numeric, format: .binary, context: .forTests()))
+            XCTAssertNoThrow(result = try Decimal.decode(from: &buffer, type: .numeric, format: .binary, context: .default))
             XCTAssertEqual(value, result)
         }
     }
@@ -22,7 +22,7 @@ class Decimal_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(0))
         
-        XCTAssertThrowsError(try Decimal.decode(from: &buffer, type: .int8, format: .binary, context: .forTests())) {
+        XCTAssertThrowsError(try Decimal.decode(from: &buffer, type: .int8, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
         }
     }
