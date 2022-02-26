@@ -92,6 +92,34 @@ extension PostgresConnection {
     }
 }
 
+#if swift(>=5.5) && canImport(_Concurrency)
+extension PostgresConnection {
+    func close() async throws {
+        try await self.close().get()
+    }
+
+    func query(_ query: PostgresQuery, logger: Logger, file: String = #file, line: UInt = #line) async throws -> PostgresRowSequence {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.underlying.connectionID)"
+
+        do {
+            guard query.binds.count <= Int(Int16.max) else {
+                throw PSQLError.tooManyParameters
+            }
+            let promise = self.underlying.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+            let context = ExtendedQueryContext(
+                query: query,
+                logger: logger,
+                promise: promise)
+
+            self.underlying.channel.write(PSQLTask.extendedQuery(context), promise: nil)
+
+            return try await promise.futureResult.map({ $0.asyncSequence() }).get()
+        }
+    }
+}
+#endif
+
 // MARK: PostgresDatabase
 
 extension PostgresConnection: PostgresDatabase {
