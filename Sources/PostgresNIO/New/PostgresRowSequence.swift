@@ -8,31 +8,31 @@ import NIOConcurrencyHelpers
 struct PostgresRowSequence: AsyncSequence {
     typealias Element = PostgresRow
     typealias AsyncIterator = Iterator
-    
+
     final class _Internal {
-        
+
         let consumer: AsyncStreamConsumer
-        
+
         init(consumer: AsyncStreamConsumer) {
             self.consumer = consumer
         }
-        
+
         deinit {
             // if no iterator was created, we need to cancel the stream
             self.consumer.sequenceDeinitialized()
         }
-        
+
         func makeAsyncIterator() -> Iterator {
             self.consumer.makeAsyncIterator()
         }
     }
-    
+
     let _internal: _Internal
-    
+
     init(_ consumer: AsyncStreamConsumer) {
         self._internal = .init(consumer: consumer)
     }
-    
+
     func makeAsyncIterator() -> Iterator {
         self._internal.makeAsyncIterator()
     }
@@ -41,20 +41,20 @@ struct PostgresRowSequence: AsyncSequence {
 extension PostgresRowSequence {
     struct Iterator: AsyncIteratorProtocol {
         typealias Element = PostgresRow
-        
+
         let _internal: _Internal
-        
+
         init(consumer: AsyncStreamConsumer) {
             self._internal = _Internal(consumer: consumer)
         }
-        
+
         mutating func next() async throws -> PostgresRow? {
             try await self._internal.next()
         }
-        
+
         final class _Internal {
             let consumer: AsyncStreamConsumer
-            
+
             init(consumer: AsyncStreamConsumer) {
                 self.consumer = consumer
             }
@@ -62,7 +62,7 @@ extension PostgresRowSequence {
             deinit {
                 self.consumer.iteratorDeinitialized()
             }
-            
+
             func next() async throws -> PostgresRow? {
                 try await self.consumer.next()
             }
@@ -72,44 +72,44 @@ extension PostgresRowSequence {
 
 final class AsyncStreamConsumer {
     let lock = Lock()
-    
+
     let lookupTable: [String: Int]
     let columns: [RowDescription.Column]
     private var state: StateMachine
-    
+
     init(
         lookupTable: [String: Int],
         columns: [RowDescription.Column]
     ) {
         self.state = StateMachine()
-        
+
         self.lookupTable = lookupTable
         self.columns = columns
     }
-    
+
     func startCompleted(_ buffer: CircularBuffer<DataRow>, commandTag: String) {
         self.lock.withLock {
             self.state.finished(buffer, commandTag: commandTag)
         }
     }
-    
+
     func startStreaming(_ buffer: CircularBuffer<DataRow>, upstream: PSQLRowStream) {
         self.lock.withLock {
             self.state.buffered(buffer, upstream: upstream)
         }
     }
-    
+
     func startFailed(_ error: Error) {
         self.lock.withLock {
             self.state.failed(error)
         }
     }
-    
+
     func receive(_ newRows: [DataRow]) {
         let receiveAction = self.lock.withLock {
             self.state.receive(newRows)
         }
-        
+
         switch receiveAction {
         case .succeed(let continuation, let data, signalDemandTo: let source):
             let row = PostgresRow(
@@ -119,34 +119,34 @@ final class AsyncStreamConsumer {
             )
             continuation.resume(returning: row)
             source?.demand()
-            
+
         case .none:
             break
         }
     }
-    
+
     func receive(completion result: Result<String, Error>) {
         let completionAction = self.lock.withLock {
             self.state.receive(completion: result)
         }
-        
+
         switch completionAction {
         case .succeed(let continuation):
             continuation.resume(returning: nil)
-            
+
         case .fail(let continuation, let error):
             continuation.resume(throwing: error)
-            
+
         case .none:
             break
         }
     }
-    
+
     func sequenceDeinitialized() {
         let action = self.lock.withLock {
             self.state.sequenceDeinitialized()
         }
-        
+
         switch action {
         case .cancelStream(let source):
             source.cancel()
@@ -154,7 +154,7 @@ final class AsyncStreamConsumer {
             break
         }
     }
-    
+
     func makeAsyncIterator() -> PostgresRowSequence.Iterator {
         self.lock.withLock {
             self.state.createAsyncIterator()
@@ -182,7 +182,7 @@ final class AsyncStreamConsumer {
         case .returnNil:
             self.lock.unlock()
             return nil
-            
+
         case .returnRow(let data, signalDemandTo: let source):
             self.lock.unlock()
             source?.demand()
@@ -191,11 +191,11 @@ final class AsyncStreamConsumer {
                 lookupTable: self.lookupTable,
                 columns: self.columns
             )
-            
+
         case .throwError(let error):
             self.lock.unlock()
             throw error
-            
+
         case .hitSlowPath:
             return try await withCheckedThrowingContinuation { continuation in
                 let slowPathAction = self.state.next(for: continuation)
@@ -213,13 +213,13 @@ final class AsyncStreamConsumer {
 }
 
 extension AsyncStreamConsumer {
-    struct StateMachine {
-        enum UpstreamState {
+    private struct StateMachine {
+        private enum UpstreamState {
             enum DemandState {
                 case canAskForMore
                 case waitingForMore(CheckedContinuation<PostgresRow?, Error>?)
             }
-            
+
             case initialized
             /// The upstream has more data that can be received
             case streaming(AdaptiveRowBuffer, PSQLRowStream, DemandState)
@@ -234,17 +234,17 @@ extension AsyncStreamConsumer {
             /// `.streaming` or `.finished` state.
             case modifying
         }
-        
-        enum DownstreamState {
+
+        private enum DownstreamState {
             case sequenceCreated
             case iteratorCreated
         }
-        
-        var upstreamState = UpstreamState.initialized
-        var downstreamState = DownstreamState.sequenceCreated
-        
+
+        private var upstreamState = UpstreamState.initialized
+        private var downstreamState = DownstreamState.sequenceCreated
+
         init() {}
-        
+
         mutating func buffered(_ buffer: CircularBuffer<DataRow>, upstream: PSQLRowStream) {
             switch self.upstreamState {
             case .initialized:
@@ -255,7 +255,7 @@ extension AsyncStreamConsumer {
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
         }
-        
+
         mutating func finished(_ buffer: CircularBuffer<DataRow>, commandTag: String) {
             switch self.upstreamState {
             case .initialized:
@@ -266,7 +266,7 @@ extension AsyncStreamConsumer {
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
         }
-        
+
         mutating func failed(_ error: Error) {
             switch self.upstreamState {
             case .initialized:
@@ -276,7 +276,7 @@ extension AsyncStreamConsumer {
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
         }
-        
+
         mutating func createAsyncIterator() {
             switch self.downstreamState {
             case .sequenceCreated:
@@ -285,28 +285,28 @@ extension AsyncStreamConsumer {
                 preconditionFailure("An iterator already exists")
             }
         }
-        
+
         enum SequenceDeinitializedAction {
             case cancelStream(PSQLRowStream)
             case none
         }
-        
+
         mutating func sequenceDeinitialized() -> SequenceDeinitializedAction {
             switch (self.downstreamState, self.upstreamState) {
             case (.sequenceCreated, .initialized):
                 preconditionFailure("Invalid state: \(self.downstreamState), \(self.upstreamState)")
-                
+
             case (.sequenceCreated, .streaming(_, let source, _)):
                 return .cancelStream(source)
-                
+
             case (.sequenceCreated, .finished),
                  (.sequenceCreated, .consumed),
                  (.sequenceCreated, .failed):
                 return .none
-                
+
             case (.iteratorCreated, _):
                 return .none
-                
+
             case (_, .modifying):
                 preconditionFailure("Invalid state: \(self.downstreamState), \(self.upstreamState)")
             }
@@ -331,14 +331,13 @@ extension AsyncStreamConsumer {
             }
         }
 
-        
         enum NextFastPathAction {
             case hitSlowPath
             case throwError(Error)
             case returnRow(DataRow, signalDemandTo: PSQLRowStream?)
             case returnNil
         }
-        
+
         mutating func next() -> NextFastPathAction {
             switch self.upstreamState {
             case .initialized:
@@ -363,7 +362,7 @@ extension AsyncStreamConsumer {
                     self.upstreamState = .streaming(buffer, source, .waitingForMore(.none))
                     return .hitSlowPath
                 }
-                
+
                 self.upstreamState = .streaming(buffer, source, .waitingForMore(.none))
                 return .returnRow(data, signalDemandTo: nil)
 
@@ -376,7 +375,7 @@ extension AsyncStreamConsumer {
                     self.upstreamState = .consumed
                     return .returnNil
                 }
-                
+
                 self.upstreamState = .finished(buffer, commandTag)
                 return .returnRow(data, signalDemandTo: nil)
 
@@ -396,41 +395,41 @@ extension AsyncStreamConsumer {
             case signalDemand(PSQLRowStream)
             case none
         }
-        
+
         mutating func next(for continuation: CheckedContinuation<PostgresRow?, Error>) -> NextSlowPathAction {
             switch self.upstreamState {
             case .initialized:
                 preconditionFailure()
-                
+
             case .streaming(let buffer, let source, .canAskForMore):
                 precondition(buffer.isEmpty)
                 self.upstreamState = .streaming(buffer, source, .waitingForMore(continuation))
                 return .signalDemand(source)
-                
+
             case .streaming(let buffer, let source, .waitingForMore(.none)):
                 precondition(buffer.isEmpty)
                 self.upstreamState = .streaming(buffer, source, .waitingForMore(continuation))
                 return .none
-            
+
             case .streaming(_, _, .waitingForMore(.some)),
                  .finished,
                  .failed,
                  .consumed:
                 preconditionFailure("Expected that state was already handled by fast path. Invalid upstream state: \(self.upstreamState)")
-                
+
             case .modifying:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
             }
         }
-        
+
         enum ReceiveAction {
             case succeed(CheckedContinuation<PostgresRow?, Error>, DataRow, signalDemandTo: PSQLRowStream?)
             case none
         }
-        
+
         mutating func receive(_ newRows: [DataRow]) -> ReceiveAction {
             precondition(!newRows.isEmpty)
-            
+
             switch self.upstreamState {
             case .streaming(var buffer, let source, .waitingForMore(.some(let continuation))):
                 buffer.append(contentsOf: newRows)
@@ -441,34 +440,34 @@ extension AsyncStreamConsumer {
                 }
                 self.upstreamState = .streaming(buffer, source, .canAskForMore)
                 return .succeed(continuation, first, signalDemandTo: nil)
-            
+
             case .streaming(var buffer, let source, .waitingForMore(.none)):
                 buffer.append(contentsOf: newRows)
                 self.upstreamState = .streaming(buffer, source, .canAskForMore)
                 return .none
-                
+
             case .streaming(var buffer, let source, .canAskForMore):
                 buffer.append(contentsOf: newRows)
                 self.upstreamState = .streaming(buffer, source, .canAskForMore)
                 return .none
-                
+
             case .initialized, .finished, .consumed:
                 preconditionFailure()
-                
+
             case .failed:
                 return .none
-                
+
             case .modifying:
                 preconditionFailure()
             }
         }
-        
+
         enum CompletionResult {
             case succeed(CheckedContinuation<PostgresRow?, Error>)
             case fail(CheckedContinuation<PostgresRow?, Error>, Error)
             case none
         }
-        
+
         mutating func receive(completion result: Result<String, Error>) -> CompletionResult {
             switch result {
             case .success(let commandTag):
@@ -477,54 +476,54 @@ extension AsyncStreamConsumer {
                 return self.receiveError(error)
             }
         }
-        
+
         private mutating func receiveEnd(commandTag: String) -> CompletionResult {
             switch self.upstreamState {
             case .streaming(let buffer, _, .waitingForMore(.some(let continuation))):
                 precondition(buffer.isEmpty)
                 self.upstreamState = .consumed
                 return .succeed(continuation)
-            
+
             case .streaming(let buffer, _, .waitingForMore(.none)):
                 self.upstreamState = .finished(buffer, commandTag)
                 return .none
-                
+
             case .streaming(let buffer, _, .canAskForMore):
                 self.upstreamState = .finished(buffer, commandTag)
                 return .none
-                
+
             case .initialized, .finished, .consumed:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
-                
+
             case .failed:
                 return .none
-                
+
             case .modifying:
                 preconditionFailure()
             }
         }
-        
+
         private mutating func receiveError(_ error: Error) -> CompletionResult {
             switch self.upstreamState {
             case .streaming(let buffer, _, .waitingForMore(.some(let continuation))):
                 precondition(buffer.isEmpty)
                 self.upstreamState = .consumed
                 return .fail(continuation, error)
-            
+
             case .streaming(_, _, .waitingForMore(.none)):
                 self.upstreamState = .failed(error)
                 return .none
-                
+
             case .streaming(_, _, .canAskForMore):
                 self.upstreamState = .failed(error)
                 return .none
-                
+
             case .initialized, .finished, .consumed:
                 preconditionFailure("Invalid upstream state: \(self.upstreamState)")
-                
+
             case .failed:
                 return .none
-                
+
             case .modifying:
                 preconditionFailure()
             }
@@ -553,11 +552,11 @@ struct AdaptiveRowBuffer {
     private var circularBuffer: CircularBuffer<DataRow>
     private var target: Int
     private var canShrink: Bool = false
-    
+
     var isEmpty: Bool {
         self.circularBuffer.isEmpty
     }
-    
+
     init(minimum: Int, maximum: Int, target: Int, buffer: CircularBuffer<DataRow>) {
         precondition(minimum <= target && target <= maximum)
         self.minimum = minimum
@@ -565,7 +564,7 @@ struct AdaptiveRowBuffer {
         self.target = target
         self.circularBuffer = buffer
     }
-    
+
     init(_ circularBuffer: CircularBuffer<DataRow>) {
         self.init(
             minimum: Self.defaultBufferMinimum,
@@ -574,7 +573,7 @@ struct AdaptiveRowBuffer {
             buffer: circularBuffer
         )
     }
-    
+
     mutating func append<Rows: Sequence>(contentsOf newRows: Rows) where Rows.Element == DataRow {
         self.circularBuffer.append(contentsOf: newRows)
         if self.circularBuffer.count >= self.target, self.canShrink, self.target > self.minimum {
@@ -586,16 +585,16 @@ struct AdaptiveRowBuffer {
     /// Returns the next row in the FIFO buffer and a `bool` signalling if new rows should be loaded.
     mutating func removeFirst() -> (DataRow, Bool) {
         let element = self.circularBuffer.removeFirst()
-        
+
         // If the buffer is drained now, we should double our target size.
         if self.circularBuffer.count == 0, self.target < self.maximum {
             self.target = self.target * 2
             self.canShrink = false
         }
-        
+
         return (element, self.circularBuffer.count < self.target)
     }
-    
+
     mutating func popFirst() -> (DataRow, Bool)? {
         guard !self.circularBuffer.isEmpty else {
             return nil
