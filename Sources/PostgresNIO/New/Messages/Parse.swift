@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     
     struct Parse: PSQLMessagePayloadEncodable, Equatable {
         /// The name of the destination prepared statement (an empty string selects the unnamed prepared statement).

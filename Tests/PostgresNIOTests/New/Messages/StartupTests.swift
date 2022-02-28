@@ -8,22 +8,22 @@ class StartupTests: XCTestCase {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
         
-        let replicationValues: [PSQLFrontendMessage.Startup.Parameters.Replication] = [
+        let replicationValues: [PostgresFrontendMessage.Startup.Parameters.Replication] = [
             .`true`,
             .`false`,
             .database
         ]
         
         for replication in replicationValues {
-            let parameters = PSQLFrontendMessage.Startup.Parameters(
+            let parameters = PostgresFrontendMessage.Startup.Parameters(
                 user: "test",
                 database: "abc123",
                 options: "some options",
                 replication: replication
             )
             
-            let startup = PSQLFrontendMessage.Startup.versionThree(parameters: parameters)
-            let message = PSQLFrontendMessage.startup(startup)
+            let startup = PostgresFrontendMessage.Startup.versionThree(parameters: parameters)
+            let message = PostgresFrontendMessage.startup(startup)
             encoder.encode(data: message, out: &byteBuffer)
             
             let byteBufferLength = Int32(byteBuffer.readableBytes)
@@ -46,7 +46,7 @@ class StartupTests: XCTestCase {
     }
 }
 
-extension PSQLFrontendMessage.Startup.Parameters.Replication {
+extension PostgresFrontendMessage.Startup.Parameters.Replication {
     var stringValue: String {
         switch self {
         case .true:

@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     
     struct Execute: PSQLMessagePayloadEncodable, Equatable {
         /// The name of the portal to execute (an empty string selects the unnamed portal).

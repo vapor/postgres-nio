@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     
     struct Password: PSQLMessagePayloadEncodable, Equatable {
         let value: String

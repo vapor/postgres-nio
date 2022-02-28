@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     
     enum Describe: PSQLMessagePayloadEncodable, Equatable {
         

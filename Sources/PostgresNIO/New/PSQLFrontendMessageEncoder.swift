@@ -1,10 +1,10 @@
 
 struct PSQLFrontendMessageEncoder: MessageToByteEncoder {
-    typealias OutboundIn = PSQLFrontendMessage
+    typealias OutboundIn = PostgresFrontendMessage
     
     init() {}
     
-    func encode(data message: PSQLFrontendMessage, out buffer: inout ByteBuffer) {
+    func encode(data message: PostgresFrontendMessage, out buffer: inout ByteBuffer) {
         switch message {
         case .bind(let bind):
             buffer.writeInteger(message.id.rawValue)
@@ -63,7 +63,7 @@ struct PSQLFrontendMessageEncoder: MessageToByteEncoder {
     }
     
     private func encode<Payload: PSQLMessagePayloadEncodable>(
-        messageID: PSQLFrontendMessage.ID,
+        messageID: PostgresFrontendMessage.ID,
         payload: Payload,
         into buffer: inout ByteBuffer)
     {
