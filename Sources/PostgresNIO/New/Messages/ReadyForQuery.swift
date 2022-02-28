@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     enum TransactionState: PayloadDecodable, RawRepresentable {
         typealias RawValue = UInt8
         
@@ -43,7 +43,7 @@ extension PSQLBackendMessage {
     }
 }
 
-extension PSQLBackendMessage.TransactionState: CustomDebugStringConvertible {
+extension PostgresBackendMessage.TransactionState: CustomDebugStringConvertible {
     var debugDescription: String {
         switch self {
         case .idle:

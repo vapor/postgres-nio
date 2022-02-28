@@ -2,7 +2,7 @@ import NIOCore
 
 struct ConnectionStateMachine {
     
-    typealias TransactionState = PSQLBackendMessage.TransactionState
+    typealias TransactionState = PostgresBackendMessage.TransactionState
     
     struct ConnectionContext {
         let processID: Int32
@@ -66,7 +66,7 @@ struct ConnectionStateMachine {
         case sendSSLRequest
         case establishSSLConnection
         case provideAuthenticationContext
-        case forwardNotificationToListeners(PSQLBackendMessage.NotificationResponse)
+        case forwardNotificationToListeners(PostgresBackendMessage.NotificationResponse)
         case fireEventReadyForQuery
         case fireChannelInactive
         /// Close the connection by sending a `Terminate` message and then closing the connection. This is for clean shutdowns.
@@ -298,7 +298,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func authenticationMessageReceived(_ message: PSQLBackendMessage.Authentication) -> ConnectionAction {
+    mutating func authenticationMessageReceived(_ message: PostgresBackendMessage.Authentication) -> ConnectionAction {
         guard case .authenticating(var authState) = self.state else {
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.authentication(message)))
         }
@@ -310,7 +310,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func backendKeyDataReceived(_ keyData: PSQLBackendMessage.BackendKeyData) -> ConnectionAction {
+    mutating func backendKeyDataReceived(_ keyData: PostgresBackendMessage.BackendKeyData) -> ConnectionAction {
         guard case .authenticated(_, let parameters) = self.state else {
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.backendKeyData(keyData)))
         }
@@ -323,7 +323,7 @@ struct ConnectionStateMachine {
         return .wait
     }
     
-    mutating func parameterStatusReceived(_ status: PSQLBackendMessage.ParameterStatus) -> ConnectionAction {
+    mutating func parameterStatusReceived(_ status: PostgresBackendMessage.ParameterStatus) -> ConnectionAction {
         switch self.state {
         case .sslRequestSent,
              .sslNegotiated,
@@ -373,7 +373,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> ConnectionAction {
+    mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> ConnectionAction {
         switch self.state {
         case .sslRequestSent,
              .sslNegotiated,
@@ -487,7 +487,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func noticeReceived(_ notice: PSQLBackendMessage.NoticeResponse) -> ConnectionAction {
+    mutating func noticeReceived(_ notice: PostgresBackendMessage.NoticeResponse) -> ConnectionAction {
         switch self.state {
         case .extendedQuery(var extendedQuery, let connectionContext):
             return self.avoidingStateMachineCoW { machine -> ConnectionAction in
@@ -500,11 +500,11 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func notificationReceived(_ notification: PSQLBackendMessage.NotificationResponse) -> ConnectionAction {
+    mutating func notificationReceived(_ notification: PostgresBackendMessage.NotificationResponse) -> ConnectionAction {
         return .forwardNotificationToListeners(notification)
     }
     
-    mutating func readyForQueryReceived(_ transactionState: PSQLBackendMessage.TransactionState) -> ConnectionAction {
+    mutating func readyForQueryReceived(_ transactionState: PostgresBackendMessage.TransactionState) -> ConnectionAction {
         switch self.state {
         case .authenticated(let backendKeyData, let parameters):
             guard let keyData = backendKeyData else {
@@ -694,7 +694,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func parameterDescriptionReceived(_ description: PSQLBackendMessage.ParameterDescription) -> ConnectionAction {
+    mutating func parameterDescriptionReceived(_ description: PostgresBackendMessage.ParameterDescription) -> ConnectionAction {
         switch self.state {
         case .extendedQuery(var queryState, let connectionContext) where !queryState.isComplete:
             return self.avoidingStateMachineCoW { machine -> ConnectionAction in

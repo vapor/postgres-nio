@@ -8,7 +8,7 @@ class ParameterStatusTests: XCTestCase {
     func testDecode() {
         var buffer = ByteBuffer()
         
-        let expected: [PSQLBackendMessage] = [
+        let expected: [PostgresBackendMessage] = [
             .parameterStatus(.init(parameter: "DateStyle", value: "ISO, MDY")),
             .parameterStatus(.init(parameter: "application_name", value: "")),
             .parameterStatus(.init(parameter: "server_encoding", value: "UTF8")),

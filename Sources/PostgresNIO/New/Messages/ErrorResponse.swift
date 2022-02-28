@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     
     enum Field: UInt8, Hashable {
         /// Severity: the field contents are ERROR, FATAL, or PANIC (in an error message),
@@ -81,40 +81,40 @@ extension PSQLBackendMessage {
     }
         
     struct ErrorResponse: PSQLMessageNotice, PayloadDecodable, Equatable {
-        let fields: [PSQLBackendMessage.Field: String]
+        let fields: [PostgresBackendMessage.Field: String]
         
-        init(fields: [PSQLBackendMessage.Field: String]) {
+        init(fields: [PostgresBackendMessage.Field: String]) {
             self.fields = fields
         }
     }
     
     struct NoticeResponse: PSQLMessageNotice, PayloadDecodable, Equatable {
-        let fields: [PSQLBackendMessage.Field: String]
+        let fields: [PostgresBackendMessage.Field: String]
         
-        init(fields: [PSQLBackendMessage.Field: String]) {
+        init(fields: [PostgresBackendMessage.Field: String]) {
             self.fields = fields
         }
     }
 }
 
 protocol PSQLMessageNotice {
-    var fields: [PSQLBackendMessage.Field: String] { get }
+    var fields: [PostgresBackendMessage.Field: String] { get }
     
-    init(fields: [PSQLBackendMessage.Field: String])
+    init(fields: [PostgresBackendMessage.Field: String])
 }
 
-extension PSQLBackendMessage.PayloadDecodable where Self: PSQLMessageNotice {
+extension PostgresBackendMessage.PayloadDecodable where Self: PSQLMessageNotice {
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {        
-        var fields: [PSQLBackendMessage.Field: String] = [:]
+        var fields: [PostgresBackendMessage.Field: String] = [:]
         while let id = buffer.readInteger(as: UInt8.self) {
             if id == 0 {
                 break
             }
-            guard let field = PSQLBackendMessage.Field(rawValue: id) else {
+            guard let field = PostgresBackendMessage.Field(rawValue: id) else {
                 throw PSQLPartialDecodingError.valueNotRawRepresentable(
                     value: id,
-                    asType: PSQLBackendMessage.Field.self)
+                    asType: PostgresBackendMessage.Field.self)
             }
             
             guard let string = buffer.readNullTerminatedString() else {
@@ -126,7 +126,7 @@ extension PSQLBackendMessage.PayloadDecodable where Self: PSQLMessageNotice {
     }
 }
 
-extension PSQLBackendMessage.Field: CustomStringConvertible {
+extension PostgresBackendMessage.Field: CustomStringConvertible {
     
     var description: String {
         switch self {

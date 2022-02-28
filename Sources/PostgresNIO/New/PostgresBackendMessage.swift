@@ -2,10 +2,10 @@ import NIOCore
 //import struct Foundation.Data
 
 
-/// A protocol to implement for all associated value in the `PSQLBackendMessage` enum
+/// A protocol to implement for all associated value in the `PostgresBackendMessage` enum
 protocol PSQLMessagePayloadDecodable {
     
-    /// Decodes the associated value for a `PSQLBackendMessage` from the given `ByteBuffer`.
+    /// Decodes the associated value for a `PostgresBackendMessage` from the given `ByteBuffer`.
     ///
     /// When the decoding is done all bytes in the given `ByteBuffer` must be consumed.
     /// `buffer.readableBytes` must be `0`. In case of an error a `PartialDecodingError`
@@ -20,7 +20,7 @@ protocol PSQLMessagePayloadDecodable {
 ///
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
-enum PSQLBackendMessage {
+enum PostgresBackendMessage {
     
     typealias PayloadDecodable = PSQLMessagePayloadDecodable
     
@@ -45,7 +45,7 @@ enum PSQLBackendMessage {
     case sslUnsupported
 }
     
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     enum ID: RawRepresentable, Equatable {
         typealias RawValue = UInt8
         
@@ -184,9 +184,9 @@ extension PSQLBackendMessage {
     }
 }
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     
-    static func decode(from buffer: inout ByteBuffer, for messageID: ID) throws -> PSQLBackendMessage {
+    static func decode(from buffer: inout ByteBuffer, for messageID: ID) throws -> PostgresBackendMessage {
         switch messageID {
         case .authentication:
             return try .authentication(.decode(from: &buffer))
@@ -248,7 +248,7 @@ extension PSQLBackendMessage {
     }
 }
 
-extension PSQLBackendMessage: CustomDebugStringConvertible {
+extension PostgresBackendMessage: CustomDebugStringConvertible {
     var debugDescription: String {
         switch self {
         case .authentication(let authentication):

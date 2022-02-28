@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     
     struct BackendKeyData: PayloadDecodable, Equatable {
         let processID: Int32
@@ -16,7 +16,7 @@ extension PSQLBackendMessage {
     }
 }
 
-extension PSQLBackendMessage.BackendKeyData: CustomDebugStringConvertible {
+extension PostgresBackendMessage.BackendKeyData: CustomDebugStringConvertible {
     var debugDescription: String {
         "processID: \(processID), secretKey: \(secretKey)"
     }

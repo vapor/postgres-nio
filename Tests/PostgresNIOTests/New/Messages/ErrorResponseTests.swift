@@ -6,7 +6,7 @@ import NIOTestUtils
 class ErrorResponseTests: XCTestCase {
     
     func testDecode() {
-        let fields: [PSQLBackendMessage.Field : String] = [
+        let fields: [PostgresBackendMessage.Field : String] = [
             .file: "auth.c",
             .routine: "auth_failed",
             .line: "334",
@@ -25,7 +25,7 @@ class ErrorResponseTests: XCTestCase {
         }
         
         let expectedInOuts = [
-            (buffer, [PSQLBackendMessage.error(.init(fields: fields))]),
+            (buffer, [PostgresBackendMessage.error(.init(fields: fields))]),
         ]
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(

@@ -251,7 +251,7 @@ extension PostgresConnection {
 }
 
 extension PostgresConnection: PSQLChannelHandlerNotificationDelegate {
-    func notificationReceived(_ notification: PSQLBackendMessage.NotificationResponse) {
+    func notificationReceived(_ notification: PostgresBackendMessage.NotificationResponse) {
         self.underlying.eventLoop.assertInEventLoop()
 
         guard let listeners = self.notificationListeners[notification.channel] else {

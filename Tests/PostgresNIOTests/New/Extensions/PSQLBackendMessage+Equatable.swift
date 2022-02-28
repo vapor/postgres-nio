@@ -1,6 +1,6 @@
 @testable import PostgresNIO
 
-extension PSQLBackendMessage: Equatable {
+extension PostgresBackendMessage: Equatable {
     
     public static func ==(lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {

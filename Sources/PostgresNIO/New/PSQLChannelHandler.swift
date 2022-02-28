@@ -4,7 +4,7 @@ import Crypto
 import Logging
 
 protocol PSQLChannelHandlerNotificationDelegate: AnyObject {
-    func notificationReceived(_: PSQLBackendMessage.NotificationResponse)
+    func notificationReceived(_: PostgresBackendMessage.NotificationResponse)
 }
 
 final class PSQLChannelHandler: ChannelDuplexHandler {

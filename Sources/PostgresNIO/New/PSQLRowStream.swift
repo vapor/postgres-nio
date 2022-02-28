@@ -255,7 +255,7 @@ final class PSQLRowStream {
         }
     }
     
-    internal func noticeReceived(_ notice: PSQLBackendMessage.NoticeResponse) {
+    internal func noticeReceived(_ notice: PostgresBackendMessage.NoticeResponse) {
         self.logger.debug("Notice Received", metadata: [
             .notice: "\(notice)"
         ])

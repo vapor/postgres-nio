@@ -42,7 +42,7 @@ struct AuthenticationStateMachine {
         return .sendStartupMessage(self.authContext)
     }
     
-    mutating func authenticationMessageReceived(_ message: PSQLBackendMessage.Authentication) -> Action {
+    mutating func authenticationMessageReceived(_ message: PostgresBackendMessage.Authentication) -> Action {
         switch self.state {
         case .startupMessageSent:
             switch message {
@@ -156,7 +156,7 @@ struct AuthenticationStateMachine {
         }
     }
     
-    mutating func errorReceived(_ message: PSQLBackendMessage.ErrorResponse) -> Action {
+    mutating func errorReceived(_ message: PostgresBackendMessage.ErrorResponse) -> Action {
         return self.setAndFireError(.server(message))
     }
     

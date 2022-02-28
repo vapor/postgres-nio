@@ -67,12 +67,12 @@ extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
 }
 
 extension ConnectionStateMachine {
-    static func readyForQuery(transactionState: PSQLBackendMessage.TransactionState = .idle) -> Self {
+    static func readyForQuery(transactionState: PostgresBackendMessage.TransactionState = .idle) -> Self {
         let connectionContext = Self.createConnectionContext(transactionState: transactionState)
         return ConnectionStateMachine(.readyForQuery(connectionContext))
     }
     
-    static func createConnectionContext(transactionState: PSQLBackendMessage.TransactionState = .idle) -> ConnectionContext {
+    static func createConnectionContext(transactionState: PostgresBackendMessage.TransactionState = .idle) -> ConnectionContext {
         let paramaters = [
             "DateStyle": "ISO, MDY",
             "application_name": "",

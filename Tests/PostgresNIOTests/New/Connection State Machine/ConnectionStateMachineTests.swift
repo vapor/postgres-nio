@@ -136,7 +136,7 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.connected(requireTLS: false), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
-        let fields: [PSQLBackendMessage.Field: String] = [
+        let fields: [PostgresBackendMessage.Field: String] = [
             .message: "password authentication failed for user \"postgres\"",
             .severity: "FATAL",
             .sqlState: "28P01",
