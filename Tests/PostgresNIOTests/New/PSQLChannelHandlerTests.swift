@@ -38,7 +38,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
         var config = self.testConnectionConfiguration()
-        config.tlsConfiguration = .makeClientConfiguration()
+        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         var addSSLCallbackIsHit = false
         let handler = PSQLChannelHandler(configuration: config) { channel in
             addSSLCallbackIsHit = true
@@ -80,7 +80,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testSSLUnsupportedClosesConnection() {
         var config = self.testConnectionConfiguration()
-        config.tlsConfiguration = .makeClientConfiguration()
+        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         
         let handler = PSQLChannelHandler(configuration: config) { channel in
             XCTFail("This callback should never be exectuded")
@@ -173,7 +173,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         username: String = "test",
         database: String = "postgres",
         password: String = "password",
-        tlsConfiguration: TLSConfiguration? = nil
+        tls: PSQLConnection.Configuration.TLS = .disable
     ) -> PSQLConnection.Configuration {
         PSQLConnection.Configuration(
             host: host,
@@ -181,7 +181,7 @@ class PSQLChannelHandlerTests: XCTestCase {
             username: username,
             database: database,
             password: password,
-            tlsConfiguration: tlsConfiguration
+            tls: tls
         )
     }
 }

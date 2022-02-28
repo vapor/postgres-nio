@@ -57,7 +57,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.decoder = NIOSingleStepByteToMessageProcessor(PSQLBackendMessageDecoder())
     }
     #endif
-    
+
     // MARK: Handler lifecycle
     
     func handlerAdded(context: ChannelHandlerContext) {
@@ -331,7 +331,8 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     // MARK: - Private Methods -
     
     private func connected(context: ChannelHandlerContext) {
-        let action = self.state.connected(requireTLS: self.configureSSLCallback != nil)
+
+        let action = self.state.connected(tls: .init(self.configuration.tls))
         
         self.run(action, with: context)
     }
@@ -570,5 +571,31 @@ private extension Insecure.MD5.Digest {
             result.append(Self.lowercaseLookup[Int(byte & 0x0F)])
         }
         return String(decoding: result, as: Unicode.UTF8.self)
+    }
+}
+
+extension ConnectionStateMachine.TLSConfiguration {
+    fileprivate init(_ connection: PSQLConnection.Configuration.TLS) {
+        switch connection.base {
+        case .disable:
+            self = .disable
+        case .require:
+            self = .require
+        case .prefer:
+            self = .prefer
+        }
+    }
+}
+
+extension PSQLChannelHandler {
+    convenience init(
+        configuration: PSQLConnection.Configuration,
+        configureSSLCallback: ((Channel) throws -> Void)?)
+    {
+        self.init(
+            configuration: configuration,
+            logger: .psqlNoOpLogger,
+            configureSSLCallback: configureSSLCallback
+        )
     }
 }

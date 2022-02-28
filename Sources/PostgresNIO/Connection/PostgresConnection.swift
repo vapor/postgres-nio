@@ -54,17 +54,29 @@ extension PostgresConnection {
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
-        let configuration = PSQLConnection.Configuration(
-            connection: .resolved(address: socketAddress, serverName: serverHostname),
-            authentication: nil,
-            tlsConfiguration: tlsConfiguration
-        )
+        var tlsFuture: EventLoopFuture<PSQLConnection.Configuration.TLS>
 
-        return PSQLConnection.connect(
-            configuration: configuration,
-            logger: logger,
-            on: eventLoop
-        ).map { connection in
+        if let tlsConfiguration = tlsConfiguration {
+            tlsFuture = eventLoop.makeSucceededVoidFuture().flatMapBlocking(onto: .global(qos: .default)) {
+                try PSQLConnection.Configuration.TLS.require(.init(configuration: tlsConfiguration))
+            }
+        } else {
+            tlsFuture = eventLoop.makeSucceededFuture(.disable)
+        }
+
+        return tlsFuture.flatMap { tls in
+            let configuration = PSQLConnection.Configuration(
+                connection: .resolved(address: socketAddress, serverName: serverHostname),
+                authentication: nil,
+                tls: tls
+            )
+
+            return PSQLConnection.connect(
+                configuration: configuration,
+                logger: logger,
+                on: eventLoop
+            )
+        }.map { connection in
             PostgresConnection(underlying: connection, logger: logger)
         }.flatMapErrorThrowing { error in
             throw error.asAppropriatePostgresError

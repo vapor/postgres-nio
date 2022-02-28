@@ -23,6 +23,30 @@ final class PSQLConnection {
                 self.password = password
             }
         }
+
+        struct TLS {
+            enum Base {
+                case disable
+                case prefer(NIOSSLContext)
+                case require(NIOSSLContext)
+            }
+
+            var base: Base
+
+            private init(_ base: Base) {
+                self.base = base
+            }
+
+            static var disable: Self = Self.init(.disable)
+
+            static func prefer(_ sslContext: NIOSSLContext) -> Self {
+                self.init(.prefer(sslContext))
+            }
+
+            static func require(_ sslContext: NIOSSLContext) -> Self {
+                self.init(.require(sslContext))
+            }
+        }
         
         enum Connection {
             case unresolved(host: String, port: Int)
@@ -34,27 +58,27 @@ final class PSQLConnection {
         /// The authentication properties to send to the Postgres server during startup auth handshake
         var authentication: Authentication?
         
-        var tlsConfiguration: TLSConfiguration?
+        var tls: TLS
         
         init(host: String,
              port: Int = 5432,
              username: String,
              database: String? = nil,
              password: String? = nil,
-             tlsConfiguration: TLSConfiguration? = nil
+             tls: TLS = .disable
         ) {
             self.connection = .unresolved(host: host, port: port)
             self.authentication = Authentication(username: username, password: password, database: database)
-            self.tlsConfiguration = tlsConfiguration
+            self.tls = tls
         }
         
         init(connection: Connection,
              authentication: Authentication?,
-             tlsConfiguration: TLSConfiguration?
+             tls: TLS
         ) {
             self.connection = connection
             self.authentication = authentication
-            self.tlsConfiguration = tlsConfiguration
+            self.tls = tls
         }
     }
     
@@ -185,14 +209,19 @@ final class PSQLConnection {
                 let bootstrap = ClientBootstrap(group: eventLoop)
                     .channelInitializer { channel in
                         var configureSSLCallback: ((Channel) throws -> ())? = nil
-                        if let tlsConfiguration = configuration.tlsConfiguration {
+
+                        switch configuration.tls.base {
+                        case .disable:
+                            break
+
+                        case .prefer(let sslContext), .require(let sslContext):
                             configureSSLCallback = { channel in
                                 channel.eventLoop.assertInEventLoop()
-                                
-                                let sslContext = try NIOSSLContext(configuration: tlsConfiguration)
+
                                 let sslHandler = try NIOSSLClientHandler(
                                     context: sslContext,
-                                    serverHostname: configuration.sslServerHostname)
+                                    serverHostname: configuration.sslServerHostname
+                                )
                                 try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
                             }
                         }
