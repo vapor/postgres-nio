@@ -74,14 +74,18 @@ final class PSQLEventsHandler: ChannelInboundHandler {
     }
     
     func handlerAdded(context: ChannelHandlerContext) {
-        precondition(!context.channel.isActive)
-        
         self.readyForStartupPromise = context.eventLoop.makePromise(of: Void.self)
         self.authenticatePromise = context.eventLoop.makePromise(of: Void.self)
+
+        if context.channel.isActive, case .initialized = self.state {
+            self.state = .connected
+        }
     }
     
     func channelActive(context: ChannelHandlerContext) {
-        self.state = .connected
+        if case .initialized = self.state {
+            self.state = .connected
+        }
         context.fireChannelActive()
     }
     

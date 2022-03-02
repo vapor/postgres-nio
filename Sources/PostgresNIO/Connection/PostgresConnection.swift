@@ -2,6 +2,7 @@ import NIOCore
 import NIOConcurrencyHelpers
 import NIOSSL
 import Logging
+import NIOPosix
 
 public final class PostgresConnection {
     typealias ID = Int
@@ -123,13 +124,66 @@ public final class PostgresConnection {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
-
-        self.channel.pipeline.handler(type: PSQLChannelHandler.self).whenSuccess { handler in
-            handler.notificationDelegate = self
-        }
     }
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
+    }
+
+    func start(configuration: Configuration) -> EventLoopFuture<Void> {
+        // 1. configure handlers
+
+        var configureSSLCallback: ((Channel) throws -> ())? = nil
+        switch configuration.tls.base {
+        case .disable:
+            break
+
+        case .prefer(let sslContext), .require(let sslContext):
+            configureSSLCallback = { channel in
+                channel.eventLoop.assertInEventLoop()
+
+                let sslHandler = try NIOSSLClientHandler(
+                    context: sslContext,
+                    serverHostname: configuration.sslServerHostname
+                )
+                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
+            }
+        }
+
+        let channelHandler = PSQLChannelHandler(
+            configuration: configuration,
+            logger: logger,
+            configureSSLCallback: configureSSLCallback
+        )
+        channelHandler.notificationDelegate = self
+
+        let eventHandler = PSQLEventsHandler(logger: logger)
+
+        // 2. add handlers
+
+        do {
+            try self.channel.pipeline.syncOperations.addHandler(eventHandler)
+            try self.channel.pipeline.syncOperations.addHandler(channelHandler, position: .before(eventHandler))
+        } catch {
+            return self.eventLoop.makeFailedFuture(error)
+        }
+
+        let startupFuture: EventLoopFuture<Void>
+        if configuration.authentication == nil {
+            startupFuture = eventHandler.readyForStartupFuture
+        } else {
+            startupFuture = eventHandler.authenticateFuture
+        }
+
+        // 3. wait for startup future to succeed.
+
+        return startupFuture.flatMapError { error in
+            // in case of an startup error, the connection must be closed and after that
+            // the originating error should be surfaced
+
+            self.channel.closeFuture.flatMapThrowing { _ in
+                throw error
+            }
+        }
     }
 
     static func connect(
@@ -149,67 +203,19 @@ public final class PostgresConnection {
         // This saves us a number of context switches between the thread the Connection is created
         // on and the EventLoop. In addition, it eliminates all potential races between the creating
         // thread and the EventLoop.
-        return eventLoop.flatSubmit {
-            eventLoop.submit { () throws -> SocketAddress in
-                switch configuration.connection {
-                case .resolved(let address, _):
-                    return address
-                case .unresolved(let host, let port):
-                    return try SocketAddress.makeAddressResolvingHost(host, port: port)
-                }
-            }.flatMap { address -> EventLoopFuture<Channel> in
-                let bootstrap = ClientBootstrap(group: eventLoop)
-                    .channelInitializer { channel in
-                        var configureSSLCallback: ((Channel) throws -> ())? = nil
+        return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
+            let connectFuture: EventLoopFuture<Channel>
 
-                        switch configuration.tls.base {
-                        case .disable:
-                            break
+            switch configuration.connection {
+            case .resolved(let address, _):
+                connectFuture = ClientBootstrap(group: eventLoop).connect(to: address)
+            case .unresolved(let host, let port):
+                connectFuture = ClientBootstrap(group: eventLoop).connect(host: host, port: port)
+            }
 
-                        case .prefer(let sslContext), .require(let sslContext):
-                            configureSSLCallback = { channel in
-                                channel.eventLoop.assertInEventLoop()
-
-                                let sslHandler = try NIOSSLClientHandler(
-                                    context: sslContext,
-                                    serverHostname: configuration.sslServerHostname
-                                )
-                                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
-                            }
-                        }
-
-                        return channel.pipeline.addHandlers([
-                            PSQLChannelHandler(
-                                configuration: configuration,
-                                logger: logger,
-                                configureSSLCallback: configureSSLCallback),
-                            PSQLEventsHandler(logger: logger)
-                        ])
-                    }
-
-                return bootstrap.connect(to: address)
-            }.flatMap { channel -> EventLoopFuture<Channel> in
-                channel.pipeline.handler(type: PSQLEventsHandler.self).flatMap {
-                    eventHandler -> EventLoopFuture<Void> in
-
-                    let startupFuture: EventLoopFuture<Void>
-                    if configuration.authentication == nil {
-                        startupFuture = eventHandler.readyForStartupFuture
-                    } else {
-                        startupFuture = eventHandler.authenticateFuture
-                    }
-
-                    return startupFuture.flatMapError { error in
-                        // in case of an startup error, the connection must be closed and after that
-                        // the originating error should be surfaced
-
-                        channel.closeFuture.flatMapThrowing { _ in
-                            throw error
-                        }
-                    }
-                }.map { _ in channel }
-            }.map { channel in
-                PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
+            return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
+                let connection = PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
+                return connection.start(configuration: configuration).map { _ in connection }
             }.flatMapErrorThrowing { error -> PostgresConnection in
                 switch error {
                 case is PSQLError:

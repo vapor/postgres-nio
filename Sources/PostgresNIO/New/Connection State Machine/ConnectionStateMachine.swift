@@ -134,22 +134,37 @@ struct ConnectionStateMachine {
     }
     
     mutating func connected(tls: TLSConfiguration) -> ConnectionAction {
-        guard case .initialized = self.state else {
-            preconditionFailure("Unexpected state")
-        }
+        switch self.state {
+        case .initialized:
+            switch tls {
+            case .disable:
+                self.state = .waitingToStartAuthentication
+                return .provideAuthenticationContext
 
-        switch tls {
-        case .disable:
-            self.state = .waitingToStartAuthentication
-            return .provideAuthenticationContext
+            case .prefer:
+                self.state = .sslRequestSent(.prefer)
+                return .sendSSLRequest
 
-        case .prefer:
-            self.state = .sslRequestSent(.prefer)
-            return .sendSSLRequest
+            case .require:
+                self.state = .sslRequestSent(.require)
+                return .sendSSLRequest
+            }
 
-        case .require:
-            self.state = .sslRequestSent(.require)
-            return .sendSSLRequest
+        case .sslRequestSent,
+             .sslNegotiated,
+             .sslHandlerAdded,
+             .waitingToStartAuthentication,
+             .authenticating,
+             .authenticated,
+             .readyForQuery,
+             .extendedQuery,
+             .prepareStatement,
+             .closeCommand,
+             .error,
+             .closing,
+             .closed,
+             .modifying:
+            return .wait
         }
     }
     
