@@ -5,9 +5,9 @@ struct PSQLError: Error {
     enum Base {
         case sslUnsupported
         case failedToAddSSLHandler(underlying: Error)
-        case server(PSQLBackendMessage.ErrorResponse)
+        case server(PostgresBackendMessage.ErrorResponse)
         case decoding(PSQLDecodingError)
-        case unexpectedBackendMessage(PSQLBackendMessage)
+        case unexpectedBackendMessage(PostgresBackendMessage)
         case unsupportedAuthMechanism(PSQLAuthScheme)
         case authMechanismRequiresPassword
         case saslError(underlyingError: Error)
@@ -35,7 +35,7 @@ struct PSQLError: Error {
         Self.init(.failedToAddSSLHandler(underlying: error))
     }
     
-    static func server(_ message: PSQLBackendMessage.ErrorResponse) -> PSQLError {
+    static func server(_ message: PostgresBackendMessage.ErrorResponse) -> PSQLError {
         Self.init(.server(message))
     }
     
@@ -43,7 +43,7 @@ struct PSQLError: Error {
         Self.init(.decoding(error))
     }
     
-    static func unexpectedBackendMessage(_ message: PSQLBackendMessage) -> PSQLError {
+    static func unexpectedBackendMessage(_ message: PostgresBackendMessage) -> PSQLError {
         Self.init(.unexpectedBackendMessage(message))
     }
     

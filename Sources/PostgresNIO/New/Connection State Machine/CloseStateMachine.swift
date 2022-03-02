@@ -43,7 +43,7 @@ struct CloseStateMachine {
         return .succeedClose(closeContext)
     }
     
-    mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> Action {
+    mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> Action {
         let error = PSQLError.server(errorMessage)
         switch self.state {
         case .initialized:

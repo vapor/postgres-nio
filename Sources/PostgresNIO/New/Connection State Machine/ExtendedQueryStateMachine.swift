@@ -83,7 +83,7 @@ struct ExtendedQueryStateMachine {
         }
     }
     
-    mutating func parameterDescriptionReceived(_ parameterDescription: PSQLBackendMessage.ParameterDescription) -> Action {
+    mutating func parameterDescriptionReceived(_ parameterDescription: PostgresBackendMessage.ParameterDescription) -> Action {
         guard case .parseCompleteReceived(let queryContext) = self.state else {
             return self.setAndFireError(.unexpectedBackendMessage(.parameterDescription(parameterDescription)))
         }
@@ -217,7 +217,7 @@ struct ExtendedQueryStateMachine {
         preconditionFailure("Unimplemented")
     }
     
-    mutating func errorReceived(_ errorMessage: PSQLBackendMessage.ErrorResponse) -> Action {
+    mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> Action {
         let error = PSQLError.server(errorMessage)
         switch self.state {
         case .initialized:
@@ -244,7 +244,7 @@ struct ExtendedQueryStateMachine {
         }
     }
     
-    mutating func noticeReceived(_ notice: PSQLBackendMessage.NoticeResponse) -> Action {
+    mutating func noticeReceived(_ notice: PostgresBackendMessage.NoticeResponse) -> Action {
         //self.queryObject.noticeReceived(notice)
         return .wait
     }

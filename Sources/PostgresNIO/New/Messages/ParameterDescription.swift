@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     
     struct ParameterDescription: PayloadDecodable, Equatable {
         /// Specifies the object ID of the parameter data type.

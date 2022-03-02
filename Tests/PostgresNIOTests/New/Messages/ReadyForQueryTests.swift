@@ -8,7 +8,7 @@ class ReadyForQueryTests: XCTestCase {
     func testDecode() {
         var buffer = ByteBuffer()
         
-        let states: [PSQLBackendMessage.TransactionState] = [
+        let states: [PostgresBackendMessage.TransactionState] = [
             .idle,
             .inFailedTransaction,
             .inTransaction,
@@ -27,7 +27,7 @@ class ReadyForQueryTests: XCTestCase {
             }
         }
         
-        let expected = states.map { state -> PSQLBackendMessage in
+        let expected = states.map { state -> PostgresBackendMessage in
             .readyForQuery(state)
         }
         
@@ -67,8 +67,8 @@ class ReadyForQueryTests: XCTestCase {
     }
     
     func testDebugDescription() {
-        XCTAssertEqual(String(reflecting: PSQLBackendMessage.TransactionState.idle), ".idle")
-        XCTAssertEqual(String(reflecting: PSQLBackendMessage.TransactionState.inTransaction), ".inTransaction")
-        XCTAssertEqual(String(reflecting: PSQLBackendMessage.TransactionState.inFailedTransaction), ".inFailedTransaction")
+        XCTAssertEqual(String(reflecting: PostgresBackendMessage.TransactionState.idle), ".idle")
+        XCTAssertEqual(String(reflecting: PostgresBackendMessage.TransactionState.inTransaction), ".inTransaction")
+        XCTAssertEqual(String(reflecting: PostgresBackendMessage.TransactionState.inFailedTransaction), ".inFailedTransaction")
     }
 }

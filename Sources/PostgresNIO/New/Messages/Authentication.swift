@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     
     enum Authentication: PayloadDecodable {
         case ok
@@ -61,7 +61,7 @@ extension PSQLBackendMessage {
     }
 }
 
-extension PSQLBackendMessage.Authentication: Equatable {
+extension PostgresBackendMessage.Authentication: Equatable {
     static func ==(lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.ok, .ok):
@@ -92,7 +92,7 @@ extension PSQLBackendMessage.Authentication: Equatable {
     }
 }
 
-extension PSQLBackendMessage.Authentication: CustomDebugStringConvertible {
+extension PostgresBackendMessage.Authentication: CustomDebugStringConvertible {
     var debugDescription: String {
         switch self {
         case .ok:

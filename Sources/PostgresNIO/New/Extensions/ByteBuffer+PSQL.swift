@@ -2,7 +2,7 @@ import NIOCore
 
 internal extension ByteBuffer {
     
-    mutating func psqlWriteBackendMessageID(_ messageID: PSQLBackendMessage.ID) {
+    mutating func psqlWriteBackendMessageID(_ messageID: PostgresBackendMessage.ID) {
         self.writeInteger(messageID.rawValue)
     }
     

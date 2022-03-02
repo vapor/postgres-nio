@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLBackendMessage {
+extension PostgresBackendMessage {
     
     struct ParameterStatus: PayloadDecodable, Equatable {
         /// The name of the run-time parameter being reported.
@@ -23,7 +23,7 @@ extension PSQLBackendMessage {
     }
 }
 
-extension PSQLBackendMessage.ParameterStatus: CustomDebugStringConvertible {
+extension PostgresBackendMessage.ParameterStatus: CustomDebugStringConvertible {
     var debugDescription: String {
         "parameter: \(String(reflecting: self.parameter)), value: \(String(reflecting: self.value))"
     }

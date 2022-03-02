@@ -11,7 +11,7 @@ class RowDescriptionTests: XCTestCase {
             .init(name: "Second", tableOID: 123, columnAttributeNumber: 456, dataType: .uuidArray, dataTypeSize: 567, dataTypeModifier: 123, format: .text),
         ]
         
-        let expected: [PSQLBackendMessage] = [
+        let expected: [PostgresBackendMessage] = [
             .rowDescription(.init(columns: columns))
         ]
         

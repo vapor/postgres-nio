@@ -23,7 +23,7 @@ class DataRowTests: XCTestCase {
         let rowSlice = buffer.getSlice(at: 7, length: buffer.readableBytes - 7)!
 
         let expectedInOuts = [
-            (buffer, [PSQLBackendMessage.dataRow(.init(columnCount: 3, bytes: rowSlice))]),
+            (buffer, [PostgresBackendMessage.dataRow(.init(columnCount: 3, bytes: rowSlice))]),
         ]
 
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(

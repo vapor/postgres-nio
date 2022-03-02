@@ -1,5 +1,5 @@
 struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
-    typealias InboundOut = PSQLBackendMessage
+    typealias InboundOut = PostgresBackendMessage
     
     private(set) var hasAlreadyReceivedBytes: Bool
     
@@ -7,7 +7,7 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         self.hasAlreadyReceivedBytes = hasAlreadyReceivedBytes
     }
     
-    mutating func decode(buffer: inout ByteBuffer) throws -> PSQLBackendMessage? {
+    mutating func decode(buffer: inout ByteBuffer) throws -> PostgresBackendMessage? {
         
         if !self.hasAlreadyReceivedBytes {
             // We have not received any bytes yet! Let's peek at the first message id. If it
@@ -51,7 +51,7 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         }
         
         // 2. make sure we have a known message identifier
-        guard let messageID = PSQLBackendMessage.ID(rawValue: idByte) else {
+        guard let messageID = PostgresBackendMessage.ID(rawValue: idByte) else {
             buffer.moveReaderIndex(to: startReaderIndex)
             let completeMessage = buffer.readSlice(length: Int(length) + 1)!
             throw PSQLDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessage)
@@ -59,7 +59,7 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         
         // 3. decode the message
         do {
-            let result = try PSQLBackendMessage.decode(from: &message, for: messageID)
+            let result = try PostgresBackendMessage.decode(from: &message, for: messageID)
             if message.readableBytes > 0 {
                 throw PSQLPartialDecodingError.expectedExactlyNRemainingBytes(0, actual: message.readableBytes)
             }
@@ -73,7 +73,7 @@ struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         }
     }
     
-    mutating func decodeLast(buffer: inout ByteBuffer, seenEOF: Bool) throws -> PSQLBackendMessage? {
+    mutating func decodeLast(buffer: inout ByteBuffer, seenEOF: Bool) throws -> PostgresBackendMessage? {
         try self.decode(buffer: &buffer)
     }
 }

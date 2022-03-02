@@ -6,7 +6,7 @@ import NIOTestUtils
 class NotificationResponseTests: XCTestCase {
     
     func testDecode() {
-        let expected: [PSQLBackendMessage] = [
+        let expected: [PostgresBackendMessage] = [
             .notification(.init(backendPID: 123, channel: "test", payload: "hello")),
             .notification(.init(backendPID: 123, channel: "test", payload: "world")),
             .notification(.init(backendPID: 123, channel: "foo", payload: "bar"))

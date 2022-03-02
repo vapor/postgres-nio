@@ -6,7 +6,7 @@ import NIOTestUtils
 class ParameterDescriptionTests: XCTestCase {
     
     func testDecode() {
-        let expected: [PSQLBackendMessage] = [
+        let expected: [PostgresBackendMessage] = [
             .parameterDescription(.init(dataTypes: [.bool, .varchar, .uuid, .json, .jsonbArray])),
         ]
         

@@ -31,9 +31,9 @@ class PSQLChannelHandlerTests: XCTestCase {
         XCTAssertEqual(startup.parameters.options, nil)
         XCTAssertEqual(startup.parameters.replication, .false)
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.authentication(.ok)))
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678))))
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.readyForQuery(.idle)))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.ok)))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678))))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.readyForQuery(.idle)))
     }
     
     func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
@@ -58,7 +58,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         
         XCTAssertEqual(request.code, 80877103)
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.sslSupported))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslSupported))
         
         // a NIOSSLHandler has been added, after it SSL had been negotiated
         XCTAssertTrue(addSSLCallbackIsHit)
@@ -99,7 +99,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         
         // read the ssl request message
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .sslRequest(.init()))
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.sslUnsupported))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslUnsupported))
         
         // the event handler should have seen an error
         XCTAssertEqual(eventHandler.errors.count, 1)
@@ -128,7 +128,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.authentication(.md5(salt: (0,1,2,3)))))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.md5(salt: (0,1,2,3)))))
         
         var message: PostgresFrontendMessage?
         XCTAssertNoThrow(message = try embedded.readOutbound(as: PostgresFrontendMessage.self))
@@ -157,7 +157,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
-        XCTAssertNoThrow(try embedded.writeInbound(PSQLBackendMessage.authentication(.plaintext)))
+        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.plaintext)))
         
         var message: PostgresFrontendMessage?
         XCTAssertNoThrow(message = try embedded.readOutbound(as: PostgresFrontendMessage.self))

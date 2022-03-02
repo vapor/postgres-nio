@@ -9,59 +9,59 @@ class PSQLBackendMessageTests: XCTestCase {
     // MARK: ID
     
     func testInitMessageIDWithBytes() {
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "R")), .authentication)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "K")), .backendKeyData)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "2")), .bindComplete)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "3")), .closeComplete)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "C")), .commandComplete)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "d")), .copyData)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "c")), .copyDone)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "G")), .copyInResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "H")), .copyOutResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "W")), .copyBothResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "D")), .dataRow)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "I")), .emptyQueryResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "E")), .error)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "V")), .functionCallResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "v")), .negotiateProtocolVersion)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "n")), .noData)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "N")), .noticeResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "A")), .notificationResponse)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "t")), .parameterDescription)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "S")), .parameterStatus)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "1")), .parseComplete)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "s")), .portalSuspended)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "Z")), .readyForQuery)
-        XCTAssertEqual(PSQLBackendMessage.ID(rawValue: UInt8(ascii: "T")), .rowDescription)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "R")), .authentication)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "K")), .backendKeyData)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "2")), .bindComplete)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "3")), .closeComplete)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "C")), .commandComplete)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "d")), .copyData)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "c")), .copyDone)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "G")), .copyInResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "H")), .copyOutResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "W")), .copyBothResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "D")), .dataRow)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "I")), .emptyQueryResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "E")), .error)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "V")), .functionCallResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "v")), .negotiateProtocolVersion)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "n")), .noData)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "N")), .noticeResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "A")), .notificationResponse)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "t")), .parameterDescription)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "S")), .parameterStatus)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "1")), .parseComplete)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "s")), .portalSuspended)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "Z")), .readyForQuery)
+        XCTAssertEqual(PostgresBackendMessage.ID(rawValue: UInt8(ascii: "T")), .rowDescription)
         
-        XCTAssertNil(PSQLBackendMessage.ID(rawValue: 0))
+        XCTAssertNil(PostgresBackendMessage.ID(rawValue: 0))
     }
     
     func testMessageIDHasCorrectRawValue() {
-        XCTAssertEqual(PSQLBackendMessage.ID.authentication.rawValue, UInt8(ascii: "R"))
-        XCTAssertEqual(PSQLBackendMessage.ID.backendKeyData.rawValue, UInt8(ascii: "K"))
-        XCTAssertEqual(PSQLBackendMessage.ID.bindComplete.rawValue, UInt8(ascii: "2"))
-        XCTAssertEqual(PSQLBackendMessage.ID.closeComplete.rawValue, UInt8(ascii: "3"))
-        XCTAssertEqual(PSQLBackendMessage.ID.commandComplete.rawValue, UInt8(ascii: "C"))
-        XCTAssertEqual(PSQLBackendMessage.ID.copyData.rawValue, UInt8(ascii: "d"))
-        XCTAssertEqual(PSQLBackendMessage.ID.copyDone.rawValue, UInt8(ascii: "c"))
-        XCTAssertEqual(PSQLBackendMessage.ID.copyInResponse.rawValue, UInt8(ascii: "G"))
-        XCTAssertEqual(PSQLBackendMessage.ID.copyOutResponse.rawValue, UInt8(ascii: "H"))
-        XCTAssertEqual(PSQLBackendMessage.ID.copyBothResponse.rawValue, UInt8(ascii: "W"))
-        XCTAssertEqual(PSQLBackendMessage.ID.dataRow.rawValue, UInt8(ascii: "D"))
-        XCTAssertEqual(PSQLBackendMessage.ID.emptyQueryResponse.rawValue, UInt8(ascii: "I"))
-        XCTAssertEqual(PSQLBackendMessage.ID.error.rawValue, UInt8(ascii: "E"))
-        XCTAssertEqual(PSQLBackendMessage.ID.functionCallResponse.rawValue, UInt8(ascii: "V"))
-        XCTAssertEqual(PSQLBackendMessage.ID.negotiateProtocolVersion.rawValue, UInt8(ascii: "v"))
-        XCTAssertEqual(PSQLBackendMessage.ID.noData.rawValue, UInt8(ascii: "n"))
-        XCTAssertEqual(PSQLBackendMessage.ID.noticeResponse.rawValue, UInt8(ascii: "N"))
-        XCTAssertEqual(PSQLBackendMessage.ID.notificationResponse.rawValue, UInt8(ascii: "A"))
-        XCTAssertEqual(PSQLBackendMessage.ID.parameterDescription.rawValue, UInt8(ascii: "t"))
-        XCTAssertEqual(PSQLBackendMessage.ID.parameterStatus.rawValue, UInt8(ascii: "S"))
-        XCTAssertEqual(PSQLBackendMessage.ID.parseComplete.rawValue, UInt8(ascii: "1"))
-        XCTAssertEqual(PSQLBackendMessage.ID.portalSuspended.rawValue, UInt8(ascii: "s"))
-        XCTAssertEqual(PSQLBackendMessage.ID.readyForQuery.rawValue, UInt8(ascii: "Z"))
-        XCTAssertEqual(PSQLBackendMessage.ID.rowDescription.rawValue, UInt8(ascii: "T"))
+        XCTAssertEqual(PostgresBackendMessage.ID.authentication.rawValue, UInt8(ascii: "R"))
+        XCTAssertEqual(PostgresBackendMessage.ID.backendKeyData.rawValue, UInt8(ascii: "K"))
+        XCTAssertEqual(PostgresBackendMessage.ID.bindComplete.rawValue, UInt8(ascii: "2"))
+        XCTAssertEqual(PostgresBackendMessage.ID.closeComplete.rawValue, UInt8(ascii: "3"))
+        XCTAssertEqual(PostgresBackendMessage.ID.commandComplete.rawValue, UInt8(ascii: "C"))
+        XCTAssertEqual(PostgresBackendMessage.ID.copyData.rawValue, UInt8(ascii: "d"))
+        XCTAssertEqual(PostgresBackendMessage.ID.copyDone.rawValue, UInt8(ascii: "c"))
+        XCTAssertEqual(PostgresBackendMessage.ID.copyInResponse.rawValue, UInt8(ascii: "G"))
+        XCTAssertEqual(PostgresBackendMessage.ID.copyOutResponse.rawValue, UInt8(ascii: "H"))
+        XCTAssertEqual(PostgresBackendMessage.ID.copyBothResponse.rawValue, UInt8(ascii: "W"))
+        XCTAssertEqual(PostgresBackendMessage.ID.dataRow.rawValue, UInt8(ascii: "D"))
+        XCTAssertEqual(PostgresBackendMessage.ID.emptyQueryResponse.rawValue, UInt8(ascii: "I"))
+        XCTAssertEqual(PostgresBackendMessage.ID.error.rawValue, UInt8(ascii: "E"))
+        XCTAssertEqual(PostgresBackendMessage.ID.functionCallResponse.rawValue, UInt8(ascii: "V"))
+        XCTAssertEqual(PostgresBackendMessage.ID.negotiateProtocolVersion.rawValue, UInt8(ascii: "v"))
+        XCTAssertEqual(PostgresBackendMessage.ID.noData.rawValue, UInt8(ascii: "n"))
+        XCTAssertEqual(PostgresBackendMessage.ID.noticeResponse.rawValue, UInt8(ascii: "N"))
+        XCTAssertEqual(PostgresBackendMessage.ID.notificationResponse.rawValue, UInt8(ascii: "A"))
+        XCTAssertEqual(PostgresBackendMessage.ID.parameterDescription.rawValue, UInt8(ascii: "t"))
+        XCTAssertEqual(PostgresBackendMessage.ID.parameterStatus.rawValue, UInt8(ascii: "S"))
+        XCTAssertEqual(PostgresBackendMessage.ID.parseComplete.rawValue, UInt8(ascii: "1"))
+        XCTAssertEqual(PostgresBackendMessage.ID.portalSuspended.rawValue, UInt8(ascii: "s"))
+        XCTAssertEqual(PostgresBackendMessage.ID.readyForQuery.rawValue, UInt8(ascii: "Z"))
+        XCTAssertEqual(PostgresBackendMessage.ID.rowDescription.rawValue, UInt8(ascii: "T"))
     }
     
     // MARK: Decoder
@@ -70,11 +70,11 @@ class PSQLBackendMessageTests: XCTestCase {
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt8(ascii: "S"))
         
-        var expectedMessages: [PSQLBackendMessage] = [.sslSupported]
+        var expectedMessages: [PostgresBackendMessage] = [.sslSupported]
         
         // we test tons of ParameterStatus messages after the SSLSupported message, since those are
         // also identified by an "S"
-        let parameterStatus: [PSQLBackendMessage.ParameterStatus] = [
+        let parameterStatus: [PostgresBackendMessage.ParameterStatus] = [
             .init(parameter: "DateStyle", value: "ISO, MDY"),
             .init(parameter: "application_name", value: ""),
             .init(parameter: "server_encoding", value: "UTF8"),
@@ -102,8 +102,8 @@ class PSQLBackendMessageTests: XCTestCase {
         XCTAssertNoThrow(try embedded.writeInbound(buffer))
         
         for expected in expectedMessages {
-            var message: PSQLBackendMessage?
-            XCTAssertNoThrow(message = try embedded.readInbound(as: PSQLBackendMessage.self))
+            var message: PostgresBackendMessage?
+            XCTAssertNoThrow(message = try embedded.readInbound(as: PostgresBackendMessage.self))
             XCTAssertEqual(message, expected)
         }
     }
@@ -114,7 +114,7 @@ class PSQLBackendMessageTests: XCTestCase {
         
         // we test a NoticeResponse messages after the SSLUnupported message, since NoticeResponse
         // is identified by a "N"
-        let fields: [PSQLBackendMessage.Field : String] = [
+        let fields: [PostgresBackendMessage.Field : String] = [
             .file: "auth.c",
             .routine: "auth_failed",
             .line: "334",
@@ -124,7 +124,7 @@ class PSQLBackendMessageTests: XCTestCase {
             .message: "password authentication failed for user \"postgre3\"",
         ]
         
-        let expectedMessages: [PSQLBackendMessage] = [
+        let expectedMessages: [PostgresBackendMessage] = [
             .sslUnsupported,
             .notice(.init(fields: fields))
         ]
@@ -142,14 +142,14 @@ class PSQLBackendMessageTests: XCTestCase {
         XCTAssertNoThrow(try embedded.writeInbound(buffer))
         
         for expected in expectedMessages {
-            var message: PSQLBackendMessage?
-            XCTAssertNoThrow(message = try embedded.readInbound(as: PSQLBackendMessage.self))
+            var message: PostgresBackendMessage?
+            XCTAssertNoThrow(message = try embedded.readInbound(as: PostgresBackendMessage.self))
             XCTAssertEqual(message, expected)
         }
     }
 
     func testPayloadsWithoutAssociatedValues() {
-        let messageIDs: [PSQLBackendMessage.ID] = [
+        let messageIDs: [PostgresBackendMessage.ID] = [
             .bindComplete,
             .closeComplete,
             .emptyQueryResponse,
@@ -163,7 +163,7 @@ class PSQLBackendMessageTests: XCTestCase {
             buffer.writeBackendMessage(id: messageID) { _ in }
         }
         
-        let expected: [PSQLBackendMessage] = [
+        let expected: [PostgresBackendMessage] = [
             .bindComplete,
             .closeComplete,
             .emptyQueryResponse,
@@ -178,7 +178,7 @@ class PSQLBackendMessageTests: XCTestCase {
     }
     
     func testPayloadsWithoutAssociatedValuesInvalidLength() {
-        let messageIDs: [PSQLBackendMessage.ID] = [
+        let messageIDs: [PostgresBackendMessage.ID] = [
             .bindComplete,
             .closeComplete,
             .emptyQueryResponse,
@@ -202,7 +202,7 @@ class PSQLBackendMessageTests: XCTestCase {
     }
     
     func testDecodeCommandCompleteMessage() {
-        let expected: [PSQLBackendMessage] = [
+        let expected: [PostgresBackendMessage] = [
             .commandComplete("SELECT 100"),
             .commandComplete("INSERT 0 1"),
             .commandComplete("UPDATE 1"),
@@ -256,40 +256,40 @@ class PSQLBackendMessageTests: XCTestCase {
     }
     
     func testDebugDescription() {
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.ok))", ".authentication(.ok)")
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.kerberosV5))",
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.ok))", ".authentication(.ok)")
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.kerberosV5))",
                        ".authentication(.kerberosV5)")
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.md5(salt: (0, 1, 2, 3))))",
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.md5(salt: (0, 1, 2, 3))))",
                        ".authentication(.md5(salt: (0, 1, 2, 3)))")
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.plaintext))",
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.plaintext))",
                        ".authentication(.plaintext)")
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.scmCredential))",
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.scmCredential))",
                        ".authentication(.scmCredential)")
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.gss))",
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.gss))",
                        ".authentication(.gss)")
-        XCTAssertEqual("\(PSQLBackendMessage.authentication(.sspi))",
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.sspi))",
                        ".authentication(.sspi)")
         
-        XCTAssertEqual("\(PSQLBackendMessage.parameterStatus(.init(parameter: "foo", value: "bar")))",
+        XCTAssertEqual("\(PostgresBackendMessage.parameterStatus(.init(parameter: "foo", value: "bar")))",
                        #".parameterStatus(parameter: "foo", value: "bar")"#)
-        XCTAssertEqual("\(PSQLBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567)))",
+        XCTAssertEqual("\(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567)))",
                        ".backendKeyData(processID: 1234, secretKey: 4567)")
         
-        XCTAssertEqual("\(PSQLBackendMessage.bindComplete)", ".bindComplete")
-        XCTAssertEqual("\(PSQLBackendMessage.closeComplete)", ".closeComplete")
-        XCTAssertEqual("\(PSQLBackendMessage.commandComplete("SELECT 123"))", #".commandComplete("SELECT 123")"#)
-        XCTAssertEqual("\(PSQLBackendMessage.emptyQueryResponse)", ".emptyQueryResponse")
-        XCTAssertEqual("\(PSQLBackendMessage.noData)", ".noData")
-        XCTAssertEqual("\(PSQLBackendMessage.parseComplete)", ".parseComplete")
-        XCTAssertEqual("\(PSQLBackendMessage.portalSuspended)", ".portalSuspended")
+        XCTAssertEqual("\(PostgresBackendMessage.bindComplete)", ".bindComplete")
+        XCTAssertEqual("\(PostgresBackendMessage.closeComplete)", ".closeComplete")
+        XCTAssertEqual("\(PostgresBackendMessage.commandComplete("SELECT 123"))", #".commandComplete("SELECT 123")"#)
+        XCTAssertEqual("\(PostgresBackendMessage.emptyQueryResponse)", ".emptyQueryResponse")
+        XCTAssertEqual("\(PostgresBackendMessage.noData)", ".noData")
+        XCTAssertEqual("\(PostgresBackendMessage.parseComplete)", ".parseComplete")
+        XCTAssertEqual("\(PostgresBackendMessage.portalSuspended)", ".portalSuspended")
         
-        XCTAssertEqual("\(PSQLBackendMessage.readyForQuery(.idle))", ".readyForQuery(.idle)")
-        XCTAssertEqual("\(PSQLBackendMessage.readyForQuery(.inTransaction))",
+        XCTAssertEqual("\(PostgresBackendMessage.readyForQuery(.idle))", ".readyForQuery(.idle)")
+        XCTAssertEqual("\(PostgresBackendMessage.readyForQuery(.inTransaction))",
                        ".readyForQuery(.inTransaction)")
-        XCTAssertEqual("\(PSQLBackendMessage.readyForQuery(.inFailedTransaction))",
+        XCTAssertEqual("\(PostgresBackendMessage.readyForQuery(.inFailedTransaction))",
                        ".readyForQuery(.inFailedTransaction)")
-        XCTAssertEqual("\(PSQLBackendMessage.sslSupported)", ".sslSupported")
-        XCTAssertEqual("\(PSQLBackendMessage.sslUnsupported)", ".sslUnsupported")
+        XCTAssertEqual("\(PostgresBackendMessage.sslSupported)", ".sslSupported")
+        XCTAssertEqual("\(PostgresBackendMessage.sslUnsupported)", ".sslUnsupported")
     }
     
 }
