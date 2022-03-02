@@ -12,8 +12,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         XCTAssertNoThrow(try conn?.close().wait())
     }
 
@@ -22,7 +22,7 @@ final class IntegrationTests: XCTestCase {
         // authentication failure.
         try XCTSkipIf(env("POSTGRES_HOST_AUTH_METHOD") == "trust")
 
-        let config = PSQLConnection.Configuration(
+        let config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: 5432,
             username: env("POSTGRES_USER") ?? "test_username",
@@ -36,8 +36,8 @@ final class IntegrationTests: XCTestCase {
         var logger = Logger.psqlTest
         logger.logLevel = .info
 
-        var connection: PSQLConnection?
-        XCTAssertThrowsError(connection = try PSQLConnection.connect(configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
+        var connection: PostgresConnection?
+        XCTAssertThrowsError(connection = try PostgresConnection.connect(connectionID: 1, configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
             XCTAssertTrue($0 is PSQLError)
         }
 
@@ -50,8 +50,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -68,8 +68,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -96,8 +96,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         for _ in 0..<1_000 {
@@ -116,8 +116,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -134,8 +134,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -176,8 +176,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -194,8 +194,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -212,8 +212,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -230,8 +230,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -259,8 +259,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -285,8 +285,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var stream: PSQLRowStream?
@@ -310,8 +310,8 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        var conn: PSQLConnection?
-        XCTAssertNoThrow(conn = try PSQLConnection.test(on: eventLoop).wait())
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         do {
@@ -344,27 +344,4 @@ final class IntegrationTests: XCTestCase {
             XCTAssertEqual(result?.bar, 2)
         }
     }
-}
-
-
-extension PSQLConnection {
-
-    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PSQLConnection> {
-        var logger = Logger(label: "psql.connection.test")
-        logger.logLevel = logLevel
-        let config = PSQLConnection.Configuration(
-            host: env("POSTGRES_HOSTNAME") ?? "localhost",
-            port: 5432,
-            username: env("POSTGRES_USER") ?? "test_username",
-            database: env("POSTGRES_DB") ?? "test_database",
-            password: env("POSTGRES_PASSWORD") ?? "test_password",
-            tls: .disable
-        )
-
-        return PSQLConnection.connect(configuration: config, logger: logger, on: eventLoop)
-    }
-}
-
-extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
-    static let `default`: Self = PostgresDecodingContext(jsonDecoder: JSONDecoder())
 }

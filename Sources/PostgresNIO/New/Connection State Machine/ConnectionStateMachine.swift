@@ -1084,7 +1084,7 @@ extension ConnectionStateMachine {
         case .tooManyParameters:
             return true
         case .connectionQuiescing:
-            preconditionFailure("Pure client error, that is thrown directly in PSQLConnection")
+            preconditionFailure("Pure client error, that is thrown directly in PostgresConnection")
         case .connectionClosed:
             preconditionFailure("Pure client error, that is thrown directly and should never ")
         case .connectionError:

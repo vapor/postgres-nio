@@ -1,5 +1,8 @@
 import Logging
 
+@usableFromInline
+enum PSQLConnection {}
+
 extension PSQLConnection {
     @usableFromInline
     enum LoggerMetaDataKey: String {
