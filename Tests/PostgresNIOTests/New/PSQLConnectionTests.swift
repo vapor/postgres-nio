@@ -27,7 +27,8 @@ class PSQLConnectionTests: XCTestCase {
             username: "postgres",
             database: "postgres",
             password: "abc123",
-            tlsConfiguration: nil)
+            tls: .disable
+        )
         
         var logger = Logger.psqlTest
         logger.logLevel = .trace

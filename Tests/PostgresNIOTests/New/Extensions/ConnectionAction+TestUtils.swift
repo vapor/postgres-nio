@@ -91,7 +91,8 @@ extension ConnectionStateMachine {
             processID: 2730,
             secretKey: 882037977,
             parameters: paramaters,
-            transactionState: transactionState)
+            transactionState: transactionState
+        )
     }
 }
 
