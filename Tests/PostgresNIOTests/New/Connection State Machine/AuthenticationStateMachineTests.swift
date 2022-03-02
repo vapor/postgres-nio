@@ -6,7 +6,9 @@ class AuthenticationStateMachineTests: XCTestCase {
     
     func testAuthenticatePlaintext() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        var state = ConnectionStateMachine(.waitingToStartAuthentication)
+
+        var state = ConnectionStateMachine()
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.plaintext), .sendPasswordMessage(.cleartext, authContext))
@@ -15,7 +17,8 @@ class AuthenticationStateMachineTests: XCTestCase {
     
     func testAuthenticateMD5() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        var state = ConnectionStateMachine(.waitingToStartAuthentication)
+        var state = ConnectionStateMachine()
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
         
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
@@ -25,7 +28,8 @@ class AuthenticationStateMachineTests: XCTestCase {
     
     func testAuthenticateMD5WithoutPassword() {
         let authContext = AuthContext(username: "test", password: nil, database: "test")
-        var state = ConnectionStateMachine(.waitingToStartAuthentication)
+        var state = ConnectionStateMachine()
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
         
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
@@ -35,15 +39,16 @@ class AuthenticationStateMachineTests: XCTestCase {
     
     func testAuthenticateOkAfterStartUpWithoutAuthChallenge() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        var state = ConnectionStateMachine(.waitingToStartAuthentication)
-        
+        var state = ConnectionStateMachine()
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.ok), .wait)
     }
     
     func testAuthenticationFailure() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        var state = ConnectionStateMachine(.waitingToStartAuthentication)
+        var state = ConnectionStateMachine()
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
         
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
@@ -74,7 +79,8 @@ class AuthenticationStateMachineTests: XCTestCase {
         
         for (message, mechanism) in unsupported {
             let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-            var state = ConnectionStateMachine(.waitingToStartAuthentication)
+            var state = ConnectionStateMachine()
+            XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
                            .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unsupportedAuthMechanism(mechanism), closePromise: nil)))
@@ -92,7 +98,8 @@ class AuthenticationStateMachineTests: XCTestCase {
         
         for message in unexpected {
             let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-            var state = ConnectionStateMachine(.waitingToStartAuthentication)
+            var state = ConnectionStateMachine()
+            XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
                            .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(message)), closePromise: nil)))
@@ -118,7 +125,8 @@ class AuthenticationStateMachineTests: XCTestCase {
         
         for message in unexpected {
             let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-            var state = ConnectionStateMachine(.waitingToStartAuthentication)
+            var state = ConnectionStateMachine()
+            XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
             XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
             XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
             XCTAssertEqual(state.authenticationMessageReceived(message),
