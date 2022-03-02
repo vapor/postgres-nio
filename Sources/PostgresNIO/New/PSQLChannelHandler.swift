@@ -57,7 +57,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.decoder = NIOSingleStepByteToMessageProcessor(PSQLBackendMessageDecoder())
     }
     #endif
-    
+
     // MARK: Handler lifecycle
     
     func handlerAdded(context: ChannelHandlerContext) {
@@ -331,7 +331,8 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     // MARK: - Private Methods -
     
     private func connected(context: ChannelHandlerContext) {
-        let action = self.state.connected(requireTLS: self.configureSSLCallback != nil)
+
+        let action = self.state.connected(tls: .init(self.configuration.tls))
         
         self.run(action, with: context)
     }
@@ -397,7 +398,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext)
     {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-        let parse = PSQLFrontendMessage.Parse(
+        let parse = PostgresFrontendMessage.Parse(
             preparedStatementName: statementName,
             query: query,
             parameters: [])
@@ -412,7 +413,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         executeStatement: PSQLExecuteStatement,
         context: ChannelHandlerContext
     ) {
-        let bind = PSQLFrontendMessage.Bind(
+        let bind = PostgresFrontendMessage.Bind(
             portalName: "",
             preparedStatementName: executeStatement.name,
             bind: executeStatement.binds)
@@ -429,11 +430,11 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
         let unnamedStatementName = ""
-        let parse = PSQLFrontendMessage.Parse(
+        let parse = PostgresFrontendMessage.Parse(
             preparedStatementName: unnamedStatementName,
             query: query.sql,
             parameters: query.binds.metadata.map(\.dataType))
-        let bind = PSQLFrontendMessage.Bind(
+        let bind = PostgresFrontendMessage.Bind(
             portalName: "",
             preparedStatementName: unnamedStatementName,
             bind: query.binds)
@@ -527,8 +528,8 @@ extension PSQLConnection.Configuration.Authentication {
 }
 
 extension AuthContext {
-    func toStartupParameters() -> PSQLFrontendMessage.Startup.Parameters {
-        PSQLFrontendMessage.Startup.Parameters(
+    func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
+        PostgresFrontendMessage.Startup.Parameters(
             user: self.username,
             database: self.database,
             options: nil,
@@ -570,5 +571,31 @@ private extension Insecure.MD5.Digest {
             result.append(Self.lowercaseLookup[Int(byte & 0x0F)])
         }
         return String(decoding: result, as: Unicode.UTF8.self)
+    }
+}
+
+extension ConnectionStateMachine.TLSConfiguration {
+    fileprivate init(_ connection: PSQLConnection.Configuration.TLS) {
+        switch connection.base {
+        case .disable:
+            self = .disable
+        case .require:
+            self = .require
+        case .prefer:
+            self = .prefer
+        }
+    }
+}
+
+extension PSQLChannelHandler {
+    convenience init(
+        configuration: PSQLConnection.Configuration,
+        configureSSLCallback: ((Channel) throws -> Void)?)
+    {
+        self.init(
+            configuration: configuration,
+            logger: .psqlNoOpLogger,
+            configureSSLCallback: configureSSLCallback
+        )
     }
 }

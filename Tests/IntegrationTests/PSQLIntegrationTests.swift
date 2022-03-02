@@ -28,7 +28,7 @@ final class IntegrationTests: XCTestCase {
             username: env("POSTGRES_USER") ?? "test_username",
             database: env("POSTGRES_DB") ?? "test_database",
             password: "wrong_password",
-            tlsConfiguration: nil)
+            tls: .disable)
 
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -358,7 +358,8 @@ extension PSQLConnection {
             username: env("POSTGRES_USER") ?? "test_username",
             database: env("POSTGRES_DB") ?? "test_database",
             password: env("POSTGRES_PASSWORD") ?? "test_password",
-            tlsConfiguration: nil)
+            tls: .disable
+        )
 
         return PSQLConnection.connect(configuration: config, logger: logger, on: eventLoop)
     }

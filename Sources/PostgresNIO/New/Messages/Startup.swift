@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     struct Startup: PSQLMessagePayloadEncodable, Equatable {
 
         /// Creates a `Startup` with "3.0" as the protocol version.

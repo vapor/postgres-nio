@@ -9,7 +9,7 @@ class ConnectionStateMachineTests: XCTestCase {
     func testStartup() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         var state = ConnectionStateMachine()
-        XCTAssertEqual(state.connected(requireTLS: false), .provideAuthenticationContext)
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.plaintext), .sendPasswordMessage(.cleartext, authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.ok), .wait)
@@ -18,7 +18,7 @@ class ConnectionStateMachineTests: XCTestCase {
     func testSSLStartupSuccess() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         var state = ConnectionStateMachine()
-        XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
+        XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
         XCTAssertEqual(state.sslHandlerAdded(), .wait)
         XCTAssertEqual(state.sslEstablished(), .provideAuthenticationContext)
@@ -31,18 +31,25 @@ class ConnectionStateMachineTests: XCTestCase {
         struct SSLHandlerAddError: Error, Equatable {}
         
         var state = ConnectionStateMachine()
-        XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
+        XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
         let failError = PSQLError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
         XCTAssertEqual(state.errorHappened(failError), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }
     
-    func testSSLStartupSSLUnsupported() {
+    func testTLSRequiredStartupSSLUnsupported() {
         var state = ConnectionStateMachine()
         
-        XCTAssertEqual(state.connected(requireTLS: true), .sendSSLRequest)
+        XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslUnsupportedReceived(),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.sslUnsupported, closePromise: nil)))
+    }
+
+    func testTLSPreferredStartupSSLUnsupported() {
+        var state = ConnectionStateMachine()
+
+        XCTAssertEqual(state.connected(tls: .prefer), .sendSSLRequest)
+        XCTAssertEqual(state.sslUnsupportedReceived(), .provideAuthenticationContext)
     }
         
     func testParameterStatusReceivedAndBackendKeyAfterAuthenticated() {
@@ -133,7 +140,7 @@ class ConnectionStateMachineTests: XCTestCase {
             promise: queryPromise)
 
         XCTAssertEqual(state.enqueue(task: .extendedQuery(extendedQueryContext)), .wait)
-        XCTAssertEqual(state.connected(requireTLS: false), .provideAuthenticationContext)
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
         let fields: [PostgresBackendMessage.Field: String] = [

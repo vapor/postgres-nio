@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     
     struct Bind: PSQLMessagePayloadEncodable, Equatable {
         /// The name of the destination portal (an empty string selects the unnamed portal).

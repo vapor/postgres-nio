@@ -18,8 +18,13 @@ struct ConnectionStateMachine {
     }
     
     enum State {
+        enum TLSConfiguration {
+            case prefer
+            case require
+        }
+
         case initialized
-        case sslRequestSent
+        case sslRequestSent(TLSConfiguration)
         case sslNegotiated
         case sslHandlerAdded
         case waitingToStartAuthentication
@@ -114,26 +119,38 @@ struct ConnectionStateMachine {
     init() {
         self.state = .initialized
     }
-    
+
     #if DEBUG
     /// for testing purposes only
     init(_ state: State) {
         self.state = state
     }
     #endif
+
+    enum TLSConfiguration {
+        case disable
+        case prefer
+        case require
+    }
     
-    mutating func connected(requireTLS: Bool) -> ConnectionAction {
+    mutating func connected(tls: TLSConfiguration) -> ConnectionAction {
         guard case .initialized = self.state else {
             preconditionFailure("Unexpected state")
         }
 
-        if requireTLS {
-            self.state = .sslRequestSent
+        switch tls {
+        case .disable:
+            self.state = .waitingToStartAuthentication
+            return .provideAuthenticationContext
+
+        case .prefer:
+            self.state = .sslRequestSent(.prefer)
+            return .sendSSLRequest
+
+        case .require:
+            self.state = .sslRequestSent(.require)
             return .sendSSLRequest
         }
-            
-        self.state = .waitingToStartAuthentication
-        return .provideAuthenticationContext
     }
     
     mutating func provideAuthenticationContext(_ authContext: AuthContext) -> ConnectionAction {
@@ -223,8 +240,12 @@ struct ConnectionStateMachine {
     
     mutating func sslUnsupportedReceived() -> ConnectionAction {
         switch self.state {
-        case .sslRequestSent:
+        case .sslRequestSent(.require):
             return self.closeConnectionAndCleanup(.sslUnsupported)
+
+        case .sslRequestSent(.prefer):
+            self.state = .waitingToStartAuthentication
+            return .provideAuthenticationContext
         
         case .initialized,
              .sslNegotiated,

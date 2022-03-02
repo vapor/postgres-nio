@@ -15,7 +15,7 @@ struct BufferedMessageEncoder {
         self.encoder = encoder
     }
     
-    mutating func encode(_ message: PSQLFrontendMessage) {
+    mutating func encode(_ message: PostgresFrontendMessage) {
         switch self.state {
         case .flushed:
             self.state = .writable

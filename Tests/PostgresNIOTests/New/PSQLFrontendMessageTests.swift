@@ -7,17 +7,17 @@ class PSQLFrontendMessageTests: XCTestCase {
     // MARK: ID
     
     func testMessageIDs() {
-        XCTAssertEqual(PSQLFrontendMessage.ID.bind.rawValue, UInt8(ascii: "B"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.close.rawValue, UInt8(ascii: "C"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.describe.rawValue, UInt8(ascii: "D"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.execute.rawValue, UInt8(ascii: "E"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.flush.rawValue, UInt8(ascii: "H"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.parse.rawValue, UInt8(ascii: "P"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.password.rawValue, UInt8(ascii: "p"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.saslInitialResponse.rawValue, UInt8(ascii: "p"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.saslResponse.rawValue, UInt8(ascii: "p"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.sync.rawValue, UInt8(ascii: "S"))
-        XCTAssertEqual(PSQLFrontendMessage.ID.terminate.rawValue, UInt8(ascii: "X"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.bind.rawValue, UInt8(ascii: "B"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.close.rawValue, UInt8(ascii: "C"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.describe.rawValue, UInt8(ascii: "D"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.execute.rawValue, UInt8(ascii: "E"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.flush.rawValue, UInt8(ascii: "H"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.parse.rawValue, UInt8(ascii: "P"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.password.rawValue, UInt8(ascii: "p"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.saslInitialResponse.rawValue, UInt8(ascii: "p"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.saslResponse.rawValue, UInt8(ascii: "p"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.sync.rawValue, UInt8(ascii: "S"))
+        XCTAssertEqual(PostgresFrontendMessage.ID.terminate.rawValue, UInt8(ascii: "X"))
     }
     
     // MARK: Encoder
@@ -28,7 +28,7 @@ class PSQLFrontendMessageTests: XCTestCase {
         encoder.encode(data: .flush, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PSQLFrontendMessage.ID.flush.rawValue, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PostgresFrontendMessage.ID.flush.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
     
@@ -38,7 +38,7 @@ class PSQLFrontendMessageTests: XCTestCase {
         encoder.encode(data: .sync, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PSQLFrontendMessage.ID.sync.rawValue, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PostgresFrontendMessage.ID.sync.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
     
@@ -48,7 +48,7 @@ class PSQLFrontendMessageTests: XCTestCase {
         encoder.encode(data: .terminate, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PSQLFrontendMessage.ID.terminate.rawValue, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PostgresFrontendMessage.ID.terminate.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
 

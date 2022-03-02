@@ -7,8 +7,8 @@ class SSLRequestTests: XCTestCase {
     func testSSLRequest() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let request = PSQLFrontendMessage.SSLRequest()
-        let message = PSQLFrontendMessage.sslRequest(request)
+        let request = PostgresFrontendMessage.SSLRequest()
+        let message = PostgresFrontendMessage.sslRequest(request)
         encoder.encode(data: message, out: &byteBuffer)
         
         let byteBufferLength = Int32(byteBuffer.readableBytes)

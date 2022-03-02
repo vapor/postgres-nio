@@ -7,9 +7,9 @@ class SASLInitialResponseTests: XCTestCase {
     func testEncodeWithData() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let sasl = PSQLFrontendMessage.SASLInitialResponse(
+        let sasl = PostgresFrontendMessage.SASLInitialResponse(
             saslMechanism: "hello", initialData: [0, 1, 2, 3, 4, 5, 6, 7])
-        let message = PSQLFrontendMessage.saslInitialResponse(sasl)
+        let message = PostgresFrontendMessage.saslInitialResponse(sasl)
         encoder.encode(data: message, out: &byteBuffer)
         
         let length: Int = 1 + 4 + (sasl.saslMechanism.count + 1) + 4 + sasl.initialData.count
@@ -21,7 +21,7 @@ class SASLInitialResponseTests: XCTestCase {
         // + 8 initialData
         
         XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.saslInitialResponse.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.saslInitialResponse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), sasl.saslMechanism)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(sasl.initialData.count))
@@ -32,9 +32,9 @@ class SASLInitialResponseTests: XCTestCase {
     func testEncodeWithoutData() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let sasl = PSQLFrontendMessage.SASLInitialResponse(
+        let sasl = PostgresFrontendMessage.SASLInitialResponse(
             saslMechanism: "hello", initialData: [])
-        let message = PSQLFrontendMessage.saslInitialResponse(sasl)
+        let message = PostgresFrontendMessage.saslInitialResponse(sasl)
         encoder.encode(data: message, out: &byteBuffer)
         
         let length: Int = 1 + 4 + (sasl.saslMechanism.count + 1) + 4 + sasl.initialData.count
@@ -46,7 +46,7 @@ class SASLInitialResponseTests: XCTestCase {
         // + 0 initialData
         
         XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.saslInitialResponse.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.saslInitialResponse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), sasl.saslMechanism)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(-1))

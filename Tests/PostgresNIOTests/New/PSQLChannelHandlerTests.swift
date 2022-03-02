@@ -19,9 +19,9 @@ class PSQLChannelHandlerTests: XCTestCase {
         ])
         defer { XCTAssertNoThrow(try embedded.finish()) }
         
-        var maybeMessage: PSQLFrontendMessage?
+        var maybeMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
-        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PSQLFrontendMessage.self))
+        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
         guard case .startup(let startup) = maybeMessage else {
             return XCTFail("Unexpected message")
         }
@@ -38,7 +38,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
         var config = self.testConnectionConfiguration()
-        config.tlsConfiguration = .makeClientConfiguration()
+        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         var addSSLCallbackIsHit = false
         let handler = PSQLChannelHandler(configuration: config) { channel in
             addSSLCallbackIsHit = true
@@ -49,9 +49,9 @@ class PSQLChannelHandlerTests: XCTestCase {
             handler
         ])
         
-        var maybeMessage: PSQLFrontendMessage?
+        var maybeMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
-        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PSQLFrontendMessage.self))
+        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
         guard case .sslRequest(let request) = maybeMessage else {
             return XCTFail("Unexpected message")
         }
@@ -67,8 +67,8 @@ class PSQLChannelHandlerTests: XCTestCase {
         embedded.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: ""))
         
         // startup message should be issued
-        var maybeStartupMessage: PSQLFrontendMessage?
-        XCTAssertNoThrow(maybeStartupMessage = try embedded.readOutbound(as: PSQLFrontendMessage.self))
+        var maybeStartupMessage: PostgresFrontendMessage?
+        XCTAssertNoThrow(maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
         guard case .startup(let startupMessage) = maybeStartupMessage else {
             return XCTFail("Unexpected message")
         }
@@ -80,7 +80,7 @@ class PSQLChannelHandlerTests: XCTestCase {
     
     func testSSLUnsupportedClosesConnection() {
         var config = self.testConnectionConfiguration()
-        config.tlsConfiguration = .makeClientConfiguration()
+        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         
         let handler = PSQLChannelHandler(configuration: config) { channel in
             XCTFail("This callback should never be exectuded")
@@ -98,7 +98,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         XCTAssertTrue(embedded.isActive)
         
         // read the ssl request message
-        XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .sslRequest(.init()))
+        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .sslRequest(.init()))
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslUnsupported))
         
         // the event handler should have seen an error
@@ -126,12 +126,12 @@ class PSQLChannelHandlerTests: XCTestCase {
         ])
         
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
-        XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
+        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.md5(salt: (0,1,2,3)))))
         
-        var message: PSQLFrontendMessage?
-        XCTAssertNoThrow(message = try embedded.readOutbound(as: PSQLFrontendMessage.self))
+        var message: PostgresFrontendMessage?
+        XCTAssertNoThrow(message = try embedded.readOutbound(as: PostgresFrontendMessage.self))
         
         XCTAssertEqual(message, .password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a")))
     }
@@ -155,12 +155,12 @@ class PSQLChannelHandlerTests: XCTestCase {
         ])
         
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
-        XCTAssertEqual(try embedded.readOutbound(as: PSQLFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
+        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.plaintext)))
         
-        var message: PSQLFrontendMessage?
-        XCTAssertNoThrow(message = try embedded.readOutbound(as: PSQLFrontendMessage.self))
+        var message: PostgresFrontendMessage?
+        XCTAssertNoThrow(message = try embedded.readOutbound(as: PostgresFrontendMessage.self))
         
         XCTAssertEqual(message, .password(.init(value: password)))
     }
@@ -173,7 +173,7 @@ class PSQLChannelHandlerTests: XCTestCase {
         username: String = "test",
         database: String = "postgres",
         password: String = "password",
-        tlsConfiguration: TLSConfiguration? = nil
+        tls: PSQLConnection.Configuration.TLS = .disable
     ) -> PSQLConnection.Configuration {
         PSQLConnection.Configuration(
             host: host,
@@ -181,7 +181,7 @@ class PSQLChannelHandlerTests: XCTestCase {
             username: username,
             database: database,
             password: password,
-            tlsConfiguration: tlsConfiguration
+            tls: tls
         )
     }
 }

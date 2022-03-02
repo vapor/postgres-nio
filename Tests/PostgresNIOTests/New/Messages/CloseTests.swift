@@ -7,11 +7,11 @@ class CloseTests: XCTestCase {
     func testEncodeClosePortal() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let message = PSQLFrontendMessage.close(.portal("Hello"))
+        let message = PostgresFrontendMessage.close(.portal("Hello"))
         encoder.encode(data: message, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 12)
-        XCTAssertEqual(PSQLFrontendMessage.ID.close.rawValue, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PostgresFrontendMessage.ID.close.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(11, byteBuffer.readInteger(as: Int32.self))
         XCTAssertEqual(UInt8(ascii: "P"), byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual("Hello", byteBuffer.readNullTerminatedString())
@@ -21,11 +21,11 @@ class CloseTests: XCTestCase {
     func testEncodeCloseUnnamedStatement() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let message = PSQLFrontendMessage.close(.preparedStatement(""))
+        let message = PostgresFrontendMessage.close(.preparedStatement(""))
         encoder.encode(data: message, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 7)
-        XCTAssertEqual(PSQLFrontendMessage.ID.close.rawValue, byteBuffer.readInteger(as: UInt8.self))
+        XCTAssertEqual(PostgresFrontendMessage.ID.close.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(6, byteBuffer.readInteger(as: Int32.self))
         XCTAssertEqual(UInt8(ascii: "S"), byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual("", byteBuffer.readNullTerminatedString())
