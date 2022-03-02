@@ -1,7 +1,7 @@
 @testable import PostgresNIO
 
 struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
-    typealias InboundOut = PSQLFrontendMessage
+    typealias InboundOut = PostgresFrontendMessage
     
     private(set) var isInStartup: Bool
     
@@ -9,7 +9,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         self.isInStartup = true
     }
     
-    mutating func decode(buffer: inout ByteBuffer) throws -> PSQLFrontendMessage? {
+    mutating func decode(buffer: inout ByteBuffer) throws -> PostgresFrontendMessage? {
         // make sure we have at least one byte to read
         guard buffer.readableBytes > 0 else {
             return nil
@@ -58,14 +58,14 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
                     }
                 }
                 
-                let parameters = PSQLFrontendMessage.Startup.Parameters(
+                let parameters = PostgresFrontendMessage.Startup.Parameters(
                     user: user!,
                     database: database,
                     options: options,
                     replication: .false
                 )
                 
-                let startup = PSQLFrontendMessage.Startup(
+                let startup = PostgresFrontendMessage.Startup(
                     protocolVersion: 0x00_03_00_00,
                     parameters: parameters
                 )
@@ -95,7 +95,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         }
         
         // 2. make sure we have a known message identifier
-        guard let messageID = PSQLFrontendMessage.ID(rawValue: idByte) else {
+        guard let messageID = PostgresFrontendMessage.ID(rawValue: idByte) else {
             throw PSQLDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessageBuffer)
         }
         
@@ -106,7 +106,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
             // move reader index forward by five bytes
             slice.moveReaderIndex(forwardBy: 5)
             
-            return try PSQLFrontendMessage.decode(from: &slice, for: messageID)
+            return try PostgresFrontendMessage.decode(from: &slice, for: messageID)
         } catch let error as PSQLPartialDecodingError {
             throw PSQLDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessageBuffer)
         } catch {
@@ -114,14 +114,14 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         }
     }
     
-    mutating func decodeLast(buffer: inout ByteBuffer, seenEOF: Bool) throws -> PSQLFrontendMessage? {
+    mutating func decodeLast(buffer: inout ByteBuffer, seenEOF: Bool) throws -> PostgresFrontendMessage? {
         try self.decode(buffer: &buffer)
     }
 }
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     
-    static func decode(from buffer: inout ByteBuffer, for messageID: ID) throws -> PSQLFrontendMessage {
+    static func decode(from buffer: inout ByteBuffer, for messageID: ID) throws -> PostgresFrontendMessage {
         switch messageID {
         case .bind:
             preconditionFailure("TODO: Unimplemented")

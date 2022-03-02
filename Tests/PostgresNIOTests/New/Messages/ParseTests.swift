@@ -7,11 +7,11 @@ class ParseTests: XCTestCase {
     func testEncode() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let parse = PSQLFrontendMessage.Parse(
+        let parse = PostgresFrontendMessage.Parse(
             preparedStatementName: "test",
             query: "SELECT version()",
             parameters: [.bool, .int8, .bytea, .varchar, .text, .uuid, .json, .jsonbArray])
-        let message = PSQLFrontendMessage.parse(parse)
+        let message = PostgresFrontendMessage.parse(parse)
         encoder.encode(data: message, out: &byteBuffer)
         
         let length: Int = 1 + 4 + (parse.preparedStatementName.count + 1) + (parse.query.count + 1) + 2 + parse.parameters.count * 4
@@ -22,7 +22,7 @@ class ParseTests: XCTestCase {
         // + 1 query ()
         
         XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PSQLFrontendMessage.ID.parse.rawValue)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.parse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.preparedStatementName)
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.query)

@@ -1,6 +1,6 @@
 import NIOCore
 
-extension PSQLFrontendMessage {
+extension PostgresFrontendMessage {
     /// A message asking the PostgreSQL server if TLS is supported
     /// For more info, see https://www.postgresql.org/docs/10/static/protocol-flow.html#id-1.10.5.7.11
     struct SSLRequest: PSQLMessagePayloadEncodable, Equatable {

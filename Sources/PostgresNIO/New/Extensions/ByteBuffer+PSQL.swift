@@ -6,7 +6,7 @@ internal extension ByteBuffer {
         self.writeInteger(messageID.rawValue)
     }
     
-    mutating func psqlWriteFrontendMessageID(_ messageID: PSQLFrontendMessage.ID) {
+    mutating func psqlWriteFrontendMessageID(_ messageID: PostgresFrontendMessage.ID) {
         self.writeInteger(messageID.rawValue)
     }
 

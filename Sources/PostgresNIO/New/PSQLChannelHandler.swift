@@ -398,7 +398,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext)
     {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-        let parse = PSQLFrontendMessage.Parse(
+        let parse = PostgresFrontendMessage.Parse(
             preparedStatementName: statementName,
             query: query,
             parameters: [])
@@ -413,7 +413,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         executeStatement: PSQLExecuteStatement,
         context: ChannelHandlerContext
     ) {
-        let bind = PSQLFrontendMessage.Bind(
+        let bind = PostgresFrontendMessage.Bind(
             portalName: "",
             preparedStatementName: executeStatement.name,
             bind: executeStatement.binds)
@@ -430,11 +430,11 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
         let unnamedStatementName = ""
-        let parse = PSQLFrontendMessage.Parse(
+        let parse = PostgresFrontendMessage.Parse(
             preparedStatementName: unnamedStatementName,
             query: query.sql,
             parameters: query.binds.metadata.map(\.dataType))
-        let bind = PSQLFrontendMessage.Bind(
+        let bind = PostgresFrontendMessage.Bind(
             portalName: "",
             preparedStatementName: unnamedStatementName,
             bind: query.binds)
@@ -528,8 +528,8 @@ extension PSQLConnection.Configuration.Authentication {
 }
 
 extension AuthContext {
-    func toStartupParameters() -> PSQLFrontendMessage.Startup.Parameters {
-        PSQLFrontendMessage.Startup.Parameters(
+    func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
+        PostgresFrontendMessage.Startup.Parameters(
             user: self.username,
             database: self.database,
             options: nil,

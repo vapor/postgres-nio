@@ -7,8 +7,8 @@ class CancelTests: XCTestCase {
     func testEncodeCancel() {
         let encoder = PSQLFrontendMessageEncoder()
         var byteBuffer = ByteBuffer()
-        let cancel = PSQLFrontendMessage.Cancel(processID: 1234, secretKey: 4567)
-        let message = PSQLFrontendMessage.cancel(cancel)
+        let cancel = PostgresFrontendMessage.Cancel(processID: 1234, secretKey: 4567)
+        let message = PostgresFrontendMessage.cancel(cancel)
         encoder.encode(data: message, out: &byteBuffer)
         
         XCTAssertEqual(byteBuffer.readableBytes, 16)
