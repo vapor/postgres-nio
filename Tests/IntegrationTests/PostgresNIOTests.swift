@@ -1064,7 +1064,7 @@ final class PostgresNIOTests: XCTestCase {
     func testRemoteClose() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        XCTAssertNoThrow( try conn?.underlying.channel.close().wait() )
+        XCTAssertNoThrow( try conn?.channel.close().wait() )
     }
 
     // https://github.com/vapor/postgres-nio/issues/113

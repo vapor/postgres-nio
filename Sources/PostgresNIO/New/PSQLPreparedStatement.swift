@@ -7,7 +7,7 @@ struct PSQLPreparedStatement {
     let query: String
     
     /// The postgres connection the statement was prepared on
-    let connection: PSQLConnection
+    let connection: PostgresConnection
     
     /// The `RowDescription` to apply to all `DataRow`s when executing this `PSQLPreparedStatement`
     let rowDescription: RowDescription?

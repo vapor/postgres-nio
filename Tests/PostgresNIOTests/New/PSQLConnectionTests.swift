@@ -21,7 +21,7 @@ class PSQLConnectionTests: XCTestCase {
             return XCTFail("Could not get port number from temp started server")
         }
         
-        let config = PSQLConnection.Configuration(
+        let config = PostgresConnection.Configuration(
             host: "127.0.0.1",
             port: port,
             username: "postgres",
@@ -33,7 +33,7 @@ class PSQLConnectionTests: XCTestCase {
         var logger = Logger.psqlTest
         logger.logLevel = .trace
         
-        XCTAssertThrowsError(try PSQLConnection.connect(configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
+        XCTAssertThrowsError(try PostgresConnection.connect(connectionID: 1, configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
             XCTAssertTrue($0 is PSQLError)
         }
     }

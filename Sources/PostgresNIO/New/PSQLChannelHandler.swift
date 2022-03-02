@@ -26,13 +26,13 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     private var rowStream: PSQLRowStream?
     private var decoder: NIOSingleStepByteToMessageProcessor<PSQLBackendMessageDecoder>
     private var encoder: BufferedMessageEncoder!
-    private let configuration: PSQLConnection.Configuration
+    private let configuration: PostgresConnection.Configuration
     private let configureSSLCallback: ((Channel) throws -> Void)?
     
     /// this delegate should only be accessed on the connections `EventLoop`
     weak var notificationDelegate: PSQLChannelHandlerNotificationDelegate?
     
-    init(configuration: PSQLConnection.Configuration,
+    init(configuration: PostgresConnection.Configuration,
          logger: Logger,
          configureSSLCallback: ((Channel) throws -> Void)?)
     {
@@ -45,7 +45,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     
     #if DEBUG
     /// for testing purposes only
-    init(configuration: PSQLConnection.Configuration,
+    init(configuration: PostgresConnection.Configuration,
          state: ConnectionStateMachine = .init(.initialized),
          logger: Logger = .psqlNoOpLogger,
          configureSSLCallback: ((Channel) throws -> Void)?)
@@ -518,7 +518,7 @@ extension PSQLChannelHandler: PSQLRowsDataSource {
     }
 }
 
-extension PSQLConnection.Configuration.Authentication {
+extension PostgresConnection.Configuration.Authentication {
     func toAuthContext() -> AuthContext {
         AuthContext(
             username: self.username,
@@ -575,7 +575,7 @@ private extension Insecure.MD5.Digest {
 }
 
 extension ConnectionStateMachine.TLSConfiguration {
-    fileprivate init(_ connection: PSQLConnection.Configuration.TLS) {
+    fileprivate init(_ connection: PostgresConnection.Configuration.TLS) {
         switch connection.base {
         case .disable:
             self = .disable
@@ -589,7 +589,7 @@ extension ConnectionStateMachine.TLSConfiguration {
 
 extension PSQLChannelHandler {
     convenience init(
-        configuration: PSQLConnection.Configuration,
+        configuration: PostgresConnection.Configuration,
         configureSSLCallback: ((Channel) throws -> Void)?)
     {
         self.init(
