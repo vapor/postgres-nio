@@ -26,7 +26,7 @@ class String_PSQLCodableTests: XCTestCase {
         for dataType in dataTypes {
             var loopBuffer = buffer
             var result: String?
-            XCTAssertNoThrow(result = try String.decode(from: &loopBuffer, type: dataType, format: .binary, context: .default))
+            XCTAssertNoThrow(result = try String(from: &loopBuffer, type: dataType, format: .binary, context: .default))
             XCTAssertEqual(result, expected)
         }
     }
@@ -37,7 +37,7 @@ class String_PSQLCodableTests: XCTestCase {
         
         for dataType in dataTypes {
             var loopBuffer = buffer
-            XCTAssertThrowsError(try String.decode(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
+            XCTAssertThrowsError(try String(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
                 XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
             }
         }
@@ -49,7 +49,7 @@ class String_PSQLCodableTests: XCTestCase {
         uuid.encode(into: &buffer, context: .default)
         
         var decoded: String?
-        XCTAssertNoThrow(decoded = try String.decode(from: &buffer, type: .uuid, format: .binary, context: .default))
+        XCTAssertNoThrow(decoded = try String(from: &buffer, type: .uuid, format: .binary, context: .default))
         XCTAssertEqual(decoded, uuid.uuidString)
     }
     
@@ -60,7 +60,7 @@ class String_PSQLCodableTests: XCTestCase {
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
         
-        XCTAssertThrowsError(try String.decode(from: &buffer, type: .uuid, format: .binary, context: .default)) {
+        XCTAssertThrowsError(try String(from: &buffer, type: .uuid, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
         }
     }

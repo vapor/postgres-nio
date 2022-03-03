@@ -12,7 +12,7 @@ class Bytes_PSQLCodableTests: XCTestCase {
         XCTAssertEqual(data.psqlType, .bytea)
         
         var result: Data?
-        XCTAssertNoThrow(result = try Data.decode(from: &buffer, type: .bytea, format: .binary, context: .default))
+        result = Data(from: &buffer, type: .bytea, format: .binary, context: .default)
         XCTAssertEqual(data, result)
     }
     
@@ -24,7 +24,7 @@ class Bytes_PSQLCodableTests: XCTestCase {
         XCTAssertEqual(bytes.psqlType, .bytea)
         
         var result: ByteBuffer?
-        XCTAssertNoThrow(result = try ByteBuffer.decode(from: &buffer, type: .bytea, format: .binary, context: .default))
+        result = ByteBuffer(from: &buffer, type: .bytea, format: .binary, context: .default)
         XCTAssertEqual(bytes, result)
     }
     
