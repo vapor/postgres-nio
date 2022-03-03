@@ -566,3 +566,7 @@ private extension String {
         }
     }
 }
+
+#if swift(>=5.6)
+extension PostgresConnection: @unchecked Sendable {}
+#endif

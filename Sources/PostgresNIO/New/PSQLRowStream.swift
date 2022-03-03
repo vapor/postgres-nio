@@ -396,3 +396,8 @@ protocol PSQLRowsDataSource {
     func cancel(for stream: PSQLRowStream)
     
 }
+
+#if swift(>=5.6)
+// Thread safety is guaranteed in the RowStream through dispatching onto the NIO EventLoop.
+extension PSQLRowStream: @unchecked Sendable {}
+#endif

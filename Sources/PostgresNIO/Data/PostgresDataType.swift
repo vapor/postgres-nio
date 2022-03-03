@@ -17,6 +17,11 @@ extension PostgresFormat: CustomStringConvertible {
     }
 }
 
+#if swift(>=5.6)
+extension PostgresFormat: Sendable {}
+#endif
+
+
 // TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
 extension PostgresFormat: Codable {}
 
@@ -232,6 +237,10 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
         return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"
     }
 }
+
+#if swift(>=5.6)
+extension PostgresDataType: Sendable {}
+#endif
 
 // TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
 extension PostgresDataType: Codable {}

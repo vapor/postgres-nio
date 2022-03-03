@@ -1,4 +1,8 @@
+#if swift(>=5.6)
+@preconcurrency import NIOCore
+#else
 import NIOCore
+#endif
 import Foundation
 
 public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertible {
@@ -112,3 +116,7 @@ extension PostgresData: PostgresDataConvertible {
         return self
     }
 }
+
+#if swift(>=5.6)
+extension PostgresData: Sendable {}
+#endif
