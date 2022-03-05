@@ -19,7 +19,7 @@ extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
     }
 }
 
-extension ByteBuffer: PostgresCodable {
+extension ByteBuffer: PostgresEncodable {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -35,18 +35,22 @@ extension ByteBuffer: PostgresCodable {
         var copyOfSelf = self // dirty hack
         byteBuffer.writeBuffer(&copyOfSelf)
     }
+}
 
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+extension ByteBuffer: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        return buffer
+    ) {
+        self = buffer
     }
 }
 
-extension Data: PostgresCodable {
+extension ByteBuffer: PostgresCodable {}
+
+extension Data: PostgresEncodable {
     var psqlType: PostgresDataType {
         .bytea
     }
@@ -61,13 +65,17 @@ extension Data: PostgresCodable {
     ) {
         byteBuffer.writeBytes(self)
     }
+}
 
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+extension Data: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        return buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
+    ) {
+        self = buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }
 }
+
+extension Data: PostgresCodable {}

@@ -1,30 +1,14 @@
 import NIOCore
 
-extension UInt8: PostgresCodable {
+// MARK: UInt8
+
+extension UInt8: PostgresEncodable {
     var psqlType: PostgresDataType {
         .char
     }
 
     var psqlFormat: PostgresFormat {
         .binary
-    }
-
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch type {
-        case .bpchar, .char:
-            guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            
-            return value
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
     }
 
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -35,7 +19,31 @@ extension UInt8: PostgresCodable {
     }
 }
 
-extension Int16: PostgresCodable {
+extension UInt8: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch type {
+        case .bpchar, .char:
+            guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+
+            self = value
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension UInt8: PostgresCodable {}
+
+// MARK: Int16
+
+extension Int16: PostgresEncodable {
     
     var psqlType: PostgresDataType {
         .int2
@@ -43,28 +51,6 @@ extension Int16: PostgresCodable {
 
     var psqlFormat: PostgresFormat {
         .binary
-    }
-
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch (format, type) {
-        case (.binary, .int2):
-            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        case (.text, .int2):
-            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int16(string) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
     }
 
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -75,40 +61,41 @@ extension Int16: PostgresCodable {
     }
 }
 
-extension Int32: PostgresCodable {
+extension Int16: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch (format, type) {
+        case (.binary, .int2):
+            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        case (.text, .int2):
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int16(string) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension Int16: PostgresCodable {}
+
+// MARK: Int32
+
+extension Int32: PostgresEncodable {
     var psqlType: PostgresDataType {
         .int4
     }
     
     var psqlFormat: PostgresFormat {
         .binary
-    }
-
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch (format, type) {
-        case (.binary, .int2):
-            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return Int32(value)
-        case (.binary, .int4):
-            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return Int32(value)
-        case (.text, .int2), (.text, .int4):
-            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int32(string) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
     }
 
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -119,45 +106,46 @@ extension Int32: PostgresCodable {
     }
 }
 
-extension Int64: PostgresCodable {
+extension Int32: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch (format, type) {
+        case (.binary, .int2):
+            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = Int32(value)
+        case (.binary, .int4):
+            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = Int32(value)
+        case (.text, .int2), (.text, .int4):
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int32(string) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension Int32: PostgresCodable {}
+
+// MARK: Int64
+
+extension Int64: PostgresEncodable {
     var psqlType: PostgresDataType {
         .int8
     }
 
     var psqlFormat: PostgresFormat {
         .binary
-    }
-
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch (format, type) {
-        case (.binary, .int2):
-            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return Int64(value)
-        case (.binary, .int4):
-            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return Int64(value)
-        case (.binary, .int8):
-            guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int64.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        case (.text, .int2), (.text, .int4), (.text, .int8):
-            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int64(string) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
     }
 
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -168,7 +156,45 @@ extension Int64: PostgresCodable {
     }
 }
 
-extension Int: PostgresCodable {
+extension Int64: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch (format, type) {
+        case (.binary, .int2):
+            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = Int64(value)
+        case (.binary, .int4):
+            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = Int64(value)
+        case (.binary, .int8):
+            guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int64.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        case (.text, .int2), (.text, .int4), (.text, .int8):
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int64(string) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension Int64: PostgresCodable {}
+
+// MARK: Int
+
+extension Int: PostgresEncodable {
     var psqlType: PostgresDataType {
         switch self.bitWidth {
         case Int32.bitWidth:
@@ -184,38 +210,6 @@ extension Int: PostgresCodable {
         .binary
     }
 
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch (format, type) {
-        case (.binary, .int2):
-            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return Int(value)
-        case (.binary, .int4):
-            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return Int(value)
-        case (.binary, .int8) where Int.bitWidth == 64:
-            guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        case (.text, .int2), (.text, .int4), (.text, .int8):
-            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int(string) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
-    }
-
     func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
@@ -223,3 +217,39 @@ extension Int: PostgresCodable {
         byteBuffer.writeInteger(self, as: Int.self)
     }
 }
+
+extension Int: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch (format, type) {
+        case (.binary, .int2):
+            guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = Int(value)
+        case (.binary, .int4):
+            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = Int(value)
+        case (.binary, .int8) where Int.bitWidth == 64:
+            guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        case (.text, .int2), (.text, .int4), (.text, .int8):
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Int(string) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension Int: PostgresCodable {}

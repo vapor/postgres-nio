@@ -104,12 +104,12 @@ extension Array: PostgresEncodable where Element: PSQLArrayElement {
 }
 
 extension Array: PostgresDecodable where Element: PSQLArrayElement {
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+    init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Array<Element> {
+    ) throws {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.
             throw PostgresCastingError.Code.failure
@@ -124,7 +124,8 @@ extension Array: PostgresDecodable where Element: PSQLArrayElement {
         let elementType = PostgresDataType(element)
         
         guard isNotEmpty == 1 else {
-            return []
+            self = []
+            return
         }
         
         guard let (expectedArrayCount, dimensions) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32).self),
@@ -146,12 +147,12 @@ extension Array: PostgresDecodable where Element: PSQLArrayElement {
                 throw PostgresCastingError.Code.failure
             }
             
-            let element = try Element.decode(from: &elementBuffer, type: elementType, format: format, context: context)
+            let element = try Element.init(from: &elementBuffer, type: elementType, format: format, context: context)
             
             result.append(element)
         }
         
-        return result
+        self = result
     }
 }
 

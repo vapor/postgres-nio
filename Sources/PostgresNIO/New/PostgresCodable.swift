@@ -24,7 +24,7 @@ protocol PostgresDecodable {
     /// String? should be PostgresDecodable, String?? should not be PostgresDecodable
     associatedtype _DecodableType: PostgresDecodable = Self
 
-    /// Decode an entity from the `byteBuffer` in postgres wire format
+    /// Create an entity from the `byteBuffer` in postgres wire format
     ///
     /// - Parameters:
     ///   - byteBuffer: A `ByteBuffer` to decode. The byteBuffer is sliced in such a way that it is expected
@@ -35,12 +35,12 @@ protocol PostgresDecodable {
     ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+    init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self
+    ) throws
 
     /// Decode an entity from the `byteBuffer` in postgres wire format. This method has a default implementation and
     /// is only overwritten for `Optional`s. Other than in the
@@ -63,7 +63,7 @@ extension PostgresDecodable {
         guard var buffer = byteBuffer else {
             throw PostgresCastingError.Code.missingData
         }
-        return try self.decode(from: &buffer, type: type, format: format, context: context)
+        return try self.init(from: &buffer, type: type, format: format, context: context)
     }
 }
 
@@ -116,7 +116,12 @@ extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
 extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped._DecodableType == Wrapped {
     typealias _DecodableType = Wrapped
 
-    static func decode<JSONDecoder : PostgresJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PostgresDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
         preconditionFailure("This should not be called")
     }
 
@@ -128,7 +133,7 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
     ) throws -> Optional<Wrapped> {
         switch byteBuffer {
         case .some(var buffer):
-            return try Wrapped.decode(from: &buffer, type: type, format: format, context: context)
+            return try Wrapped(from: &buffer, type: type, format: format, context: context)
         case .none:
             return .none
         }
