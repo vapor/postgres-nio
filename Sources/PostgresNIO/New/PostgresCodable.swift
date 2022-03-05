@@ -24,7 +24,7 @@ protocol PostgresDecodable {
     /// String? should be PostgresDecodable, String?? should not be PostgresDecodable
     associatedtype _DecodableType: PostgresDecodable = Self
 
-    /// Decode an entity from the `byteBuffer` in postgres wire format
+    /// Create an entity from the `byteBuffer` in postgres wire format
     ///
     /// - Parameters:
     ///   - byteBuffer: A `ByteBuffer` to decode. The byteBuffer is sliced in such a way that it is expected
@@ -35,12 +35,12 @@ protocol PostgresDecodable {
     ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding json and metadata to create better errors.
     /// - Returns: A decoded object
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+    init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self
+    ) throws
 
     /// Decode an entity from the `byteBuffer` in postgres wire format. This method has a default implementation and
     /// is only overwritten for `Optional`s. Other than in the
@@ -63,7 +63,7 @@ extension PostgresDecodable {
         guard var buffer = byteBuffer else {
             throw PostgresCastingError.Code.missingData
         }
-        return try self.decode(from: &buffer, type: type, format: format, context: context)
+        return try self.init(from: &buffer, type: type, format: format, context: context)
     }
 }
 
@@ -89,34 +89,58 @@ extension PostgresEncodable {
     }
 }
 
-struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder> {
-    let jsonEncoder: JSONEncoder
+/// A context that is passed to Swift objects that are encoded into the Postgres wire format. Used
+/// to pass further information to the encoding method.
+public struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder> {
+    /// A ``PostgresJSONEncoder`` used to encode the object to json.
+    public var jsonEncoder: JSONEncoder
 
-    init(jsonEncoder: JSONEncoder) {
+
+    /// Creates a ``PostgresEncodingContext`` with the given ``PostgresJSONEncoder``. In case you want
+    /// to use the a ``PostgresEncodingContext`` with an unconfigured Foundation `JSONEncoder`
+    /// you can use the ``default`` context instead.
+    ///
+    /// - Parameter jsonEncoder: A ``PostgresJSONEncoder`` to use when encoding objects to json
+    public init(jsonEncoder: JSONEncoder) {
         self.jsonEncoder = jsonEncoder
     }
 }
 
 extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
-    static let `default` = PostgresEncodingContext(jsonEncoder: JSONEncoder())
+    /// A default ``PostgresEncodingContext`` that uses a Foundation `JSONEncoder`.
+    public static let `default` = PostgresEncodingContext(jsonEncoder: JSONEncoder())
 }
 
-struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
-    let jsonDecoder: JSONDecoder
-    
-    init(jsonDecoder: JSONDecoder) {
+/// A context that is passed to Swift objects that are decoded from the Postgres wire format. Used
+/// to pass further information to the decoding method.
+public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
+    /// A ``PostgresJSONDecoder`` used to decode the object from json.
+    public var jsonDecoder: JSONDecoder
+
+    /// Creates a ``PostgresDecodingContext`` with the given ``PostgresJSONDecoder``. In case you want
+    /// to use the a ``PostgresDecodingContext`` with an unconfigured Foundation `JSONDecoder`
+    /// you can use the ``default`` context instead.
+    ///
+    /// - Parameter jsonDecoder: A ``PostgresJSONDecoder`` to use when decoding objects from json
+    public init(jsonDecoder: JSONDecoder) {
         self.jsonDecoder = jsonDecoder
     }
 }
 
 extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
-    static let `default` = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
+    /// A default ``PostgresDecodingContext`` that uses a Foundation `JSONDecoder`.
+    public static let `default` = PostgresDecodingContext(jsonDecoder: Foundation.JSONDecoder())
 }
 
 extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped._DecodableType == Wrapped {
     typealias _DecodableType = Wrapped
 
-    static func decode<JSONDecoder : PostgresJSONDecoder>(from byteBuffer: inout ByteBuffer, type: PostgresDataType, format: PostgresFormat, context: PostgresDecodingContext<JSONDecoder>) throws -> Optional<Wrapped> {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
         preconditionFailure("This should not be called")
     }
 
@@ -128,7 +152,7 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
     ) throws -> Optional<Wrapped> {
         switch byteBuffer {
         case .some(var buffer):
-            return try Wrapped.decode(from: &buffer, type: type, format: format, context: context)
+            return try Wrapped(from: &buffer, type: type, format: format, context: context)
         case .none:
             return .none
         }

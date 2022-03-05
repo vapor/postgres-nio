@@ -1,35 +1,27 @@
 import NIOCore
 
-extension Bool: PostgresCodable {
-    var psqlType: PostgresDataType {
-        .bool
-    }
-    
-    var psqlFormat: PostgresFormat {
-        .binary
-    }
-
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+extension Bool: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
+    ) throws {
         guard type == .bool else {
             throw PostgresCastingError.Code.typeMismatch
         }
-        
+
         switch format {
         case .binary:
             guard buffer.readableBytes == 1 else {
                 throw PostgresCastingError.Code.failure
             }
-            
+
             switch buffer.readInteger(as: UInt8.self) {
             case .some(0):
-                return false
+                self = false
             case .some(1):
-                return true
+                self = true
             default:
                 throw PostgresCastingError.Code.failure
             }
@@ -37,16 +29,26 @@ extension Bool: PostgresCodable {
             guard buffer.readableBytes == 1 else {
                 throw PostgresCastingError.Code.failure
             }
-            
+
             switch buffer.readInteger(as: UInt8.self) {
             case .some(UInt8(ascii: "f")):
-                return false
+                self = false
             case .some(UInt8(ascii: "t")):
-                return true
+                self = true
             default:
                 throw PostgresCastingError.Code.failure
             }
         }
+    }
+}
+
+extension Bool: PostgresEncodable {
+    var psqlType: PostgresDataType {
+        .bool
+    }
+    
+    var psqlFormat: PostgresFormat {
+        .binary
     }
     
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -56,3 +58,5 @@ extension Bool: PostgresCodable {
         byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }
 }
+
+extension Bool: PostgresCodable {}
