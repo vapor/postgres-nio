@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.UUID
 
-extension String: PostgresCodable {
+extension String: PostgresEncodable {
     var psqlType: PostgresDataType {
         .text
     }
@@ -16,27 +16,31 @@ extension String: PostgresCodable {
     ) {
         byteBuffer.writeString(self)
     }
-    
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+}
+
+extension String: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
+    ) throws {
         switch (format, type) {
         case (_, .varchar),
              (_, .text),
              (_, .name):
             // we can force unwrap here, since this method only fails if there are not enough
             // bytes available.
-            return buffer.readString(length: buffer.readableBytes)!
+            self = buffer.readString(length: buffer.readableBytes)!
         case (_, .uuid):
-            guard let uuid = try? UUID.decode(from: &buffer, type: .uuid, format: format, context: context) else {
+            guard let uuid = try? UUID(from: &buffer, type: .uuid, format: format, context: context) else {
                 throw PostgresCastingError.Code.failure
             }
-            return uuid.uuidString
+            self = uuid.uuidString
         default:
             throw PostgresCastingError.Code.typeMismatch
         }
     }
 }
+
+extension String: PostgresCodable {}

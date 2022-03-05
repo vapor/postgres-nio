@@ -1,37 +1,13 @@
 import NIOCore
 import struct Foundation.Date
 
-extension Date: PostgresCodable {
+extension Date: PostgresEncodable {
     var psqlType: PostgresDataType {
         .timestamptz
     }
     
     var psqlFormat: PostgresFormat {
         .binary
-    }
-    
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch type {
-        case .timestamp, .timestamptz:
-            guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            let seconds = Double(microseconds) / Double(_microsecondsPerSecond)
-            return Date(timeInterval: seconds, since: _psqlDateStart)
-        case .date:
-            guard buffer.readableBytes == 4, let days = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
-            }
-            let seconds = Int64(days) * _secondsInDay
-            return Date(timeInterval: Double(seconds), since: _psqlDateStart)
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
     }
     
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -51,3 +27,30 @@ extension Date: PostgresCodable {
     private static let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)
 }
 
+extension Date: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch type {
+        case .timestamp, .timestamptz:
+            guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            let seconds = Double(microseconds) / Double(Self._microsecondsPerSecond)
+            self = Date(timeInterval: seconds, since: Self._psqlDateStart)
+        case .date:
+            guard buffer.readableBytes == 4, let days = buffer.readInteger(as: Int32.self) else {
+                throw PostgresCastingError.Code.failure
+            }
+            let seconds = Int64(days) * Self._secondsInDay
+            self = Date(timeInterval: Double(seconds), since: Self._psqlDateStart)
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension Date: PostgresCodable {}

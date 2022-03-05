@@ -2,8 +2,7 @@ import NIOCore
 import struct Foundation.UUID
 import typealias Foundation.uuid_t
 
-extension UUID: PostgresCodable {
-    
+extension UUID: PostgresEncodable {
     var psqlType: PostgresDataType {
         .uuid
     }
@@ -24,19 +23,21 @@ extension UUID: PostgresCodable {
             uuid.12, uuid.13, uuid.14, uuid.15,
         ])
     }
-    
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
+}
+
+extension UUID: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
+    ) throws {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {
                 throw PostgresCastingError.Code.failure
             }
-            return uuid
+            self = uuid
         case (.binary, .varchar),
              (.binary, .text),
              (.text, .uuid),
@@ -45,16 +46,18 @@ extension UUID: PostgresCodable {
             guard buffer.readableBytes == 36 else {
                 throw PostgresCastingError.Code.failure
             }
-            
+
             guard let uuid = buffer.readString(length: 36).flatMap({ UUID(uuidString: $0) }) else {
                 throw PostgresCastingError.Code.failure
             }
-            return uuid
+            self = uuid
         default:
             throw PostgresCastingError.Code.typeMismatch
         }
     }
 }
+
+extension UUID: PostgresCodable {}
 
 extension ByteBuffer {
     mutating func readUUID() -> UUID? {

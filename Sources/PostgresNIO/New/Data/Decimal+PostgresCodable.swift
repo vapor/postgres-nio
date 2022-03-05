@@ -1,35 +1,13 @@
 import NIOCore
 import struct Foundation.Decimal
 
-extension Decimal: PostgresCodable {
+extension Decimal: PostgresEncodable {
     var psqlType: PostgresDataType {
         .numeric
     }
     
     var psqlFormat: PostgresFormat {
         .binary
-    }
-    
-    static func decode<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Self {
-        switch (format, type) {
-        case (.binary, .numeric):
-            guard let numeric = PostgresNumeric(buffer: &buffer) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return numeric.decimal
-        case (.text, .numeric):
-            guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
-                throw PostgresCastingError.Code.failure
-            }
-            return value
-        default:
-            throw PostgresCastingError.Code.typeMismatch
-        }
     }
     
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -45,3 +23,29 @@ extension Decimal: PostgresCodable {
         byteBuffer.writeBuffer(&value)
     }
 }
+
+extension Decimal: PostgresDecodable {
+    init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        switch (format, type) {
+        case (.binary, .numeric):
+            guard let numeric = PostgresNumeric(buffer: &buffer) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = numeric.decimal
+        case (.text, .numeric):
+            guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
+                throw PostgresCastingError.Code.failure
+            }
+            self = value
+        default:
+            throw PostgresCastingError.Code.typeMismatch
+        }
+    }
+}
+
+extension Decimal: PostgresCodable {}
