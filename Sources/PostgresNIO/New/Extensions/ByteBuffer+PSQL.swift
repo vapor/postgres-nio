@@ -10,10 +10,12 @@ internal extension ByteBuffer {
         self.writeInteger(messageID.rawValue)
     }
 
+    @usableFromInline
     mutating func psqlReadFloat() -> Float? {
         return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }
     }
 
+    @usableFromInline
     mutating func psqlReadDouble() -> Double? {
         return self.readInteger(as: UInt64.self).map { Double(bitPattern: $0) }
     }

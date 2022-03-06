@@ -81,7 +81,9 @@ struct PSQLError: Error {
 }
 
 /// An error that may happen when a ``PostgresRow`` or ``PostgresCell`` is decoded to native Swift types.
+@usableFromInline
 struct PostgresCastingError: Error, Equatable {
+    @usableFromInline
     struct Code: Hashable, Error {
         enum Base {
             case missingData
@@ -95,8 +97,11 @@ struct PostgresCastingError: Error, Equatable {
             self.base = base
         }
 
+        @usableFromInline
         static let missingData = Self.init(.missingData)
+        @usableFromInline
         static let typeMismatch = Self.init(.typeMismatch)
+        @usableFromInline
         static let failure = Self.init(.failure)
     }
 
@@ -127,7 +132,8 @@ struct PostgresCastingError: Error, Equatable {
         // reason we overwrite the error description by default to this generic "Database error"
         "Database error"
     }
-    
+
+    @usableFromInline
     static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
         return lhs.code == rhs.code
             && lhs.columnName == rhs.columnName

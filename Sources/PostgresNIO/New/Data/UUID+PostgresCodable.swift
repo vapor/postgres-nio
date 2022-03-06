@@ -26,7 +26,8 @@ extension UUID: PostgresEncodable {
 }
 
 extension UUID: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -60,6 +61,7 @@ extension UUID: PostgresDecodable {
 extension UUID: PostgresCodable {}
 
 extension ByteBuffer {
+    @usableFromInline
     mutating func readUUID() -> UUID? {
         guard self.readableBytes >= MemoryLayout<uuid_t>.size else {
             return nil

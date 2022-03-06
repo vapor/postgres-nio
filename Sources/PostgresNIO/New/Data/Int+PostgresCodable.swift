@@ -20,7 +20,8 @@ extension UInt8: PostgresEncodable {
 }
 
 extension UInt8: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -62,7 +63,8 @@ extension Int16: PostgresEncodable {
 }
 
 extension Int16: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -107,7 +109,8 @@ extension Int32: PostgresEncodable {
 }
 
 extension Int32: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -157,7 +160,8 @@ extension Int64: PostgresEncodable {
 }
 
 extension Int64: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -219,7 +223,8 @@ extension Int: PostgresEncodable {
 }
 
 extension Int: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

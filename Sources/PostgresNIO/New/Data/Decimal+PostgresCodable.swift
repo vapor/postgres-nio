@@ -25,7 +25,7 @@ extension Decimal: PostgresEncodable {
 }
 
 extension Decimal: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

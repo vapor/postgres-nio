@@ -19,16 +19,20 @@ extension Date: PostgresEncodable {
     }
     
     // MARK: Private Constants
-    
-    private static let _microsecondsPerSecond: Int64 = 1_000_000
-    private static let _secondsInDay: Int64 = 24 * 60 * 60
+
+    @usableFromInline
+    static let _microsecondsPerSecond: Int64 = 1_000_000
+    @usableFromInline
+    static let _secondsInDay: Int64 = 24 * 60 * 60
     
     /// values are stored as seconds before or after midnight 2000-01-01
-    private static let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)
+    @usableFromInline
+    static let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)
 }
 
 extension Date: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

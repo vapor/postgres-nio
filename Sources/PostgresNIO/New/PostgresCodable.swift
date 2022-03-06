@@ -17,7 +17,7 @@ protocol PostgresEncodable {
 /// A type that can decode itself from a postgres wire binary representation.
 ///
 /// If you want to conform a type to PostgresDecodable you must implement the decode method.
-protocol PostgresDecodable {
+public protocol PostgresDecodable {
     /// A type definition of the type that actually implements the PostgresDecodable protocol. This is an escape hatch to
     /// prevent a cycle in the conformace of the Optional type to PostgresDecodable.
     ///
@@ -54,7 +54,7 @@ protocol PostgresDecodable {
 
 extension PostgresDecodable {
     @inlinable
-    static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
+    public static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -133,9 +133,9 @@ extension PostgresDecodingContext where JSONDecoder == Foundation.JSONDecoder {
 }
 
 extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped._DecodableType == Wrapped {
-    typealias _DecodableType = Wrapped
+    public typealias _DecodableType = Wrapped
 
-    init<JSONDecoder: PostgresJSONDecoder>(
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -144,7 +144,8 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
         preconditionFailure("This should not be called")
     }
 
-    static func _decodeRaw<JSONDecoder : PostgresJSONDecoder>(
+    @inlinable
+    public static func _decodeRaw<JSONDecoder : PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
