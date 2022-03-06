@@ -76,3 +76,7 @@ struct RowDescription: PostgresBackendMessage.PayloadDecodable, Equatable {
         return RowDescription(columns: result)
     }
 }
+
+#if swift(>=5.6)
+extension RowDescription.Column: Sendable {}
+#endif

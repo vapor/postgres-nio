@@ -1,4 +1,8 @@
+#if swift(>=5.6)
+@preconcurrency import NIOCore
+#else
 import NIOCore
+#endif
 import class Foundation.JSONDecoder
 
 /// `PostgresRow` represents a single table row that is received from the server for a query or a prepared statement.
@@ -311,3 +315,11 @@ extension PostgresRow: CustomStringConvertible {
         return row.description
     }
 }
+
+#if swift(>=5.6)
+extension PostgresRow: Sendable {}
+
+extension PostgresRandomAccessRow: Sendable {}
+#endif
+
+
