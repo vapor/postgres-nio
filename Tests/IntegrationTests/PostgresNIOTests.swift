@@ -704,17 +704,18 @@ final class PostgresNIOTests: XCTestCase {
     func testRemoteTLSServer() {
         // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
         var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.connect(
-            to: SocketAddress.makeAddressResolvingHost("elmer.db.elephantsql.com", port: 5432),
-            tlsConfiguration: .makeClientConfiguration(),
-            serverHostname: "elmer.db.elephantsql.com",
-            on: eventLoop
-        ).wait())
-        XCTAssertNoThrow(try conn?.authenticate(
+        let logger = Logger(label: "test")
+        let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
+        let config = PostgresConnection.Configuration(
+            host: "elmer.db.elephantsql.com",
+            port: 5432,
             username: "uymgphwj",
             database: "uymgphwj",
-            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
-        ).wait())
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
+            tls: .require(sslContext)
+        )
+
+        XCTAssertNoThrow(conn = try PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
@@ -723,6 +724,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "version"].string?.contains("PostgreSQL"), true)
     }
 
+    @available(*, deprecated, message: "Test deprecated functionality")
     func testFailingTLSConnectionClosesConnection() {
         // There was a bug (https://github.com/vapor/postgres-nio/issues/133) where we would hit
         // an assert because we didn't close the connection. This test should succeed without hitting
@@ -744,6 +746,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertTrue(true)
     }
 
+    @available(*, deprecated, message: "Test deprecated functionality")
     func testInvalidPassword() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait())

@@ -174,13 +174,10 @@ class PSQLChannelHandlerTests: XCTestCase {
         database: String = "postgres",
         password: String = "password",
         tls: PostgresConnection.Configuration.TLS = .disable
-    ) -> PostgresConnection.Configuration {
-        PostgresConnection.Configuration(
-            host: host,
-            port: port,
-            username: username,
-            database: database,
-            password: password,
+    ) -> PostgresConnection.InternalConfiguration {
+        PostgresConnection.InternalConfiguration(
+            connection: .unresolved(host: host, port: port),
+            authentication: .init(username: username, password: password, database: database),
             tls: tls
         )
     }

@@ -33,7 +33,7 @@ class PSQLConnectionTests: XCTestCase {
         var logger = Logger.psqlTest
         logger.logLevel = .trace
         
-        XCTAssertThrowsError(try PostgresConnection.connect(connectionID: 1, configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
+        XCTAssertThrowsError(try PostgresConnection.connect(on: eventLoopGroup.next(), configuration: config, id: 1, logger: logger).wait()) {
             XCTAssertTrue($0 is PSQLError)
         }
     }
