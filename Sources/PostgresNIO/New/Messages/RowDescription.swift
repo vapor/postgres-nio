@@ -8,31 +8,41 @@ import NIOCore
 ///         enclosing type, the enclosing type must be @usableFromInline as well.
 ///         Not putting `DataRow` in ``PSQLBackendMessage`` is our way to trick
 ///         the Swift compiler.
+@usableFromInline
 struct RowDescription: PostgresBackendMessage.PayloadDecodable, Equatable {
     /// Specifies the object ID of the parameter data type.
+    @usableFromInline
     var columns: [Column]
-    
+
+    @usableFromInline
     struct Column: Equatable {
         /// The field name.
+        @usableFromInline
         var name: String
         
         /// If the field can be identified as a column of a specific table, the object ID of the table; otherwise zero.
+        @usableFromInline
         var tableOID: Int32
         
         /// If the field can be identified as a column of a specific table, the attribute number of the column; otherwise zero.
+        @usableFromInline
         var columnAttributeNumber: Int16
         
         /// The object ID of the field's data type.
+        @usableFromInline
         var dataType: PostgresDataType
         
         /// The data type size (see pg_type.typlen). Note that negative values denote variable-width types.
+        @usableFromInline
         var dataTypeSize: Int16
         
         /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
+        @usableFromInline
         var dataTypeModifier: Int32
         
         /// The format being used for the field. Currently will be text or binary. In a RowDescription returned
         /// from the statement variant of Describe, the format code is not yet known and will always be text.
+        @usableFromInline
         var format: PostgresFormat
     }
     

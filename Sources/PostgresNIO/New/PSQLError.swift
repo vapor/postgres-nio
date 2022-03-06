@@ -134,6 +134,29 @@ struct PostgresCastingError: Error, Equatable {
     }
 
     @usableFromInline
+    init(
+        code: Code,
+        columnName: String,
+        columnIndex: Int,
+        targetType: Any.Type,
+        postgresType: PostgresDataType,
+        postgresFormat: PostgresFormat,
+        postgresData: ByteBuffer?,
+        file: String,
+        line: Int
+    ) {
+        self.code = code
+        self.columnName = columnName
+        self.columnIndex = columnIndex
+        self.targetType = targetType
+        self.postgresType = postgresType
+        self.postgresFormat = postgresFormat
+        self.postgresData = postgresData
+        self.file = file
+        self.line = line
+    }
+
+    @usableFromInline
     static func ==(lhs: PostgresCastingError, rhs: PostgresCastingError) -> Bool {
         return lhs.code == rhs.code
             && lhs.columnName == rhs.columnName
