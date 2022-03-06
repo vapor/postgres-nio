@@ -11,9 +11,9 @@ function gen() {
         echo ""
     fi
 
-    #echo "    @inlinable"
-    #echo "    @_alwaysEmitIntoClient"
-    echo -n "    func decode<T0: PostgresDecodable"
+    echo "    @inlinable"
+    echo "    @_alwaysEmitIntoClient"
+    echo -n "    public func decode<T0: PostgresDecodable"
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n)): PostgresDecodable"
     done
