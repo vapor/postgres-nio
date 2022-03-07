@@ -707,13 +707,18 @@ final class PostgresNIOTests: XCTestCase {
         let logger = Logger(label: "test")
         let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
         let config = PostgresConnection.Configuration(
-            host: "elmer.db.elephantsql.com",
-            port: 5432,
-            username: "uymgphwj",
-            database: "uymgphwj",
-            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
+            connection: .init(
+                host: "elmer.db.elephantsql.com",
+                port: 5432
+            ),
+            authentication: .init(
+                username: "uymgphwj",
+                database: "uymgphwj",
+                password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
+            ),
             tls: .require(sslContext)
         )
+
 
         XCTAssertNoThrow(conn = try PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }

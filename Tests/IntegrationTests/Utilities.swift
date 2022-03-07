@@ -29,11 +29,15 @@ extension PostgresConnection {
         logger.logLevel = logLevel
 
         let config = PostgresConnection.Configuration(
-            host: env("POSTGRES_HOSTNAME") ?? "localhost",
-            port: 5432,
-            username: env("POSTGRES_USER") ?? "test_username",
-            database: env("POSTGRES_DB") ?? "test_database",
-            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            connection: .init(
+                host: env("POSTGRES_HOSTNAME") ?? "localhost",
+                port: 5432
+            ),
+            authentication: .init(
+                username: env("POSTGRES_USER") ?? "test_username",
+                database: env("POSTGRES_DB") ?? "test_database",
+                password: env("POSTGRES_PASSWORD") ?? "test_password"
+            ),
             tls: .disable
         )
 

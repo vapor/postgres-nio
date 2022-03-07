@@ -21,23 +21,17 @@ public final class PostgresConnection {
             /// The database to open on the server
             ///
             /// - Default: `nil`
-            public var database: String? = nil
+            public var database: Optional<String>
 
             /// The database user's password.
             ///
             /// - Default: `nil`
-            public var password: String? = nil
+            public var password: Optional<String>
 
-            public init(username: String, password: String?, database: String?) {
+            public init(username: String, database: String?, password: String?) {
                 self.username = username
                 self.database = database
                 self.password = password
-            }
-
-            public init() {
-                self.username = "postgres"
-                self.database = nil
-                self.password = nil
             }
         }
 
@@ -81,12 +75,7 @@ public final class PostgresConnection {
             /// - Default: 5432
             public var port: Int
 
-            public init() {
-                self.host = "localhost"
-                self.port = 5432
-            }
-
-            public init(host: String, port: Int) {
+            public init(host: String, port: Int = 5432) {
                 self.host = host
                 self.port = port
             }
@@ -100,22 +89,13 @@ public final class PostgresConnection {
         public var tls: TLS
 
         public init(
-            host: String,
-            port: Int = 5432,
-            username: String,
-            database: String? = nil,
-            password: String? = nil,
-            tls: TLS = .disable
+            connection: Connection,
+            authentication: Authentication,
+            tls: TLS
         ) {
-            self.connection = Connection(host: host, port: port)
-            self.authentication = Authentication(username: username, password: password, database: database)
+            self.connection = connection
+            self.authentication = authentication
             self.tls = tls
-        }
-
-        public init() {
-            self.authentication = Authentication()
-            self.connection = Connection()
-            self.tls = .disable
         }
     }
 
@@ -227,6 +207,15 @@ public final class PostgresConnection {
         }
     }
 
+    /// Create a new connection to a Postgres server
+    ///
+    /// - Parameters:
+    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: A SwiftNIO `EventLoopFuture` that will provide a ``PostgresConnection``
+    ///            at a later point in time.
     public static func connect(
         on eventLoop: EventLoop,
         configuration: PostgresConnection.Configuration,
@@ -341,6 +330,9 @@ public final class PostgresConnection {
     }
 
 
+    /// Closes the connection to the server.
+    ///
+    /// - Returns: An EventLoopFuture that is succeeded once the connection is closed.
     public func close() -> EventLoopFuture<Void> {
         guard !self.isClosed else {
             return self.eventLoop.makeSucceededFuture(())
@@ -422,6 +414,15 @@ extension PostgresConnection {
 
 #if swift(>=5.5) && canImport(_Concurrency)
 extension PostgresConnection {
+
+    /// Creates a new connection to a Postgres server.
+    ///
+    /// - Parameters:
+    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
     public static func connect(
         on eventLoop: EventLoop,
         configuration: PostgresConnection.Configuration,
@@ -436,6 +437,7 @@ extension PostgresConnection {
         ).get()
     }
 
+    /// Closes the connection to the server.
     public func close() async throws {
         try await self.close().get()
     }
