@@ -1,15 +1,16 @@
 import NIOCore
 
 extension Float: PostgresEncodable {
-    static var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .float4
     }
     
-    static var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -50,15 +51,16 @@ extension Float: PostgresDecodable {
 extension Float: PostgresCodable {}
 
 extension Double: PostgresEncodable {
-    static var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .float8
     }
     
-    static var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {

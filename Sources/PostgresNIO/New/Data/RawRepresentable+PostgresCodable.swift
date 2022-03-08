@@ -1,15 +1,16 @@
 import NIOCore
 
 extension PostgresEncodable where Self: RawRepresentable, RawValue: PostgresEncodable {
-    static var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         RawValue.psqlType
     }
     
-    static var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         RawValue.psqlFormat
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {

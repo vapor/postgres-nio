@@ -3,18 +3,20 @@ import NIOFoundationCompat
 import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 
-private let JSONBVersionByte: UInt8 = 0x01
+@usableFromInline
+let JSONBVersionByte: UInt8 = 0x01
 
-extension PostgresEncodable where Self: Codable {
-    static var psqlType: PostgresDataType {
+extension PostgresEncodable where Self: Encodable {
+    public static var psqlType: PostgresDataType {
         .jsonb
     }
     
-    static var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
@@ -23,7 +25,7 @@ extension PostgresEncodable where Self: Codable {
     }
 }
 
-extension PostgresDecodable where Self: Codable {
+extension PostgresDecodable where Self: Decodable {
     init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,

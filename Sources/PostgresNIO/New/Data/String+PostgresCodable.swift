@@ -2,15 +2,16 @@ import NIOCore
 import struct Foundation.UUID
 
 extension String: PostgresEncodable {
-    static var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .text
     }
     
-    static var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {

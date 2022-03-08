@@ -3,15 +3,16 @@ import struct Foundation.UUID
 import typealias Foundation.uuid_t
 
 extension UUID: PostgresEncodable {
-    static var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .uuid
     }
     
-    static var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
