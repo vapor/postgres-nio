@@ -5,9 +5,8 @@ import NIOConcurrencyHelpers
 /// An async sequence of ``PostgresRow``s.
 ///
 /// - Note: This is a struct to allow us to move to a move only type easily once they become available.
-struct PostgresRowSequence: AsyncSequence {
-    typealias Element = PostgresRow
-    typealias AsyncIterator = Iterator
+public struct PostgresRowSequence: AsyncSequence {
+    public typealias Element = PostgresRow
 
     final class _Internal {
 
@@ -22,7 +21,7 @@ struct PostgresRowSequence: AsyncSequence {
             self.consumer.sequenceDeinitialized()
         }
 
-        func makeAsyncIterator() -> Iterator {
+        func makeAsyncIterator() -> AsyncIterator {
             self.consumer.makeAsyncIterator()
         }
     }
@@ -33,14 +32,14 @@ struct PostgresRowSequence: AsyncSequence {
         self._internal = .init(consumer: consumer)
     }
 
-    func makeAsyncIterator() -> Iterator {
+    public func makeAsyncIterator() -> AsyncIterator {
         self._internal.makeAsyncIterator()
     }
 }
 
 extension PostgresRowSequence {
-    struct Iterator: AsyncIteratorProtocol {
-        typealias Element = PostgresRow
+    public struct AsyncIterator: AsyncIteratorProtocol {
+        public typealias Element = PostgresRow
 
         let _internal: _Internal
 
@@ -48,7 +47,7 @@ extension PostgresRowSequence {
             self._internal = _Internal(consumer: consumer)
         }
 
-        mutating func next() async throws -> PostgresRow? {
+        public mutating func next() async throws -> PostgresRow? {
             try await self._internal.next()
         }
 
@@ -155,11 +154,11 @@ final class AsyncStreamConsumer {
         }
     }
 
-    func makeAsyncIterator() -> PostgresRowSequence.Iterator {
+    func makeAsyncIterator() -> PostgresRowSequence.AsyncIterator {
         self.lock.withLock {
             self.state.createAsyncIterator()
         }
-        let iterator = PostgresRowSequence.Iterator(consumer: self)
+        let iterator = PostgresRowSequence.AsyncIterator(consumer: self)
         return iterator
     }
 
