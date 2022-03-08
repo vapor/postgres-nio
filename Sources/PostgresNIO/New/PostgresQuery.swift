@@ -86,7 +86,7 @@ struct PostgresBindings: Hashable {
         }
 
         init<Value: PostgresEncodable>(value: Value) {
-            self.init(dataType: value.psqlType, format: value.psqlFormat)
+            self.init(dataType: Value.psqlType, format: Value.psqlFormat)
         }
     }
 

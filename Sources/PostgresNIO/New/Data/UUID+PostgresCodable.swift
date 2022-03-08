@@ -3,11 +3,11 @@ import struct Foundation.UUID
 import typealias Foundation.uuid_t
 
 extension UUID: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .uuid
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     

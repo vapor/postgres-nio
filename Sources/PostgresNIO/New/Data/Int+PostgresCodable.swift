@@ -3,11 +3,11 @@ import NIOCore
 // MARK: UInt8
 
 extension UInt8: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .char
     }
 
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
 
@@ -45,12 +45,11 @@ extension UInt8: PostgresCodable {}
 // MARK: Int16
 
 extension Int16: PostgresEncodable {
-    
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .int2
     }
 
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
 
@@ -92,11 +91,11 @@ extension Int16: PostgresCodable {}
 // MARK: Int32
 
 extension Int32: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .int4
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
 
@@ -143,11 +142,11 @@ extension Int32: PostgresCodable {}
 // MARK: Int64
 
 extension Int64: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .int8
     }
 
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
 
@@ -199,7 +198,7 @@ extension Int64: PostgresCodable {}
 // MARK: Int
 
 extension Int: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         switch self.bitWidth {
         case Int32.bitWidth:
             return .int4
@@ -210,7 +209,7 @@ extension Int: PostgresEncodable {
         }
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
 

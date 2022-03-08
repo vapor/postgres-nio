@@ -1,11 +1,11 @@
 import NIOCore
 
 extension Float: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .float4
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -50,11 +50,11 @@ extension Float: PostgresDecodable {
 extension Float: PostgresCodable {}
 
 extension Double: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .float8
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     

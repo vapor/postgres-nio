@@ -44,11 +44,11 @@ extension Bool: PostgresDecodable {
 }
 
 extension Bool: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .bool
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     
