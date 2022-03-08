@@ -12,9 +12,11 @@ import class Foundation.JSONDecoder
 ///            random access to cells in O(1) create a new ``PostgresRandomAccessRow`` with the given row and
 ///            access it instead.
 public struct PostgresRow {
+    @usableFromInline
     let lookupTable: [String: Int]
+    @usableFromInline
     let data: DataRow
-
+    @usableFromInline
     let columns: [RowDescription.Column]
 
     init(data: DataRow, lookupTable: [String: Int], columns: [RowDescription.Column]) {

@@ -38,7 +38,8 @@ extension ByteBuffer: PostgresEncodable {
 }
 
 extension ByteBuffer: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -68,7 +69,8 @@ extension Data: PostgresEncodable {
 }
 
 extension Data: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

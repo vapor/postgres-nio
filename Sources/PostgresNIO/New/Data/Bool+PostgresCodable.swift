@@ -1,7 +1,8 @@
 import NIOCore
 
 extension Bool: PostgresDecodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

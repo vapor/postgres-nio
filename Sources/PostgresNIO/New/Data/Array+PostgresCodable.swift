@@ -103,8 +103,23 @@ extension Array: PostgresEncodable where Element: PSQLArrayElement {
     }
 }
 
-extension Array: PostgresDecodable where Element: PSQLArrayElement {
-    init<JSONDecoder: PostgresJSONDecoder>(
+/// A type that can be decoded into a Swift Array of its own type from a Postgres array.
+public protocol PostgresArrayDecodable: PostgresDecodable {}
+
+extension Bool: PostgresArrayDecodable {}
+extension ByteBuffer: PostgresArrayDecodable {}
+extension UInt8: PostgresArrayDecodable {}
+extension Int16: PostgresArrayDecodable {}
+extension Int32: PostgresArrayDecodable {}
+extension Int64: PostgresArrayDecodable {}
+extension Int: PostgresArrayDecodable {}
+extension Float: PostgresArrayDecodable {}
+extension Double: PostgresArrayDecodable {}
+extension String: PostgresArrayDecodable {}
+extension UUID: PostgresArrayDecodable {}
+
+extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Element == Element._DecodableType {
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -114,48 +129,44 @@ extension Array: PostgresDecodable where Element: PSQLArrayElement {
             // currently we only support decoding arrays in binary format.
             throw PostgresCastingError.Code.failure
         }
-        
+
         guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, UInt32).self),
               0 <= isNotEmpty, isNotEmpty <= 1, b == 0
         else {
             throw PostgresCastingError.Code.failure
         }
-        
+
         let elementType = PostgresDataType(element)
-        
+
         guard isNotEmpty == 1 else {
             self = []
             return
         }
-        
+
         guard let (expectedArrayCount, dimensions) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32).self),
               expectedArrayCount > 0,
               dimensions == 1
         else {
             throw PostgresCastingError.Code.failure
         }
-                
+
         var result = Array<Element>()
         result.reserveCapacity(Int(expectedArrayCount))
-        
+
         for _ in 0 ..< expectedArrayCount {
-            guard let elementLength = buffer.readInteger(as: Int32.self) else {
+            guard let elementLength = buffer.readInteger(as: Int32.self), elementLength >= 0 else {
                 throw PostgresCastingError.Code.failure
             }
-            
+
             guard var elementBuffer = buffer.readSlice(length: numericCast(elementLength)) else {
                 throw PostgresCastingError.Code.failure
             }
-            
+
             let element = try Element.init(from: &elementBuffer, type: elementType, format: format, context: context)
-            
+
             result.append(element)
         }
-        
+
         self = result
     }
-}
-
-extension Array: PostgresCodable where Element: PSQLArrayElement {
-
 }

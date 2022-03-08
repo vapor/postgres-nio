@@ -8,10 +8,11 @@ import NIOCore
 ///         enclosing type, the enclosing type must be @usableFromInline as well.
 ///         Not putting `DataRow` in ``PSQLBackendMessage`` is our way to trick
 ///         the Swift compiler
+@usableFromInline
 struct DataRow: PostgresBackendMessage.PayloadDecodable, Equatable {
-    
+    @usableFromInline
     var columnCount: Int16
-    
+    @usableFromInline
     var bytes: ByteBuffer
     
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
@@ -35,43 +36,48 @@ struct DataRow: PostgresBackendMessage.PayloadDecodable, Equatable {
 }
 
 extension DataRow: Sequence {
+    @usableFromInline
     typealias Element = ByteBuffer?
-    
-    // There is no contiguous storage available... Sadly
-    func withContiguousStorageIfAvailable<R>(_ body: (UnsafeBufferPointer<ByteBuffer?>) throws -> R) rethrows -> R? {
-        nil
-    }
 }
 
 extension DataRow: Collection {
-    
+
+    @usableFromInline
     struct ColumnIndex: Comparable {
+        @usableFromInline
         var offset: Int
-        
+
+        @inlinable
         init(_ index: Int) {
             self.offset = index
         }
         
         // Only needed implementation for comparable. The compiler synthesizes the rest from this.
+        @inlinable
         static func < (lhs: Self, rhs: Self) -> Bool {
             lhs.offset < rhs.offset
         }
     }
-    
+
+    @usableFromInline
     typealias Index = DataRow.ColumnIndex
-    
+
+    @inlinable
     var startIndex: ColumnIndex {
         ColumnIndex(self.bytes.readerIndex)
     }
-    
+
+    @inlinable
     var endIndex: ColumnIndex {
         ColumnIndex(self.bytes.readerIndex + self.bytes.readableBytes)
     }
-    
+
+    @inlinable
     var count: Int {
         Int(self.columnCount)
     }
-    
+
+    @inlinable
     func index(after index: ColumnIndex) -> ColumnIndex {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
@@ -82,7 +88,8 @@ extension DataRow: Collection {
         }
         return ColumnIndex(index.offset + MemoryLayout<Int32>.size + elementLength)
     }
-    
+
+    @inlinable
     subscript(index: ColumnIndex) -> Element {
         guard index < self.endIndex else {
             preconditionFailure("index out of bounds")
@@ -100,12 +107,12 @@ extension DataRow {
         guard index < self.columnCount else {
             preconditionFailure("index out of bounds")
         }
-        
+
         var byteIndex = self.startIndex
         for _ in 0..<index {
             byteIndex = self.index(after: byteIndex)
         }
-        
+
         return self[byteIndex]
     }
 }
