@@ -90,7 +90,7 @@ final class PostgresRowSequenceTests: XCTestCase {
         let dataRows: [DataRow] = (0..<128).map { [ByteBuffer(integer: Int64($0))] }
         stream.receive(dataRows)
 
-        var iterator: PostgresRowSequence.Iterator? = rowSequence.makeAsyncIterator()
+        var iterator: PostgresRowSequence.AsyncIterator? = rowSequence.makeAsyncIterator()
         iterator = nil
 
         XCTAssertEqual(dataSource.cancelCount, 1)

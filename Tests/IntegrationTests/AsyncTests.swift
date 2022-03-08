@@ -33,8 +33,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         try await withTestConnection(on: eventLoop) { connection in
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
             var counter = 1
-            for try await row in rows {
-                XCTAssertEqual(try row.decode(Int.self, context: .default), counter)
+            for try await element in rows.decode(Int.self, context: .default) {
+                XCTAssertEqual(element, counter)
                 counter += 1
             }
 
