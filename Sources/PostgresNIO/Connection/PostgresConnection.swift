@@ -4,23 +4,38 @@ import NIOSSL
 import Logging
 import NIOPosix
 
+/// A Postgres connection. Use it to run queries against a Postgres server.
 public final class PostgresConnection {
-    typealias ID = Int
+    /// A Postgres connection ID
+    public typealias ID = Int
 
-    struct Configuration {
-        struct Authentication {
-            var username: String
-            var database: String? = nil
-            var password: String? = nil
+    /// A configuration object for a connection
+    public struct Configuration {
+        /// A structure to configure the connection's authentication properties
+        public struct Authentication {
+            /// The username to connect with.
+            ///
+            /// - Default: postgres
+            public var username: String
 
-            init(username: String, password: String?, database: String?) {
+            /// The database to open on the server
+            ///
+            /// - Default: `nil`
+            public var database: Optional<String>
+
+            /// The database user's password.
+            ///
+            /// - Default: `nil`
+            public var password: Optional<String>
+
+            public init(username: String, database: String?, password: String?) {
                 self.username = username
                 self.database = database
                 self.password = password
             }
         }
 
-        struct TLS {
+        public struct TLS {
             enum Base {
                 case disable
                 case prefer(NIOSSLContext)
@@ -33,44 +48,50 @@ public final class PostgresConnection {
                 self.base = base
             }
 
-            static var disable: Self = Self.init(.disable)
+            /// Do not try to create a TLS connection to the server.
+            public static var disable: Self = Self.init(.disable)
 
-            static func prefer(_ sslContext: NIOSSLContext) -> Self {
+            /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
+            /// If the server does not support TLS, create an insecure connection.
+            public static func prefer(_ sslContext: NIOSSLContext) -> Self {
                 self.init(.prefer(sslContext))
             }
 
-            static func require(_ sslContext: NIOSSLContext) -> Self {
+            /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
+            /// If the server does not support TLS, fail the connection creation.
+            public static func require(_ sslContext: NIOSSLContext) -> Self {
                 self.init(.require(sslContext))
             }
         }
 
-        enum Connection {
-            case unresolved(host: String, port: Int)
-            case resolved(address: SocketAddress, serverName: String?)
+        public struct Connection {
+            /// The server to connect to
+            ///
+            /// - Default: localhost
+            public var host: String
+
+            /// The server port to connect to.
+            ///
+            /// - Default: 5432
+            public var port: Int
+
+            public init(host: String, port: Int = 5432) {
+                self.host = host
+                self.port = port
+            }
         }
 
-        var connection: Connection
+        public var connection: Connection
 
         /// The authentication properties to send to the Postgres server during startup auth handshake
-        var authentication: Authentication?
+        public var authentication: Authentication
 
-        var tls: TLS
+        public var tls: TLS
 
-        init(host: String,
-             port: Int = 5432,
-             username: String,
-             database: String? = nil,
-             password: String? = nil,
-             tls: TLS = .disable
-        ) {
-            self.connection = .unresolved(host: host, port: port)
-            self.authentication = Authentication(username: username, password: password, database: database)
-            self.tls = tls
-        }
-
-        init(connection: Connection,
-             authentication: Authentication?,
-             tls: TLS
+        public init(
+            connection: Connection,
+            authentication: Authentication,
+            tls: TLS
         ) {
             self.connection = connection
             self.authentication = authentication
@@ -129,7 +150,7 @@ public final class PostgresConnection {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
     }
 
-    func start(configuration: Configuration) -> EventLoopFuture<Void> {
+    func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
         var configureSSLCallback: ((Channel) throws -> ())? = nil
@@ -186,9 +207,32 @@ public final class PostgresConnection {
         }
     }
 
+    /// Create a new connection to a Postgres server
+    ///
+    /// - Parameters:
+    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: A SwiftNIO `EventLoopFuture` that will provide a ``PostgresConnection``
+    ///            at a later point in time.
+    public static func connect(
+        on eventLoop: EventLoop,
+        configuration: PostgresConnection.Configuration,
+        id connectionID: ID,
+        logger: Logger
+    ) -> EventLoopFuture<PostgresConnection> {
+        self.connect(
+            connectionID: connectionID,
+            configuration: .init(configuration),
+            logger: logger,
+            on: eventLoop
+        )
+    }
+
     static func connect(
         connectionID: ID,
-        configuration: PostgresConnection.Configuration,
+        configuration: PostgresConnection.InternalConfiguration,
         logger: Logger,
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
@@ -286,6 +330,9 @@ public final class PostgresConnection {
     }
 
 
+    /// Closes the connection to the server.
+    ///
+    /// - Returns: An EventLoopFuture that is succeeded once the connection is closed.
     public func close() -> EventLoopFuture<Void> {
         guard !self.isClosed else {
             return self.eventLoop.makeSucceededFuture(())
@@ -301,6 +348,10 @@ public final class PostgresConnection {
 extension PostgresConnection {
     static let idGenerator = NIOAtomic.makeAtomic(value: 0)
 
+    @available(*, deprecated,
+        message: "Use the new connect method that allows you to connect and authenticate in a single step",
+        renamed: "connect(on:configuration:id:logger:)"
+    )
     public static func connect(
         to socketAddress: SocketAddress,
         tlsConfiguration: TLSConfiguration? = nil,
@@ -319,7 +370,7 @@ extension PostgresConnection {
         }
 
         return tlsFuture.flatMap { tls in
-            let configuration = PostgresConnection.Configuration(
+            let configuration = PostgresConnection.InternalConfiguration(
                 connection: .resolved(address: socketAddress, serverName: serverHostname),
                 authentication: nil,
                 tls: tls
@@ -336,6 +387,10 @@ extension PostgresConnection {
         }
     }
 
+    @available(*, deprecated,
+        message: "Use the new connect method that allows you to connect and authenticate in a single step",
+        renamed: "connect(on:configuration:id:logger:)"
+    )
     public func authenticate(
         username: String,
         database: String? = nil,
@@ -359,7 +414,31 @@ extension PostgresConnection {
 
 #if swift(>=5.5) && canImport(_Concurrency)
 extension PostgresConnection {
-    func close() async throws {
+
+    /// Creates a new connection to a Postgres server.
+    ///
+    /// - Parameters:
+    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
+    public static func connect(
+        on eventLoop: EventLoop,
+        configuration: PostgresConnection.Configuration,
+        id connectionID: ID,
+        logger: Logger
+    ) async throws -> PostgresConnection {
+        try await self.connect(
+            connectionID: connectionID,
+            configuration: .init(configuration),
+            logger: logger,
+            on: eventLoop
+        ).get()
+    }
+
+    /// Closes the connection to the server.
+    public func close() async throws {
         try await self.close().get()
     }
 
@@ -367,20 +446,18 @@ extension PostgresConnection {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
-        do {
-            guard query.binds.count <= Int(Int16.max) else {
-                throw PSQLError.tooManyParameters
-            }
-            let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
-            let context = ExtendedQueryContext(
-                query: query,
-                logger: logger,
-                promise: promise)
-
-            self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
-
-            return try await promise.futureResult.map({ $0.asyncSequence() }).get()
+        guard query.binds.count <= Int(Int16.max) else {
+            throw PSQLError.tooManyParameters
         }
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let context = ExtendedQueryContext(
+            query: query,
+            logger: logger,
+            promise: promise)
+
+        self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
+
+        return try await promise.futureResult.map({ $0.asyncSequence() }).get()
     }
 }
 #endif
@@ -539,7 +616,7 @@ enum CloseTarget {
     case portal(String)
 }
 
-extension PostgresConnection.Configuration {
+extension PostgresConnection.InternalConfiguration {
     var sslServerHostname: String? {
         switch self.connection {
         case .unresolved(let host, _):
@@ -564,6 +641,33 @@ private extension String {
             return inet_pton(AF_INET, ptr, &ipv4Addr) == 1 ||
                    inet_pton(AF_INET6, ptr, &ipv6Addr) == 1
         }
+    }
+}
+
+extension PostgresConnection {
+    /// A configuration object to bring the new ``PostgresConnection.Configuration`` together with
+    /// the deprecated configuration.
+    ///
+    /// TODO: Drop with next major release
+    struct InternalConfiguration {
+        enum Connection {
+            case unresolved(host: String, port: Int)
+            case resolved(address: SocketAddress, serverName: String?)
+        }
+
+        var connection: Connection
+
+        var authentication: Configuration.Authentication?
+
+        var tls: Configuration.TLS
+    }
+}
+
+extension PostgresConnection.InternalConfiguration {
+    init(_ config: PostgresConnection.Configuration) {
+        self.authentication = config.authentication
+        self.connection = .unresolved(host: config.connection.host, port: config.connection.port)
+        self.tls = config.tls
     }
 }
 

@@ -26,13 +26,13 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     private var rowStream: PSQLRowStream?
     private var decoder: NIOSingleStepByteToMessageProcessor<PSQLBackendMessageDecoder>
     private var encoder: BufferedMessageEncoder!
-    private let configuration: PostgresConnection.Configuration
+    private let configuration: PostgresConnection.InternalConfiguration
     private let configureSSLCallback: ((Channel) throws -> Void)?
     
     /// this delegate should only be accessed on the connections `EventLoop`
     weak var notificationDelegate: PSQLChannelHandlerNotificationDelegate?
     
-    init(configuration: PostgresConnection.Configuration,
+    init(configuration: PostgresConnection.InternalConfiguration,
          logger: Logger,
          configureSSLCallback: ((Channel) throws -> Void)?)
     {
@@ -45,7 +45,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     
     #if DEBUG
     /// for testing purposes only
-    init(configuration: PostgresConnection.Configuration,
+    init(configuration: PostgresConnection.InternalConfiguration,
          state: ConnectionStateMachine = .init(.initialized),
          logger: Logger = .psqlNoOpLogger,
          configureSSLCallback: ((Channel) throws -> Void)?)
@@ -575,8 +575,8 @@ private extension Insecure.MD5.Digest {
 }
 
 extension ConnectionStateMachine.TLSConfiguration {
-    fileprivate init(_ connection: PostgresConnection.Configuration.TLS) {
-        switch connection.base {
+    fileprivate init(_ tls: PostgresConnection.Configuration.TLS) {
+        switch tls.base {
         case .disable:
             self = .disable
         case .require:
@@ -589,7 +589,7 @@ extension ConnectionStateMachine.TLSConfiguration {
 
 extension PSQLChannelHandler {
     convenience init(
-        configuration: PostgresConnection.Configuration,
+        configuration: PostgresConnection.InternalConfiguration,
         configureSSLCallback: ((Channel) throws -> Void)?)
     {
         self.init(

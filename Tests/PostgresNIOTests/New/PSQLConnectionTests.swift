@@ -22,18 +22,15 @@ class PSQLConnectionTests: XCTestCase {
         }
         
         let config = PostgresConnection.Configuration(
-            host: "127.0.0.1",
-            port: port,
-            username: "postgres",
-            database: "postgres",
-            password: "abc123",
+            connection: .init(host: "127.0.0.1", port: port),
+            authentication: .init(username: "postgres", database: "postgres", password: "abc123"),
             tls: .disable
         )
         
         var logger = Logger.psqlTest
         logger.logLevel = .trace
         
-        XCTAssertThrowsError(try PostgresConnection.connect(connectionID: 1, configuration: config, logger: logger, on: eventLoopGroup.next()).wait()) {
+        XCTAssertThrowsError(try PostgresConnection.connect(on: eventLoopGroup.next(), configuration: config, id: 1, logger: logger).wait()) {
             XCTAssertTrue($0 is PSQLError)
         }
     }
