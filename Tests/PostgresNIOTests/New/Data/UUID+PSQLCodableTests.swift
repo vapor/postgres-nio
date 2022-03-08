@@ -11,8 +11,8 @@ class UUID_PSQLCodableTests: XCTestCase {
             
             uuid.encode(into: &buffer, context: .default)
             
-            XCTAssertEqual(uuid.psqlType, .uuid)
-            XCTAssertEqual(uuid.psqlFormat, .binary)
+            XCTAssertEqual(UUID.psqlType, .uuid)
+            XCTAssertEqual(UUID.psqlFormat, .binary)
             XCTAssertEqual(buffer.readableBytes, 16)
             var byteIterator = buffer.readableBytesView.makeIterator()
             
