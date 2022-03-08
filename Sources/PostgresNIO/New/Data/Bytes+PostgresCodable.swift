@@ -3,11 +3,11 @@ import NIOCore
 import NIOFoundationCompat
 
 extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .bytea
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -20,11 +20,11 @@ extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
 }
 
 extension ByteBuffer: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .bytea
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     
@@ -52,11 +52,11 @@ extension ByteBuffer: PostgresDecodable {
 extension ByteBuffer: PostgresCodable {}
 
 extension Data: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .bytea
     }
 
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
 

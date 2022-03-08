@@ -2,11 +2,11 @@ import NIOCore
 import struct Foundation.Decimal
 
 extension Decimal: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         .numeric
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     

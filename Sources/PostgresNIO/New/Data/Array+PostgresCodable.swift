@@ -68,11 +68,11 @@ extension UUID: PSQLArrayElement {
 }
 
 extension Array: PostgresEncodable where Element: PSQLArrayElement {
-    var psqlType: PostgresDataType {
+    static var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
     
-    var psqlFormat: PostgresFormat {
+    static var psqlFormat: PostgresFormat {
         .binary
     }
     
