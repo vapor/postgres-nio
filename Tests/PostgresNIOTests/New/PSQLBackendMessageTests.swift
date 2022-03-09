@@ -97,7 +97,7 @@ class PSQLBackendMessageTests: XCTestCase {
             expectedMessages.append(.parameterStatus(parameterStatus))
         }
         
-        let handler = ByteToMessageHandler(PSQLBackendMessageDecoder())
+        let handler = ByteToMessageHandler(PostgresBackendMessageDecoder())
         let embedded = EmbeddedChannel(handler: handler)
         XCTAssertNoThrow(try embedded.writeInbound(buffer))
         
@@ -137,7 +137,7 @@ class PSQLBackendMessageTests: XCTestCase {
             buffer.writeInteger(0, as: UInt8.self) // signal done
         }
         
-        let handler = ByteToMessageHandler(PSQLBackendMessageDecoder())
+        let handler = ByteToMessageHandler(PostgresBackendMessageDecoder())
         let embedded = EmbeddedChannel(handler: handler)
         XCTAssertNoThrow(try embedded.writeInbound(buffer))
         
@@ -174,7 +174,7 @@ class PSQLBackendMessageTests: XCTestCase {
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
     }
     
     func testPayloadsWithoutAssociatedValuesInvalidLength() {
@@ -195,7 +195,7 @@ class PSQLBackendMessageTests: XCTestCase {
             
             XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
-                decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
                 XCTAssert($0 is PSQLDecodingError)
             }
         }
@@ -222,7 +222,7 @@ class PSQLBackendMessageTests: XCTestCase {
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(okBuffer, expected)],
-            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
         
         // test commandTag is not null terminated
         for message in expected {
@@ -237,7 +237,7 @@ class PSQLBackendMessageTests: XCTestCase {
             
             XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(failBuffer, [])],
-                decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
                 XCTAssert($0 is PSQLDecodingError)
             }
         }
@@ -250,7 +250,7 @@ class PSQLBackendMessageTests: XCTestCase {
         
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
+            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
             XCTAssert($0 is PSQLDecodingError)
         }
     }
