@@ -1,4 +1,8 @@
+#if swift(>=5.6)
+@preconcurrency import NIOCore
+#else
 import NIOCore
+#endif
 
 /// A backend data row message.
 ///
@@ -116,3 +120,7 @@ extension DataRow {
         return self[byteIndex]
     }
 }
+
+#if swift(>=5.6)
+extension DataRow: Sendable {}
+#endif
