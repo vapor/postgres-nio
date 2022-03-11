@@ -1,6 +1,9 @@
 <img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
-<br>
-<a href="https://docs.vapor.codes/4.0/">
+
+<a href="https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level">
+    <img src="https://img.shields.io/badge/sswg-incubating-green.svg" alt="SSWG Incubating">
+</a>
+<a href="https://api.vapor.codes/postgres-nio/main/PostgresNIO/">
     <img src="http://img.shields.io/badge/read_the-docs-2196f3.svg" alt="Documentation">
 </a>
 <a href="https://discord.gg/vapor">
@@ -18,211 +21,185 @@
 <br>
 <br>
 
-🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO](https://github.com/apple/swift-nio).
+🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO].
 
-### Major Releases
+Features:
 
-The table below shows a list of PostgresNIO major releases alongside their compatible NIO and Swift versions. 
+- A `PostgresConnection` which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
+- An async/await interface that supports backpressure 
+- Automatic conversions between Swift primitive types and the Postgres wire format
+- Integrated with the Swift server ecosystem, including use of [SwiftLog].
+- Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
+- Support for `Network.framework` when available (e.g. on Apple platforms)
 
-|Version|NIO|Swift|SPM|
-|-|-|-|-|
-|1.0|2.0+|5.2+|`from: "1.0.0"`|
-
-Use the SPM string to easily include the dependendency in your `Package.swift` file.
-
-```swift
-.package(url: "https://github.com/vapor/postgres-nio.git", from: ...)
-```
-
-### Supported Platforms
-
-PostgresNIO supports the following platforms:
-
-- Ubuntu 16.04+
-- macOS 10.15+
-
-### Security
-
-Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
-
-## Overview
-
-PostgresNIO is a client package for connecting to, authorizing, and querying a PostgreSQL server. At the heart of this module are NIO channel handlers for parsing and serializing messages in PostgreSQL's proprietary wire protocol. These channel handlers are combined in a request / response style connection type that provides a convenient, client-like interface for performing queries. 
-
-Support for both simple (text) and parameterized (binary) querying is provided out of the box alongside a `PostgresData` type that handles conversion between PostgreSQL's wire format and native Swift types.
-
-### Motivation
-
-Most Swift implementations of Postgres clients are based on the [libpq](https://www.postgresql.org/docs/11/libpq.html) C library which handles transport internally. Building a library directly on top of Postgres' wire protocol using SwiftNIO should yield a more reliable, maintainable, and performant interface for PostgreSQL databases.
-
-### Goals
-
-This package is meant to be a low-level, unopinionated PostgreSQL wire-protocol implementation for Swift. The hope is that higher level packages can share PostgresNIO as a foundation for interacting with PostgreSQL servers without needing to duplicate complex logic.
-
-Because of this, PostgresNIO excludes some important concepts for the sake of simplicity, such as:
-
-- Connection pooling
-- Swift `Codable` integration
-- Query building
-
-If you are looking for a PostgreSQL client package to use in your project, take a look at these higher-level packages built on top of PostgresNIO:
-
-- [`vapor/postgres-kit`](https://github.com/vapor/postgresql)
-
-### Dependencies
-
-This package has four dependencies:
-
-- [`apple/swift-nio`](https://github.com/apple/swift-nio) for IO
-- [`apple/swift-nio-ssl`](https://github.com/apple/swift-nio-ssl) for TLS
-- [`apple/swift-log`](https://github.com/apple/swift-log) for logging
-- [`apple/swift-metrics`](https://github.com/apple/swift-metrics) for metrics
-
-This package has no additional system dependencies.
+PostgresNIO does not have a `ConnectionPool` as of today, but this is a feature high on our list. If 
+you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
 
 ## API Docs
 
-Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/main/PostgresNIO/) for a detailed look at all of the classes, structs, protocols, and more.
+Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/main/PostgresNIO/) for a 
+detailed look at all of the classes, structs, protocols, and more.
 
-## Getting Started
+## Getting started
 
-This section will provide a quick look at using PostgresNIO.
+#### Adding the dependency
 
-### Creating a Connection
+Add `PostgresNIO` as dependency to your `Package.swift`:
 
-The first step to making a query is creating a new `PostgresConnection`. The minimum requirements to create one are a `SocketAddress` and `EventLoop`. 
+```swift
+  dependencies: [
+    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.8.0"),
+    ...
+  ]
+```
+
+Add `PostgresNIO` to the target you want to use it in:
+```swift
+  targets: [
+    .target(name: "MyFancyTarget", dependencies: [
+      .product(name: "PostgresNIO", package: "postgres-nio"),
+    ])
+  ]
+```
+
+#### Creating a connection
+
+To create a connection, first create a connection configuration object:
 
 ```swift
 import PostgresNIO
 
-let eventLoop: EventLoop = ...
-let conn = try PostgresConnection.connect(
-    to: .makeAddressResolvingHost("my.psql.server", port: 5432),
-    on: eventLoop
-).wait()
-defer { try! conn.close().wait() }
+let config = PostgresConnection.Configuration(
+   connection: .init(
+     host: "localhost",
+     port: 5432
+   ),
+   authentication: .init(
+     username: "my_username",
+     database: "my_database",
+     password: "my_password"
+   ),
+   tls: .disable
+)
 ```
 
-Note: These examples will make use of `wait()` for simplicity. This is appropriate if you are using PostgresNIO on the main thread, like for a CLI tool or in tests. However, you should never use `wait()` on an event loop.
-
-There are a few ways to create a `SocketAddress`:
-
-- `init(ipAddress: String, port: Int)`
-- `init(unixDomainSocketPath: String)`
-- `makeAddressResolvingHost(_ host: String, port: Int)`
-
-There are also some additional arguments you can supply to `connect`. 
-
-- `tlsConfiguration` An optional `TLSConfiguration` struct. If supplied, the PostgreSQL connection will be upgraded to use SSL.
-- `serverHostname` An optional `String` to use in conjunction with `tlsConfiguration` to specify the server's hostname. 
-
-`connect` will return a future `PostgresConnection`, or an error if it could not connect. Make sure you close the connection before it deinitializes.
-
-### Authentication
-
-Once you have a connection, you will need to authenticate with the server using the `authenticate` method.
+A connection must be created on a SwiftNIO `EventLoop`. In most server use cases, an 
+`EventLoopGroup` is created at app startup and closed during app shutdown.
 
 ```swift
-try conn.authenticate(
-    username: "your_username",
-    database: "your_database",
-    password: "your_password"
-).wait()
+import NIOPosix
+
+let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+
+// Much later
+try eventLoopGroup.syncShutdown()
 ```
 
-This requires a username. You may supply a database name and password if needed. 
+A `Logger` is also required.
 
-### Database Protocol
+```swift
+import Logging
 
-Interaction with a server revolves around the `PostgresDatabase` protocol. This protocol includes methods like `query(_:)` for executing SQL queries and reading the resulting rows. 
+let logger = Logger(label: "postgres-logger")
+```
 
-`PostgresConnection` is the default implementation of `PostgresDatabase` provided by this package. Assume `db` here is the connection from the previous example.
+Now we can put it together:
 
 ```swift
 import PostgresNIO
+import NIOPosix
+import Logging
 
-let db: PostgresDatabase = ...
-// now we can use client to do queries
+let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+let logger = Logger(label: "postgres-logger")
+
+let config = PostgresConnection.Configuration(
+   connection: .init(
+     host: "localhost",
+     port: 5432
+   ),
+   authentication: .init(
+     username: "my_username",
+     database: "my_database",
+     password: "my_password"
+   ),
+   tls: .disable
+)
+
+let connection = try await PostgresConnection.connect(
+  on eventLoop: eventLoopGroup.next(),
+  configuration: config,
+  id connectionID: 1,
+  logger: logger
+)
+
+// Close your connection once done
+try await connection.close()
+
+// Shutdown the EventLoopGroup, once all connections are closed.
+try eventLoopGroup.syncShutdown()
 ```
 
-### Simple Query
+#### Querying
 
-Simple (or text) queries allow you to execute a SQL string on the connected PostgreSQL server. These queries do not support binding parameters, so any values sent must be escaped manually.
-
-These queries are most useful for schema or transactional queries, or simple selects. Note that values returned by simple queries will be transferred in the less efficient text format. 
-
-`simpleQuery` has two overloads, one that returns an array of rows, and one that accepts a closure for handling each row as it is returned.
+Once a connection is established, queries can be sent to the server. This is very straightforward:
 
 ```swift
-let rows = try db.simpleQuery("SELECT version()").wait()
-print(rows) // [["version": "12.x.x"]]
-
-try db.simpleQuery("SELECT version()") { row in
-    print(row) // ["version": "12.x.x"]
-}.wait()
+let rows = try await connection.query("SELECT id, username, birthday FROM users", logger: logger)
 ```
 
-### Parameterized Query
-
-Parameterized (or binary) queries allow you to execute a SQL string on the connected PostgreSQL server. These queries support passing bound parameters as a separate argument. Each parameter is represented in the SQL string using incrementing placeholders, starting at `$1`. 
-
-These queries are most useful for selecting, inserting, and updating data. Data for these queries is transferred using the highly efficient binary format. 
-
-Just like `simpleQuery`, `query` also offers two overloads. One that returns an array of rows, and one that accepts a closure for handling each row as it is returned.
+The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. The rows can be iterated one-by-one: 
 
 ```swift
-let rows = try db.query("SELECT * FROM planets WHERE name = $1", ["Earth"]).wait()
-print(rows) // [["id": 42, "name": "Earth"]]
-
-try db.query("SELECT * FROM planets WHERE name = $1", ["Earth"]) { row in
-    print(row) // ["id": 42, "name": "Earth"]
-}.wait()
+for try await row in rows {
+  // do something with the row
+}
 ```
 
-### Rows and Data
+#### Decoding from PostgresRow
 
-Both `simpleQuery` and `query` return the same `PostgresRow` type. Columns can be fetched from the row using the `column(_: String)` method.
+However, in most cases it is much easier to request a row's fields as a set of Swift types:
 
 ```swift
-let row: PostgresRow = ...
-let version = row.column("version")
-print(version) // PostgresData?
+for try await (id, username, birthday) in rows.decode((Int, String, Date).self, context: .default) {
+  // do something with the datatypes.
+}
 ```
 
-`PostgresRow` columns are stored as `PostgresData`. This struct contains the raw bytes returned by PostgreSQL as well as some information for parsing them, such as:
+A type must implement the `PostgresDecodable` protocol in order to be decoded from a row. PostgresNIO provides default implementations for most of Swift's builtin types, as well as some types provided by Foundation:
 
-- Postgres column type
-- Wire format: binary or text
-- Value as array of bytes
+- `Bool`
+- `Bytes`, `Data`, `ByteBuffer`
+- `Date`
+- `UInt8`, `Int16`, `Int32`, `Int64`, `Int`
+- `Float`, `Double`
+- `String`
+- `UUID`
 
-`PostgresData` has a variety of convenience methods for converting column data to usable Swift types.
+#### Querying with parameters
+
+Sending parameterized queries to the database is also supported (in the coolest way possible):
 
 ```swift
-let data: PostgresData= ...
-
-print(data.string) // String?
-
-// Postgres only supports signed Ints.
-print(data.int) // Int?
-print(data.int16) // Int16?
-print(data.int32) // Int32?
-print(data.int64) // Int64?
-
-// 'char' can be interpreted as a UInt8. 
-// It will show in db as a character though. 
-print(data.uint8) // UInt8?
-
-print(data.bool) // Bool?
-
-print(try data.jsonb(as: Foo.self)) // Foo?
-
-print(data.float) // Float?
-print(data.double) // Double?
-
-print(data.date) // Date?
-print(data.uuid) // UUID?
-
-print(data.numeric) // PostgresNumeric?
+let id = 1
+let username = "fancyuser"
+let birthday = Date()
+try await connection.query("""
+  INSERT INTO users (id, username, birthday) VALUES (\(id), \(username), \(birthday))
+  """, 
+  logger: logger
+)
 ```
 
-`PostgresData` is also used for sending data _to_ the server via parameterized values. To create `PostgresData` from a Swift type, use the available intializer methods. 
+While this looks at first glance like a classic case of [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) 😱, PostgresNIO's API ensures that this usage is safe. The first parameter of the `query(_:logger:)` method is not a plain `String`, but a `PostgresQuery`, which implements Swift's `ExpressibleByStringInterpolation` protocol. PostgresNIO uses the literal parts of the provided string as the SQL query and replaces each interpolated value with a parameter binding. Only values which implement the `PostgresEncodable` protocol may be interpolated in this way. As with `PostgresDecodable`, PostgresNIO provides default implementations for most common types.
+
+Some queries do not receive any rows from the server (most often `INSERT`, `UPDATE`, and `DELETE` queries with no `RETURNING` clause, not to mention most DDL queries). To support this, the `query(_:logger:)` method is marked `@discardableResult`, so that the compiler does not issue a warning if the return value is not used. 
+
+## Security
+
+Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
+
+[EventLoopGroupConnectionPool]: https://github.com/vapor/async-kit/blob/main/Sources/AsyncKit/ConnectionPool/EventLoopGroupConnectionPool.swift
+[AsyncKit]: https://github.com/vapor/async-kit/
+[SwiftNIO]: https://github.com/apple/swift-nio
+[SwiftLog]: https://github.com/apple/swift-log
