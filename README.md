@@ -83,7 +83,8 @@ let config = PostgresConnection.Configuration(
 )
 ```
 
-A connection must be created on a SwiftNIO `EventLoop`. In most server use cases, an`EventLoopGroup` is created at app startup and closed during app shutdown.
+A connection must be created on a SwiftNIO `EventLoop`. In most server use cases, an 
+`EventLoopGroup` is created at app startup and closed during app shutdown.
 
 ```swift
 import NIOPosix
