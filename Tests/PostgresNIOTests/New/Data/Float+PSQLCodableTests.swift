@@ -10,7 +10,7 @@ class Float_PSQLCodableTests: XCTestCase {
         for value in values {
             var buffer = ByteBuffer()
             value.encode(into: &buffer, context: .default)
-            XCTAssertEqual(value.psqlType, .float8)
+            XCTAssertEqual(Double.psqlType, .float8)
             XCTAssertEqual(buffer.readableBytes, 8)
 
             var result: Double?
@@ -25,7 +25,7 @@ class Float_PSQLCodableTests: XCTestCase {
         for value in values {
             var buffer = ByteBuffer()
             value.encode(into: &buffer, context: .default)
-            XCTAssertEqual(value.psqlType, .float4)
+            XCTAssertEqual(Float.psqlType, .float4)
             XCTAssertEqual(buffer.readableBytes, 4)
 
             var result: Float?
@@ -39,7 +39,7 @@ class Float_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(value.psqlType, .float8)
+        XCTAssertEqual(Double.psqlType, .float8)
         XCTAssertEqual(buffer.readableBytes, 8)
 
         var result: Double?
@@ -52,7 +52,7 @@ class Float_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(value.psqlType, .float8)
+        XCTAssertEqual(Double.psqlType, .float8)
         XCTAssertEqual(buffer.readableBytes, 8)
 
         var result: Double?
@@ -66,7 +66,7 @@ class Float_PSQLCodableTests: XCTestCase {
         for value in values {
             var buffer = ByteBuffer()
             value.encode(into: &buffer, context: .default)
-            XCTAssertEqual(value.psqlType, .float4)
+            XCTAssertEqual(Float.psqlType, .float4)
             XCTAssertEqual(buffer.readableBytes, 4)
 
             var result: Double?
@@ -81,7 +81,7 @@ class Float_PSQLCodableTests: XCTestCase {
         for value in values {
             var buffer = ByteBuffer()
             value.encode(into: &buffer, context: .default)
-            XCTAssertEqual(value.psqlType, .float8)
+            XCTAssertEqual(Double.psqlType, .float8)
             XCTAssertEqual(buffer.readableBytes, 8)
 
             var result: Float?

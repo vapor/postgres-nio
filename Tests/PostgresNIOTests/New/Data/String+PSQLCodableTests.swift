@@ -10,7 +10,7 @@ class String_PSQLCodableTests: XCTestCase {
         
         value.encode(into: &buffer, context: .default)
         
-        XCTAssertEqual(value.psqlType, .text)
+        XCTAssertEqual(String.psqlType, .text)
         XCTAssertEqual(buffer.readString(length: buffer.readableBytes), value)
     }
     

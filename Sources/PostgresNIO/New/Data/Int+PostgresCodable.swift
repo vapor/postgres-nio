@@ -3,15 +3,16 @@ import NIOCore
 // MARK: UInt8
 
 extension UInt8: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .char
     }
 
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
 
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -45,16 +46,16 @@ extension UInt8: PostgresCodable {}
 // MARK: Int16
 
 extension Int16: PostgresEncodable {
-    
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .int2
     }
 
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
 
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -92,15 +93,16 @@ extension Int16: PostgresCodable {}
 // MARK: Int32
 
 extension Int32: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .int4
     }
     
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
 
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -143,15 +145,16 @@ extension Int32: PostgresCodable {}
 // MARK: Int64
 
 extension Int64: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .int8
     }
 
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
 
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -199,22 +202,23 @@ extension Int64: PostgresCodable {}
 // MARK: Int
 
 extension Int: PostgresEncodable {
-    var psqlType: PostgresDataType {
-        switch self.bitWidth {
-        case Int32.bitWidth:
+    public static var psqlType: PostgresDataType {
+        switch MemoryLayout<Int>.size {
+        case 4:
             return .int4
-        case Int64.bitWidth:
+        case 8:
             return .int8
         default:
             preconditionFailure("Int is expected to be an Int32 or Int64")
         }
     }
     
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
 
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -237,12 +241,12 @@ extension Int: PostgresDecodable {
             }
             self = Int(value)
         case (.binary, .int4):
-            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
+            guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self).flatMap({ Int(exactly: $0) }) else {
                 throw PostgresCastingError.Code.failure
             }
-            self = Int(value)
-        case (.binary, .int8) where Int.bitWidth == 64:
-            guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self) else {
+            self = value
+        case (.binary, .int8):
+            guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self).flatMap({ Int(exactly: $0) }) else {
                 throw PostgresCastingError.Code.failure
             }
             self = value

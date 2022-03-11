@@ -3,15 +3,16 @@ import NIOCore
 import NIOFoundationCompat
 
 extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .bytea
     }
     
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -20,15 +21,16 @@ extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
 }
 
 extension ByteBuffer: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .bytea
     }
     
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
@@ -52,15 +54,16 @@ extension ByteBuffer: PostgresDecodable {
 extension ByteBuffer: PostgresCodable {}
 
 extension Data: PostgresEncodable {
-    var psqlType: PostgresDataType {
+    public static var psqlType: PostgresDataType {
         .bytea
     }
 
-    var psqlFormat: PostgresFormat {
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
 
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {

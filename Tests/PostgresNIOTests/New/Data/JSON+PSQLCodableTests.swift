@@ -16,7 +16,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         var buffer = ByteBuffer()
         let hello = Hello(name: "world")
         XCTAssertNoThrow(try hello.encode(into: &buffer, context: .default))
-        XCTAssertEqual(hello.psqlType, .jsonb)
+        XCTAssertEqual(Hello.psqlType, .jsonb)
         
         // verify jsonb prefix byte
         XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 1)
