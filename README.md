@@ -3,7 +3,7 @@
 <a href="https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level">
     <img src="https://img.shields.io/badge/sswg-incubating-green.svg" alt="SSWG Incubating">
 </a>
-<a href="https://docs.vapor.codes/4.0/">
+<a href="https://api.vapor.codes/postgres-nio/main/PostgresNIO/">
     <img src="http://img.shields.io/badge/read_the-docs-2196f3.svg" alt="Documentation">
 </a>
 <a href="https://discord.gg/vapor">
@@ -63,8 +63,6 @@ Add `PostgresNIO` to the target you want to use it in:
 ```
 
 #### Creating a connection
-
-PostgresNIO is a server-side
 
 To create a connection, first create a connection configuration object:
 
