@@ -24,7 +24,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     /// The context is captured in `handlerAdded` and released` in `handlerRemoved`
     private var handlerContext: ChannelHandlerContext!
     private var rowStream: PSQLRowStream?
-    private var decoder: NIOSingleStepByteToMessageProcessor<PSQLBackendMessageDecoder>
+    private var decoder: NIOSingleStepByteToMessageProcessor<PostgresBackendMessageDecoder>
     private var encoder: BufferedMessageEncoder!
     private let configuration: PostgresConnection.InternalConfiguration
     private let configureSSLCallback: ((Channel) throws -> Void)?
@@ -40,7 +40,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
-        self.decoder = NIOSingleStepByteToMessageProcessor(PSQLBackendMessageDecoder())
+        self.decoder = NIOSingleStepByteToMessageProcessor(PostgresBackendMessageDecoder())
     }
     
     #if DEBUG
@@ -54,7 +54,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
-        self.decoder = NIOSingleStepByteToMessageProcessor(PSQLBackendMessageDecoder())
+        self.decoder = NIOSingleStepByteToMessageProcessor(PostgresBackendMessageDecoder())
     }
     #endif
 

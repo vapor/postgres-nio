@@ -28,7 +28,7 @@ class DataRowTests: XCTestCase {
 
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: expectedInOuts,
-            decoderFactory: { PSQLBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
     }
     
     func testIteratingElements() {

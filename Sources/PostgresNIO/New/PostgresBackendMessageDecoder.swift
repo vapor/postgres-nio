@@ -1,4 +1,4 @@
-struct PSQLBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
+struct PostgresBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
     typealias InboundOut = PostgresBackendMessage
     
     private(set) var hasAlreadyReceivedBytes: Bool
