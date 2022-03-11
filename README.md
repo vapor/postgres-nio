@@ -25,7 +25,7 @@
 
 Features:
 
-- A `PostgresConnection` which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
+- A [`PostgresConnection`] which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
 - An async/await interface that supports backpressure 
 - Automatic conversions between Swift primitive types and the Postgres wire format
 - Integrated with the Swift server ecosystem, including use of [SwiftLog].
@@ -95,7 +95,7 @@ let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 try eventLoopGroup.syncShutdown()
 ```
 
-A `Logger` is also required.
+A [`Logger`] is also required.
 
 ```swift
 import Logging
@@ -166,7 +166,7 @@ for try await (id, username, birthday) in rows.decode((Int, String, Date).self, 
 }
 ```
 
-A type must implement the `PostgresDecodable` protocol in order to be decoded from a row. PostgresNIO provides default implementations for most of Swift's builtin types, as well as some types provided by Foundation:
+A type must implement the [`PostgresDecodable`] protocol in order to be decoded from a row. PostgresNIO provides default implementations for most of Swift's builtin types, as well as some types provided by Foundation:
 
 - `Bool`
 - `Bytes`, `Data`, `ByteBuffer`
@@ -191,15 +191,24 @@ try await connection.query("""
 )
 ```
 
-While this looks at first glance like a classic case of [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) 😱, PostgresNIO's API ensures that this usage is safe. The first parameter of the `query(_:logger:)` method is not a plain `String`, but a `PostgresQuery`, which implements Swift's `ExpressibleByStringInterpolation` protocol. PostgresNIO uses the literal parts of the provided string as the SQL query and replaces each interpolated value with a parameter binding. Only values which implement the `PostgresEncodable` protocol may be interpolated in this way. As with `PostgresDecodable`, PostgresNIO provides default implementations for most common types.
+While this looks at first glance like a classic case of [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) 😱, PostgresNIO's API ensures that this usage is safe. The first parameter of the [`query(_:logger:)`] method is not a plain `String`, but a [`PostgresQuery`], which implements Swift's `ExpressibleByStringInterpolation` protocol. PostgresNIO uses the literal parts of the provided string as the SQL query and replaces each interpolated value with a parameter binding. Only values which implement the [`PostgresEncodable`] protocol may be interpolated in this way. As with [`PostgresDecodable`], PostgresNIO provides default implementations for most common types.
 
-Some queries do not receive any rows from the server (most often `INSERT`, `UPDATE`, and `DELETE` queries with no `RETURNING` clause, not to mention most DDL queries). To support this, the `query(_:logger:)` method is marked `@discardableResult`, so that the compiler does not issue a warning if the return value is not used. 
+Some queries do not receive any rows from the server (most often `INSERT`, `UPDATE`, and `DELETE` queries with no `RETURNING` clause, not to mention most DDL queries). To support this, the [`query(_:logger:)`] method is marked `@discardableResult`, so that the compiler does not issue a warning if the return value is not used. 
 
 ## Security
 
 Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
 
-[EventLoopGroupConnectionPool]: https://github.com/vapor/async-kit/blob/main/Sources/AsyncKit/ConnectionPool/EventLoopGroupConnectionPool.swift
-[AsyncKit]: https://github.com/vapor/async-kit/
+[`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
+[`query(_:logger:)`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/#postgresconnection.query(_:logger:file:line:)
+[`PostgresQuery`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresQuery/
+[`PostgresRow`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresRow/
+[`PostgresRowSequence`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresRowSequence/
+[`PostgresDecodable`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresDecodable/
+[`PostgresEncodable`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresEncodable/
+
+[PostgresKit]: https://github.com/vapor/postgres-kit
+
 [SwiftNIO]: https://github.com/apple/swift-nio
 [SwiftLog]: https://github.com/apple/swift-log
+[`Logger`]: https://apple.github.io/swift-log/docs/current/Logging/Structs/Logger.html
