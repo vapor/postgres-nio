@@ -25,14 +25,15 @@
 
 Features:
 
-- A PostgresConnection that allows you to connect to, authorize and query a PostgreSQL server
+- A `PostgresConnection` which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
 - An async/await interface that supports backpressure 
-- Converting Swift primitive types to and from the Postgres wire format
-- Integrates with the Swift server ecosystem, by using swift-log
-- Supports running Linux through NIOPosix on running Darwin through Network.framework and NIOTS
+- Automatic conversions between Swift primitive types and the Postgres wire format
+- Integrated with the Swift server ecosystem, including use of [SwiftLog].
+- Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
+- Support for `Network.framework` when available (e.g. on Apple platforms)
 
-PostgresNIO does not have a ConnectionPool as of today – but this is a feature high on our list. If 
-you need a ConnectionPool today, please have a look at Vapor's [PostgresKit]. 
+PostgresNIO does not have a `ConnectionPool` as of today, but this is a feature high on our list. If 
+you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
 
 ## API Docs
 
@@ -43,7 +44,7 @@ detailed look at all of the classes, structs, protocols, and more.
 
 #### Adding the dependency
 
-Add `PostgresNIO` as dependency to your Package.swift:
+Add `PostgresNIO` as dependency to your `Package.swift`:
 
 ```swift
   dependencies: [
@@ -65,7 +66,7 @@ Add `PostgresNIO` to the target you want to use it in:
 
 PostgresNIO is a server-side
 
-To create a connection you should first create a connection configuration object.
+To create a connection, first create a connection configuration object:
 
 ```swift
 import PostgresNIO
@@ -84,8 +85,7 @@ let config = PostgresConnection.Configuration(
 )
 ```
 
-Next you will need a SwiftNIO EventLoop to create your connection on. In most server use-cases you 
-create the EventLoopGroup on your app's startup and you close it once you shutdown your app.
+A connection must be created on a SwiftNIO `EventLoop`. In most server use cases, an`EventLoopGroup` is created at app startup and closed during app shutdown.
 
 ```swift
 import NIOPosix
@@ -96,7 +96,7 @@ let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 try eventLoopGroup.syncShutdown()
 ```
 
-Last you will need a Logger.
+A `Logger` is also required.
 
 ```swift
 import Logging
@@ -143,14 +143,13 @@ try eventLoopGroup.syncShutdown()
 
 #### Querying
 
-Once you have a connection you can start to query your server. This is very straightforward:
+Once a connection is established, queries can be sent to the server. This is very straightforward:
 
 ```swift
 let rows = try await connection.query("SELECT id, username, birthday FROM users", logger: logger)
 ```
 
-The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. You can 
-consume the rows 1 by 1: 
+The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. The rows can be iterated one-by-one: 
 
 ```swift
 for try await row in rows {
@@ -160,7 +159,7 @@ for try await row in rows {
 
 #### Decoding from PostgresRow
 
-However in most cases you want to cast a row directly into Swift primitive datatypes:
+However, in most cases it is much easier to request a row's fields as a set of Swift types:
 
 ```swift
 for try await (id, username, birthday) in rows.decode((Int, String, Date).self, context: .default) {
@@ -168,20 +167,19 @@ for try await (id, username, birthday) in rows.decode((Int, String, Date).self, 
 }
 ```
 
-To be able to decode a Postgres value to a Swift struct, the type needs to implement the 
-`PostgresDecodable` protocol. PostgresNIO has default implementations for a number of Swift 
-primitives:
+A type must implement the `PostgresDecodable` protocol in order to be decoded from a row. PostgresNIO provides default implementations for most of Swift's builtin types, as well as some types provided by Foundation:
 
-- Bool
-- Bytes, Data, ByteBuffer
-- Date
-- UInt8, Int16, Int32, Int64, Int, Float, Double
-- String
-- UUID
+- `Bool`
+- `Bytes`, `Data`, `ByteBuffer`
+- `Date`
+- `UInt8`, `Int16`, `Int32`, `Int64`, `Int`
+- `Float`, `Double`
+- `String`
+- `UUID`
 
-#### Quering with parameters
+#### Querying with parameters
 
-Sending parameterized queries to the database is also supported. (In the coolest way possible):
+Sending parameterized queries to the database is also supported (in the coolest way possible):
 
 ```swift
 let id = 1
@@ -194,15 +192,9 @@ try await connection.query("""
 )
 ```
 
-Yes, that looks like [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) 😱, but this is 
-actually save in PostgresNIO. The first parameter, of the query function is not a String, but a 
-PostgresQuery, that implements the `ExpressibleByStringInterpolation` protocol. For this reason, 
-PostgresNIO uses the static string as the SQL and the interpolation parameters as the bindings of 
-the query. To interpolate values into the query, your values need to implement the 
-`PostgresEncodable` protocol. 
+While this looks at first glance like a classic case of [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) 😱, PostgresNIO's API ensures that this usage is safe. The first parameter of the `query(_:logger:)` method is not a plain `String`, but a `PostgresQuery`, which implements Swift's `ExpressibleByStringInterpolation` protocol. PostgresNIO uses the literal parts of the provided string as the SQL query and replaces each interpolated value with a parameter binding. Only values which implement the `PostgresEncodable` protocol may be interpolated in this way. As with `PostgresDecodable`, PostgresNIO provides default implementations for most common types.
 
-For some queries you won't receive any rows from the server (mainly `INSERT`, `UPDATE` and `DELETE`). 
-To make the API support this, the result of the `query` function is an `@discardableResult`. 
+Some queries do not receive any rows from the server (most often `INSERT`, `UPDATE`, and `DELETE` queries with no `RETURNING` clause, not to mention most DDL queries). To support this, the `query(_:logger:)` method is marked `@discardableResult`, so that the compiler does not issue a warning if the return value is not used. 
 
 ## Security
 
@@ -211,3 +203,4 @@ Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md)
 [EventLoopGroupConnectionPool]: https://github.com/vapor/async-kit/blob/main/Sources/AsyncKit/ConnectionPool/EventLoopGroupConnectionPool.swift
 [AsyncKit]: https://github.com/vapor/async-kit/
 [SwiftNIO]: https://github.com/apple/swift-nio
+[SwiftLog]: https://github.com/apple/swift-log
