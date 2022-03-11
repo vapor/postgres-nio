@@ -1,3 +1,5 @@
+<img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
+
 <a href="https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level">
     <img src="https://img.shields.io/badge/sswg-incubating-green.svg" alt="SSWG Incubating">
 </a>
@@ -18,8 +20,6 @@
 </a>
 <br>
 <br>
-
-# PostgresNIO
 
 🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO].
 
