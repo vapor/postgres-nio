@@ -11,8 +11,8 @@ class Bool_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(value.psqlType, .bool)
-        XCTAssertEqual(value.psqlFormat, .binary)
+        XCTAssertEqual(Bool.psqlType, .bool)
+        XCTAssertEqual(Bool.psqlFormat, .binary)
         XCTAssertEqual(buffer.readableBytes, 1)
         XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 1)
         
@@ -26,8 +26,8 @@ class Bool_PSQLCodableTests: XCTestCase {
         
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(value.psqlType, .bool)
-        XCTAssertEqual(value.psqlFormat, .binary)
+        XCTAssertEqual(Bool.psqlType, .bool)
+        XCTAssertEqual(Bool.psqlFormat, .binary)
         XCTAssertEqual(buffer.readableBytes, 1)
         XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 0)
 

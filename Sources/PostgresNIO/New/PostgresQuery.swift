@@ -1,51 +1,54 @@
-struct PostgresQuery: Hashable {
+/// A Postgres SQL query, that can be executed on a Postgres server. Contains the raw sql string and bindings.
+public struct PostgresQuery: Hashable {
     /// The query string
-    var sql: String
+    public var sql: String
     /// The query binds
-    var binds: PostgresBindings
+    public var binds: PostgresBindings
 
-    init(unsafeSQL sql: String, binds: PostgresBindings = PostgresBindings()) {
+    public init(unsafeSQL sql: String, binds: PostgresBindings = PostgresBindings()) {
         self.sql = sql
         self.binds = binds
     }
 }
 
 extension PostgresQuery: ExpressibleByStringInterpolation {
-    typealias StringInterpolation = Interpolation
-
-    init(stringInterpolation: Interpolation) {
+    public init(stringInterpolation: StringInterpolation) {
         self.sql = stringInterpolation.sql
         self.binds = stringInterpolation.binds
     }
 
-    init(stringLiteral value: String) {
+    public init(stringLiteral value: String) {
         self.sql = value
         self.binds = PostgresBindings()
     }
 }
 
 extension PostgresQuery {
-    struct Interpolation: StringInterpolationProtocol {
-        typealias StringLiteralType = String
+    public struct StringInterpolation: StringInterpolationProtocol {
+        public typealias StringLiteralType = String
 
+        @usableFromInline
         var sql: String
+        @usableFromInline
         var binds: PostgresBindings
 
-        init(literalCapacity: Int, interpolationCount: Int) {
+        public init(literalCapacity: Int, interpolationCount: Int) {
             self.sql = ""
             self.binds = PostgresBindings(capacity: interpolationCount)
         }
 
-        mutating func appendLiteral(_ literal: String) {
+        public mutating func appendLiteral(_ literal: String) {
             self.sql.append(contentsOf: literal)
         }
 
-        mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Value) throws {
+        @inlinable
+        public mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Optional<Value>) throws {
+        @inlinable
+        public mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Optional<Value>) throws {
             switch value {
             case .none:
                 self.binds.appendNull()
@@ -56,7 +59,8 @@ extension PostgresQuery {
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
+        @inlinable
+        public mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PostgresEncodingContext<JSONEncoder>
         ) throws {
@@ -75,43 +79,59 @@ struct PSQLExecuteStatement {
     var rowDescription: RowDescription?
 }
 
-struct PostgresBindings: Hashable {
+public struct PostgresBindings: Hashable {
+    @usableFromInline
     struct Metadata: Hashable {
+        @usableFromInline
         var dataType: PostgresDataType
+        @usableFromInline
         var format: PostgresFormat
 
+        @inlinable
         init(dataType: PostgresDataType, format: PostgresFormat) {
             self.dataType = dataType
             self.format = format
         }
 
+        @inlinable
         init<Value: PostgresEncodable>(value: Value) {
-            self.init(dataType: value.psqlType, format: value.psqlFormat)
+            self.init(dataType: Value.psqlType, format: Value.psqlFormat)
         }
     }
 
+    @usableFromInline
     var metadata: [Metadata]
+    @usableFromInline
     var bytes: ByteBuffer
 
-    var count: Int {
+    public var count: Int {
         self.metadata.count
     }
 
-    init() {
+    public init() {
         self.metadata = []
         self.bytes = ByteBuffer()
     }
 
-    init(capacity: Int) {
+    public init(capacity: Int) {
         self.metadata = []
         self.metadata.reserveCapacity(capacity)
         self.bytes = ByteBuffer()
         self.bytes.reserveCapacity(128 * capacity)
     }
 
-    mutating func appendNull() {
+    public mutating func appendNull() {
         self.bytes.writeInteger(-1, as: Int32.self)
         self.metadata.append(.init(dataType: .null, format: .binary))
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Value,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
+        try value.encodeRaw(into: &self.bytes, context: context)
+        self.metadata.append(.init(value: value))
     }
 
     mutating func append(_ postgresData: PostgresData) {
@@ -123,13 +143,5 @@ struct PostgresBindings: Hashable {
             self.bytes.writeBuffer(&input)
         }
         self.metadata.append(.init(dataType: postgresData.type, format: .binary))
-    }
-
-    mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
-        _ value: Value,
-        context: PostgresEncodingContext<JSONEncoder>
-    ) throws {
-        try value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(value: value))
     }
 }

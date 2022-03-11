@@ -294,15 +294,17 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
+        let uuidString = "2c68f645-9ca6-468b-b193-ee97f241c2f8"
+
         var stream: PSQLRowStream?
         XCTAssertNoThrow(stream = try conn?.query("""
-            SELECT '2c68f645-9ca6-468b-b193-ee97f241c2f8'::UUID as uuid
+            SELECT \(uuidString)::UUID as uuid
             """, logger: .psqlTest).wait())
 
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try stream?.all().wait())
         XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode(UUID.self, context: .default), UUID(uuidString: "2c68f645-9ca6-468b-b193-ee97f241c2f8"))
+        XCTAssertEqual(try rows?.first?.decode(UUID.self, context: .default), UUID(uuidString: uuidString))
     }
 
     func testRoundTripJSONB() {

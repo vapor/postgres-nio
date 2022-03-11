@@ -1,82 +1,103 @@
 import NIOCore
 import struct Foundation.UUID
 
+// MARK: Protocols
+
 /// A type, of which arrays can be encoded into and decoded from a postgres binary format
-protocol PSQLArrayElement: PostgresCodable {
+public protocol PostgresArrayEncodable: PostgresEncodable {
     static var psqlArrayType: PostgresDataType { get }
-    static var psqlArrayElementType: PostgresDataType { get }
 }
 
-extension Bool: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .boolArray }
-    static var psqlArrayElementType: PostgresDataType { .bool }
+/// A type that can be decoded into a Swift Array of its own type from a Postgres array.
+public protocol PostgresArrayDecodable: PostgresDecodable {}
+
+// MARK: Element conformances
+
+extension Bool: PostgresArrayDecodable {}
+
+extension Bool: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .boolArray }
 }
 
-extension ByteBuffer: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .byteaArray }
-    static var psqlArrayElementType: PostgresDataType { .bytea }
+extension ByteBuffer: PostgresArrayDecodable {}
+
+extension ByteBuffer: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .byteaArray }
 }
 
-extension UInt8: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .charArray }
-    static var psqlArrayElementType: PostgresDataType { .char }
+extension UInt8: PostgresArrayDecodable {}
+
+extension UInt8: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .charArray }
 }
 
-extension Int16: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .int2Array }
-    static var psqlArrayElementType: PostgresDataType { .int2 }
+
+extension Int16: PostgresArrayDecodable {}
+
+extension Int16: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .int2Array }
 }
 
-extension Int32: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .int4Array }
-    static var psqlArrayElementType: PostgresDataType { .int4 }
+extension Int32: PostgresArrayDecodable {}
+
+extension Int32: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .int4Array }
 }
 
-extension Int64: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .int8Array }
-    static var psqlArrayElementType: PostgresDataType { .int8 }
+extension Int64: PostgresArrayDecodable {}
+
+extension Int64: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .int8Array }
 }
 
-extension Int: PSQLArrayElement {
-    #if (arch(i386) || arch(arm))
-    static var psqlArrayType: PostgresDataType { .int4Array }
-    static var psqlArrayElementType: PostgresDataType { .int4 }
-    #else
-    static var psqlArrayType: PostgresDataType { .int8Array }
-    static var psqlArrayElementType: PostgresDataType { .int8 }
-    #endif
+extension Int: PostgresArrayDecodable {}
+
+extension Int: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType {
+        if MemoryLayout<Int>.size == 8 {
+            return .int8Array
+        }
+        return .int4Array
+    }
 }
 
-extension Float: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .float4Array }
-    static var psqlArrayElementType: PostgresDataType { .float4 }
+extension Float: PostgresArrayDecodable {}
+
+extension Float: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .float4Array }
 }
 
-extension Double: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .float8Array }
-    static var psqlArrayElementType: PostgresDataType { .float8 }
+extension Double: PostgresArrayDecodable {}
+
+extension Double: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .float8Array }
 }
 
-extension String: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .textArray }
-    static var psqlArrayElementType: PostgresDataType { .text }
+extension String: PostgresArrayDecodable {}
+
+extension String: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .textArray }
 }
 
-extension UUID: PSQLArrayElement {
-    static var psqlArrayType: PostgresDataType { .uuidArray }
-    static var psqlArrayElementType: PostgresDataType { .uuid }
+extension UUID: PostgresArrayDecodable {}
+
+extension UUID: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .uuidArray }
 }
 
-extension Array: PostgresEncodable where Element: PSQLArrayElement {
-    var psqlType: PostgresDataType {
+// MARK: Array conformances
+
+extension Array: PostgresEncodable where Element: PostgresArrayEncodable {
+    public static var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
-    
-    var psqlFormat: PostgresFormat {
+
+    public static var psqlFormat: PostgresFormat {
         .binary
     }
-    
-    func encode<JSONEncoder: PostgresJSONEncoder>(
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
@@ -85,13 +106,13 @@ extension Array: PostgresEncodable where Element: PSQLArrayElement {
         // b
         buffer.writeInteger(0, as: Int32.self)
         // array element type
-        buffer.writeInteger(Element.psqlArrayElementType.rawValue)
+        buffer.writeInteger(Element.psqlType.rawValue)
 
         // continue if the array is not empty
         guard !self.isEmpty else {
             return
         }
-        
+
         // length of array
         buffer.writeInteger(numericCast(self.count), as: Int32.self)
         // dimensions
@@ -103,20 +124,6 @@ extension Array: PostgresEncodable where Element: PSQLArrayElement {
     }
 }
 
-/// A type that can be decoded into a Swift Array of its own type from a Postgres array.
-public protocol PostgresArrayDecodable: PostgresDecodable {}
-
-extension Bool: PostgresArrayDecodable {}
-extension ByteBuffer: PostgresArrayDecodable {}
-extension UInt8: PostgresArrayDecodable {}
-extension Int16: PostgresArrayDecodable {}
-extension Int32: PostgresArrayDecodable {}
-extension Int64: PostgresArrayDecodable {}
-extension Int: PostgresArrayDecodable {}
-extension Float: PostgresArrayDecodable {}
-extension Double: PostgresArrayDecodable {}
-extension String: PostgresArrayDecodable {}
-extension UUID: PostgresArrayDecodable {}
 
 extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Element == Element._DecodableType {
     public init<JSONDecoder: PostgresJSONDecoder>(
