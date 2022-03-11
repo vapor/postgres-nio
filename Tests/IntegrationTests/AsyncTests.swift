@@ -1,6 +1,6 @@
 import Logging
 import XCTest
-@testable import PostgresNIO
+import PostgresNIO
 
 #if swift(>=5.5.2)
 final class AsyncPostgresConnectionTests: XCTestCase {

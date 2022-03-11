@@ -442,7 +442,22 @@ extension PostgresConnection {
         try await self.close().get()
     }
 
-    func query(_ query: PostgresQuery, logger: Logger, file: String = #file, line: UInt = #line) async throws -> PostgresRowSequence {
+    /// Run a query on the Postgres server the connection is connected to.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file, the query was started in. Used for better error reporting.
+    ///   - line: The line, the query was started in. Used for better error reporting.
+    /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
+    ///            The sequence  be discarded.
+    @discardableResult
+    public func query(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #file,
+        line: Int = #line
+    ) async throws -> PostgresRowSequence {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
