@@ -1,6 +1,9 @@
 import Logging
 import XCTest
 import PostgresNIO
+#if canImport(Network)
+import NIOTransportServices
+#endif
 
 #if swift(>=5.5.2)
 final class AsyncPostgresConnectionTests: XCTestCase {
@@ -41,6 +44,28 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             XCTAssertEqual(counter, end + 1)
         }
     }
+
+    #if canImport(Network)
+    func testSelect10kRowsNetworkFramework() async throws {
+        let eventLoopGroup = NIOTSEventLoopGroup()
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let start = 1
+        let end = 10000
+
+        try await withTestConnection(on: eventLoop) { connection in
+            let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
+            var counter = 1
+            for try await element in rows.decode(Int.self, context: .default) {
+                XCTAssertEqual(element, counter)
+                counter += 1
+            }
+
+            XCTAssertEqual(counter, end + 1)
+        }
+    }
+    #endif
 }
 
 extension XCTestCase {

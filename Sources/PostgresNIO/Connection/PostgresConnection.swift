@@ -1,5 +1,8 @@
 import NIOCore
 import NIOConcurrencyHelpers
+#if canImport(Network)
+import NIOTransportServices
+#endif
 import NIOSSL
 import Logging
 import NIOPosix
@@ -249,12 +252,13 @@ public final class PostgresConnection {
         // thread and the EventLoop.
         return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
             let connectFuture: EventLoopFuture<Channel>
+            let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
 
             switch configuration.connection {
             case .resolved(let address, _):
-                connectFuture = ClientBootstrap(group: eventLoop).connect(to: address)
+                connectFuture = bootstrap.connect(to: address)
             case .unresolved(let host, let port):
-                connectFuture = ClientBootstrap(group: eventLoop).connect(host: host, port: port)
+                connectFuture = bootstrap.connect(host: host, port: port)
             }
 
             return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
@@ -269,6 +273,23 @@ public final class PostgresConnection {
                 }
             }
         }
+    }
+
+    static func makeBootstrap(
+        on eventLoop: EventLoop,
+        configuration: PostgresConnection.InternalConfiguration
+    ) -> NIOClientTCPBootstrapProtocol {
+        #if canImport(Network)
+        if let tsBootstrap = NIOTSConnectionBootstrap(validatingGroup: eventLoop) {
+            return tsBootstrap
+        }
+        #endif
+
+        if let nioBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
+            return nioBootstrap
+        }
+
+        fatalError("No matching bootstrap found")
     }
 
     // MARK: Query
