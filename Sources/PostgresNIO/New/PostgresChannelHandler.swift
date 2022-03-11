@@ -7,7 +7,7 @@ protocol PSQLChannelHandlerNotificationDelegate: AnyObject {
     func notificationReceived(_: PostgresBackendMessage.NotificationResponse)
 }
 
-final class PSQLChannelHandler: ChannelDuplexHandler {
+final class PostgresChannelHandler: ChannelDuplexHandler {
     typealias OutboundIn = PSQLTask
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
@@ -501,7 +501,7 @@ final class PSQLChannelHandler: ChannelDuplexHandler {
     }
 }
 
-extension PSQLChannelHandler: PSQLRowsDataSource {
+extension PostgresChannelHandler: PSQLRowsDataSource {
     func request(for stream: PSQLRowStream) {
         guard self.rowStream === stream else {
             return
@@ -587,7 +587,7 @@ extension ConnectionStateMachine.TLSConfiguration {
     }
 }
 
-extension PSQLChannelHandler {
+extension PostgresChannelHandler {
     convenience init(
         configuration: PostgresConnection.InternalConfiguration,
         configureSSLCallback: ((Channel) throws -> Void)?)

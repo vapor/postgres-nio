@@ -3,7 +3,7 @@ import NIOTLS
 import Logging
 
 enum PSQLOutgoingEvent {    
-    /// the event we send down the channel to inform the `PSQLChannelHandler` to authenticate
+    /// the event we send down the channel to inform the ``PostgresChannelHandler`` to authenticate
     ///
     /// this shall be removed with the next breaking change and always supplied with `PSQLConnection.Configuration`
     case authenticate(AuthContext)
@@ -11,10 +11,10 @@ enum PSQLOutgoingEvent {
 
 enum PSQLEvent {
     
-    /// the event that is used to inform upstream handlers that `PSQLChannelHandler` has established a connection
+    /// the event that is used to inform upstream handlers that ``PostgresChannelHandler`` has established a connection
     case readyForStartup
     
-    /// the event that is used to inform upstream handlers that `PSQLChannelHandler` is currently idle
+    /// the event that is used to inform upstream handlers that ``PostgresChannelHandler`` is currently idle
     case readyForQuery
 }
 

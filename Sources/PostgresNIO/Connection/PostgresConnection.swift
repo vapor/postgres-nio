@@ -173,7 +173,7 @@ public final class PostgresConnection {
             }
         }
 
-        let channelHandler = PSQLChannelHandler(
+        let channelHandler = PostgresChannelHandler(
             configuration: configuration,
             logger: logger,
             configureSSLCallback: configureSSLCallback
@@ -597,7 +597,7 @@ extension PostgresConnection {
 
         let listenContext = PostgresListenContext()
 
-        self.channel.pipeline.handler(type: PSQLChannelHandler.self).whenSuccess { handler in
+        self.channel.pipeline.handler(type: PostgresChannelHandler.self).whenSuccess { handler in
             if self.notificationListeners[channel] != nil {
                 self.notificationListeners[channel]!.append((listenContext, notificationHandler))
             }
