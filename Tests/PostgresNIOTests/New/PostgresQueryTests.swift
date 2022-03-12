@@ -3,16 +3,18 @@ import XCTest
 
 final class PostgresQueryTests: XCTestCase {
 
-    func testStringInterpolationWithOptional() throws {
+    func testStringInterpolationWithOptional() {
         let string = "Hello World"
         let null: UUID? = nil
         let uuid: UUID? = UUID()
 
-        let query: PostgresQuery = try """
+        var query: PostgresQuery?
+        XCTAssertNoThrow(query = try """
             INSERT INTO foo (id, title, something) SET (\(uuid), \(string), \(null));
             """
+        )
 
-        XCTAssertEqual(query.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
+        XCTAssertEqual(query?.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
 
         var expected = ByteBuffer()
         expected.writeInteger(Int32(16))
@@ -27,10 +29,10 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeString(string)
         expected.writeInteger(Int32(-1))
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        XCTAssertEqual(query?.binds.bytes, expected)
     }
 
-    func testStringInterpolationWithCustomJSONEncoder() throws {
+    func testStringInterpolationWithCustomJSONEncoder() {
         struct Foo: Codable, PostgresCodable {
             var helloWorld: String
         }
@@ -38,11 +40,13 @@ final class PostgresQueryTests: XCTestCase {
         let jsonEncoder = JSONEncoder()
         jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
 
-        let query: PostgresQuery = try """
+        var query: PostgresQuery?
+        XCTAssertNoThrow(query = try """
             INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
             """
+        )
 
-        XCTAssertEqual(query.sql, "INSERT INTO test (foo) SET ($1);")
+        XCTAssertEqual(query?.sql, "INSERT INTO test (foo) SET ($1);")
 
         let expectedJSON = #"{"hello_world":"bar"}"#
 
@@ -51,17 +55,10 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(UInt8(0x01))
         expected.writeString(expectedJSON)
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        XCTAssertEqual(query?.binds.bytes, expected)
     }
 
-    func testAllowUsersToGenerateLotsOfRows() throws {
-        struct Foo: Codable, PostgresCodable {
-            var helloWorld: String
-        }
-
-        let jsonEncoder = JSONEncoder()
-        jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
-
+    func testAllowUsersToGenerateLotsOfRows() {
         let sql = "INSERT INTO test (id) SET (\((1...5).map({"$\($0)"}).joined(separator: ", ")));"
 
         var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
@@ -78,5 +75,20 @@ final class PostgresQueryTests: XCTestCase {
         }
 
         XCTAssertEqual(query.binds.bytes, expected)
+    }
+
+    func testUnescapedSQL() {
+        let tableName = UUID().uuidString.uppercased()
+        let value = 1
+
+        var query: PostgresQuery?
+        XCTAssertNoThrow(query = try "INSERT INTO \(unescaped: tableName) (id) SET (\(value));")
+        XCTAssertEqual(query?.sql, "INSERT INTO \(tableName) (id) SET ($1);")
+
+        var expected = ByteBuffer()
+        expected.writeInteger(UInt32(8))
+        expected.writeInteger(value)
+
+        XCTAssertEqual(query?.binds.bytes, expected)
     }
 }

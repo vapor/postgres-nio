@@ -67,6 +67,11 @@ extension PostgresQuery {
             try self.binds.append(value, context: context)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
+
+        @inlinable
+        public mutating func appendInterpolation(unescaped interpolated: String) {
+            self.sql.append(contentsOf: interpolated)
+        }
     }
 }
 
