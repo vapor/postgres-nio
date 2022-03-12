@@ -22,7 +22,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     /// A `ChannelHandlerContext` to be used for non channel related events. (for example: More rows needed).
     ///
     /// The context is captured in `handlerAdded` and released` in `handlerRemoved`
-    private var handlerContext: ChannelHandlerContext!
+    private var handlerContext: ChannelHandlerContext?
     private var rowStream: PSQLRowStream?
     private var decoder: NIOSingleStepByteToMessageProcessor<PostgresBackendMessageDecoder>
     private var encoder: BufferedMessageEncoder!
@@ -266,7 +266,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             
         case .forwardStreamComplete(let buffer, let commandTag):
             guard let rowStream = self.rowStream else {
-                preconditionFailure("Expected to have a row stream here.")
+                // if the stream was cancelled we don't have it here anymore.
+                return
             }
             self.rowStream = nil
             if buffer.count > 0 {
@@ -503,18 +504,20 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
 extension PostgresChannelHandler: PSQLRowsDataSource {
     func request(for stream: PSQLRowStream) {
-        guard self.rowStream === stream else {
+        guard self.rowStream === stream, let handlerContext = self.handlerContext else {
             return
         }
         let action = self.state.requestQueryRows()
-        self.run(action, with: self.handlerContext!)
+        self.run(action, with: handlerContext)
     }
     
     func cancel(for stream: PSQLRowStream) {
-        guard self.rowStream === stream else {
+        guard self.rowStream === stream, let handlerContext = self.handlerContext else {
             return
         }
         // we ignore this right now :)
+        let action = self.state.cancelQueryStream()
+        self.run(action, with: handlerContext)
     }
 }
 
@@ -523,7 +526,8 @@ extension PostgresConnection.Configuration.Authentication {
         AuthContext(
             username: self.username,
             password: self.password,
-            database: self.database)
+            database: self.database
+        )
     }
 }
 
@@ -533,7 +537,8 @@ extension AuthContext {
             user: self.username,
             database: self.database,
             options: nil,
-            replication: .false)
+            replication: .false
+        )
     }
 }
 

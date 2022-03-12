@@ -23,6 +23,8 @@ struct RowStreamStateMachine {
         /// preserved for performance reasons.
         case waitingForDemand([DataRow])
 
+        case failed
+
         case modifying
     }
 
@@ -63,6 +65,11 @@ struct RowStreamStateMachine {
             buffer.append(newRow)
             self.state = .waitingForReadOrDemand(buffer)
 
+        case .failed:
+            // Once the row stream state machine is marked as failed, no further events must be
+            // forwarded to it.
+            preconditionFailure("Invalid state: \(self.state)")
+
         case .modifying:
             preconditionFailure("Invalid state: \(self.state)")
         }
@@ -85,6 +92,11 @@ struct RowStreamStateMachine {
              .waitingForDemand,
              .waitingForReadOrDemand:
             preconditionFailure("How can we receive a body part, after a channelReadComplete, but no read has been forwarded yet. Invalid state: \(self.state)")
+
+        case .failed:
+            // Once the row stream state machine is marked as failed, no further events must be
+            // forwarded to it.
+            preconditionFailure("Invalid state: \(self.state)")
 
         case .modifying:
             preconditionFailure("Invalid state: \(self.state)")
@@ -111,6 +123,11 @@ struct RowStreamStateMachine {
             // the next `channelReadComplete` we will forward all buffered data
             return .wait
 
+        case .failed:
+            // Once the row stream state machine is marked as failed, no further events must be
+            // forwarded to it.
+            preconditionFailure("Invalid state: \(self.state)")
+
         case .modifying:
             preconditionFailure("Invalid state: \(self.state)")
         }
@@ -136,6 +153,11 @@ struct RowStreamStateMachine {
             // from the consumer
             return .wait
 
+        case .failed:
+            // Once the row stream state machine is marked as failed, no further events must be
+            // forwarded to it.
+            preconditionFailure("Invalid state: \(self.state)")
+
         case .modifying:
             preconditionFailure("Invalid state: \(self.state)")
         }
@@ -157,6 +179,33 @@ struct RowStreamStateMachine {
             // `channelRead`s without waiting for a next `context.read` call. For this reason we might
             // receive a call to `end()`, when we don't expect it here.
             return buffer
+
+        case .failed:
+            // Once the row stream state machine is marked as failed, no further events must be
+            // forwarded to it.
+            preconditionFailure("Invalid state: \(self.state)")
+
+        case .modifying:
+            preconditionFailure("Invalid state: \(self.state)")
+        }
+    }
+
+    mutating func fail() -> Action {
+        switch self.state {
+        case .waitingForRows,
+             .waitingForReadOrDemand,
+             .waitingForRead:
+            self.state = .failed
+            return .wait
+
+        case .waitingForDemand:
+            self.state = .failed
+            return .read
+
+        case .failed:
+            // Once the row stream state machine is marked as failed, no further events must be
+            // forwarded to it.
+            preconditionFailure("Invalid state: \(self.state)")
 
         case .modifying:
             preconditionFailure("Invalid state: \(self.state)")
