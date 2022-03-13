@@ -29,8 +29,7 @@ Features:
 - Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
 - Support for `Network.framework` when available (e.g. on Apple platforms)
 
-PostgresNIO does not have a `ConnectionPool` as of today, but this is a feature high on our list. If 
-you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
+PostgresNIO does not provide a `ConnectionPool` as of today, but this is a [feature high on our list](https://github.com/vapor/postgres-nio/issues/256). If you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
 
 ## API Docs
 
