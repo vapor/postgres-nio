@@ -1,22 +1,13 @@
-name: main codecov
+name: CI for main
 on:
   push:
     branches:
       - main
 jobs:
   update-main-codecov:
-    runs-on: ubuntu-latest
-    container: swift:5.5-focal
-    steps:
-      - name: Check out main
-        uses: actions/checkout@v2
-      - name: Run unit tests with code coverage and Thread Sanitizer
-        run: swift test --enable-code-coverage --sanitize=thread --filter=^PostgresNIOTests
-      - name: Submit coverage report to Codecov.io
-        uses: vapor/swift-codecov-action@v0.1.1
-        with:
-          cc_flags: 'unittests'
-          cc_env_vars: 'SWIFT_VERSION,SWIFT_PLATFORM,RUNNER_OS,RUNNER_ARCH'
-          cc_fail_ci_if_error: true
-          cc_verbose: true
-          cc_dry_run: false
+    uses: vapor/ci/.github/workflows/run-unit-tests.yml@reusable-workflows
+    with:
+      with_coverage: true
+      with_tsan: true
+      coverage_ignores: '/Tests/'
+      test_filter: '^PostgresNIOTests'
