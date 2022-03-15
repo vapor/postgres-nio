@@ -1098,6 +1098,8 @@ extension ConnectionStateMachine {
             return true
         case .tooManyParameters:
             return true
+        case .invalidCommandTag:
+            return true
         case .connectionQuiescing:
             preconditionFailure("Pure client error, that is thrown directly in PostgresConnection")
         case .connectionClosed:

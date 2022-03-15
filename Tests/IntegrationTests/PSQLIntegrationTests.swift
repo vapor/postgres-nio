@@ -59,10 +59,9 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("SELECT version()", logger: .psqlTest).wait())
+        let rows = result?.rows
         var version: String?
         XCTAssertNoThrow(version = try rows?.first?.decode(String.self, context: .default))
         XCTAssertEqual(version?.contains("PostgreSQL"), true)
@@ -77,12 +76,9 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("SELECT generate_series(1, 10000);", logger: .psqlTest).wait())
-
+        var metadata: PostgresQueryMetadata?
         var received: Int64 = 0
-
-        XCTAssertNoThrow(try stream?.onRow { row in
+        XCTAssertNoThrow(metadata = try conn?.query("SELECT generate_series(1, 10000);", logger: .psqlTest) { row in
             func workaround() {
                 var number: Int64?
                 XCTAssertNoThrow(number = try row.decode(Int64.self, context: .default))
@@ -94,6 +90,8 @@ final class IntegrationTests: XCTestCase {
         }.wait())
 
         XCTAssertEqual(received, 10000)
+        XCTAssertEqual(metadata?.command, "SELECT")
+        XCTAssertEqual(metadata?.rows, 10000)
     }
 
     func test1kRoundTrips() {
@@ -106,12 +104,10 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         for _ in 0..<1_000 {
-            var stream: PSQLRowStream?
-            XCTAssertNoThrow(stream = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-            var rows: [PostgresRow]?
-            XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
+            var result: PostgresQueryResult?
+            XCTAssertNoThrow(result = try conn?.query("SELECT version()", logger: .psqlTest).wait())
             var version: String?
-            XCTAssertNoThrow(version = try rows?.first?.decode(String.self, context: .default))
+            XCTAssertNoThrow(version = try result?.rows.first?.decode(String.self, context: .default))
             XCTAssertEqual(version?.contains("PostgreSQL"), true)
         }
     }
@@ -125,12 +121,10 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).wait())
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try XCTUnwrap(stream).all().wait())
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).wait())
         var foo: String?
-        XCTAssertNoThrow(foo = try rows?.first?.decode(String.self, context: .default))
+        XCTAssertNoThrow(foo = try result?.rows.first?.decode(String.self, context: .default))
         XCTAssertEqual(foo, "hello")
     }
 
@@ -143,8 +137,8 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("""
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("""
         SELECT
             1::SMALLINT                   as smallint,
             -32767::SMALLINT              as smallint_min,
@@ -157,10 +151,8 @@ final class IntegrationTests: XCTestCase {
             9223372036854775807::BIGINT   as bigint_max
         """, logger: .psqlTest).wait())
 
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
-        let row = rows?.first
+        XCTAssertEqual(result?.rows.count, 1)
+        let row = result?.rows.first
 
         var cells: (Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64)?
         XCTAssertNoThrow(cells = try row?.decode((Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64).self, context: .default))
@@ -185,13 +177,11 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
+        var result: PostgresQueryResult?
         let array: [Int64] = [1, 2, 3]
-        XCTAssertNoThrow(stream = try conn?.query("SELECT \(array)::int8[] as array", logger: .psqlTest).wait())
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode([Int64].self, context: .default), array)
+        XCTAssertNoThrow(result = try conn?.query("SELECT \(array)::int8[] as array", logger: .psqlTest).wait())
+        XCTAssertEqual(result?.rows.count, 1)
+        XCTAssertEqual(try result?.rows.first?.decode([Int64].self, context: .default), array)
     }
 
     func testDecodeEmptyIntegerArray() {
@@ -203,13 +193,11 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("SELECT '{}'::int[] as array", logger: .psqlTest).wait())
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("SELECT '{}'::int[] as array", logger: .psqlTest).wait())
 
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode([Int64].self, context: .default), [])
+        XCTAssertEqual(result?.rows.count, 1)
+        XCTAssertEqual(try result?.rows.first?.decode([Int64].self, context: .default), [])
     }
 
     func testDoubleArraySerialization() {
@@ -221,13 +209,11 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
+        var result: PostgresQueryResult?
         let doubles: [Double] = [3.14, 42]
-        XCTAssertNoThrow(stream = try conn?.query("SELECT \(doubles)::double precision[] as doubles", logger: .psqlTest).wait())
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode([Double].self, context: .default), doubles)
+        XCTAssertNoThrow(result = try conn?.query("SELECT \(doubles)::double precision[] as doubles", logger: .psqlTest).wait())
+        XCTAssertEqual(result?.rows.count, 1)
+        XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
     }
 
     func testDecodeDates() {
@@ -239,20 +225,18 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("""
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("""
             SELECT
                 '2016-01-18 01:02:03 +0042'::DATE         as date,
                 '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
                 '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
             """, logger: .psqlTest).wait())
 
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(result?.rows.count, 1)
 
         var cells: (Date, Date, Date)?
-        XCTAssertNoThrow(cells = try rows?.first?.decode((Date, Date, Date).self, context: .default))
+        XCTAssertNoThrow(cells = try result?.rows.first?.decode((Date, Date, Date).self, context: .default))
 
         XCTAssertEqual(cells?.0.description, "2016-01-18 00:00:00 +0000")
         XCTAssertEqual(cells?.1.description, "2016-01-18 01:02:03 +0000")
@@ -268,24 +252,22 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("""
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("""
             SELECT
                 \(Decimal(string: "123456.789123")!)::numeric     as numeric,
                 \(Decimal(string: "-123456.789123")!)::numeric     as numeric_negative
             """, logger: .psqlTest).wait())
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(result?.rows.count, 1)
 
         var cells: (Decimal, Decimal)?
-        XCTAssertNoThrow(cells = try rows?.first?.decode((Decimal, Decimal).self, context: .default))
+        XCTAssertNoThrow(cells = try result?.rows.first?.decode((Decimal, Decimal).self, context: .default))
 
         XCTAssertEqual(cells?.0, Decimal(string: "123456.789123"))
         XCTAssertEqual(cells?.1, Decimal(string: "-123456.789123"))
     }
 
-    func testDecodeUUID() {
+    func testRoundTripUUID() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
@@ -296,15 +278,15 @@ final class IntegrationTests: XCTestCase {
 
         let uuidString = "2c68f645-9ca6-468b-b193-ee97f241c2f8"
 
-        var stream: PSQLRowStream?
-        XCTAssertNoThrow(stream = try conn?.query("""
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("""
             SELECT \(uuidString)::UUID as uuid
-            """, logger: .psqlTest).wait())
+            """,
+            logger: .psqlTest
+        ).wait())
 
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try stream?.all().wait())
-        XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode(UUID.self, context: .default), UUID(uuidString: uuidString))
+        XCTAssertEqual(result?.rows.count, 1)
+        XCTAssertEqual(try result?.rows.first?.decode(UUID.self, context: .default), UUID(uuidString: uuidString))
     }
 
     func testRoundTripJSONB() {
@@ -322,33 +304,29 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         do {
-            var stream: PSQLRowStream?
-            XCTAssertNoThrow(stream = try conn?.query("""
+            var result: PostgresQueryResult?
+            XCTAssertNoThrow(result = try conn?.query("""
                 select \(Object(foo: 1, bar: 2))::jsonb as jsonb
                 """, logger: .psqlTest).wait())
-            
-            var rows: [PostgresRow]?
-            XCTAssertNoThrow(rows = try stream?.all().wait())
-            XCTAssertEqual(rows?.count, 1)
-            var result: Object?
-            XCTAssertNoThrow(result = try rows?.first?.decode(Object.self, context: .default))
-            XCTAssertEqual(result?.foo, 1)
-            XCTAssertEqual(result?.bar, 2)
+
+            XCTAssertEqual(result?.rows.count, 1)
+            var obj: Object?
+            XCTAssertNoThrow(obj = try result?.rows.first?.decode(Object.self, context: .default))
+            XCTAssertEqual(obj?.foo, 1)
+            XCTAssertEqual(obj?.bar, 2)
         }
 
         do {
-            var stream: PSQLRowStream?
-            XCTAssertNoThrow(stream = try conn?.query("""
+            var result: PostgresQueryResult?
+            XCTAssertNoThrow(result = try conn?.query("""
                 select \(Object(foo: 1, bar: 2))::json as json
                 """, logger: .psqlTest).wait())
-            
-            var rows: [PostgresRow]?
-            XCTAssertNoThrow(rows = try stream?.all().wait())
-            XCTAssertEqual(rows?.count, 1)
-            var result: Object?
-            XCTAssertNoThrow(result = try rows?.first?.decode(Object.self, context: .default))
-            XCTAssertEqual(result?.foo, 1)
-            XCTAssertEqual(result?.bar, 2)
+
+            XCTAssertEqual(result?.rows.count, 1)
+            var obj: Object?
+            XCTAssertNoThrow(obj = try result?.rows.first?.decode(Object.self, context: .default))
+            XCTAssertEqual(obj?.foo, 1)
+            XCTAssertEqual(obj?.bar, 2)
         }
     }
 }

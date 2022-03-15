@@ -24,7 +24,7 @@ extension PSQLError {
             return PostgresError.protocol("Unable to authenticate without password")
         case .saslError(underlyingError: let underlying):
             return underlying
-        case .tooManyParameters:
+        case .tooManyParameters, .invalidCommandTag:
             return self
         case .connectionQuiescing:
             return PostgresError.connectionClosed
