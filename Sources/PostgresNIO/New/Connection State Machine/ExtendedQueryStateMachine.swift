@@ -253,7 +253,7 @@ struct ExtendedQueryStateMachine {
         case .drain:
             precondition(self.isCancelled)
             self.state = .commandComplete(commandTag: commandTag)
-            return .forwardStreamComplete([], commandTag: commandTag)
+            return .wait
         
         case .initialized,
              .parseDescribeBindExecuteSyncSent,

@@ -36,6 +36,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsRows == rhsRows
         case (.forwardStreamComplete(let lhsBuffer, let lhsCommandTag), .forwardStreamComplete(let rhsBuffer, let rhsCommandTag)):
             return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag
+        case (.forwardStreamError(let lhsError, let lhsRead, let lhsCleanupContext), .forwardStreamError(let rhsError , let rhsRead, let rhsCleanupContext)):
+            return lhsError == rhsError && lhsRead == rhsRead && lhsCleanupContext == rhsCleanupContext
         case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
             return lhsName == rhsName && lhsQuery == rhsQuery
         case (.succeedPreparedStatementCreation(let lhsContext, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsContext, let rhsRowDescription)):
