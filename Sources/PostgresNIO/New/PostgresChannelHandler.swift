@@ -13,11 +13,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     typealias OutboundOut = ByteBuffer
 
     private let logger: Logger
-    private var state: ConnectionStateMachine {
-        didSet {
-            self.logger.trace("Connection state changed", metadata: [.connectionState: "\(self.state)"])
-        }
-    }
+    private var state: ConnectionStateMachine
     
     /// A `ChannelHandlerContext` to be used for non channel related events. (for example: More rows needed).
     ///
