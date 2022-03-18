@@ -294,7 +294,7 @@ public final class PostgresConnection {
 
     // MARK: Query
 
-    func query(_ query: PostgresQuery, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
+    private func queryStream(_ query: PostgresQuery, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
         guard query.binds.count <= Int(Int16.max) else {
@@ -433,6 +433,8 @@ extension PostgresConnection {
     }
 }
 
+// MARK: Async/Await Interface
+
 #if swift(>=5.5) && canImport(_Concurrency)
 extension PostgresConnection {
 
@@ -489,7 +491,8 @@ extension PostgresConnection {
         let context = ExtendedQueryContext(
             query: query,
             logger: logger,
-            promise: promise)
+            promise: promise
+        )
 
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
 
@@ -498,7 +501,64 @@ extension PostgresConnection {
 }
 #endif
 
-// MARK: PostgresDatabase
+// MARK: EventLoopFuture interface
+
+extension PostgresConnection {
+
+    /// Run a query on the Postgres server the connection is connected to and collect all rows.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file, the query was started in. Used for better error reporting.
+    ///   - line: The line, the query was started in. Used for better error reporting.
+    /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryResult``.
+    public func query(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #file,
+        line: Int = #line
+    ) -> EventLoopFuture<PostgresQueryResult> {
+        self.queryStream(query, logger: logger).flatMap { rowStream in
+            rowStream.all().flatMapThrowing { rows -> PostgresQueryResult in
+                guard let metadata = PostgresQueryMetadata(string: rowStream.commandTag) else {
+                    throw PSQLError.invalidCommandTag(rowStream.commandTag)
+                }
+                return PostgresQueryResult(metadata: metadata, rows: rows)
+            }
+        }
+    }
+
+    /// Run a query on the Postgres server the connection is connected to and iterate the rows in a callback.
+    ///
+    /// - Note: This API does not support back-pressure. If you need back-pressure please use the query
+    ///         API, that supports structured concurrency.
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file, the query was started in. Used for better error reporting.
+    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - onRow: A closure that is invoked for every row.
+    /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryMetadata``.
+    public func query(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #file,
+        line: Int = #line,
+        _ onRow: @escaping (PostgresRow) throws -> ()
+    ) -> EventLoopFuture<PostgresQueryMetadata> {
+        self.queryStream(query, logger: logger).flatMap { rowStream in
+            rowStream.onRow(onRow).flatMapThrowing { () -> PostgresQueryMetadata in
+                guard let metadata = PostgresQueryMetadata(string: rowStream.commandTag) else {
+                    throw PSQLError.invalidCommandTag(rowStream.commandTag)
+                }
+                return metadata
+            }
+        }
+    }
+}
+
+// MARK: PostgresDatabase conformance
 
 extension PostgresConnection: PostgresDatabase {
     public func send(
@@ -513,14 +573,14 @@ extension PostgresConnection: PostgresDatabase {
 
         switch command {
         case .query(let query, let onMetadata, let onRow):
-            resultFuture = self.query(query, logger: logger).flatMap { stream in
+            resultFuture = self.queryStream(query, logger: logger).flatMap { stream in
                 return stream.onRow(onRow).map { _ in
                     onMetadata(PostgresQueryMetadata(string: stream.commandTag)!)
                 }
             }
 
         case .queryAll(let query, let onResult):
-            resultFuture = self.query(query, logger: logger).flatMap { rows in
+            resultFuture = self.queryStream(query, logger: logger).flatMap { rows in
                 return rows.all().map { allrows in
                     onResult(.init(metadata: PostgresQueryMetadata(string: rows.commandTag)!, rows: allrows))
                 }
