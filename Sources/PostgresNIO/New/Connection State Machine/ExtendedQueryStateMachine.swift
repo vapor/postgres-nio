@@ -15,7 +15,7 @@ struct ExtendedQueryStateMachine {
         /// used after receiving a `bindComplete` message
         case bindCompleteReceived(ExtendedQueryContext)
         case streaming([RowDescription.Column], RowStreamStateMachine)
-        /// A state that is used, if the current query was cancelled, and we want to drain rows from the connection ASAP
+        /// Indicates that the current query was cancelled and we want to drain rows from the connection ASAP
         case drain([RowDescription.Column])
         
         case commandComplete(commandTag: String)
