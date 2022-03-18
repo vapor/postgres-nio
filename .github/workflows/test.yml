@@ -2,35 +2,13 @@ name: test
 on: [ 'pull_request' ]
 
 jobs:
-  linux-unit:
-    strategy:
-      fail-fast: false
-      matrix:
-        swiftver:
-          - swift:5.2
-          - swift:5.3
-          - swift:5.5
-          - swift:5.6
-          - swiftlang/swift:nightly-main
-        swiftos:
-          - focal
-    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
-    runs-on: ubuntu-latest
-    env:
-      LOG_LEVEL: debug
-    steps:
-      - name: Check out package
-        uses: actions/checkout@v3
-      - name: Run unit tests with code coverage and Thread Sanitizer
-        run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
-      - name: Submit coverage report to Codecov.io
-        uses: vapor/swift-codecov-action@v0.2
-        with:
-          cc_flags: 'unittests'
-          cc_env_vars: 'SWIFT_VERSION,SWIFT_PLATFORM,RUNNER_OS,RUNNER_ARCH'
-          cc_fail_ci_if_error: true
-          cc_verbose: true
-          cc_dry_run: false
+  unit-tests:
+    uses: vapor/ci/.github/workflows/run-unit-tests.yml@reusable-workflows
+    with:
+      with_coverage: true
+      with_tsan: true
+      coverage_ignores: '/Tests/'
+      test_filter: '^PostgresNIOTests'
 
   linux-integration-and-dependencies:
     strategy:
@@ -103,15 +81,14 @@ jobs:
       - name: Run fluent-postgres-driver tests
         run: swift test --package-path fluent-postgres-driver
 
-  macos-all:
+  macos-integration:
     strategy:
       fail-fast: false
       matrix:
+        # Only test latest version and one auth method on macOS
         dbimage:
-          # Only test the lastest version on macOS, let Linux do the rest
           - postgresql@14
         dbauth:
-          # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         xcode:
           - latest-stable
@@ -138,7 +115,8 @@ jobs:
         timeout-minutes: 2
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Run all tests
+      - name: Run integration tests
         run: |
-          swift test --enable-test-discovery -Xlinker -rpath \
-                -Xlinker $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx
+          swift test \
+            --filter=^IntegrationTests \
+            -Xlinker -rpath -Xlinker $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx
