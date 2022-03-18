@@ -842,7 +842,15 @@ struct ConnectionStateMachine {
     // MARK: Consumer
     
     mutating func cancelQueryStream() -> ConnectionAction {
-        preconditionFailure("Unimplemented")
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
+            preconditionFailure("Tried to cancel stream without active query")
+        }
+
+        return self.avoidingStateMachineCoW { machine -> ConnectionAction in
+            let action = queryState.cancel()
+            machine.state = .extendedQuery(queryState, connectionContext)
+            return machine.modify(with: action)
+        }
     }
     
     mutating func requestQueryRows() -> ConnectionAction {
@@ -1074,6 +1082,8 @@ extension ConnectionStateMachine {
             return true
         case .failedToAddSSLHandler:
             return true
+        case .queryCancelled:
+            return false
         case .server(let message):
             guard let sqlState = message.fields[.sqlState] else {
                 // any error message that doesn't have a sql state field, is unexpected by default.

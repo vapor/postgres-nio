@@ -11,7 +11,8 @@ struct PSQLError: Error {
         case unsupportedAuthMechanism(PSQLAuthScheme)
         case authMechanismRequiresPassword
         case saslError(underlyingError: Error)
-        
+
+        case queryCancelled
         case tooManyParameters
         case connectionQuiescing
         case connectionClosed
@@ -57,6 +58,10 @@ struct PSQLError: Error {
     
     static func sasl(underlying: Error) -> PSQLError {
         Self.init(.saslError(underlyingError: underlying))
+    }
+
+    static var queryCancelled: PSQLError {
+        Self.init(.queryCancelled)
     }
     
     static var tooManyParameters: PSQLError {
