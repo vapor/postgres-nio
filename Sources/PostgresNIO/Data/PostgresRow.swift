@@ -178,6 +178,13 @@ extension PostgresRandomAccessRow: RandomAccessCollection {
         }
         return self[index]
     }
+
+    /// Checks if the row contains a cell for the given column name.
+    /// - Parameter column: The column name to check against
+    /// - Returns: `true` if the row contains this column, `false` if it does not.
+    public func contains(_ column: String) -> Bool {
+        self.lookupTable[column] != nil
+    }
 }
 
 extension PostgresRandomAccessRow {
@@ -286,8 +293,8 @@ extension PostgresRow {
 
     @available(*, deprecated, message: """
         This call is O(n) where n is the number of cells in the row. For random access to cells
-        in a row create a PostgresRandomAccessCollection from the row first and use its subscript
-        methods.
+        in a row create a PostgresRandomAccessRow from the row first and use its subscript
+        methods. (see `makeRandomAccess()`)
         """)
     public func column(_ column: String) -> PostgresData? {
         guard let index = self.lookupTable[column] else {
