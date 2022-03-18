@@ -3,6 +3,8 @@ import NIOCore
 extension PSQLError {
     func toPostgresError() -> Error {
         switch self.base {
+        case .queryCancelled:
+            return self
         case .server(let errorMessage):
             var fields = [PostgresMessage.Error.Field: String]()
             fields.reserveCapacity(errorMessage.fields.count)

@@ -10,7 +10,7 @@ jobs:
           - swift:5.2
           - swift:5.3
           - swift:5.5
-          - swiftlang/swift:nightly-5.6
+          - swift:5.6
           - swiftlang/swift:nightly-main
         swiftos:
           - focal
@@ -20,11 +20,11 @@ jobs:
       LOG_LEVEL: debug
     steps:
       - name: Check out package
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run unit tests with code coverage and Thread Sanitizer
         run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
       - name: Submit coverage report to Codecov.io
-        uses: vapor/swift-codecov-action@v0.1.1
+        uses: vapor/swift-codecov-action@v0.2
         with:
           cc_flags: 'unittests'
           cc_env_vars: 'SWIFT_VERSION,SWIFT_PLATFORM,RUNNER_OS,RUNNER_ARCH'
@@ -47,7 +47,7 @@ jobs:
             dbauth: md5
           - dbimage: postgres:11
             dbauth: trust
-    container: swift:5.5-focal
+    container: swift:5.6-focal
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -84,15 +84,15 @@ jobs:
           POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
     steps:
       - name: Check out package
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: { path: 'postgres-nio' }
       - name: Run integration tests
         run: swift test --package-path postgres-nio --filter=^IntegrationTests
       - name: Check out postgres-kit dependent
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
       - name: Check out fluent-postgres-driver dependent
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with: { repository: 'vapor/fluent-postgres-driver', path: 'fluent-postgres-driver' }
       - name: Use local package in dependents
         run: |
@@ -137,7 +137,7 @@ jobs:
           pg_ctl start --wait
         timeout-minutes: 2
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run all tests
         run: |
           swift test --enable-test-discovery -Xlinker -rpath \

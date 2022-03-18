@@ -2,7 +2,7 @@ import NIOCore
 
 struct ExtendedQueryStateMachine {
     
-    enum State {
+    private enum State {
         case initialized(ExtendedQueryContext)
         case parseDescribeBindExecuteSyncSent(ExtendedQueryContext)
         
@@ -15,6 +15,8 @@ struct ExtendedQueryStateMachine {
         /// used after receiving a `bindComplete` message
         case bindCompleteReceived(ExtendedQueryContext)
         case streaming([RowDescription.Column], RowStreamStateMachine)
+        /// Indicates that the current query was cancelled and we want to drain rows from the connection ASAP
+        case drain([RowDescription.Column])
         
         case commandComplete(commandTag: String)
         case error(PSQLError)
@@ -41,9 +43,11 @@ struct ExtendedQueryStateMachine {
         case wait
     }
     
-    var state: State
+    private var state: State
+    private var isCancelled: Bool
     
     init(queryContext: ExtendedQueryContext) {
+        self.isCancelled = false
         self.state = .initialized(queryContext)
     }
     
@@ -69,6 +73,44 @@ struct ExtendedQueryStateMachine {
                 }
                 return .sendBindExecuteSync(prepared)
             }
+        }
+    }
+
+    mutating func cancel() -> Action {
+        switch self.state {
+        case .initialized:
+            preconditionFailure("Start must be called immediatly after the query was created")
+
+        case .parseDescribeBindExecuteSyncSent(let queryContext),
+             .parseCompleteReceived(let queryContext),
+             .parameterDescriptionReceived(let queryContext),
+             .rowDescriptionReceived(let queryContext, _),
+             .noDataMessageReceived(let queryContext),
+             .bindCompleteReceived(let queryContext):
+            guard !self.isCancelled else {
+                return .wait
+            }
+
+            self.isCancelled = true
+            return .failQuery(queryContext, with: .queryCancelled)
+
+        case .streaming(let columns, var streamStateMachine):
+            precondition(!self.isCancelled)
+            self.isCancelled = true
+            self.state = .drain(columns)
+            switch streamStateMachine.fail() {
+            case .wait:
+                return .forwardStreamError(.queryCancelled, read: false)
+            case .read:
+                return .forwardStreamError(.queryCancelled, read: true)
+            }
+
+        case .commandComplete, .error, .drain:
+            // the stream has already finished.
+            return .wait
+
+        case .modifying:
+            preconditionFailure("Invalid state: \(self.state)")
         }
     }
     
@@ -147,9 +189,11 @@ struct ExtendedQueryStateMachine {
              .parameterDescriptionReceived,
              .bindCompleteReceived,
              .streaming,
+             .drain,
              .commandComplete,
              .error:
             return self.setAndFireError(.unexpectedBackendMessage(.bindComplete))
+
         case .modifying:
             preconditionFailure("Invalid state")
         }
@@ -169,6 +213,13 @@ struct ExtendedQueryStateMachine {
                 state = .streaming(columns, demandStateMachine)
                 return .wait
             }
+
+        case .drain(let columns):
+            guard dataRow.columnCount == columns.count else {
+                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            }
+            // we ignore all rows and wait for readyForQuery
+            return .wait
             
         case .initialized,
              .parseDescribeBindExecuteSyncSent,
@@ -198,6 +249,11 @@ struct ExtendedQueryStateMachine {
                 state = .commandComplete(commandTag: commandTag)
                 return .forwardStreamComplete(demandStateMachine.end(), commandTag: commandTag)
             }
+
+        case .drain:
+            precondition(self.isCancelled)
+            self.state = .commandComplete(commandTag: commandTag)
+            return .wait
         
         case .initialized,
              .parseDescribeBindExecuteSyncSent,
@@ -229,7 +285,7 @@ struct ExtendedQueryStateMachine {
             return self.setAndFireError(error)
         case .rowDescriptionReceived, .noDataMessageReceived:
             return self.setAndFireError(error)
-        case .streaming:
+        case .streaming, .drain:
             return self.setAndFireError(error)
         case .commandComplete:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
@@ -269,6 +325,9 @@ struct ExtendedQueryStateMachine {
                 }
             }
 
+        case .drain:
+            return .wait
+
         case .initialized,
              .parseDescribeBindExecuteSyncSent,
              .parseCompleteReceived,
@@ -291,6 +350,7 @@ struct ExtendedQueryStateMachine {
         switch self.state {
         case .initialized,
              .commandComplete,
+             .drain,
              .error,
              .parseDescribeBindExecuteSyncSent,
              .parseCompleteReceived,
@@ -327,6 +387,7 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived:
             return .read
         case .streaming(let columns, var demandStateMachine):
+            precondition(!self.isCancelled)
             return self.avoidingStateMachineCoW { state -> Action in
                 let action = demandStateMachine.read()
                 state = .streaming(columns, demandStateMachine)
@@ -339,6 +400,7 @@ struct ExtendedQueryStateMachine {
             }
         case .initialized,
              .commandComplete,
+             .drain,
              .error:
             // we already have the complete stream received, now we are waiting for a
             // `readyForQuery` package. To receive this we need to read!
@@ -361,10 +423,19 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived(let context):
             self.state = .error(error)
             return .failQuery(context, with: error)
-            
-        case .streaming:
+
+        case .drain:
             self.state = .error(error)
             return .forwardStreamError(error, read: false)
+            
+        case .streaming(_, var streamStateMachine):
+            self.state = .error(error)
+            switch streamStateMachine.fail() {
+            case .wait:
+                return .forwardStreamError(error, read: false)
+            case .read:
+                return .forwardStreamError(error, read: true)
+            }
             
         case .commandComplete, .error:
             preconditionFailure("""

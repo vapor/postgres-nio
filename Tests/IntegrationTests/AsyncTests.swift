@@ -45,6 +45,25 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testSelect10times10kRows() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let start = 1
+        let end = 10000
+
+        try await withTestConnection(on: eventLoop) { connection in
+            await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                for _ in 0..<10 {
+                    taskGroup.addTask {
+                        try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
+                    }
+                }
+            }
+        }
+    }
+
     #if canImport(Network)
     func testSelect10kRowsNetworkFramework() async throws {
         let eventLoopGroup = NIOTSEventLoopGroup()

@@ -12,7 +12,8 @@ struct PSQLError: Error {
         case authMechanismRequiresPassword
         case saslError(underlyingError: Error)
         case invalidCommandTag(String)
-        
+
+        case queryCancelled
         case tooManyParameters
         case connectionQuiescing
         case connectionClosed
@@ -62,6 +63,10 @@ struct PSQLError: Error {
 
     static func invalidCommandTag(_ value: String) -> PSQLError {
         Self.init(.invalidCommandTag(value))
+    }
+
+    static var queryCancelled: PSQLError {
+        Self.init(.queryCancelled)
     }
     
     static var tooManyParameters: PSQLError {
