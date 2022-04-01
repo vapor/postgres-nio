@@ -1,10 +1,10 @@
-// swift-tools-version:5.5
+// swift-tools-version:5.3
 import PackageDescription
 
 let package = Package(
     name: "postgres-nio",
     platforms: [
-        .macOS(.v12),
+        .macOS(.v10_15),
         .iOS(.v13),
         .watchOS(.v6),
         .tvOS(.v13),
