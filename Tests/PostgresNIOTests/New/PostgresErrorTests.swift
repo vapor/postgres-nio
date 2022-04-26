@@ -45,6 +45,6 @@ final class PostgresCastingErrorTests: XCTestCase {
             line: 123
         )
 
-        XCTAssertNotEqual("\(error)", "Database error")
+        XCTAssertEqual("\(error)", "Database error")
     }
 }
