@@ -531,7 +531,7 @@ extension AsyncStreamConsumer {
 }
 
 extension PostgresRowSequence {
-    func collect() async throws -> [PostgresRow] {
+    public func collect() async throws -> [PostgresRow] {
         var result = [PostgresRow]()
         for try await row in self {
             result.append(row)
