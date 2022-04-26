@@ -39,8 +39,8 @@ extension PostgresCell {
                 format: self.format,
                 context: context
             )
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: self.columnName,
                 columnIndex: self.columnIndex,
