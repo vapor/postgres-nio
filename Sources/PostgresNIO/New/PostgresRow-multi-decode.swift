@@ -3,11 +3,7 @@
 extension PostgresRow {
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
-) {
+    public func decode<T0: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0) {
         precondition(self.columns.count >= 1)
         let columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -19,8 +15,7 @@ extension PostgresRow {
         do {
             let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
-)
+            return (r0)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -38,14 +33,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1) {
         precondition(self.columns.count >= 2)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -63,9 +51,7 @@ extension PostgresRow {
             swiftTargetType = T1.self
             let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
-)
+            return (r0, r1)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -83,17 +69,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2) {
         precondition(self.columns.count >= 3)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -117,10 +93,7 @@ extension PostgresRow {
             swiftTargetType = T2.self
             let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
-)
+            return (r0, r1, r2)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -138,20 +111,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3) {
         precondition(self.columns.count >= 4)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -181,11 +141,7 @@ extension PostgresRow {
             swiftTargetType = T3.self
             let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
-)
+            return (r0, r1, r2, r3)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -203,23 +159,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4) {
         precondition(self.columns.count >= 5)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -255,12 +195,7 @@ extension PostgresRow {
             swiftTargetType = T4.self
             let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
-)
+            return (r0, r1, r2, r3, r4)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -278,26 +213,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5) {
         precondition(self.columns.count >= 6)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -339,13 +255,7 @@ extension PostgresRow {
             swiftTargetType = T5.self
             let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
-)
+            return (r0, r1, r2, r3, r4, r5)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -363,29 +273,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6) {
         precondition(self.columns.count >= 7)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -433,14 +321,7 @@ extension PostgresRow {
             swiftTargetType = T6.self
             let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
-)
+            return (r0, r1, r2, r3, r4, r5, r6)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -458,32 +339,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7) {
         precondition(self.columns.count >= 8)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -537,15 +393,7 @@ extension PostgresRow {
             swiftTargetType = T7.self
             let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -563,35 +411,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8) {
         precondition(self.columns.count >= 9)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -651,16 +471,7 @@ extension PostgresRow {
             swiftTargetType = T8.self
             let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -678,38 +489,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , T9: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) {
         precondition(self.columns.count >= 10)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -775,17 +555,7 @@ extension PostgresRow {
             swiftTargetType = T9.self
             let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
--n , r9
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -803,41 +573,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , T9: PostgresDecodable
--n , T10: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) {
         precondition(self.columns.count >= 11)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -909,18 +645,7 @@ extension PostgresRow {
             swiftTargetType = T10.self
             let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
--n , r9
--n , r10
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -938,44 +663,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , T9: PostgresDecodable
--n , T10: PostgresDecodable
--n , T11: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) {
         precondition(self.columns.count >= 12)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -1053,19 +741,7 @@ extension PostgresRow {
             swiftTargetType = T11.self
             let r11 = try T11._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
--n , r9
--n , r10
--n , r11
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -1083,47 +759,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , T9: PostgresDecodable
--n , T10: PostgresDecodable
--n , T11: PostgresDecodable
--n , T12: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n , T12
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n , T12
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, T12: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12) {
         precondition(self.columns.count >= 13)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -1207,20 +843,7 @@ extension PostgresRow {
             swiftTargetType = T12.self
             let r12 = try T12._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
--n , r9
--n , r10
--n , r11
--n , r12
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -1238,50 +861,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , T9: PostgresDecodable
--n , T10: PostgresDecodable
--n , T11: PostgresDecodable
--n , T12: PostgresDecodable
--n , T13: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n , T12
--n , T13
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n , T12
--n , T13
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, T12: PostgresDecodable, T13: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13) {
         precondition(self.columns.count >= 14)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -1371,21 +951,7 @@ extension PostgresRow {
             swiftTargetType = T13.self
             let r13 = try T13._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
--n , r9
--n , r10
--n , r11
--n , r12
--n , r13
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,
@@ -1403,53 +969,7 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
--n     public func decode<T0: PostgresDecodable
--n , T1: PostgresDecodable
--n , T2: PostgresDecodable
--n , T3: PostgresDecodable
--n , T4: PostgresDecodable
--n , T5: PostgresDecodable
--n , T6: PostgresDecodable
--n , T7: PostgresDecodable
--n , T8: PostgresDecodable
--n , T9: PostgresDecodable
--n , T10: PostgresDecodable
--n , T11: PostgresDecodable
--n , T12: PostgresDecodable
--n , T13: PostgresDecodable
--n , T14: PostgresDecodable
--n , JSONDecoder: PostgresJSONDecoder>(_: (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n , T12
--n , T13
--n , T14
--n ).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws
--n  -> (T0
--n , T1
--n , T2
--n , T3
--n , T4
--n , T5
--n , T6
--n , T7
--n , T8
--n , T9
--n , T10
--n , T11
--n , T12
--n , T13
--n , T14
-) {
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, T12: PostgresDecodable, T13: PostgresDecodable, T14: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14) {
         precondition(self.columns.count >= 15)
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
@@ -1545,22 +1065,7 @@ extension PostgresRow {
             swiftTargetType = T14.self
             let r14 = try T14._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
--n             return (r0
--n , r1
--n , r2
--n , r3
--n , r4
--n , r5
--n , r6
--n , r7
--n , r8
--n , r9
--n , r10
--n , r11
--n , r12
--n , r13
--n , r14
-)
+            return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14)
         } catch let code as PostgresDecodingError.Code {
             throw PostgresDecodingError(
                 code: code,

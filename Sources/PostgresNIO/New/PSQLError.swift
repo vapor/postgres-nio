@@ -91,7 +91,7 @@ struct PSQLError: Error {
 }
 
 /// An error that may happen when a ``PostgresRow`` or ``PostgresCell`` is decoded to native Swift types.
-struct PostgresDecodingError: Error, Equatable {
+public struct PostgresDecodingError: Error, Equatable {
     public struct Code: Hashable, Error {
         enum Base {
             case missingData
@@ -154,8 +154,7 @@ struct PostgresDecodingError: Error, Equatable {
         self.line = line
     }
 
-    @usableFromInline
-    static func ==(lhs: PostgresDecodingError, rhs: PostgresDecodingError) -> Bool {
+    public static func ==(lhs: PostgresDecodingError, rhs: PostgresDecodingError) -> Bool {
         return lhs.code == rhs.code
             && lhs.columnName == rhs.columnName
             && lhs.columnIndex == rhs.columnIndex
@@ -169,12 +168,12 @@ struct PostgresDecodingError: Error, Equatable {
 }
 
 extension PostgresDecodingError: CustomStringConvertible {
-  var description: String {
-    // This may seem very odd... But we are afraid that users might accidentally send the
-    // unfiltered errors out to end-users. This may leak security relevant information. For this
-    // reason we overwrite the error description by default to this generic "Database error"
-    "Database error"
-  }
+    public var description: String {
+        // This may seem very odd... But we are afraid that users might accidentally send the
+        // unfiltered errors out to end-users. This may leak security relevant information. For this
+        // reason we overwrite the error description by default to this generic "Database error"
+        "Database error"
+    }
 }
 enum PSQLAuthScheme {
     case none
