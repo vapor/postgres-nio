@@ -5,7 +5,7 @@ extension String: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .text
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -37,11 +37,11 @@ extension String: PostgresDecodable {
             self = buffer.readString(length: buffer.readableBytes)!
         case (_, .uuid):
             guard let uuid = try? UUID(from: &buffer, type: .uuid, format: format, context: context) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = uuid.uuidString
         default:
-            throw PostgresDecoingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }

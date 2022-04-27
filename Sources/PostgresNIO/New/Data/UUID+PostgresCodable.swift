@@ -6,7 +6,7 @@ extension UUID: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .uuid
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -37,7 +37,7 @@ extension UUID: PostgresDecodable {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = uuid
         case (.binary, .varchar),
@@ -46,15 +46,15 @@ extension UUID: PostgresDecodable {
              (.text, .text),
              (.text, .varchar):
             guard buffer.readableBytes == 36 else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
 
             guard let uuid = buffer.readString(length: 36).flatMap({ UUID(uuidString: $0) }) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = uuid
         default:
-            throw PostgresDecoingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
@@ -67,13 +67,13 @@ extension ByteBuffer {
         guard self.readableBytes >= MemoryLayout<uuid_t>.size else {
             return nil
         }
-        
+
         let value: UUID = self.getUUID(at: self.readerIndex)! /* must work as we have enough bytes */
         // should be MoveReaderIndex
         self.moveReaderIndex(forwardBy: MemoryLayout<uuid_t>.size)
         return value
     }
-    
+
     func getUUID(at index: Int) -> UUID? {
         var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         return self.viewBytes(at: index, length: MemoryLayout.size(ofValue: uuid)).map { bufferBytes in

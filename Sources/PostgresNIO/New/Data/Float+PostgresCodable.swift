@@ -4,7 +4,7 @@ extension Float: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .float4
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -29,21 +29,21 @@ extension Float: PostgresDecodable {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = float
         case (.binary, .float8):
             guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Float(double)
         case (.text, .float4), (.text, .float8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Float(string) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresDecoingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
@@ -54,7 +54,7 @@ extension Double: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .float8
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -79,21 +79,21 @@ extension Double: PostgresDecodable {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Double(float)
         case (.binary, .float8):
             guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = double
         case (.text, .float4), (.text, .float8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Double(string) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresDecoingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }

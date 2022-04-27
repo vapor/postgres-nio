@@ -4,7 +4,7 @@ extension PostgresEncodable where Self: RawRepresentable, RawValue: PostgresEnco
     public static var psqlType: PostgresDataType {
         RawValue.psqlType
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         RawValue.psqlFormat
     }
@@ -27,7 +27,7 @@ extension PostgresDecodable where Self: RawRepresentable, RawValue: PostgresDeco
     ) throws {
         guard let rawValue = try? RawValue(from: &buffer, type: type, format: format, context: context),
               let selfValue = Self.init(rawValue: rawValue) else {
-            throw PostgresDecoingError.Code.failure
+            throw PostgresDecodingError.Code.failure
         }
 
         self = selfValue

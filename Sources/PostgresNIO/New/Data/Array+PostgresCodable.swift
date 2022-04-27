@@ -134,7 +134,7 @@ extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Elemen
     ) throws {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.
-            throw PostgresDecoingError.Code.failure
+            throw PostgresDecodingError.Code.failure
         }
 
         guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, UInt32).self),

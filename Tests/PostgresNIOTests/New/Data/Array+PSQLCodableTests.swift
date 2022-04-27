@@ -3,7 +3,7 @@ import NIOCore
 @testable import PostgresNIO
 
 class Array_PSQLCodableTests: XCTestCase {
-    
+
     func testArrayTypes() {
 
         XCTAssertEqual(Bool.psqlArrayType, .boolArray)
@@ -29,7 +29,7 @@ class Array_PSQLCodableTests: XCTestCase {
         XCTAssertEqual(Int64.psqlArrayType, .int8Array)
         XCTAssertEqual(Int64.psqlType, .int8)
         XCTAssertEqual([Int64].psqlType, .int8Array)
-        
+
         #if (arch(i386) || arch(arm))
         XCTAssertEqual(Int.psqlArrayType, .int4Array)
         XCTAssertEqual(Int.psqlType, .int4)
@@ -56,61 +56,61 @@ class Array_PSQLCodableTests: XCTestCase {
         XCTAssertEqual(UUID.psqlType, .uuid)
         XCTAssertEqual([UUID].psqlType, .uuidArray)
     }
-    
+
     func testStringArrayRoundTrip() {
         let values = ["foo", "bar", "hello", "world"]
-        
+
         var buffer = ByteBuffer()
         XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
-        
+
         var result: [String]?
         XCTAssertNoThrow(result = try [String](from: &buffer, type: .textArray, format: .binary, context: .default))
         XCTAssertEqual(values, result)
     }
-    
+
     func testEmptyStringArrayRoundTrip() {
         let values: [String] = []
-        
+
         var buffer = ByteBuffer()
         XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
-        
+
         var result: [String]?
         XCTAssertNoThrow(result = try [String](from: &buffer, type: .textArray, format: .binary, context: .default))
         XCTAssertEqual(values, result)
     }
-    
+
     func testDecodeFailureIsNotEmptyOutOfScope() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(2)) // invalid value
         buffer.writeInteger(Int32(0))
         buffer.writeInteger(String.psqlType.rawValue)
-        
+
         XCTAssertThrowsError(try [String](from: &buffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
-    
+
     func testDecodeFailureSecondValueIsUnexpected() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(0)) // is empty
         buffer.writeInteger(Int32(1)) // invalid value, must always be 0
         buffer.writeInteger(String.psqlType.rawValue)
-        
+
         XCTAssertThrowsError(try [String](from: &buffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
-    
+
     func testDecodeFailureTriesDecodeInt8() {
         let value: Int64 = 1 << 32
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
 
         XCTAssertThrowsError(try [String](from: &buffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
-    
+
     func testDecodeFailureInvalidNumberOfArrayElements() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(1)) // invalid value
@@ -120,10 +120,10 @@ class Array_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(1)) // dimensions... must be one
 
         XCTAssertThrowsError(try [String](from: &buffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
-    
+
     func testDecodeFailureInvalidNumberOfDimensions() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(1)) // invalid value
@@ -131,12 +131,12 @@ class Array_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(String.psqlType.rawValue)
         buffer.writeInteger(Int32(1)) // expected element count
         buffer.writeInteger(Int32(2)) // dimensions... must be one
-        
+
         XCTAssertThrowsError(try [String](from: &buffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
-    
+
     func testDecodeUnexpectedEnd() {
         var unexpectedEndInElementLengthBuffer = ByteBuffer()
         unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // invalid value
@@ -145,11 +145,11 @@ class Array_PSQLCodableTests: XCTestCase {
         unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // expected element count
         unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // dimensions
         unexpectedEndInElementLengthBuffer.writeInteger(Int16(1)) // length of element, must be Int32
-        
+
         XCTAssertThrowsError(try [String](from: &unexpectedEndInElementLengthBuffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
-        
+
         var unexpectedEndInElementBuffer = ByteBuffer()
         unexpectedEndInElementBuffer.writeInteger(Int32(1)) // invalid value
         unexpectedEndInElementBuffer.writeInteger(Int32(0))
@@ -158,9 +158,9 @@ class Array_PSQLCodableTests: XCTestCase {
         unexpectedEndInElementBuffer.writeInteger(Int32(1)) // dimensions
         unexpectedEndInElementBuffer.writeInteger(Int32(12)) // length of element, must be Int32
         unexpectedEndInElementBuffer.writeString("Hello World") // only 11 bytes, 12 needed!
-        
+
         XCTAssertThrowsError(try [String](from: &unexpectedEndInElementBuffer, type: .textArray, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
 }

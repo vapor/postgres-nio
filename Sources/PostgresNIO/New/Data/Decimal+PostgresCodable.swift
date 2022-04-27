@@ -5,7 +5,7 @@ extension Decimal: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .numeric
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -34,16 +34,16 @@ extension Decimal: PostgresDecodable {
         switch (format, type) {
         case (.binary, .numeric):
             guard let numeric = PostgresNumeric(buffer: &buffer) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = numeric.decimal
         case (.text, .numeric):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresDecoingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }

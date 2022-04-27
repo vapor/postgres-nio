@@ -10,7 +10,7 @@ extension PostgresEncodable where Self: Encodable {
     public static var psqlType: PostgresDataType {
         .jsonb
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -35,13 +35,13 @@ extension PostgresDecodable where Self: Decodable {
         switch (format, type) {
         case (.binary, .jsonb):
             guard JSONBVersionByte == buffer.readInteger(as: UInt8.self) else {
-                throw PostgresDecoingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = try context.jsonDecoder.decode(Self.self, from: buffer)
         case (.binary, .json), (.text, .jsonb), (.text, .json):
             self = try context.jsonDecoder.decode(Self.self, from: buffer)
         default:
-            throw PostgresDecoingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
