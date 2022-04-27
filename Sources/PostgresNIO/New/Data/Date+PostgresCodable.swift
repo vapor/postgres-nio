@@ -5,7 +5,7 @@ extension Date: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .timestamptz
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -18,14 +18,14 @@ extension Date: PostgresEncodable {
         let seconds = self.timeIntervalSince(Self._psqlDateStart) * Double(Self._microsecondsPerSecond)
         byteBuffer.writeInteger(Int64(seconds))
     }
-    
+
     // MARK: Private Constants
 
     @usableFromInline
     static let _microsecondsPerSecond: Int64 = 1_000_000
     @usableFromInline
     static let _secondsInDay: Int64 = 24 * 60 * 60
-    
+
     /// values are stored as seconds before or after midnight 2000-01-01
     @usableFromInline
     static let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)
@@ -42,18 +42,18 @@ extension Date: PostgresDecodable {
         switch type {
         case .timestamp, .timestamptz:
             guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             let seconds = Double(microseconds) / Double(Self._microsecondsPerSecond)
             self = Date(timeInterval: seconds, since: Self._psqlDateStart)
         case .date:
             guard buffer.readableBytes == 4, let days = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             let seconds = Int64(days) * Self._secondsInDay
             self = Date(timeInterval: Double(seconds), since: Self._psqlDateStart)
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }

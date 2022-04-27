@@ -65,8 +65,8 @@ function gen() {
         echo -n ", r$(($n))"
     done
     echo ")"
-    echo "        } catch let code as PostgresCastingError.Code {"
-    echo "            throw PostgresCastingError("
+    echo "        } catch let code as PostgresDecodingError.Code {"
+    echo "            throw PostgresDecodingError("
     echo "                code: code,"
     echo "                columnName: column.name,"
     echo "                columnIndex: columnIndex,"

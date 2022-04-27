@@ -31,12 +31,12 @@ extension UInt8: PostgresDecodable {
         switch type {
         case .bpchar, .char:
             guard buffer.readableBytes == 1, let value = buffer.readInteger(as: UInt8.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
 
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
@@ -74,16 +74,16 @@ extension Int16: PostgresDecodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         case (.text, .int2):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int16(string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
@@ -96,7 +96,7 @@ extension Int32: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .int4
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -121,21 +121,21 @@ extension Int32: PostgresDecodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Int32(value)
         case (.binary, .int4):
             guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Int32(value)
         case (.text, .int2), (.text, .int4):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int32(string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
@@ -173,26 +173,26 @@ extension Int64: PostgresDecodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Int64(value)
         case (.binary, .int4):
             guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Int64(value)
         case (.binary, .int8):
             guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int64.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         case (.text, .int2), (.text, .int4), (.text, .int8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int64(string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }
@@ -212,7 +212,7 @@ extension Int: PostgresEncodable {
             preconditionFailure("Int is expected to be an Int32 or Int64")
         }
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -237,26 +237,26 @@ extension Int: PostgresDecodable {
         switch (format, type) {
         case (.binary, .int2):
             guard buffer.readableBytes == 2, let value = buffer.readInteger(as: Int16.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = Int(value)
         case (.binary, .int4):
             guard buffer.readableBytes == 4, let value = buffer.readInteger(as: Int32.self).flatMap({ Int(exactly: $0) }) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         case (.binary, .int8):
             guard buffer.readableBytes == 8, let value = buffer.readInteger(as: Int.self).flatMap({ Int(exactly: $0) }) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         case (.text, .int2), (.text, .int4), (.text, .int8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Int(string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
     }
 }

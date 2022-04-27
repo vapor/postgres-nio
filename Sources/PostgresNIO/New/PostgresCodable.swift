@@ -5,10 +5,10 @@ import Foundation
 public protocol PostgresEncodable {
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     static var psqlType: PostgresDataType { get }
-    
+
     /// identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
     static var psqlFormat: PostgresFormat { get }
-    
+
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the ``PostgresBindings``.
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
@@ -61,7 +61,7 @@ extension PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard var buffer = byteBuffer else {
-            throw PostgresCastingError.Code.missingData
+            throw PostgresDecodingError.Code.missingData
         }
         return try self.init(from: &buffer, type: type, format: format, context: context)
     }
@@ -84,7 +84,7 @@ extension PostgresEncodable {
         // The value of the parameter, in the format indicated by the associated format
         // code. n is the above length.
         try self.encode(into: &buffer, context: context)
-        
+
         // overwrite the empty length, with the real value
         buffer.setInteger(numericCast(buffer.writerIndex - startIndex), at: lengthIndex, as: Int32.self)
     }
