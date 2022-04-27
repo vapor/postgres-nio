@@ -38,7 +38,7 @@ class String_PSQLCodableTests: XCTestCase {
         for dataType in dataTypes {
             var loopBuffer = buffer
             XCTAssertThrowsError(try String(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
-                XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
+                XCTAssertEqual($0 as? PostgresDecoingError.Code, .typeMismatch)
             }
         }
     }
@@ -61,7 +61,7 @@ class String_PSQLCodableTests: XCTestCase {
         buffer.moveReaderIndex(forwardBy: 1)
         
         XCTAssertThrowsError(try String(from: &buffer, type: .uuid, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
     }
 }

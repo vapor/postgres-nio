@@ -37,11 +37,11 @@ extension String: PostgresDecodable {
             self = buffer.readString(length: buffer.readableBytes)!
         case (_, .uuid):
             guard let uuid = try? UUID(from: &buffer, type: .uuid, format: format, context: context) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = uuid.uuidString
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }

@@ -34,16 +34,16 @@ extension Decimal: PostgresDecodable {
         switch (format, type) {
         case (.binary, .numeric):
             guard let numeric = PostgresNumeric(buffer: &buffer) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = numeric.decimal
         case (.text, .numeric):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Decimal(string: string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }

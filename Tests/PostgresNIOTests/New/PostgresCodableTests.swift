@@ -53,12 +53,12 @@ final class PostgresCodableTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try row.decode(String.self, context: .default)) {
-            XCTAssertEqual(($0 as? PostgresCastingError)?.line, #line - 1)
-            XCTAssertEqual(($0 as? PostgresCastingError)?.file, #file)
+            XCTAssertEqual(($0 as? PostgresDecoingError)?.line, #line - 1)
+            XCTAssertEqual(($0 as? PostgresDecoingError)?.file, #file)
 
-            XCTAssertEqual(($0 as? PostgresCastingError)?.code, .missingData)
-            XCTAssert(($0 as? PostgresCastingError)?.targetType == String.self)
-            XCTAssertEqual(($0 as? PostgresCastingError)?.postgresType, .text)
+            XCTAssertEqual(($0 as? PostgresDecoingError)?.code, .missingData)
+            XCTAssert(($0 as? PostgresDecoingError)?.targetType == String.self)
+            XCTAssertEqual(($0 as? PostgresDecoingError)?.postgresType, .text)
         }
     }
 }

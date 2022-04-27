@@ -55,7 +55,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         XCTAssertThrowsError(try Hello(from: &buffer, type: .jsonb, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
     }
     
@@ -64,7 +64,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         buffer.writeString(#"{"hello":"world"}"#)
 
         XCTAssertThrowsError(try Hello(from: &buffer, type: .text, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .typeMismatch)
         }
     }
     

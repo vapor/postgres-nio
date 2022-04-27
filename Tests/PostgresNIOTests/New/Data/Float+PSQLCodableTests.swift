@@ -98,22 +98,22 @@ class Float_PSQLCodableTests: XCTestCase {
 
         var toLongBuffer1 = eightByteBuffer
         XCTAssertThrowsError(try Double(from: &toLongBuffer1, type: .float4, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
 
         var toLongBuffer2 = eightByteBuffer
         XCTAssertThrowsError(try Float(from: &toLongBuffer2, type: .float4, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
 
         var toShortBuffer1 = fourByteBuffer
         XCTAssertThrowsError(try Double(from: &toShortBuffer1, type: .float8, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
 
         var toShortBuffer2 = fourByteBuffer
         XCTAssertThrowsError(try Float(from: &toShortBuffer2, type: .float8, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
     }
     
@@ -123,12 +123,12 @@ class Float_PSQLCodableTests: XCTestCase {
 
         var copy1 = buffer
         XCTAssertThrowsError(try Double(from: &copy1, type: .int8, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .typeMismatch)
         }
 
         var copy2 = buffer
         XCTAssertThrowsError(try Float(from: &copy2, type: .int8, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .typeMismatch)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .typeMismatch)
         }
     }
 }

@@ -30,7 +30,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int16(4)) // out of bounds
 
         XCTAssertThrowsError(try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
     }
     
@@ -39,7 +39,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int32(1)) // out of bounds
 
         XCTAssertThrowsError(try MyRawRepresentable(from: &buffer, type: Int32.psqlType, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresCastingError.Code, .failure)
+            XCTAssertEqual($0 as? PostgresDecoingError.Code, .failure)
         }
     }
     

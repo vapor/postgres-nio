@@ -27,7 +27,7 @@ extension PostgresDecodable where Self: RawRepresentable, RawValue: PostgresDeco
     ) throws {
         guard let rawValue = try? RawValue(from: &buffer, type: type, format: format, context: context),
               let selfValue = Self.init(rawValue: rawValue) else {
-            throw PostgresCastingError.Code.failure
+            throw PostgresDecoingError.Code.failure
         }
 
         self = selfValue

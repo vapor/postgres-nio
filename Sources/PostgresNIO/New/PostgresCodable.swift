@@ -61,7 +61,7 @@ extension PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
         guard var buffer = byteBuffer else {
-            throw PostgresCastingError.Code.missingData
+            throw PostgresDecoingError.Code.missingData
         }
         return try self.init(from: &buffer, type: type, format: format, context: context)
     }

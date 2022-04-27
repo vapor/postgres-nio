@@ -29,21 +29,21 @@ extension Float: PostgresDecodable {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = float
         case (.binary, .float8):
             guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = Float(double)
         case (.text, .float4), (.text, .float8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Float(string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }
@@ -79,21 +79,21 @@ extension Double: PostgresDecodable {
         switch (format, type) {
         case (.binary, .float4):
             guard buffer.readableBytes == 4, let float = buffer.psqlReadFloat() else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = Double(float)
         case (.binary, .float8):
             guard buffer.readableBytes == 8, let double = buffer.psqlReadDouble() else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = double
         case (.text, .float4), (.text, .float8):
             guard let string = buffer.readString(length: buffer.readableBytes), let value = Double(string) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = value
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }

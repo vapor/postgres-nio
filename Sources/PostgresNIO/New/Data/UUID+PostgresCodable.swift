@@ -37,7 +37,7 @@ extension UUID: PostgresDecodable {
         switch (format, type) {
         case (.binary, .uuid):
             guard let uuid = buffer.readUUID() else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = uuid
         case (.binary, .varchar),
@@ -46,15 +46,15 @@ extension UUID: PostgresDecodable {
              (.text, .text),
              (.text, .varchar):
             guard buffer.readableBytes == 36 else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
 
             guard let uuid = buffer.readString(length: 36).flatMap({ UUID(uuidString: $0) }) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = uuid
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }

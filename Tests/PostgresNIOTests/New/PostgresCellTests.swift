@@ -40,7 +40,7 @@ final class PostgresCellTests: XCTestCase {
         )
 
         XCTAssertThrowsError(try cell.decode(Int?.self, context: .default)) {
-            guard let error = $0 as? PostgresCastingError else {
+            guard let error = $0 as? PostgresDecoingError else {
                 return XCTFail("Unexpected error")
             }
 

@@ -42,18 +42,18 @@ extension Date: PostgresDecodable {
         switch type {
         case .timestamp, .timestamptz:
             guard buffer.readableBytes == 8, let microseconds = buffer.readInteger(as: Int64.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             let seconds = Double(microseconds) / Double(Self._microsecondsPerSecond)
             self = Date(timeInterval: seconds, since: Self._psqlDateStart)
         case .date:
             guard buffer.readableBytes == 4, let days = buffer.readInteger(as: Int32.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             let seconds = Int64(days) * Self._secondsInDay
             self = Date(timeInterval: Double(seconds), since: Self._psqlDateStart)
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }

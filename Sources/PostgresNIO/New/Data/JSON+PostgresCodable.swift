@@ -35,13 +35,13 @@ extension PostgresDecodable where Self: Decodable {
         switch (format, type) {
         case (.binary, .jsonb):
             guard JSONBVersionByte == buffer.readInteger(as: UInt8.self) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecoingError.Code.failure
             }
             self = try context.jsonDecoder.decode(Self.self, from: buffer)
         case (.binary, .json), (.text, .jsonb), (.text, .json):
             self = try context.jsonDecoder.decode(Self.self, from: buffer)
         default:
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecoingError.Code.typeMismatch
         }
     }
 }
