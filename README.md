@@ -1,6 +1,6 @@
 <img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
 
-[![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)]
+[![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)][SSWG-Incubation]
 [![Documentation]]
 [![Team Chat]]
 [![MIT License]]
@@ -186,8 +186,7 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 
 Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
 
-![SSWG Incubating Badge]: https://img.shields.io/badge/sswg-incubating-green.svg
-[![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
+[SSWG-Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
 ![Documentation]: http://img.shields.io/badge/read_the-docs-2196f3.svg
 [![Documentation]]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
 ![Team Chat]: https://img.shields.io/discord/431917998102675485.svg
