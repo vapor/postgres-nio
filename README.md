@@ -184,7 +184,7 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 
 ## Security
 
-Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
+Please see [SECURITY.md] for details on the security process.
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
 [Documentation]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
@@ -192,7 +192,7 @@ Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md)
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
 [Swift 5.4]: https://swift.org
-
+[Security.md]: SECURITY.md
 
 [`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
 [`query(_:logger:)`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/#postgresconnection.query(_:logger:file:line:)
