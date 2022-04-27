@@ -192,7 +192,7 @@ Please see [SECURITY.md] for details on the security process.
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
 [Swift 5.4]: https://swift.org
-[Security.md]: SECURITY.md
+[Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
 [`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
 [`query(_:logger:)`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/#postgresconnection.query(_:logger:file:line:)
