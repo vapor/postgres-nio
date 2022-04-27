@@ -1,23 +1,11 @@
 <img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
 
-<a href="https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level">
-    <img src="https://img.shields.io/badge/sswg-incubating-green.svg" alt="SSWG Incubating">
-</a>
-<a href="https://api.vapor.codes/postgres-nio/main/PostgresNIO/">
-    <img src="http://img.shields.io/badge/read_the-docs-2196f3.svg" alt="Documentation">
-</a>
-<a href="https://discord.gg/vapor">
-    <img src="https://img.shields.io/discord/431917998102675485.svg" alt="Team Chat">
-</a>
-<a href="LICENSE">
-    <img src="http://img.shields.io/badge/license-MIT-brightgreen.svg" alt="MIT License">
-</a>
-<a href="https://github.com/vapor/postgres-nio/actions">
-    <img src="https://github.com/vapor/postgres-nio/actions/workflows/main-codecov.yml/badge.svg" alt="Continuous Integration">
-</a>
-<a href="https://swift.org">
-    <img src="http://img.shields.io/badge/swift-5.2-brightgreen.svg" alt="Swift 5.2">
-</a>
+[![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)][SSWG Incubation]
+[![Documentation](http://img.shields.io/badge/read_the-docs-2196f3.svg)][Documentation]
+[![Team Chat](https://img.shields.io/discord/431917998102675485.svg)][Team Chat]
+[![MIT License](http://img.shields.io/badge/license-MIT-brightgreen.svg)][MIT License]
+[![Continuous Integration](https://github.com/vapor/postgres-nio/actions/workflows/test.yml/badge.svg)][Continuous Integration]
+[![Swift 5.4](http://img.shields.io/badge/swift-5.4-brightgreen.svg)][Swift 5.4]
 <br>
 <br>
 
@@ -196,7 +184,15 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 
 ## Security
 
-Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
+Please see [SECURITY.md] for details on the security process.
+
+[SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
+[Documentation]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
+[Team Chat]: https://discord.gg/vapor
+[MIT License]: LICENSE
+[Continuous Integration]: https://github.com/vapor/postgres-nio/actions
+[Swift 5.4]: https://swift.org
+[Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
 [`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
 [`query(_:logger:)`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/#postgresconnection.query(_:logger:file:line:)
