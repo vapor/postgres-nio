@@ -187,7 +187,7 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md) for details on the security process.
 
 ![SSWG Incubating Badge]: https://img.shields.io/badge/sswg-incubating-green.svg
-[!![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
+[![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
 ![Documentation]: http://img.shields.io/badge/read_the-docs-2196f3.svg
 [![Documentation]]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
 ![Team Chat]: https://img.shields.io/discord/431917998102675485.svg
