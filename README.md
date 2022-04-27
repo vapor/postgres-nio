@@ -1,6 +1,6 @@
 <img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
 
-[![SSWG Incubating Badge]]
+[![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)]
 [![Documentation]]
 [![Team Chat]]
 [![MIT License]]
