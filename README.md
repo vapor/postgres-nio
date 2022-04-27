@@ -188,10 +188,10 @@ Please see [SECURITY.md](https://github.com/vapor/.github/blob/main/SECURITY.md)
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
 [Documentation]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
-[![Team Chat]]: https://discord.gg/vapor
+[Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
-[Swift 5.4]: "https://swift.org"
+[Swift 5.4]: https://swift.org
 
 
 [`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
