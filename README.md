@@ -114,9 +114,9 @@ let config = PostgresConnection.Configuration(
 )
 
 let connection = try await PostgresConnection.connect(
-  on eventLoop: eventLoopGroup.next(),
+  on: eventLoopGroup.next(),
   configuration: config,
-  id connectionID: 1,
+  id: 1,
   logger: logger
 )
 
