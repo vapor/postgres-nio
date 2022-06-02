@@ -5,8 +5,8 @@ struct ConnectionStateMachine {
     typealias TransactionState = PostgresBackendMessage.TransactionState
     
     struct ConnectionContext {
-        let processID: Int32
-        let secretKey: Int32
+        let processID: Int32?
+        let secretKey: Int32?
         
         var parameters: [String: String]
         var transactionState: TransactionState
@@ -543,14 +543,9 @@ struct ConnectionStateMachine {
     mutating func readyForQueryReceived(_ transactionState: PostgresBackendMessage.TransactionState) -> ConnectionAction {
         switch self.state {
         case .authenticated(let backendKeyData, let parameters):
-            guard let keyData = backendKeyData else {
-                // `backendKeyData` must have been received, before receiving the first `readyForQuery`
-                return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.readyForQuery(transactionState)))
-            }
-            
             let connectionContext = ConnectionContext(
-                processID: keyData.processID,
-                secretKey: keyData.secretKey,
+                processID: backendKeyData?.processID,
+                secretKey: backendKeyData?.secretKey,
                 parameters: parameters,
                 transactionState: transactionState)
             
