@@ -77,13 +77,23 @@ public final class PostgresConnection {
             ///
             /// - Default: 5432
             public var port: Int
-
-            public init(host: String, port: Int = 5432) {
+            
+            /// Require connection to provide `BackendKeyData`
+            ///
+            /// - Default: true
+            public var requireBackendKeyData: Bool
+            
+            public init(
+                host: String,
+                port: Int = 5432,
+                requireBackendKeyData: Bool = true
+            ) {
                 self.host = host
                 self.port = port
+                self.requireBackendKeyData = requireBackendKeyData
             }
         }
-
+        
         public var connection: Connection
 
         /// The authentication properties to send to the Postgres server during startup auth handshake
@@ -377,6 +387,7 @@ extension PostgresConnection {
         to socketAddress: SocketAddress,
         tlsConfiguration: TLSConfiguration? = nil,
         serverHostname: String? = nil,
+        requireBackendKeyData: Bool = true,
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
@@ -394,7 +405,8 @@ extension PostgresConnection {
             let configuration = PostgresConnection.InternalConfiguration(
                 connection: .resolved(address: socketAddress, serverName: serverHostname),
                 authentication: nil,
-                tls: tls
+                tls: tls,
+                requireBackendKeyData: requireBackendKeyData
             )
 
             return PostgresConnection.connect(
@@ -756,6 +768,8 @@ extension PostgresConnection {
         var authentication: Configuration.Authentication?
 
         var tls: Configuration.TLS
+        
+        let requireBackendKeyData: Bool
     }
 }
 
@@ -764,6 +778,7 @@ extension PostgresConnection.InternalConfiguration {
         self.authentication = config.authentication
         self.connection = .unresolved(host: config.connection.host, port: config.connection.port)
         self.tls = config.tls
+        self.requireBackendKeyData = config.connection.requireBackendKeyData
     }
 }
 

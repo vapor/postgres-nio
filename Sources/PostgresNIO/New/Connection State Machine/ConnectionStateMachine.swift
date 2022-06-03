@@ -113,17 +113,20 @@ struct ConnectionStateMachine {
     }
     
     private var state: State
+    private var requireBackendKeyData: Bool
     private var taskQueue = CircularBuffer<PSQLTask>()
     private var quiescingState: QuiescingState = .notQuiescing
     
-    init() {
+    init(requireBackendKeyData: Bool = true) {
         self.state = .initialized
+        self.requireBackendKeyData = requireBackendKeyData
     }
 
     #if DEBUG
     /// for testing purposes only
-    init(_ state: State) {
+    init(_ state: State, requireBackendKeyData: Bool = true) {
         self.state = state
+        self.requireBackendKeyData = requireBackendKeyData
     }
     #endif
 
@@ -543,6 +546,10 @@ struct ConnectionStateMachine {
     mutating func readyForQueryReceived(_ transactionState: PostgresBackendMessage.TransactionState) -> ConnectionAction {
         switch self.state {
         case .authenticated(let backendKeyData, let parameters):
+            if self.requireBackendKeyData && backendKeyData == nil {
+                return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.readyForQuery(transactionState)))
+            }
+            
             let connectionContext = ConnectionContext(
                 processID: backendKeyData?.processID,
                 secretKey: backendKeyData?.secretKey,
