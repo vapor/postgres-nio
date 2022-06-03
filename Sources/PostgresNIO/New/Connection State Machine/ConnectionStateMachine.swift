@@ -113,7 +113,7 @@ struct ConnectionStateMachine {
     }
     
     private var state: State
-    private var requireBackendKeyData: Bool
+    private let requireBackendKeyData: Bool
     private var taskQueue = CircularBuffer<PSQLTask>()
     private var quiescingState: QuiescingState = .notQuiescing
     

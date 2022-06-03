@@ -108,6 +108,9 @@ class ConnectionStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.readyForQueryReceived(.idle),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
+        
+        state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: false)
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
     func testErrorIsIgnoredWhenClosingConnection() {
