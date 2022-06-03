@@ -92,7 +92,7 @@ class ConnectionStateMachineTests: XCTestCase {
     }
     
     func testReadyForQueryReceivedWithoutBackendKeyAfterAuthenticated() {
-        var state = ConnectionStateMachine(.authenticated(nil, [:]))
+        var state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: true)
         
         XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")), .wait)
         XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "application_name", value: "")), .wait)
@@ -108,8 +108,23 @@ class ConnectionStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.readyForQueryReceived(.idle),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
+    }
+    
+    func testReadyForQueryReceivedWithoutUnneededBackendKeyAfterAuthenticated() {
+        var state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: false)
         
-        state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: false)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "application_name", value: "")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "server_encoding", value: "UTF8")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "integer_datetimes", value: "on")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "client_encoding", value: "UTF8")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "TimeZone", value: "Etc/UTC")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "is_superuser", value: "on")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "server_version", value: "13.1 (Debian 13.1-1.pgdg100+1)")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "session_authorization", value: "postgres")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "IntervalStyle", value: "postgres")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "standard_conforming_strings", value: "on")), .wait)
+        
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     

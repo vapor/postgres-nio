@@ -89,7 +89,7 @@ public final class PostgresConnection {
                 self.port = port
             }
         }
-        
+
         public var connection: Connection
 
         /// The authentication properties to send to the Postgres server during startup auth handshake
@@ -764,7 +764,7 @@ extension PostgresConnection {
 
         var tls: Configuration.TLS
         
-        let requireBackendKeyData: Bool
+        var requireBackendKeyData: Bool
     }
 }
 
