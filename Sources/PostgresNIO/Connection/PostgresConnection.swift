@@ -387,7 +387,6 @@ extension PostgresConnection {
         to socketAddress: SocketAddress,
         tlsConfiguration: TLSConfiguration? = nil,
         serverHostname: String? = nil,
-        requireBackendKeyData: Bool = true,
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
@@ -406,7 +405,7 @@ extension PostgresConnection {
                 connection: .resolved(address: socketAddress, serverName: serverHostname),
                 authentication: nil,
                 tls: tls,
-                requireBackendKeyData: requireBackendKeyData
+                requireBackendKeyData: true
             )
 
             return PostgresConnection.connect(
