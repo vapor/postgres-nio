@@ -134,13 +134,13 @@ extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Elemen
     ) throws {
         guard case .binary = format else {
             // currently we only support decoding arrays in binary format.
-            throw PostgresCastingError.Code.failure
+            throw PostgresDecodingError.Code.failure
         }
 
         guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, UInt32).self),
               0 <= isNotEmpty, isNotEmpty <= 1, b == 0
         else {
-            throw PostgresCastingError.Code.failure
+            throw PostgresDecodingError.Code.failure
         }
 
         let elementType = PostgresDataType(element)
@@ -154,7 +154,7 @@ extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Elemen
               expectedArrayCount > 0,
               dimensions == 1
         else {
-            throw PostgresCastingError.Code.failure
+            throw PostgresDecodingError.Code.failure
         }
 
         var result = Array<Element>()
@@ -162,11 +162,11 @@ extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Elemen
 
         for _ in 0 ..< expectedArrayCount {
             guard let elementLength = buffer.readInteger(as: Int32.self), elementLength >= 0 else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
 
             guard var elementBuffer = buffer.readSlice(length: numericCast(elementLength)) else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
 
             let element = try Element.init(from: &elementBuffer, type: elementType, format: format, context: context)

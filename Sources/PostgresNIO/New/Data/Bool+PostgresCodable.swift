@@ -9,13 +9,13 @@ extension Bool: PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws {
         guard type == .bool else {
-            throw PostgresCastingError.Code.typeMismatch
+            throw PostgresDecodingError.Code.typeMismatch
         }
 
         switch format {
         case .binary:
             guard buffer.readableBytes == 1 else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
 
             switch buffer.readInteger(as: UInt8.self) {
@@ -24,11 +24,11 @@ extension Bool: PostgresDecodable {
             case .some(1):
                 self = true
             default:
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
         case .text:
             guard buffer.readableBytes == 1 else {
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
 
             switch buffer.readInteger(as: UInt8.self) {
@@ -37,7 +37,7 @@ extension Bool: PostgresDecodable {
             case .some(UInt8(ascii: "t")):
                 self = true
             default:
-                throw PostgresCastingError.Code.failure
+                throw PostgresDecodingError.Code.failure
             }
         }
     }
@@ -47,7 +47,7 @@ extension Bool: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .bool
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }

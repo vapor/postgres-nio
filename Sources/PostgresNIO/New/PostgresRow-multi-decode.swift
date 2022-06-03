@@ -16,8 +16,8 @@ extension PostgresRow {
             let r0 = try T0._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -52,8 +52,8 @@ extension PostgresRow {
             let r1 = try T1._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -94,8 +94,8 @@ extension PostgresRow {
             let r2 = try T2._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -142,8 +142,8 @@ extension PostgresRow {
             let r3 = try T3._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -196,8 +196,8 @@ extension PostgresRow {
             let r4 = try T4._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -256,8 +256,8 @@ extension PostgresRow {
             let r5 = try T5._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -322,8 +322,8 @@ extension PostgresRow {
             let r6 = try T6._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -394,8 +394,8 @@ extension PostgresRow {
             let r7 = try T7._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -472,8 +472,8 @@ extension PostgresRow {
             let r8 = try T8._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -556,8 +556,8 @@ extension PostgresRow {
             let r9 = try T9._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -646,8 +646,8 @@ extension PostgresRow {
             let r10 = try T10._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -742,8 +742,8 @@ extension PostgresRow {
             let r11 = try T11._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -844,8 +844,8 @@ extension PostgresRow {
             let r12 = try T12._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -952,8 +952,8 @@ extension PostgresRow {
             let r13 = try T13._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,
@@ -1066,8 +1066,8 @@ extension PostgresRow {
             let r14 = try T14._decodeRaw(from: &cellData, type: column.dataType, format: column.format, context: context)
 
             return (r0, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14)
-        } catch let code as PostgresCastingError.Code {
-            throw PostgresCastingError(
+        } catch let code as PostgresDecodingError.Code {
+            throw PostgresDecodingError(
                 code: code,
                 columnName: column.name,
                 columnIndex: columnIndex,

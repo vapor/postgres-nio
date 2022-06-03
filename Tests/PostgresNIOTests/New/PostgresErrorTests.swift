@@ -1,9 +1,9 @@
 @testable import PostgresNIO
 import XCTest
 
-final class PostgresCastingErrorTests: XCTestCase {
-    func testPostgresCastingErrorEquality() {
-        let error1 = PostgresCastingError(
+final class PostgresDecodingErrorTests: XCTestCase {
+    func testPostgresDecodingErrorEquality() {
+        let error1 = PostgresDecodingError(
             code: .typeMismatch,
             columnName: "column",
             columnIndex: 0,
@@ -15,7 +15,7 @@ final class PostgresCastingErrorTests: XCTestCase {
             line: 123
         )
 
-        let error2 = PostgresCastingError(
+        let error2 = PostgresDecodingError(
             code: .typeMismatch,
             columnName: "column",
             columnIndex: 0,
@@ -32,8 +32,8 @@ final class PostgresCastingErrorTests: XCTestCase {
         XCTAssertEqual(error1, error3)
     }
 
-    func testPostgresCastingErrorDescription() {
-        let error = PostgresCastingError(
+    func testPostgresDecodingErrorDescription() {
+        let error = PostgresDecodingError(
             code: .typeMismatch,
             columnName: "column",
             columnIndex: 0,
@@ -45,6 +45,6 @@ final class PostgresCastingErrorTests: XCTestCase {
             line: 123
         )
 
-        XCTAssertNotEqual("\(error)", "Database error")
+        XCTAssertEqual("\(error)", "Database error")
     }
 }

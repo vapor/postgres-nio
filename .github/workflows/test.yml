@@ -1,20 +1,25 @@
-name: test
-on: [ 'pull_request' ]
+name: CI
+on: 
+  push:
+    branches: 
+      - "main"
+  pull_request:
+    branches: 
+      - "*"
 
 jobs:
   linux-unit:
     strategy:
       fail-fast: false
       matrix:
-        swiftver:
-          - swift:5.2
-          - swift:5.3
+        swift:
+          - swift:5.4
           - swift:5.5
           - swift:5.6
           - swiftlang/swift:nightly-main
-        swiftos:
+        os:
           - focal
-    container: ${{ format('{0}-{1}', matrix.swiftver, matrix.swiftos) }}
+    container: ${{ format('{0}-{1}', matrix.swift, matrix.os) }}
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -33,6 +38,7 @@ jobs:
           cc_dry_run: false
 
   linux-integration-and-dependencies:
+    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -104,6 +110,7 @@ jobs:
         run: swift test --package-path fluent-postgres-driver
 
   macos-all:
+    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -116,7 +123,7 @@ jobs:
         xcode:
           - latest-stable
           #- latest
-    runs-on: macos-11
+    runs-on: macos-12
     env:
       LOG_LEVEL: debug
       POSTGRES_HOSTNAME: 127.0.0.1
@@ -142,3 +149,20 @@ jobs:
         run: |
           swift test --enable-test-discovery -Xlinker -rpath \
                 -Xlinker $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx
+
+  api-breakage:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: swift:5.6-focal
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    # https://github.com/actions/checkout/issues/766
+    - name: Mark the workspace as safe
+      run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
+    - name: API breaking changes
+      run: |
+        swift package diagnose-api-breaking-changes origin/main
