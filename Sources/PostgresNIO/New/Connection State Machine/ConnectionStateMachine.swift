@@ -117,7 +117,7 @@ struct ConnectionStateMachine {
     private var taskQueue = CircularBuffer<PSQLTask>()
     private var quiescingState: QuiescingState = .notQuiescing
     
-    init(requireBackendKeyData: Bool = true) {
+    init(requireBackendKeyData: Bool) {
         self.state = .initialized
         self.requireBackendKeyData = requireBackendKeyData
     }
