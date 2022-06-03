@@ -5,7 +5,7 @@ struct ConnectionStateMachine {
     typealias TransactionState = PostgresBackendMessage.TransactionState
     
     struct ConnectionContext {
-        let backendKeyData: BackendKeyData?
+        let backendKeyData: Optional<BackendKeyData>
         var parameters: [String: String]
         var transactionState: TransactionState
     }
