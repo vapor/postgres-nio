@@ -83,10 +83,10 @@ public final class PostgresConnection {
             /// - Default: 10 seconds
             public var connectTimeout: TimeAmount
 
-            public init(host: String, port: Int = 5432, connectTimeout: TimeAmount = .seconds(10)) {
+            public init(host: String, port: Int = 5432) {
                 self.host = host
                 self.port = port
-                self.connectTimeout = connectTimeout
+                self.connectTimeout = .seconds(10)
             }
         }
 
