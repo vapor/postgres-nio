@@ -77,16 +77,22 @@ public final class PostgresConnection {
             ///
             /// - Default: 5432
             public var port: Int
-            
+
             /// Require connection to provide `BackendKeyData`.
             /// For use with Amazon RDS Proxy, this must be set to false.
             ///
             /// - Default: true
             public var requireBackendKeyData: Bool = true
-            
+
+            /// Specifies a timeout to apply to a connection attempt.
+            ///
+            /// - Default: 10 seconds
+            public var connectTimeout: TimeAmount
+
             public init(host: String, port: Int = 5432) {
                 self.host = host
                 self.port = port
+                self.connectTimeout = .seconds(10)
             }
         }
 
@@ -287,12 +293,12 @@ public final class PostgresConnection {
     ) -> NIOClientTCPBootstrapProtocol {
         #if canImport(Network)
         if let tsBootstrap = NIOTSConnectionBootstrap(validatingGroup: eventLoop) {
-            return tsBootstrap
+            return tsBootstrap.connectTimeout(configuration.connectTimeout)
         }
         #endif
 
         if let nioBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
-            return nioBootstrap
+            return nioBootstrap.connectTimeout(configuration.connectTimeout)
         }
 
         fatalError("No matching bootstrap found")
@@ -399,6 +405,7 @@ extension PostgresConnection {
         return tlsFuture.flatMap { tls in
             let configuration = PostgresConnection.InternalConfiguration(
                 connection: .resolved(address: socketAddress, serverName: serverHostname),
+                connectTimeout: .seconds(10),
                 authentication: nil,
                 tls: tls,
                 requireBackendKeyData: true
@@ -759,6 +766,7 @@ extension PostgresConnection {
         }
 
         var connection: Connection
+        var connectTimeout: TimeAmount
 
         var authentication: Configuration.Authentication?
 
@@ -772,6 +780,7 @@ extension PostgresConnection.InternalConfiguration {
     init(_ config: PostgresConnection.Configuration) {
         self.authentication = config.authentication
         self.connection = .unresolved(host: config.connection.host, port: config.connection.port)
+        self.connectTimeout = config.connection.connectTimeout
         self.tls = config.tls
         self.requireBackendKeyData = config.connection.requireBackendKeyData
     }
