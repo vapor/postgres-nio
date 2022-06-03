@@ -5,9 +5,7 @@ struct ConnectionStateMachine {
     typealias TransactionState = PostgresBackendMessage.TransactionState
     
     struct ConnectionContext {
-        let processID: Int32?
-        let secretKey: Int32?
-        
+        let backendKeyData: BackendKeyData?
         var parameters: [String: String]
         var transactionState: TransactionState
     }
@@ -551,8 +549,7 @@ struct ConnectionStateMachine {
             }
             
             let connectionContext = ConnectionContext(
-                processID: backendKeyData?.processID,
-                secretKey: backendKeyData?.secretKey,
+                backendKeyData: backendKeyData,
                 parameters: parameters,
                 transactionState: transactionState)
             
@@ -1316,8 +1313,8 @@ extension ConnectionStateMachine.State: CustomDebugStringConvertible {
 extension ConnectionStateMachine.ConnectionContext: CustomDebugStringConvertible {
     var debugDescription: String {
         """
-        (processID: \(self.processID), \
-        secretKey: \(self.secretKey), \
+        (processID: \(self.backendKeyData?.processID != nil ? String(self.backendKeyData!.processID) : "nil")), \
+        secretKey: \(self.backendKeyData?.secretKey != nil ? String(self.backendKeyData!.secretKey) : "nil")), \
         parameters: \(String(reflecting: self.parameters)))
         """
     }

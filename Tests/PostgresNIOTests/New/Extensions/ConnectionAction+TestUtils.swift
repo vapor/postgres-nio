@@ -75,6 +75,8 @@ extension ConnectionStateMachine {
     }
     
     static func createConnectionContext(transactionState: PostgresBackendMessage.TransactionState = .idle) -> ConnectionContext {
+        let backendKeyData = BackendKeyData(processID: 2730, secretKey: 882037977)
+        
         let paramaters = [
             "DateStyle": "ISO, MDY",
             "application_name": "",
@@ -90,8 +92,7 @@ extension ConnectionStateMachine {
         ]
         
         return ConnectionContext(
-            processID: 2730,
-            secretKey: 882037977,
+            backendKeyData: backendKeyData,
             parameters: paramaters,
             transactionState: transactionState
         )
