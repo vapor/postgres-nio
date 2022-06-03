@@ -8,7 +8,7 @@ class ConnectionStateMachineTests: XCTestCase {
     
     func testStartup() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        var state = ConnectionStateMachine()
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         XCTAssertEqual(state.authenticationMessageReceived(.plaintext), .sendPasswordMessage(.cleartext, authContext))
@@ -17,7 +17,7 @@ class ConnectionStateMachineTests: XCTestCase {
     
     func testSSLStartupSuccess() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        var state = ConnectionStateMachine()
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
         XCTAssertEqual(state.sslHandlerAdded(), .wait)
@@ -30,7 +30,7 @@ class ConnectionStateMachineTests: XCTestCase {
     func testSSLStartupFailHandler() {
         struct SSLHandlerAddError: Error, Equatable {}
         
-        var state = ConnectionStateMachine()
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
         let failError = PSQLError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
@@ -38,7 +38,7 @@ class ConnectionStateMachineTests: XCTestCase {
     }
     
     func testTLSRequiredStartupSSLUnsupported() {
-        var state = ConnectionStateMachine()
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
         
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslUnsupportedReceived(),
@@ -46,7 +46,7 @@ class ConnectionStateMachineTests: XCTestCase {
     }
 
     func testTLSPreferredStartupSSLUnsupported() {
-        var state = ConnectionStateMachine()
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
 
         XCTAssertEqual(state.connected(tls: .prefer), .sendSSLRequest)
         XCTAssertEqual(state.sslUnsupportedReceived(), .provideAuthenticationContext)
@@ -92,7 +92,7 @@ class ConnectionStateMachineTests: XCTestCase {
     }
     
     func testReadyForQueryReceivedWithoutBackendKeyAfterAuthenticated() {
-        var state = ConnectionStateMachine(.authenticated(nil, [:]))
+        var state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: true)
         
         XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")), .wait)
         XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "application_name", value: "")), .wait)
@@ -108,6 +108,24 @@ class ConnectionStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.readyForQueryReceived(.idle),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
+    }
+    
+    func testReadyForQueryReceivedWithoutUnneededBackendKeyAfterAuthenticated() {
+        var state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: false)
+        
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "application_name", value: "")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "server_encoding", value: "UTF8")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "integer_datetimes", value: "on")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "client_encoding", value: "UTF8")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "TimeZone", value: "Etc/UTC")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "is_superuser", value: "on")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "server_version", value: "13.1 (Debian 13.1-1.pgdg100+1)")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "session_authorization", value: "postgres")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "IntervalStyle", value: "postgres")), .wait)
+        XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "standard_conforming_strings", value: "on")), .wait)
+        
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
     func testErrorIsIgnoredWhenClosingConnection() {
@@ -133,7 +151,7 @@ class ConnectionStateMachineTests: XCTestCase {
 
         let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRowStream.self)
 
-        var state = ConnectionStateMachine()
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
         let extendedQueryContext = ExtendedQueryContext(
             query: "Select version()",
             logger: .psqlTest,

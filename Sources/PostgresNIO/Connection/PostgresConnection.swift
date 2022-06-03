@@ -78,6 +78,12 @@ public final class PostgresConnection {
             /// - Default: 5432
             public var port: Int
 
+            /// Require connection to provide `BackendKeyData`.
+            /// For use with Amazon RDS Proxy, this must be set to false.
+            ///
+            /// - Default: true
+            public var requireBackendKeyData: Bool = true
+
             /// Specifies a timeout to apply to a connection attempt.
             ///
             /// - Default: 10 seconds
@@ -401,7 +407,8 @@ extension PostgresConnection {
                 connection: .resolved(address: socketAddress, serverName: serverHostname),
                 connectTimeout: .seconds(10),
                 authentication: nil,
-                tls: tls
+                tls: tls,
+                requireBackendKeyData: true
             )
 
             return PostgresConnection.connect(
@@ -764,6 +771,8 @@ extension PostgresConnection {
         var authentication: Configuration.Authentication?
 
         var tls: Configuration.TLS
+        
+        var requireBackendKeyData: Bool
     }
 }
 
@@ -773,6 +782,7 @@ extension PostgresConnection.InternalConfiguration {
         self.connection = .unresolved(host: config.connection.host, port: config.connection.port)
         self.connectTimeout = config.connection.connectTimeout
         self.tls = config.tls
+        self.requireBackendKeyData = config.connection.requireBackendKeyData
     }
 }
 

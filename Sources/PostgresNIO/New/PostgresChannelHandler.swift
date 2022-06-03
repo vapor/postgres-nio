@@ -32,7 +32,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
          logger: Logger,
          configureSSLCallback: ((Channel) throws -> Void)?)
     {
-        self.state = ConnectionStateMachine()
+        self.state = ConnectionStateMachine(requireBackendKeyData: configuration.requireBackendKeyData)
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger

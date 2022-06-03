@@ -5,9 +5,7 @@ struct ConnectionStateMachine {
     typealias TransactionState = PostgresBackendMessage.TransactionState
     
     struct ConnectionContext {
-        let processID: Int32
-        let secretKey: Int32
-        
+        let backendKeyData: Optional<BackendKeyData>
         var parameters: [String: String]
         var transactionState: TransactionState
     }
@@ -113,17 +111,20 @@ struct ConnectionStateMachine {
     }
     
     private var state: State
+    private let requireBackendKeyData: Bool
     private var taskQueue = CircularBuffer<PSQLTask>()
     private var quiescingState: QuiescingState = .notQuiescing
     
-    init() {
+    init(requireBackendKeyData: Bool) {
         self.state = .initialized
+        self.requireBackendKeyData = requireBackendKeyData
     }
 
     #if DEBUG
     /// for testing purposes only
-    init(_ state: State) {
+    init(_ state: State, requireBackendKeyData: Bool = true) {
         self.state = state
+        self.requireBackendKeyData = requireBackendKeyData
     }
     #endif
 
@@ -543,14 +544,12 @@ struct ConnectionStateMachine {
     mutating func readyForQueryReceived(_ transactionState: PostgresBackendMessage.TransactionState) -> ConnectionAction {
         switch self.state {
         case .authenticated(let backendKeyData, let parameters):
-            guard let keyData = backendKeyData else {
-                // `backendKeyData` must have been received, before receiving the first `readyForQuery`
+            if self.requireBackendKeyData && backendKeyData == nil {
                 return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.readyForQuery(transactionState)))
             }
             
             let connectionContext = ConnectionContext(
-                processID: keyData.processID,
-                secretKey: keyData.secretKey,
+                backendKeyData: backendKeyData,
                 parameters: parameters,
                 transactionState: transactionState)
             
@@ -1314,8 +1313,8 @@ extension ConnectionStateMachine.State: CustomDebugStringConvertible {
 extension ConnectionStateMachine.ConnectionContext: CustomDebugStringConvertible {
     var debugDescription: String {
         """
-        (processID: \(self.processID), \
-        secretKey: \(self.secretKey), \
+        (processID: \(self.backendKeyData?.processID != nil ? String(self.backendKeyData!.processID) : "nil")), \
+        secretKey: \(self.backendKeyData?.secretKey != nil ? String(self.backendKeyData!.secretKey) : "nil")), \
         parameters: \(String(reflecting: self.parameters)))
         """
     }

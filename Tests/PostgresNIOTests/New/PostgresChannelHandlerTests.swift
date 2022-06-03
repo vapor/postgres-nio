@@ -174,7 +174,8 @@ class PostgresChannelHandlerTests: XCTestCase {
         database: String = "postgres",
         password: String = "password",
         tls: PostgresConnection.Configuration.TLS = .disable,
-        connectTimeout: TimeAmount = .seconds(10)
+        connectTimeout: TimeAmount = .seconds(10),
+        requireBackendKeyData: Bool = true
     ) -> PostgresConnection.InternalConfiguration {
         let authentication = PostgresConnection.Configuration.Authentication(
             username: username,
@@ -186,7 +187,8 @@ class PostgresChannelHandlerTests: XCTestCase {
             connection: .unresolved(host: host, port: port),
             connectTimeout: connectTimeout,
             authentication: authentication,
-            tls: tls
+            tls: tls,
+            requireBackendKeyData: requireBackendKeyData
         )
     }
 }
