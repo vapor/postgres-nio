@@ -78,19 +78,15 @@ public final class PostgresConnection {
             /// - Default: 5432
             public var port: Int
             
-            /// Require connection to provide `BackendKeyData`
+            /// Require connection to provide `BackendKeyData`.
+            /// For use with Amazon RDS Proxy, this must be set to false.
             ///
             /// - Default: true
-            public var requireBackendKeyData: Bool
+            public var requireBackendKeyData: Bool = true
             
-            public init(
-                host: String,
-                port: Int = 5432,
-                requireBackendKeyData: Bool = true
-            ) {
+            public init(host: String, port: Int = 5432) {
                 self.host = host
                 self.port = port
-                self.requireBackendKeyData = requireBackendKeyData
             }
         }
         
