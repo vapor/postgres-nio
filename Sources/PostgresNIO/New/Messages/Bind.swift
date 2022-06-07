@@ -20,14 +20,14 @@ extension PostgresFrontendMessage {
             // zero to indicate that there are no parameters or that the parameters all use the
             // default format (text); or one, in which case the specified format code is applied
             // to all parameters; or it can equal the actual number of parameters.
-            buffer.writeInteger(Int16(self.bind.count))
+            buffer.writeInteger(UInt16(self.bind.count))
             
             // The parameter format codes. Each must presently be zero (text) or one (binary).
             self.bind.metadata.forEach {
                 buffer.writeInteger($0.format.rawValue)
             }
             
-            buffer.writeInteger(Int16(self.bind.count))
+            buffer.writeInteger(UInt16(self.bind.count))
 
             var parametersCopy = self.bind.bytes
             buffer.writeBuffer(&parametersCopy)
