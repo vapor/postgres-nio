@@ -15,7 +15,7 @@ extension PostgresFrontendMessage {
         func encode(into buffer: inout ByteBuffer) {
             buffer.writeNullTerminatedString(self.preparedStatementName)
             buffer.writeNullTerminatedString(self.query)
-            buffer.writeInteger(Int16(self.parameters.count))
+            buffer.writeInteger(UInt16(self.parameters.count))
             
             self.parameters.forEach { dataType in
                 buffer.writeInteger(dataType.rawValue)

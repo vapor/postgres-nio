@@ -26,7 +26,7 @@ class ParseTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.preparedStatementName)
         XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.query)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int16.self), Int16(parse.parameters.count))
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt16.self), UInt16(parse.parameters.count))
         XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.bool.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.int8.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.bytea.rawValue)
