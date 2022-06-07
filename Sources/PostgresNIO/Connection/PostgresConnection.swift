@@ -309,7 +309,7 @@ public final class PostgresConnection {
     private func queryStream(_ query: PostgresQuery, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
-        guard query.binds.count <= Int(Int16.max) else {
+        guard query.binds.count < Int(UInt16.max) else {
             return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
         }
 
@@ -341,7 +341,7 @@ public final class PostgresConnection {
     }
 
     func execute(_ executeStatement: PSQLExecuteStatement, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
-        guard executeStatement.binds.count <= Int(Int16.max) else {
+        guard executeStatement.binds.count < Int(UInt16.max) else {
             return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
@@ -498,7 +498,7 @@ extension PostgresConnection {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
-        guard query.binds.count <= Int(Int16.max) else {
+        guard query.binds.count < Int(UInt16.max) else {
             throw PSQLError.tooManyParameters
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
