@@ -187,6 +187,12 @@ struct PSQLPartialDecodingError: Error {
             description: "Expected the integer to be positive or null, but got \(actual).",
             file: file, line: line)
     }
+  
+  static func integerMustBePositiveAndLessThanOrNull<Number: FixedWidthInteger>(_ actual: Number, lessThan: Int, file: String = #file, line: Int = #line) -> Self {
+    return PSQLPartialDecodingError(
+      description: "Expected the integer to be positive and less than \(lessThan), or null, but got \(actual).",
+      file: file, line: line)
+  }
 }
 
 extension ByteBuffer {

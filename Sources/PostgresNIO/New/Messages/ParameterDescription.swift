@@ -7,9 +7,10 @@ extension PostgresBackendMessage {
         var dataTypes: [PostgresDataType]
         
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
-            let parameterCount = try buffer.throwingReadInteger(as: Int16.self)
-            guard parameterCount >= 0 else {
-                throw PSQLPartialDecodingError.integerMustBePositiveOrNull(parameterCount)
+            let parameterCount = try buffer.throwingReadInteger(as: Int32.self)
+            guard parameterCount >= 0, parameterCount < Int(UInt16.max) else {
+                throw PSQLPartialDecodingError.integerMustBePositiveAndLessThanOrNull(
+                  parameterCount, lessThan: Int(UInt16.max))
             }
             
             var result = [PostgresDataType]()
