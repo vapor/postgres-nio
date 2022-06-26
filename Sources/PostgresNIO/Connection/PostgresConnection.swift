@@ -601,7 +601,7 @@ extension PostgresConnection: PostgresDatabase {
             }
 
         case .prepareQuery(let request):
-            resultFuture = self.prepareStatement(request.query, with: request.name, logger: self.logger).map {
+            resultFuture = self.prepareStatement(request.query, with: request.name, logger: logger).map {
                 request.prepared = PreparedQuery(underlying: $0, database: self)
             }
 
