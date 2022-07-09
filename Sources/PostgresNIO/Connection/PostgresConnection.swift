@@ -68,15 +68,55 @@ public final class PostgresConnection {
         }
 
         public struct Connection {
+            
+            enum Base {
+                case unresolved(host: String, port: Int)
+                case resolved(address: SocketAddress)
+            }
+            
+            var connection: Base
+            
             /// The server to connect to
             ///
             /// - Default: localhost
-            public var host: String
+            @available(*, deprecated, message: "Use 'init(host:port:)' to configure the 'host'.")
+            public var host: String {
+                get {
+                    if case let .unresolved(host, _) = connection {
+                        return host
+                    } else {
+                        fatalError("Use 'init(host:port:)' to configure the 'host'.")
+                    }
+                }
+                set {
+                    if case let .unresolved(_, port) = connection {
+                        self.connection = .unresolved(host: newValue, port: port)
+                    } else {
+                        fatalError("The connection is not using a host.")
+                    }
+                }
+            }
 
             /// The server port to connect to.
             ///
             /// - Default: 5432
-            public var port: Int
+            @available(*, deprecated, message: "Use 'init(host:port:)' to configure the 'port'.")
+            public var port: Int {
+                get {
+                    if case let .unresolved(_, port) = connection {
+                        return port
+                    } else {
+                        fatalError("Use 'init(host:port:)' to configure the 'port'.")
+                    }
+                }
+                set {
+                    if case let .unresolved(host, _) = connection {
+                        self.connection = .unresolved(host: host, port: newValue)
+                    } else {
+                        fatalError("The connection is not using a port.")
+                    }
+                }
+            }
 
             /// Require connection to provide `BackendKeyData`.
             /// For use with Amazon RDS Proxy, this must be set to false.
@@ -87,12 +127,15 @@ public final class PostgresConnection {
             /// Specifies a timeout to apply to a connection attempt.
             ///
             /// - Default: 10 seconds
-            public var connectTimeout: TimeAmount
+            public var connectTimeout: TimeAmount = .seconds(10)
 
             public init(host: String, port: Int = 5432) {
-                self.host = host
-                self.port = port
-                self.connectTimeout = .seconds(10)
+                self.connection = .unresolved(host: host, port: port)
+            }
+
+            public init(unixDomainSocketPath: String) throws {
+                let address = try SocketAddress(unixDomainSocketPath: unixDomainSocketPath)
+                self.connection = .resolved(address: address)
             }
         }
 
@@ -779,7 +822,12 @@ extension PostgresConnection {
 extension PostgresConnection.InternalConfiguration {
     init(_ config: PostgresConnection.Configuration) {
         self.authentication = config.authentication
-        self.connection = .unresolved(host: config.connection.host, port: config.connection.port)
+        switch config.connection.connection {
+        case let .resolved(address):
+            self.connection = .resolved(address: address, serverName: nil)
+        case let .unresolved(host, port):
+            self.connection = .unresolved(host: host, port: port)
+        }
         self.connectTimeout = config.connection.connectTimeout
         self.tls = config.tls
         self.requireBackendKeyData = config.connection.requireBackendKeyData
