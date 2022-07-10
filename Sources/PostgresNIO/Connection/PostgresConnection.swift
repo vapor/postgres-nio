@@ -71,7 +71,7 @@ public final class PostgresConnection {
             
             enum Base {
                 case unresolved(host: String, port: Int)
-                case resolved(address: SocketAddress)
+                case resolved(address: SocketAddress, serverName: String?)
             }
             
             var connection: Base
@@ -133,9 +133,9 @@ public final class PostgresConnection {
                 self.connection = .unresolved(host: host, port: port)
             }
 
-            public init(unixDomainSocketPath: String) throws {
+            public init(unixDomainSocketPath: String, serverName: String?) throws {
                 let address = try SocketAddress(unixDomainSocketPath: unixDomainSocketPath)
-                self.connection = .resolved(address: address)
+                self.connection = .resolved(address: address, serverName: serverName)
             }
         }
 
@@ -823,8 +823,8 @@ extension PostgresConnection.InternalConfiguration {
     init(_ config: PostgresConnection.Configuration) {
         self.authentication = config.authentication
         switch config.connection.connection {
-        case let .resolved(address):
-            self.connection = .resolved(address: address, serverName: nil)
+        case let .resolved(address, serverName):
+            self.connection = .resolved(address: address, serverName: serverName)
         case let .unresolved(host, port):
             self.connection = .unresolved(host: host, port: port)
         }
