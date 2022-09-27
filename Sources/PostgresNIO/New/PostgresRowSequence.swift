@@ -70,7 +70,7 @@ extension PostgresRowSequence {
 }
 
 final class AsyncStreamConsumer {
-    let lock = Lock()
+    let lock = NIOLock()
 
     let lookupTable: [String: Int]
     let columns: [RowDescription.Column]
