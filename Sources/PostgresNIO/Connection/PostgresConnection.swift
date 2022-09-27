@@ -1,5 +1,5 @@
+import Atomics
 import NIOCore
-import NIOConcurrencyHelpers
 #if canImport(Network)
 import NIOTransportServices
 #endif
@@ -379,7 +379,7 @@ public final class PostgresConnection {
 // MARK: Connect
 
 extension PostgresConnection {
-    static let idGenerator = NIOAtomic.makeAtomic(value: 0)
+    static let idGenerator = ManagedAtomic(0)
 
     @available(*, deprecated,
         message: "Use the new connect method that allows you to connect and authenticate in a single step",
@@ -412,7 +412,7 @@ extension PostgresConnection {
             )
 
             return PostgresConnection.connect(
-                connectionID: idGenerator.add(1),
+                connectionID: self.idGenerator.wrappingIncrementThenLoad(ordering: .relaxed),
                 configuration: configuration,
                 logger: logger,
                 on: eventLoop

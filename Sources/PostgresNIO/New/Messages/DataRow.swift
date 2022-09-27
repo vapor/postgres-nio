@@ -1,8 +1,4 @@
-#if swift(>=5.6)
-@preconcurrency import NIOCore
-#else
 import NIOCore
-#endif
 
 /// A backend data row message.
 ///
