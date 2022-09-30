@@ -330,6 +330,7 @@ final class IntegrationTests: XCTestCase {
         }
     }
     
+#if swift(>=5.5.2)
     func testBindMaximumParameters() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -377,4 +378,5 @@ final class IntegrationTests: XCTestCase {
             try await connection.query(dropQuery, logger: .psqlTest)
         }
     }
+#endif
 }
