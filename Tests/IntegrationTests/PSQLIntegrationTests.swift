@@ -354,7 +354,7 @@ final class IntegrationTests: XCTestCase {
             )
             try await connection.query(createQuery, logger: .psqlTest)
             
-            var binds = PostgresBindings()
+            var binds = PostgresBindings(capacity: Int(UInt16.max))
             for _ in (0..<rowsCount) {
                 for num in (0..<columnsCount) {
                     try binds.append(num, context: .default)
@@ -373,6 +373,12 @@ final class IntegrationTests: XCTestCase {
                 binds: binds
             )
             try await connection.query(insertionQuery, logger: .psqlTest)
+            
+            let countQuery = PostgresQuery(unsafeSQL: "SELECT COUNT(*) FROM table1")
+            let countRows = try await connection.query(countQuery, logger: .psqlTest)
+            var countIterator = countRows.makeAsyncIterator()
+            let insertedRowsCount = try await countIterator.next()?.decode(Int.self, context: .default)
+            XCTAssertEqual(rowsCount, insertedRowsCount)
             
             let dropQuery = PostgresQuery(unsafeSQL: "DROP TABLE table1")
             try await connection.query(dropQuery, logger: .psqlTest)
