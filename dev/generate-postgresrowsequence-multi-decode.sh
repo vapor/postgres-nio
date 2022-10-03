@@ -4,7 +4,7 @@ set -eu
 
 here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-function gen() {
+function genWithContextParameter() {
     how_many=$1
 
     if [[ $how_many -ne 1 ]] ; then
@@ -24,7 +24,7 @@ function gen() {
     done
     echo -n ").Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) "
 
-    echo -n "-> AsyncThrowingMapSequence<PostgresRowSequence, (T0"
+    echo -n "-> AsyncThrowingMapSequence<Self, (T0"
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n))"
     done
@@ -48,6 +48,43 @@ function gen() {
     echo "    }"
 }
 
+function genWithoutContextParameter() {
+    how_many=$1
+
+    echo ""
+
+    echo "    @inlinable"
+    echo "    @_alwaysEmitIntoClient"
+    echo -n "    public func decode<T0: PostgresDecodable"
+    for ((n = 1; n<$how_many; n +=1)); do
+        echo -n ", T$(($n)): PostgresDecodable"
+    done
+
+    echo -n ">(_: (T0"
+    for ((n = 1; n<$how_many; n +=1)); do
+        echo -n ", T$(($n))"
+    done
+    echo -n ").Type, file: String = #file, line: Int = #line) "
+    echo -n "-> AsyncThrowingMapSequence<Self, (T0"
+    for ((n = 1; n<$how_many; n +=1)); do
+        echo -n ", T$(($n))"
+    done
+    echo ")> {"
+
+    echo -n "        self.decode("
+    if [[ $how_many -eq 1 ]] ; then
+        echo -n "T0.self"
+    else
+        echo -n "(T0"
+        for ((n = 1; n<$how_many; n +=1)); do
+            echo -n ", T$(($n))"
+        done
+        echo -n ").self"
+    fi
+    echo ", context: .default, file: file, line: line)"
+    echo "    }"
+}
+
 grep -q "ByteBuffer" "${BASH_SOURCE[0]}" || {
     echo >&2 "ERROR: ${BASH_SOURCE[0]}: file or directory not found (this should be this script)"
     exit 1
@@ -60,13 +97,14 @@ EOF
 echo
 
 echo "#if swift(>=5.5) && canImport(_Concurrency)"
-echo "extension PostgresRowSequence {"
+echo "extension AsyncSequence where Element == PostgresRow {"
 
 # note:
 # - widening the inverval below (eg. going from {1..15} to {1..25}) is Semver minor
 # - narrowing the interval below is SemVer _MAJOR_!
 for n in {1..15}; do
-    gen "$n"
+    genWithContextParameter "$n"
+    genWithoutContextParameter "$n"
 done
 echo "}"
 echo "#endif"
