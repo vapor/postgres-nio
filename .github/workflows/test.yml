@@ -16,7 +16,7 @@ jobs:
           - swift:5.5-bionic
           - swift:5.6-focal
           - swift:5.7-jammy
-          - swift:nightly-main-jammy
+          - swiftlang/swift:nightly-main-jammy
     container: ${{ matrix.container }}
     runs-on: ubuntu-latest
     env:
