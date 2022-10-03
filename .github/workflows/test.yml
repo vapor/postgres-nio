@@ -12,12 +12,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container:
+        swift:
           - swift:5.5-bionic
           - swift:5.6-focal
           - swift:5.7-jammy
           - swift:nightly-main-jammy
-    container: matrix.container
+    container: matrix.swift
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -151,8 +151,7 @@ jobs:
   api-breakage:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container:
-      image: swift:5.7-jammy
+    container: swift:5.7-jammy
     steps:
     - name: Checkout
       uses: actions/checkout@v3
