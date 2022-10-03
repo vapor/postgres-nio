@@ -33,6 +33,12 @@ extension PostgresRow {
 
     @inlinable
     @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable>(_: (T0).Type, file: String = #file, line: Int = #line) throws -> (T0) {
+        try self.decode(T0.self, context: .default, file: file, line: line)
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
     public func decode<T0: PostgresDecodable, T1: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(_: (T0, T1).Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws -> (T0, T1) {
         precondition(self.columns.count >= 2)
         var columnIndex = 0
@@ -65,6 +71,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable>(_: (T0, T1).Type, file: String = #file, line: Int = #line) throws -> (T0, T1) {
+        try self.decode((T0, T1).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -107,6 +119,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable>(_: (T0, T1, T2).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2) {
+        try self.decode((T0, T1, T2).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -155,6 +173,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable>(_: (T0, T1, T2, T3).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3) {
+        try self.decode((T0, T1, T2, T3).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -209,6 +233,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable>(_: (T0, T1, T2, T3, T4).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4) {
+        try self.decode((T0, T1, T2, T3, T4).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -269,6 +299,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5) {
+        try self.decode((T0, T1, T2, T3, T4, T5).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -335,6 +371,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -407,6 +449,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -485,6 +533,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -569,6 +623,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8, T9).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -659,6 +719,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -755,6 +821,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -857,6 +929,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, T12: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -965,6 +1043,12 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, T12: PostgresDecodable, T13: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13).self, context: .default, file: file, line: line)
     }
 
     @inlinable
@@ -1079,5 +1163,11 @@ extension PostgresRow {
                 line: line
             )
         }
+    }
+
+    @inlinable
+    @_alwaysEmitIntoClient
+    public func decode<T0: PostgresDecodable, T1: PostgresDecodable, T2: PostgresDecodable, T3: PostgresDecodable, T4: PostgresDecodable, T5: PostgresDecodable, T6: PostgresDecodable, T7: PostgresDecodable, T8: PostgresDecodable, T9: PostgresDecodable, T10: PostgresDecodable, T11: PostgresDecodable, T12: PostgresDecodable, T13: PostgresDecodable, T14: PostgresDecodable>(_: (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14).Type, file: String = #file, line: Int = #line) throws -> (T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14) {
+        try self.decode((T0, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14).self, context: .default, file: file, line: line)
     }
 }
