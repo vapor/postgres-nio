@@ -187,7 +187,7 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 Please see [SECURITY.md] for details on the security process.
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
-[Documentation]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
+[Documentation]: https://swiftpackageindex.com/vapor/postgres-nio/documentation
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
