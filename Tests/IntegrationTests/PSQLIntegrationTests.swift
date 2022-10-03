@@ -337,7 +337,7 @@ final class IntegrationTests: XCTestCase {
         let eventLoop = eventLoopGroup.next()
         
         try await withTestConnection(on: eventLoop) { connection in
-            // Mac binds limit is UInt16.max which is 65535 which is 3 * 5 * 17 * 257
+            // Max binds limit is UInt16.max which is 65535 which is 3 * 5 * 17 * 257
             // Max columns limit is 1664, so we will only make 5 * 257 columns which is less
             // Then we will insert 3 * 17 rows
             // In the insertion, there will be a total of 3 * 17 * 5 * 257 == UInt16.max bindings
@@ -364,7 +364,7 @@ final class IntegrationTests: XCTestCase {
             
             let insertionValues = (0..<rowsCount).map { rowIndex in
                 let indices = (0..<columnsCount).map { columnIndex -> String in
-                    "$\(rowIndex * 1_000 + columnIndex + 1)"
+                    "$\(rowIndex * columnsCount + columnIndex + 1)"
                 }
                 return "(\(indices.joined(separator: ", ")))"
             }.joined(separator: ", ")
