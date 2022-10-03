@@ -27,7 +27,7 @@ jobs:
       - name: Run unit tests with code coverage and Thread Sanitizer
         run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
       - name: Submit coverage report to Codecov.io
-        if: !contains(matrix.container, 'nightly')
+        if: contains(matrix.container, 'nightly')
         uses: vapor/swift-codecov-action@v0.2.1
         with:
           cc_flags: 'unittests'
