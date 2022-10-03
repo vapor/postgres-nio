@@ -12,14 +12,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        swift:
-          - swift:5.4
-          - swift:5.5
-          - swift:5.6
-          - swiftlang/swift:nightly-main
-        os:
-          - focal
-    container: ${{ format('{0}-{1}', matrix.swift, matrix.os) }}
+        container:
+          - swift:5.5-bionic
+          - swift:5.6-focal
+          - swift:5.7-jammy
+          - swiftlang/swift:nightly-main-jammy
+    container: ${{ matrix.container }}
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -29,6 +27,7 @@ jobs:
       - name: Run unit tests with code coverage and Thread Sanitizer
         run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
       - name: Submit coverage report to Codecov.io
+        if: "!contains(matrix.container, 'nightly')"
         uses: vapor/swift-codecov-action@v0.2
         with:
           cc_flags: 'unittests'
@@ -53,7 +52,7 @@ jobs:
             dbauth: md5
           - dbimage: postgres:11
             dbauth: trust
-    container: swift:5.6-focal
+    container: swift:5.7-jammy
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -153,8 +152,7 @@ jobs:
   api-breakage:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container:
-      image: swift:5.6-focal
+    container: swift:5.7-jammy
     steps:
     - name: Checkout
       uses: actions/checkout@v3
