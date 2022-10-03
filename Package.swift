@@ -13,15 +13,17 @@ let package = Package(
         .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.35.0"),
-        .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.11.4"),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.14.1"),
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.0.2"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.42.0"),
+        .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.13.1"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.22.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "3.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.4.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.4.4"),
     ],
     targets: [
         .target(name: "PostgresNIO", dependencies: [
+            .product(name: "Atomics", package: "swift-atomics"),
             .product(name: "Crypto", package: "swift-crypto"),
             .product(name: "Logging", package: "swift-log"),
             .product(name: "Metrics", package: "swift-metrics"),

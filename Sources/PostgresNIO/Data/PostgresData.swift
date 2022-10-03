@@ -1,9 +1,5 @@
-#if swift(>=5.6)
-@preconcurrency import NIOCore
-#else
 import NIOCore
-#endif
-import Foundation
+import struct Foundation.UUID
 
 public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertible {
     public static var null: PostgresData {

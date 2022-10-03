@@ -1,5 +1,5 @@
+import Atomics
 import NIOEmbedded
-import NIOConcurrencyHelpers
 import Dispatch
 import XCTest
 @testable import PostgresNIO
@@ -445,22 +445,22 @@ final class PostgresRowSequenceTests: XCTestCase {
 
 final class MockRowDataSource: PSQLRowsDataSource {
     var requestCount: Int {
-        self._requestCount.load()
+        self._requestCount.load(ordering: .relaxed)
     }
 
     var cancelCount: Int {
-        self._cancelCount.load()
+        self._cancelCount.load(ordering: .relaxed)
     }
 
-    private let _requestCount = NIOAtomic.makeAtomic(value: 0)
-    private let _cancelCount = NIOAtomic.makeAtomic(value: 0)
+    private let _requestCount = ManagedAtomic(0)
+    private let _cancelCount = ManagedAtomic(0)
 
     func request(for stream: PSQLRowStream) {
-        self._requestCount.add(1)
+        self._requestCount.wrappingIncrement(ordering: .relaxed)
     }
 
     func cancel(for stream: PSQLRowStream) {
-        self._cancelCount.add(1)
+        self._cancelCount.wrappingIncrement(ordering: .relaxed)
     }
 }
 #endif
