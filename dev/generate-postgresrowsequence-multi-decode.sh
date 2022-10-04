@@ -96,7 +96,7 @@ cat <<"EOF"
 EOF
 echo
 
-echo "#if swift(>=5.5) && canImport(_Concurrency)"
+echo "#if canImport(_Concurrency)"
 echo "extension AsyncSequence where Element == PostgresRow {"
 
 # note:

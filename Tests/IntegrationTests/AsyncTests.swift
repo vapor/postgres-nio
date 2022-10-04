@@ -5,7 +5,7 @@ import PostgresNIO
 import NIOTransportServices
 #endif
 
-#if swift(>=5.5.2)
+#if canImport(_Concurrency)
 final class AsyncPostgresConnectionTests: XCTestCase {
 
     func test1kRoundTrips() async throws {

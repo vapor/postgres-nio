@@ -330,7 +330,7 @@ final class IntegrationTests: XCTestCase {
         }
     }
     
-#if swift(>=5.5.2)
+#if canImport(_Concurrency)
     func testBindMaximumParameters() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }

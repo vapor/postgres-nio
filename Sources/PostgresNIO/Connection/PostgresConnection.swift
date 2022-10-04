@@ -449,7 +449,7 @@ extension PostgresConnection {
 
 // MARK: Async/Await Interface
 
-#if swift(>=5.5) && canImport(_Concurrency)
+#if canImport(_Concurrency)
 extension PostgresConnection {
 
     /// Creates a new connection to a Postgres server.
