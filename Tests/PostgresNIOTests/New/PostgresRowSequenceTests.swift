@@ -4,7 +4,7 @@ import Dispatch
 import XCTest
 @testable import PostgresNIO
 
-#if swift(>=5.5.2)
+#if canImport(_Concurrency)
 final class PostgresRowSequenceTests: XCTestCase {
 
     func testBackpressureWorks() async throws {
