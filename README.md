@@ -5,7 +5,7 @@
 [![Team Chat](https://img.shields.io/discord/431917998102675485.svg)][Team Chat]
 [![MIT License](http://img.shields.io/badge/license-MIT-brightgreen.svg)][MIT License]
 [![Continuous Integration](https://github.com/vapor/postgres-nio/actions/workflows/test.yml/badge.svg)][Continuous Integration]
-[![Swift 5.4](http://img.shields.io/badge/swift-5.4-brightgreen.svg)][Swift 5.4]
+[![Swift 5.5](http://img.shields.io/badge/swift-5.5-brightgreen.svg)][Swift 5.5]
 <br>
 <br>
 
@@ -191,7 +191,7 @@ Please see [SECURITY.md] for details on the security process.
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
-[Swift 5.4]: https://swift.org
+[Swift 5.5]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
 [`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/

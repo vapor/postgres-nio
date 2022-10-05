@@ -22,7 +22,7 @@ final class PSQLRowStream {
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, PSQLRowsDataSource)
         case consumed(Result<String, Error>)
         
-        #if swift(>=5.5) && canImport(_Concurrency)
+        #if canImport(_Concurrency)
         case asyncSequence(AsyncStreamConsumer, PSQLRowsDataSource)
         #endif
     }
@@ -63,7 +63,7 @@ final class PSQLRowStream {
     
     // MARK: Async Sequence
     
-    #if swift(>=5.5) && canImport(_Concurrency)
+    #if canImport(_Concurrency)
     func asyncSequence() -> PostgresRowSequence {
         self.eventLoop.preconditionInEventLoop()
 
@@ -304,7 +304,7 @@ final class PSQLRowStream {
             // immediately request more
             dataSource.request(for: self)
         
-        #if swift(>=5.5) && canImport(_Concurrency)
+        #if canImport(_Concurrency)
         case .asyncSequence(let consumer, _):
             consumer.receive(newRows)
         #endif
@@ -344,7 +344,7 @@ final class PSQLRowStream {
             self.downstreamState = .consumed(.success(commandTag))
             promise.succeed(rows)
             
-        #if swift(>=5.5) && canImport(_Concurrency)
+        #if canImport(_Concurrency)
         case .asyncSequence(let consumer, _):
             consumer.receive(completion: .success(commandTag))
             self.downstreamState = .consumed(.success(commandTag))
@@ -371,7 +371,7 @@ final class PSQLRowStream {
             self.downstreamState = .consumed(.failure(error))
             promise.fail(error)
             
-        #if swift(>=5.5) && canImport(_Concurrency)
+        #if canImport(_Concurrency)
         case .asyncSequence(let consumer, _):
             consumer.receive(completion: .failure(error))
             self.downstreamState = .consumed(.failure(error))
