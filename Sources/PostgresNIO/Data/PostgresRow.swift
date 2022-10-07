@@ -131,7 +131,7 @@ public struct PostgresRandomAccessRow {
     let cells: [ByteBuffer?]
     let lookupTable: [String: Int]
 
-    init(_ row: PostgresRow) {
+    public init(_ row: PostgresRow) {
         self.cells = [ByteBuffer?](row.data)
         self.columns = row.columns
         self.lookupTable = row.lookupTable
