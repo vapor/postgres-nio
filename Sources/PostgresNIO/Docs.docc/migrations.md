@@ -22,7 +22,7 @@ for row in rows.map({ PostgresRandomAccessRow($0) }) {
 ## Overview
 
 When Postgres [`1.9.0`] was released we changed the default behaviour of ``PostgresRow``s.
-Previously for each row we created an internal lookup table, that allowed you to access the rows
+Previously for each row we created an internal lookup table, that allowed you to access the rows'
 cells by name:
 
 ```swift
@@ -60,8 +60,8 @@ connection.query("SELECT id, name, email, age FROM users").whenComplete {
 }
 ```
 
-However, since we still supported the ``PostgresRow/column(_:)`` API, whcih requires a precomputed 
-lookup table within the row, users where not seeing any performance benefits. To allow users to 
+However, since we still supported the ``PostgresRow/column(_:)`` API, which requires a precomputed 
+lookup table within the row, users were not seeing any performance benefits. To allow users to 
 benefit of the new fastpath, we changed ``PostgresRow``'s behavior:
 
 By default the ``PostgresRow`` does not create an internal lookup table for its cells on creation 

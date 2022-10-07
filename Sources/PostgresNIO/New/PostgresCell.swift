@@ -6,12 +6,12 @@ public struct PostgresCell: Equatable {
     public var bytes: ByteBuffer?
     /// The cell's data type. This is important metadata when decoding the cell.
     public var dataType: PostgresDataType
-    /// The format in which the cell's bytes are encoded
+    /// The format in which the cell's bytes are encoded.
     public var format: PostgresFormat
 
-    /// The cell's column name within the row
+    /// The cell's column name within the row.
     public var columnName: String
-    /// The cell's column index within the row
+    /// The cell's column index within the row.
     public var columnIndex: Int
 
     public init(
@@ -35,7 +35,7 @@ extension PostgresCell {
     ///
     /// - Parameters:
     ///   - _: The Swift type, which conforms to ``PostgresDecodable``, to decode from the cell's ``PostgresCell/bytes`` values.
-    ///   - context: A ``PostgresDecodingContext`` to supply a custom ``PostgresJSONDecoder`` for decoding json fields.
+    ///   - context: A ``PostgresDecodingContext`` to supply a custom ``PostgresJSONDecoder`` for decoding JSON fields.
     ///   - file: The source file in which this method was called. Used in the error case in ``PostgresDecodingError``.
     ///   - line: The source file line in which this method was called. Used in the error case in ``PostgresDecodingError``.
     /// - Returns: A decoded Swift type.
