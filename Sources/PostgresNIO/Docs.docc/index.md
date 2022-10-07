@@ -15,6 +15,10 @@ Features:
  
 ## Topics
 
+### Articles
+
+- <doc:migrations>
+
 ### Connections
 
 - ``PostgresConnection``
