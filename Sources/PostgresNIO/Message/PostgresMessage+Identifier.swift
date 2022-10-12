@@ -3,6 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies an incoming or outgoing postgres message. Sent as the first byte, before the message size.
     /// Values are not unique across all identifiers, meaning some messages will require keeping state to identify.
+    @available(*, deprecated, message: "Will be removed from public API.")
     public struct Identifier: ExpressibleByIntegerLiteral, Equatable, CustomStringConvertible {
         // special
         public static let none: Identifier = 0x00
@@ -143,6 +144,7 @@ extension PostgresMessage {
 }
 
 extension ByteBuffer {
+    @available(*, deprecated, message: "Will be removed from public API")
     mutating func write(identifier: PostgresMessage.Identifier) {
         self.writeInteger(identifier.value)
     }

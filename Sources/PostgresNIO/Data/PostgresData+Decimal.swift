@@ -16,6 +16,7 @@ extension PostgresData {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Decimal: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return .numeric

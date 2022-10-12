@@ -45,6 +45,7 @@ Features:
 - ``PostgresJSONEncoder``
 - ``PostgresJSONDecoder``
 - ``PostgresDataType``
+- ``PostgresFormat``
 - ``PostgresNumeric``
 
 ### Notifications
@@ -72,8 +73,11 @@ removed from the public API with the next major release.
 - ``PostgresRequest``
 - ``PostgresMessage``
 - ``PostgresMessageType``
+- ``PostgresFormatCode``
 - ``SASLAuthenticationManager``
 - ``SASLAuthenticationMechanism``
+- ``SASLAuthenticationError``
+- ``SASLAuthenticationStepResult``
 
 [SwiftNIO]: https://github.com/apple/swift-nio
 [SwiftLog]: https://github.com/apple/swift-log

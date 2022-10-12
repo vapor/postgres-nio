@@ -47,6 +47,7 @@ extension PostgresData: ExpressibleByBooleanLiteral {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Bool: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return .bool

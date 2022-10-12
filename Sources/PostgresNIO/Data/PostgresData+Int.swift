@@ -183,6 +183,7 @@ extension PostgresData {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Int: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType { .int8 }
 
@@ -198,6 +199,7 @@ extension Int: PostgresDataConvertible {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension UInt8: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType { .char }
 
@@ -213,6 +215,7 @@ extension UInt8: PostgresDataConvertible {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Int16: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType { .int2 }
 
@@ -228,6 +231,7 @@ extension Int16: PostgresDataConvertible {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Int32: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType { .int4 }
 
@@ -243,6 +247,7 @@ extension Int32: PostgresDataConvertible {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Int64: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType { .int8 }
 

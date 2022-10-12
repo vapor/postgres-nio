@@ -1,14 +1,14 @@
 import NIOCore
 
 extension PostgresData {
-    public init<T>(array: [T])
-        where T: PostgresDataConvertible
-    {
+    @available(*, deprecated, message: "Use ``PostgresQuery`` and ``PostgresBindings`` instead.")
+    public init<T>(array: [T]) where T: PostgresDataConvertible {
         self.init(
             array: array.map { $0.postgresData },
             elementType: T.postgresDataType
         )
     }
+
     public init(array: [PostgresData?], elementType: PostgresDataType) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
         // 0 if empty, 1 if not
@@ -46,9 +46,8 @@ extension PostgresData {
         )
     }
 
-    public func array<T>(of type: T.Type = T.self) -> [T]?
-        where T: PostgresDataConvertible
-    {
+    @available(*, deprecated, message: "Use ``PostgresRow`` and ``PostgresDecodable`` instead.")
+    public func array<T>(of type: T.Type = T.self) -> [T]? where T: PostgresDataConvertible {
         guard let array = self.array else {
             return nil
         }
@@ -114,6 +113,7 @@ extension PostgresData {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Array: PostgresDataConvertible where Element: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         guard let arrayType = Element.postgresDataType.arrayType else {

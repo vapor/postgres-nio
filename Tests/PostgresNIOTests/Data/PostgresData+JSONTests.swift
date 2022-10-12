@@ -2,6 +2,7 @@ import PostgresNIO
 import XCTest
 
 class PostgresData_JSONTests: XCTestCase {
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testJSONBConvertible() {
         struct Object: PostgresJSONBCodable {
             let foo: Int

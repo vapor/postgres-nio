@@ -2,23 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
-    public struct Error: PostgresMessageType, CustomStringConvertible {
-        public static var identifier: PostgresMessage.Identifier {
-            return .error
-        }
-        
-        /// Parses an instance of this message type from a byte buffer.
-        public static func parse(from buffer: inout ByteBuffer) throws -> Error {
-            var fields: [Field: String] = [:]
-            while let field = buffer.readInteger(as: Field.self) {
-                guard let string = buffer.readNullTerminatedString() else {
-                    throw PostgresError.protocol("Could not read error response string.")
-                }
-                fields[field] = string
-            }
-            return .init(fields: fields)
-        }
-        
+    public struct Error: CustomStringConvertible {
         public enum Field: UInt8, Hashable {
             /// Severity: the field contents are ERROR, FATAL, or PANIC (in an error message),
             /// or WARNING, NOTICE, DEBUG, INFO, or LOG (in a notice message), or a
@@ -106,5 +90,24 @@ extension PostgresMessage {
             let message = self.fields[.message] ?? "Unknown"
             return "\(message) (\(unique))"
         }
+    }
+}
+
+@available(*, deprecated, message: "Deprecating conformance to `PostgresMessageType` since it is deprecated.")
+extension PostgresMessage.Error: PostgresMessageType {
+    public static var identifier: PostgresMessage.Identifier {
+        return .error
+    }
+
+    /// Parses an instance of this message type from a byte buffer.
+    public static func parse(from buffer: inout ByteBuffer) throws -> Self {
+        var fields: [Field: String] = [:]
+        while let field = buffer.readInteger(as: Field.self) {
+            guard let string = buffer.readNullTerminatedString() else {
+                throw PostgresError.protocol("Could not read error response string.")
+            }
+            fields[field] = string
+        }
+        return .init(fields: fields)
     }
 }
