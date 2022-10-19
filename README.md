@@ -5,7 +5,7 @@
 [![Team Chat](https://img.shields.io/discord/431917998102675485.svg)][Team Chat]
 [![MIT License](http://img.shields.io/badge/license-MIT-brightgreen.svg)][MIT License]
 [![Continuous Integration](https://github.com/vapor/postgres-nio/actions/workflows/test.yml/badge.svg)][Continuous Integration]
-[![Swift 5.4](http://img.shields.io/badge/swift-5.4-brightgreen.svg)][Swift 5.4]
+[![Swift 5.5](http://img.shields.io/badge/swift-5.5-brightgreen.svg)][Swift 5.5]
 <br>
 <br>
 
@@ -24,7 +24,7 @@ PostgresNIO does not provide a `ConnectionPool` as of today, but this is a [feat
 
 ## API Docs
 
-Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/main/PostgresNIO/) for a 
+Check out the [PostgresNIO API docs][Documentation] for a 
 detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting started
@@ -191,16 +191,16 @@ Please see [SECURITY.md] for details on the security process.
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
-[Swift 5.4]: https://swift.org
+[Swift 5.5]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
-[`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
-[`query(_:logger:)`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/#postgresconnection.query(_:logger:file:line:)
-[`PostgresQuery`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresQuery/
-[`PostgresRow`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresRow/
-[`PostgresRowSequence`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresRowSequence/
-[`PostgresDecodable`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresDecodable/
-[`PostgresEncodable`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresEncodable/
+[`PostgresConnection`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/
+[`query(_:logger:)`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
+[`PostgresQuery`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresquery/
+[`PostgresRow`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrow/
+[`PostgresRowSequence`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrowsequence/
+[`PostgresDecodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresdecodable/
+[`PostgresEncodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresencodable/
 
 [PostgresKit]: https://github.com/vapor/postgres-kit
 
