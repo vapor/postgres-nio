@@ -24,7 +24,7 @@ PostgresNIO does not provide a `ConnectionPool` as of today, but this is a [feat
 
 ## API Docs
 
-Check out the [PostgresNIO API docs](https://api.vapor.codes/postgres-nio/main/PostgresNIO/) for a 
+Check out the [PostgresNIO API docs][Documentation] for a 
 detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting started
@@ -187,20 +187,20 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 Please see [SECURITY.md] for details on the security process.
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
-[Documentation]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/
+[Documentation]: https://swiftpackageindex.com/vapor/postgres-nio/documentation
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
 [Swift 5.5]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
-[`PostgresConnection`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/
-[`query(_:logger:)`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresConnection/#postgresconnection.query(_:logger:file:line:)
-[`PostgresQuery`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresQuery/
-[`PostgresRow`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresRow/
-[`PostgresRowSequence`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresRowSequence/
-[`PostgresDecodable`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresDecodable/
-[`PostgresEncodable`]: https://api.vapor.codes/postgres-nio/main/PostgresNIO/PostgresEncodable/
+[`PostgresConnection`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/
+[`query(_:logger:)`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
+[`PostgresQuery`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresquery/
+[`PostgresRow`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrow/
+[`PostgresRowSequence`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrowsequence/
+[`PostgresDecodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresdecodable/
+[`PostgresEncodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresencodable/
 
 [PostgresKit]: https://github.com/vapor/postgres-kit
 
