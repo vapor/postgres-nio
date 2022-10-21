@@ -225,6 +225,38 @@ public final class PostgresConnection {
     /// Create a new connection to a Postgres server
     ///
     /// - Parameters:
+    ///   - channel: The `Channel` the ``PostgresConnection`` shall be created with
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: A SwiftNIO `EventLoopFuture` that will provide a ``PostgresConnection``
+    ///            at a later point in time.
+    public static func connect(
+        using channel: Channel,
+        configuration: PostgresConnection.Configuration,
+        id connectionID: ID,
+        logger: Logger
+    ) -> EventLoopFuture<PostgresConnection> {
+
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(connectionID)"
+        
+        return channel.eventLoop.flatSubmit {
+            let connection = PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
+            return connection.start(configuration: .init(configuration)).map { _ in connection }
+        }.flatMapErrorThrowing { error -> PostgresConnection in
+            switch error {
+            case is PSQLError:
+                throw error
+            default:
+                throw PSQLError.channel(underlying: error)
+            }
+        }
+    }
+
+    /// Create a new connection to a Postgres server
+    ///
+    /// - Parameters:
     ///   - eventLoop: The `EventLoop` the request shall be created on
     ///   - configuration: A ``Configuration`` that shall be used for the connection
     ///   - connectionID: An `Int` id, used for metadata logging
@@ -471,6 +503,28 @@ extension PostgresConnection {
             configuration: .init(configuration),
             logger: logger,
             on: eventLoop
+        ).get()
+    }
+    
+    /// Create a new connection to a Postgres server
+    ///
+    /// - Parameters:
+    ///   - channel: The `Channel` the ``PostgresConnection`` shall be created with
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
+    public static func connect(
+        using channel: Channel,
+        configuration: PostgresConnection.Configuration,
+        id connectionID: ID,
+        logger: Logger
+    ) async throws -> PostgresConnection {
+        try await self.connect(
+            using: channel,
+            configuration: configuration,
+            id: connectionID,
+            logger: logger
         ).get()
     }
 
