@@ -1,5 +1,5 @@
 import XCTest
-import PostgresNIO
+@testable import PostgresNIO
 import NIOCore
 import Logging
 #if canImport(Darwin)
@@ -42,6 +42,38 @@ extension PostgresConnection {
         )
 
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
+    
+    static func testWithChannel(on eventLoop: EventLoop) throws -> EventLoopFuture<PostgresConnection> {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = .info
+
+        let config = PostgresConnection.Configuration(
+            connection: .init(
+                host: env("POSTGRES_HOSTNAME") ?? "localhost",
+                port: 5432
+            ),
+            authentication: .init(
+                username: env("POSTGRES_USER") ?? "test_username",
+                database: env("POSTGRES_DB") ?? "test_database",
+                password: env("POSTGRES_PASSWORD") ?? "test_password"
+            ),
+            tls: .disable
+        )
+        let internalConfig: PostgresConnection.InternalConfiguration = .init(config)
+        
+        let bootstrap = PostgresConnection.makeBootstrap(on: eventLoop, configuration: internalConfig)
+        
+        let connectFuture: EventLoopFuture<Channel>
+        switch internalConfig.connection {
+        case .resolved(let address, _):
+            connectFuture = bootstrap.connect(to: address)
+        case .unresolved(let host, let port):
+            connectFuture = bootstrap.connect(host: host, port: port)
+        }
+        return connectFuture.flatMap { channel in
+            PostgresConnection.connect(using: channel, configuration: config, id: 0, logger: logger)
+        }
     }
 }
 

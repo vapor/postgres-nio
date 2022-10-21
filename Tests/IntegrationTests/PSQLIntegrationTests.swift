@@ -17,6 +17,16 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(try conn?.close().wait())
     }
 
+    func testConnectAndCloseUsingChannel() throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+        
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.testWithChannel(on: eventLoop).wait())
+        XCTAssertNoThrow(try conn?.close().wait())
+    }
+
     func testAuthenticationFailure() throws {
         // If the postgres server trusts every connection, it is really hard to create an
         // authentication failure.
