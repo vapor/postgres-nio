@@ -25,54 +25,23 @@ extension PostgresConnection {
     }
 
     static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
-        var logger = Logger(label: "postgres.connection.test")
-        logger.logLevel = logLevel
-
-        let config = PostgresConnection.Configuration(
-            connection: .init(
-                host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: 5432
-            ),
-            authentication: .init(
-                username: env("POSTGRES_USER") ?? "test_username",
-                database: env("POSTGRES_DB") ?? "test_database",
-                password: env("POSTGRES_PASSWORD") ?? "test_password"
-            ),
-            tls: .disable
-        )
-
-        return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+        PostgresConnection.connect(on: eventLoop, configuration: .connectionTest, id: 0, logger: .connectionTest)
     }
-    
-    static func testWithChannel(on eventLoop: EventLoop) throws -> EventLoopFuture<PostgresConnection> {
-        var logger = Logger(label: "postgres.connection.test")
-        logger.logLevel = .info
 
-        let config = PostgresConnection.Configuration(
-            connection: .init(
-                host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: 5432
-            ),
-            authentication: .init(
-                username: env("POSTGRES_USER") ?? "test_username",
-                database: env("POSTGRES_DB") ?? "test_database",
-                password: env("POSTGRES_PASSWORD") ?? "test_password"
-            ),
-            tls: .disable
-        )
-        let internalConfig: PostgresConnection.InternalConfiguration = .init(config)
-        
-        let bootstrap = PostgresConnection.makeBootstrap(on: eventLoop, configuration: internalConfig)
-        
+    static func testWithChannel(on eventLoop: EventLoop) throws -> EventLoopFuture<PostgresConnection> {
+        let config: PostgresConnection.InternalConfiguration = .init(.connectionTest)
+        let bootstrap = PostgresConnection.makeBootstrap(on: eventLoop, configuration: config)
+
         let connectFuture: EventLoopFuture<Channel>
-        switch internalConfig.connection {
+        switch config.connection {
         case .resolved(let address, _):
             connectFuture = bootstrap.connect(to: address)
         case .unresolved(let host, let port):
             connectFuture = bootstrap.connect(host: host, port: port)
         }
+
         return connectFuture.flatMap { channel in
-            PostgresConnection.connect(using: channel, configuration: config, id: 0, logger: logger)
+            PostgresConnection.connect(using: channel, configuration: .connectionTest, id: 0, logger: .connectionTest)
         }
     }
 }
@@ -83,6 +52,27 @@ extension Logger {
         logger.logLevel = .info
         return logger
     }
+    
+    static var connectionTest: Logger {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = .info
+        return logger
+    }
+}
+
+extension PostgresConnection.Configuration {
+    static let connectionTest: PostgresConnection.Configuration = .init(
+        connection: .init(
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: 5432
+        ),
+        authentication: .init(
+            username: env("POSTGRES_USER") ?? "test_username",
+            database: env("POSTGRES_DB") ?? "test_database",
+            password: env("POSTGRES_PASSWORD") ?? "test_password"
+        ),
+        tls: .disable
+    )
 }
 
 func env(_ name: String) -> String? {

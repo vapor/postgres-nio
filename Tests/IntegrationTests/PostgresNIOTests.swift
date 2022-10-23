@@ -41,6 +41,16 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows?.count, 1)
         XCTAssertEqual(try rows?.first?.decode(String.self, context: .default).contains("PostgreSQL"), true)
     }
+    
+    func testSimpleQueryVersionUsingChannel() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.testWithChannel(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        var rows: [PostgresRow]?
+        XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
+        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(try rows?.first?.decode(String.self, context: .default).contains("PostgreSQL"), true)
+    }
 
     func testQueryVersion() {
         var conn: PostgresConnection?
