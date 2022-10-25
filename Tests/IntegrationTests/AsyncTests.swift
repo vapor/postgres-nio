@@ -224,6 +224,29 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testListenAndNotify() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            let stream = try await connection.listen("foo")
+            var iterator = stream.makeAsyncIterator()
+
+            try await self.withTestConnection(on: eventLoop) { other in
+                try await other.query(#"NOTIFY foo, 'bar';"#, logger: .psqlTest)
+
+                try await other.query(#"NOTIFY foo, 'foo';"#, logger: .psqlTest)
+            }
+
+            let first = try await iterator.next()
+            XCTAssertEqual(first, "bar")
+
+            let second = try await iterator.next()
+            XCTAssertEqual(second, "foo")
+        }
+    }
+
     #if canImport(Network)
     func testSelect10kRowsNetworkFramework() async throws {
         let eventLoopGroup = NIOTSEventLoopGroup()

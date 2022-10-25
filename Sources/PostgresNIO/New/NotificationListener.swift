@@ -1,0 +1,119 @@
+import NIOCore
+
+final class NotificationListener {
+    let eventLoop: EventLoop
+
+    let channel: String
+    let id: Int
+
+    private var state: State
+
+    enum State {
+        case streamInitialized(CheckedContinuation<PostgresNotificationSequence, Error>)
+        case streamListening(AsyncThrowingStream<String, Error>.Continuation)
+
+        case closure(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)
+        case done
+    }
+
+    init(
+        channel: String,
+        id: Int,
+        eventLoop: EventLoop,
+        checkedContinuation: CheckedContinuation<PostgresNotificationSequence, Error>
+    ) {
+        self.channel = channel
+        self.id = id
+        self.eventLoop = eventLoop
+        self.state = .streamInitialized(checkedContinuation)
+    }
+
+    init(
+        channel: String,
+        id: Int,
+        eventLoop: EventLoop,
+        context: PostgresListenContext,
+        closure: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
+    ) {
+        self.channel = channel
+        self.id = id
+        self.eventLoop = eventLoop
+        self.state = .closure(context, closure)
+    }
+
+    func startListeningSucceeded(handler: PostgresChannelHandler) {
+        self.eventLoop.preconditionInEventLoop()
+
+        switch self.state {
+        case .streamInitialized(let checkedContinuation):
+            let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
+            let eventLoop = self.eventLoop
+            let channel = self.channel
+            let listenerID = self.id
+            continuation.onTermination = { (reason) in
+                switch reason {
+                case .cancelled:
+                    eventLoop.execute {
+                        handler.cancelNotificationListener(channel: channel, id: listenerID)
+                    }
+
+                case .finished:
+                    break
+
+                @unknown default:
+                    break
+                }
+            }
+            self.state = .streamListening(continuation)
+
+            let notificationSequence = PostgresNotificationSequence(base: stream)
+            checkedContinuation.resume(returning: notificationSequence)
+
+        case .streamListening, .done:
+            fatalError("Invalid state: \(self.state)")
+
+        case .closure:
+            break // ignore
+        }
+    }
+
+    func notificationReceived(_ backendMessage: PostgresBackendMessage.NotificationResponse) {
+        self.eventLoop.preconditionInEventLoop()
+
+        switch self.state {
+        case .streamInitialized, .done:
+            fatalError("Invalid state: \(self.state)")
+        case .streamListening(let continuation):
+            continuation.yield(backendMessage.payload)
+
+        case .closure(let postgresListenContext, let closure):
+            let message = PostgresMessage.NotificationResponse(
+                backendPID: backendMessage.backendPID,
+                channel: backendMessage.channel,
+                payload: backendMessage.payload
+            )
+            closure(postgresListenContext, message)
+        }
+    }
+
+    func failed(_ error: Error) {
+        self.eventLoop.preconditionInEventLoop()
+
+        switch self.state {
+        case .streamInitialized(let checkedContinuation):
+            self.state = .done
+            checkedContinuation.resume(throwing: error)
+
+        case .streamListening(let continuation):
+            self.state = .done
+            continuation.finish(throwing: error)
+
+        case .closure(let postgresListenContext, _):
+            self.state = .done
+            postgresListenContext.cancel()
+
+        case .done:
+            break // ignore
+        }
+    }
+}

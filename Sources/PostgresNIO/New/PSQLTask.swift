@@ -1,17 +1,27 @@
 import Logging
 import NIOCore
 
+enum HandlerTask {
+    case extendedQuery(ExtendedQueryContext)
+    case preparedStatement(PrepareStatementContext)
+    case closeCommand(CloseCommandContext)
+    case startListening(NotificationListener)
+    case cancelListening(String, Int)
+}
+
 enum PSQLTask {
     case extendedQuery(ExtendedQueryContext)
     case preparedStatement(PrepareStatementContext)
     case closeCommand(CloseCommandContext)
-    
+
     func failWithError(_ error: PSQLError) {
         switch self {
         case .extendedQuery(let extendedQueryContext):
             extendedQueryContext.promise.fail(error)
+
         case .preparedStatement(let createPreparedStatementContext):
             createPreparedStatementContext.promise.fail(error)
+
         case .closeCommand(let closeCommandContext):
             closeCommandContext.promise.fail(error)
         }
