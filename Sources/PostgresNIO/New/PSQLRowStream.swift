@@ -1,5 +1,10 @@
+#if swift(>=5.6)
 import NIOCore
 import Logging
+#else
+@preconcurrency import NIOCore
+@preconcurrency import Logging
+#endif
 
 final class PSQLRowStream {
     private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
@@ -435,7 +440,7 @@ protocol PSQLRowsDataSource {
     
 }
 
-#if swift(>=5.6)
+#if swift(>=5.5)
 // Thread safety is guaranteed in the RowStream through dispatching onto the NIO EventLoop.
 extension PSQLRowStream: @unchecked Sendable {}
 #endif
