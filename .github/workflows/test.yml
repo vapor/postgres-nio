@@ -42,13 +42,13 @@ jobs:
       fail-fast: false
       matrix:
         dbimage:
+          - postgres:15
           - postgres:14
-          - postgres:13
           - postgres:11
         include:
-          - dbimage: postgres:14
+          - dbimage: postgres:15
             dbauth: scram-sha-256
-          - dbimage: postgres:13
+          - dbimage: postgres:14
             dbauth: md5
           - dbimage: postgres:11
             dbauth: trust
@@ -115,7 +115,7 @@ jobs:
       matrix:
         dbimage:
           # Only test the lastest version on macOS, let Linux do the rest
-          - postgresql@14
+          - postgresql@15
         dbauth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
