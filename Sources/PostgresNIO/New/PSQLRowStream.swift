@@ -1,10 +1,5 @@
-#if swift(>=5.6)
 import NIOCore
 import Logging
-#else
-@preconcurrency import NIOCore
-@preconcurrency import Logging
-#endif
 
 final class PSQLRowStream {
     private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
@@ -144,10 +139,8 @@ final class PSQLRowStream {
 
     private func cancel0() {
         switch self.downstreamState {
-        case .asyncSequence(let source, let dataSource):
-            let error = CancellationError()
-            self.downstreamState = .consumed(.failure(error))
-            source.finish(error)
+        case .asyncSequence(_, let dataSource):
+            self.downstreamState = .consumed(.failure(CancellationError()))
             dataSource.cancel(for: self)
 
         case .consumed:
