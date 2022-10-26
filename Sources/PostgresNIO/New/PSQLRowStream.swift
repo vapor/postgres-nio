@@ -2,6 +2,8 @@ import NIOCore
 import Logging
 
 final class PSQLRowStream {
+    private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
+
     enum RowSource {
         case stream(PSQLRowsDataSource)
         case noRows(Result<String, Error>)
@@ -23,7 +25,7 @@ final class PSQLRowStream {
         case consumed(Result<String, Error>)
         
         #if canImport(_Concurrency)
-        case asyncSequence(AsyncStreamConsumer, PSQLRowsDataSource)
+        case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource)
         #endif
     }
     
@@ -71,26 +73,35 @@ final class PSQLRowStream {
             preconditionFailure("Invalid state: \(self.downstreamState)")
         }
         
-        let consumer = AsyncStreamConsumer(
-            lookupTable: self.lookupTable,
-            columns: self.rowDescription
+        let producer = NIOThrowingAsyncSequenceProducer.makeSequence(
+            elementType: DataRow.self,
+            failureType: Error.self,
+            backPressureStrategy: AdaptiveRowBuffer(),
+            delegate: self
         )
+
+        let source = producer.source
         
         switch bufferState {
         case .streaming(let bufferedRows, let dataSource):
-            consumer.startStreaming(bufferedRows, upstream: self)
-            self.downstreamState = .asyncSequence(consumer, dataSource)
+            let yieldResult = source.yield(contentsOf: bufferedRows)
+            self.downstreamState = .asyncSequence(source, dataSource)
+
+            self.eventLoop.execute {
+                self.executeActionBasedOnYieldResult(yieldResult, source: dataSource)
+            }
             
         case .finished(let buffer, let commandTag):
-            consumer.startCompleted(buffer, commandTag: commandTag)
+            _ = source.yield(contentsOf: buffer)
+            source.finish()
             self.downstreamState = .consumed(.success(commandTag))
             
         case .failure(let error):
-            consumer.startFailed(error)
+            source.finish(error)
             self.downstreamState = .consumed(.failure(error))
         }
         
-        return PostgresRowSequence(consumer)
+        return PostgresRowSequence(producer.sequence, lookupTable: self.lookupTable, columns: self.rowDescription)
     }
     
     func demand() {
@@ -128,10 +139,10 @@ final class PSQLRowStream {
 
     private func cancel0() {
         switch self.downstreamState {
-        case .asyncSequence(let consumer, let dataSource):
-            let error = PSQLError.connectionClosed
+        case .asyncSequence(let source, let dataSource):
+            let error = CancellationError()
             self.downstreamState = .consumed(.failure(error))
-            consumer.receive(completion: .failure(error))
+            source.finish(error)
             dataSource.cancel(for: self)
 
         case .consumed:
@@ -305,8 +316,9 @@ final class PSQLRowStream {
             dataSource.request(for: self)
         
         #if canImport(_Concurrency)
-        case .asyncSequence(let consumer, _):
-            consumer.receive(newRows)
+        case .asyncSequence(let consumer, let source):
+            let yieldResult = consumer.yield(contentsOf: newRows)
+            self.executeActionBasedOnYieldResult(yieldResult, source: source)
         #endif
             
         case .consumed(.success):
@@ -345,8 +357,8 @@ final class PSQLRowStream {
             promise.succeed(rows)
             
         #if canImport(_Concurrency)
-        case .asyncSequence(let consumer, _):
-            consumer.receive(completion: .success(commandTag))
+        case .asyncSequence(let source, _):
+            source.finish()
             self.downstreamState = .consumed(.success(commandTag))
         #endif
             
@@ -373,11 +385,27 @@ final class PSQLRowStream {
             
         #if canImport(_Concurrency)
         case .asyncSequence(let consumer, _):
-            consumer.receive(completion: .failure(error))
+            consumer.finish(error)
             self.downstreamState = .consumed(.failure(error))
         #endif
             
         case .consumed:
+            break
+        }
+    }
+
+    private func executeActionBasedOnYieldResult(_ yieldResult: AsyncSequenceSource.YieldResult, source: PSQLRowsDataSource) {
+        self.eventLoop.preconditionInEventLoop()
+        switch yieldResult {
+        case .dropped:
+            // ignore
+            break
+
+        case .produceMore:
+            source.request(for: self)
+
+        case .stopProducing:
+            // ignore
             break
         }
     }
@@ -387,6 +415,16 @@ final class PSQLRowStream {
             preconditionFailure("commandTag may only be called if all rows have been consumed")
         }
         return commandTag
+    }
+}
+
+extension PSQLRowStream: NIOAsyncSequenceProducerDelegate {
+    func produceMore() {
+        self.demand()
+    }
+
+    func didTerminate() {
+        self.cancel()
     }
 }
 

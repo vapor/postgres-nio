@@ -312,15 +312,16 @@ final class PostgresRowSequenceTests: XCTestCase {
         // received.
         let addDataRows1: [DataRow] = [[ByteBuffer(integer: Int64(0))]]
         stream.receive(addDataRows1)
+        XCTAssertEqual(dataSource.requestCount, 1)
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
         XCTAssertEqual(dataSource.requestCount, 2)
 
         // if the buffer gets new rows so that it has equal or more than target (the target size
         // should be halved)
-        let addDataRows2: [DataRow] = [[ByteBuffer(integer: Int64(0))]]
+        let addDataRows2: [DataRow] = [[ByteBuffer(integer: Int64(0))], [ByteBuffer(integer: Int64(0))]]
         stream.receive(addDataRows2) // this should to target being halved.
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
-        for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget/2 - 1) {
+        for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget / 2) {
             _ = try await rowIterator.next() // Remove all rows until we are back at target
             XCTAssertEqual(dataSource.requestCount, 2)
         }
@@ -385,11 +386,12 @@ final class PostgresRowSequenceTests: XCTestCase {
             expectedRequestCount += 1
             XCTAssertEqual(dataSource.requestCount, expectedRequestCount)
 
-            stream.receive([[ByteBuffer(integer: Int64(1))]])
+            stream.receive([[ByteBuffer(integer: Int64(1))], [ByteBuffer(integer: Int64(1))]])
             let newTarget = currentTarget / 2
+            let toDrop = currentTarget + 1 - newTarget
 
             // consume all messages that are to much.
-            for _ in 0..<newTarget {
+            for _ in 0..<toDrop {
                 _ = try await rowIterator.next()
                 XCTAssertEqual(dataSource.requestCount, expectedRequestCount)
             }
