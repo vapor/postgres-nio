@@ -42,11 +42,11 @@ jobs:
       fail-fast: false
       matrix:
         dbimage:
-          - postgres:14
+          - postgres:15
           - postgres:13
           - postgres:11
         include:
-          - dbimage: postgres:14
+          - dbimage: postgres:15
             dbauth: scram-sha-256
           - dbimage: postgres:13
             dbauth: md5
