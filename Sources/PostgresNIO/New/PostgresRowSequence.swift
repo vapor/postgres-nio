@@ -43,12 +43,24 @@ extension PostgresRowSequence {
 
         let _internal: _Internal
 
+        let lookupTable: [String: Int]
+        let columns: [RowDescription.Column]
+
         init(consumer: AsyncStreamConsumer) {
             self._internal = _Internal(consumer: consumer)
+            self.lookupTable = consumer.lookupTable
+            self.columns = consumer.columns
         }
 
         public mutating func next() async throws -> PostgresRow? {
-            try await self._internal.next()
+            if let dataRow = try await self._internal.next() {
+                return PostgresRow(
+                    data: dataRow,
+                    lookupTable: self.lookupTable,
+                    columns: columns
+                )
+            }
+            return nil
         }
 
         final class _Internal {
@@ -62,7 +74,7 @@ extension PostgresRowSequence {
                 self.consumer.iteratorDeinitialized()
             }
 
-            func next() async throws -> PostgresRow? {
+            func next() async throws -> DataRow? {
                 try await self.consumer.next()
             }
         }
@@ -111,12 +123,7 @@ final class AsyncStreamConsumer {
 
         switch receiveAction {
         case .succeed(let continuation, let data, signalDemandTo: let source):
-            let row = PostgresRow(
-                data: data,
-                lookupTable: self.lookupTable,
-                columns: self.columns
-            )
-            continuation.resume(returning: row)
+            continuation.resume(returning: data)
             source?.demand()
 
         case .none:
@@ -175,7 +182,7 @@ final class AsyncStreamConsumer {
         }
     }
     
-    func next() async throws -> PostgresRow? {
+    func next() async throws -> DataRow? {
         self.lock.lock()
         switch self.state.next() {
         case .returnNil:
@@ -185,11 +192,7 @@ final class AsyncStreamConsumer {
         case .returnRow(let data, signalDemandTo: let source):
             self.lock.unlock()
             source?.demand()
-            return PostgresRow(
-                data: data,
-                lookupTable: self.lookupTable,
-                columns: self.columns
-            )
+            return data
 
         case .throwError(let error):
             self.lock.unlock()
@@ -216,7 +219,7 @@ extension AsyncStreamConsumer {
         private enum UpstreamState {
             enum DemandState {
                 case canAskForMore
-                case waitingForMore(CheckedContinuation<PostgresRow?, Error>?)
+                case waitingForMore(CheckedContinuation<DataRow?, Error>?)
             }
 
             case initialized
@@ -395,7 +398,7 @@ extension AsyncStreamConsumer {
             case none
         }
 
-        mutating func next(for continuation: CheckedContinuation<PostgresRow?, Error>) -> NextSlowPathAction {
+        mutating func next(for continuation: CheckedContinuation<DataRow?, Error>) -> NextSlowPathAction {
             switch self.upstreamState {
             case .initialized:
                 preconditionFailure()
@@ -422,7 +425,7 @@ extension AsyncStreamConsumer {
         }
 
         enum ReceiveAction {
-            case succeed(CheckedContinuation<PostgresRow?, Error>, DataRow, signalDemandTo: PSQLRowStream?)
+            case succeed(CheckedContinuation<DataRow?, Error>, DataRow, signalDemandTo: PSQLRowStream?)
             case none
         }
 
@@ -462,8 +465,8 @@ extension AsyncStreamConsumer {
         }
 
         enum CompletionResult {
-            case succeed(CheckedContinuation<PostgresRow?, Error>)
-            case fail(CheckedContinuation<PostgresRow?, Error>, Error)
+            case succeed(CheckedContinuation<DataRow?, Error>)
+            case fail(CheckedContinuation<DataRow?, Error>, Error)
             case none
         }
 
