@@ -117,6 +117,6 @@ extension DataRow {
     }
 }
 
-#if swift(>=5.6)
+#if swift(>=5.5)
 extension DataRow: Sendable {}
 #endif
