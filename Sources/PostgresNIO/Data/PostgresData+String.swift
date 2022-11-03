@@ -22,7 +22,7 @@ extension PostgresData {
             case .numeric:
                 return self.numeric?.string
             case .uuid:
-                return value.readUUID()!.uuidString
+                return value.readUUIDBytes()!.uuidString
             case .timestamp, .timestamptz, .date:
                 return self.date?.description
             case .money:
