@@ -16,13 +16,7 @@ extension UUID: PostgresEncodable {
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
-        let uuid = self.uuid
-        byteBuffer.writeBytes([
-            uuid.0, uuid.1, uuid.2, uuid.3,
-            uuid.4, uuid.5, uuid.6, uuid.7,
-            uuid.8, uuid.9, uuid.10, uuid.11,
-            uuid.12, uuid.13, uuid.14, uuid.15,
-        ])
+        byteBuffer.writeUUIDBytes(self)
     }
 }
 
@@ -36,7 +30,7 @@ extension UUID: PostgresDecodable {
     ) throws {
         switch (format, type) {
         case (.binary, .uuid):
-            guard let uuid = buffer.readUUID() else {
+            guard let uuid = buffer.readUUIDBytes() else {
                 throw PostgresDecodingError.Code.failure
             }
             self = uuid
@@ -60,28 +54,3 @@ extension UUID: PostgresDecodable {
 }
 
 extension UUID: PostgresCodable {}
-
-extension ByteBuffer {
-    @usableFromInline
-    mutating func readUUID() -> UUID? {
-        guard self.readableBytes >= MemoryLayout<uuid_t>.size else {
-            return nil
-        }
-
-        let value: UUID = self.getUUID(at: self.readerIndex)! /* must work as we have enough bytes */
-        // should be MoveReaderIndex
-        self.moveReaderIndex(forwardBy: MemoryLayout<uuid_t>.size)
-        return value
-    }
-
-    func getUUID(at index: Int) -> UUID? {
-        var uuid: uuid_t = (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        return self.viewBytes(at: index, length: MemoryLayout.size(ofValue: uuid)).map { bufferBytes in
-            withUnsafeMutableBytes(of: &uuid) { target in
-                precondition(target.count <= bufferBytes.count)
-                target.copyBytes(from: bufferBytes)
-            }
-            return UUID(uuid: uuid)
-        }
-    }
-}
