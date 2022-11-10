@@ -57,5 +57,3 @@ extension Date: PostgresDecodable {
         }
     }
 }
-
-extension Date: PostgresCodable {}

@@ -48,8 +48,6 @@ extension Float: PostgresDecodable {
     }
 }
 
-extension Float: PostgresCodable {}
-
 extension Double: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .float8
@@ -97,5 +95,3 @@ extension Double: PostgresDecodable {
         }
     }
 }
-
-extension Double: PostgresCodable {}

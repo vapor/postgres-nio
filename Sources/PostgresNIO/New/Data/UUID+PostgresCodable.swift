@@ -52,5 +52,3 @@ extension UUID: PostgresDecodable {
         }
     }
 }
-
-extension UUID: PostgresCodable {}

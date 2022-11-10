@@ -60,5 +60,3 @@ extension Bool: PostgresEncodable {
         byteBuffer.writeInteger(self ? 1 : 0, as: UInt8.self)
     }
 }
-
-extension Bool: PostgresCodable {}

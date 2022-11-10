@@ -33,5 +33,3 @@ extension PostgresDecodable where Self: RawRepresentable, RawValue: PostgresDeco
         self = selfValue
     }
 }
-
-extension PostgresCodable where Self: RawRepresentable, RawValue: PostgresCodable, RawValue._DecodableType == RawValue {}

@@ -45,5 +45,3 @@ extension String: PostgresDecodable {
         }
     }
 }
-
-extension String: PostgresCodable {}
