@@ -60,6 +60,24 @@ extension PostgresQuery {
         }
 
         @inlinable
+        public mutating func appendInterpolation<Value: PostgresNonThrowingEncodable>(_ value: Value) {
+            self.binds.append(value, context: .default)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        @inlinable
+        public mutating func appendInterpolation<Value: PostgresNonThrowingEncodable>(_ value: Optional<Value>) {
+            switch value {
+            case .none:
+                self.binds.appendNull()
+            case .some(let value):
+                self.binds.append(value, context: .default)
+            }
+
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        @inlinable
         public mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PostgresEncodingContext<JSONEncoder>
@@ -136,6 +154,15 @@ public struct PostgresBindings: Hashable {
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         try value.encodeRaw(into: &self.bytes, context: context)
+        self.metadata.append(.init(value: value))
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresNonThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Value,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value))
     }
 

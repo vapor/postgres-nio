@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.Date
 
-extension Date: PostgresEncodable {
+extension Date: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .timestamptz
     }

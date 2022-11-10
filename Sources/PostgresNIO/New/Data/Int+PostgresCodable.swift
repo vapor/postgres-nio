@@ -2,7 +2,7 @@ import NIOCore
 
 // MARK: UInt8
 
-extension UInt8: PostgresEncodable {
+extension UInt8: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .char
     }
@@ -43,7 +43,7 @@ extension UInt8: PostgresDecodable {
 
 // MARK: Int16
 
-extension Int16: PostgresEncodable {
+extension Int16: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .int2
     }
@@ -88,7 +88,7 @@ extension Int16: PostgresDecodable {
 
 // MARK: Int32
 
-extension Int32: PostgresEncodable {
+extension Int32: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .int4
     }
@@ -138,7 +138,7 @@ extension Int32: PostgresDecodable {
 
 // MARK: Int64
 
-extension Int64: PostgresEncodable {
+extension Int64: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .int8
     }
@@ -193,7 +193,7 @@ extension Int64: PostgresDecodable {
 
 // MARK: Int
 
-extension Int: PostgresEncodable {
+extension Int: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         switch MemoryLayout<Int>.size {
         case 4:

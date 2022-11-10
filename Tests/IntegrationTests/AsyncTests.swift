@@ -90,7 +90,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             var binds = PostgresBindings(capacity: Int(UInt16.max))
             for _ in (0..<rowsCount) {
                 for num in (0..<columnsCount) {
-                    try binds.append(num, context: .default)
+                    binds.append(num, context: .default)
                 }
             }
             XCTAssertEqual(binds.count, Int(UInt16.max))

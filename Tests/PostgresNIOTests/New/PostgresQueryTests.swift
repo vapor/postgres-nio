@@ -8,13 +8,11 @@ final class PostgresQueryTests: XCTestCase {
         let null: UUID? = nil
         let uuid: UUID? = UUID()
 
-        var query: PostgresQuery?
-        XCTAssertNoThrow(query = try """
+        var query: PostgresQuery = """
             INSERT INTO foo (id, title, something) SET (\(uuid), \(string), \(null));
             """
-        )
 
-        XCTAssertEqual(query?.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
+        XCTAssertEqual(query.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
 
         var expected = ByteBuffer()
         expected.writeInteger(Int32(16))
@@ -29,7 +27,7 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeString(string)
         expected.writeInteger(Int32(-1))
 
-        XCTAssertEqual(query?.binds.bytes, expected)
+        XCTAssertEqual(query.binds.bytes, expected)
     }
 
     func testStringInterpolationWithCustomJSONEncoder() {
@@ -63,7 +61,7 @@ final class PostgresQueryTests: XCTestCase {
 
         var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
         for value in 1...5 {
-            XCTAssertNoThrow(try query.binds.append(Int(value), context: .default))
+            query.binds.append(Int(value), context: .default)
         }
 
         XCTAssertEqual(query.sql, "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")
@@ -81,14 +79,12 @@ final class PostgresQueryTests: XCTestCase {
         let tableName = UUID().uuidString.uppercased()
         let value = 1
 
-        var query: PostgresQuery?
-        XCTAssertNoThrow(query = try "INSERT INTO \(unescaped: tableName) (id) SET (\(value));")
-        XCTAssertEqual(query?.sql, "INSERT INTO \(tableName) (id) SET ($1);")
+        let query: PostgresQuery = "INSERT INTO \(unescaped: tableName) (id) SET (\(value));"
 
         var expected = ByteBuffer()
         expected.writeInteger(UInt32(8))
         expected.writeInteger(value)
 
-        XCTAssertEqual(query?.binds.bytes, expected)
+        XCTAssertEqual(query.binds.bytes, expected)
     }
 }
