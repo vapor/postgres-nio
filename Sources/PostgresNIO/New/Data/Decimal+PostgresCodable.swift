@@ -47,5 +47,3 @@ extension Decimal: PostgresDecodable {
         }
     }
 }
-
-extension Decimal: PostgresCodable {}

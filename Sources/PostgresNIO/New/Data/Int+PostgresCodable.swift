@@ -41,8 +41,6 @@ extension UInt8: PostgresDecodable {
     }
 }
 
-extension UInt8: PostgresCodable {}
-
 // MARK: Int16
 
 extension Int16: PostgresEncodable {
@@ -87,8 +85,6 @@ extension Int16: PostgresDecodable {
         }
     }
 }
-
-extension Int16: PostgresCodable {}
 
 // MARK: Int32
 
@@ -139,8 +135,6 @@ extension Int32: PostgresDecodable {
         }
     }
 }
-
-extension Int32: PostgresCodable {}
 
 // MARK: Int64
 
@@ -196,8 +190,6 @@ extension Int64: PostgresDecodable {
         }
     }
 }
-
-extension Int64: PostgresCodable {}
 
 // MARK: Int
 
@@ -260,5 +252,3 @@ extension Int: PostgresDecodable {
         }
     }
 }
-
-extension Int: PostgresCodable {}

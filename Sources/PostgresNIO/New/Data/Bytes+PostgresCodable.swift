@@ -51,8 +51,6 @@ extension ByteBuffer: PostgresDecodable {
     }
 }
 
-extension ByteBuffer: PostgresCodable {}
-
 extension Data: PostgresEncodable {
     public static var psqlType: PostgresDataType {
         .bytea
@@ -82,5 +80,3 @@ extension Data: PostgresDecodable {
         self = buffer.readData(length: buffer.readableBytes, byteTransferStrategy: .automatic)!
     }
 }
-
-extension Data: PostgresCodable {}

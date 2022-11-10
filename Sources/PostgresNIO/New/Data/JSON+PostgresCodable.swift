@@ -45,5 +45,3 @@ extension PostgresDecodable where Self: Decodable {
         }
     }
 }
-
-extension PostgresCodable where Self: Codable {}
