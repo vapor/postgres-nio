@@ -1,6 +1,4 @@
 version: 1
-builder:
-  configs:
-  - documentation_targets:
-    - PostgresNIO
+external_links:
+  documentation: "https://api.vapor.codes/postgres-nio/documentation/postgresnio/"
 
