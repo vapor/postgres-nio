@@ -3,6 +3,8 @@ import Foundation
 
 /// A type that can encode itself to a postgres wire binary representation.
 public protocol PostgresEncodable {
+    // TODO: Rename to `PostgresThrowingEncodable` with next major release
+
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     static var psqlType: PostgresDataType { get }
 
@@ -19,6 +21,8 @@ public protocol PostgresEncodable {
 /// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without
 /// having to spell `try`.
 public protocol PostgresNonThrowingEncodable: PostgresEncodable {
+    // TODO: Rename to `PostgresEncodable` with next major release
+
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>)
 }
 
