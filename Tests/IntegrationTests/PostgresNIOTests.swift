@@ -555,6 +555,19 @@ final class PostgresNIOTests: XCTestCase {
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
+    
+    func testOptionalIntegerArrayParse() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("""
+        select
+            '{1, 2, NULL, 4}'::int8[] as array
+        """).wait())
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "array"].array(of: Int?.self), [1, 2, nil, 4])
+    }
 
     func testNullIntegerArrayParse() {
         var conn: PostgresConnection?
@@ -597,6 +610,22 @@ final class PostgresNIOTests: XCTestCase {
         ]).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
+    }
+    
+    func testOptionalIntegerArraySerialize() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("""
+        select
+            $1::int8[] as array
+        """, [
+            PostgresData(array: [1, nil, 3] as [Int64?])
+        ]).wait())
+        XCTAssertEqual(rows?.count, 1)
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "array"].array(of: Int64?.self), [1, nil, 3])
     }
     
     // https://github.com/vapor/postgres-nio/issues/143

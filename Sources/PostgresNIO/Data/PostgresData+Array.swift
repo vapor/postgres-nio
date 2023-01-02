@@ -13,7 +13,7 @@ extension PostgresData {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
         // 0 if empty, 1 if not
         buffer.writeInteger(array.isEmpty ? 0 : 1, as: UInt32.self)
-        // b
+        // b - this gets ignored by psql
         buffer.writeInteger(0, as: UInt32.self)
         // array element type
         buffer.writeInteger(elementType.rawValue)
@@ -30,7 +30,7 @@ extension PostgresData {
                     buffer.writeInteger(numericCast(value.readableBytes), as: UInt32.self)
                     buffer.writeBuffer(&value)
                 } else {
-                    buffer.writeInteger(0, as: UInt32.self)
+                    buffer.writeInteger(-1, as: Int32.self)
                 }
             }
         }
@@ -77,10 +77,10 @@ extension PostgresData {
         guard let isNotEmpty = value.readInteger(as: UInt32.self) else {
             return nil
         }
-        guard let b = value.readInteger(as: UInt32.self) else {
+        // b
+        guard let _ = value.readInteger(as: UInt32.self) else {
             return nil
         }
-        assert(b == 0, "Array b field did not equal zero")
         guard let type = value.readInteger(as: PostgresDataType.self) else {
             return nil
         }
@@ -99,9 +99,9 @@ extension PostgresData {
 
         var array: [PostgresData] = []
         while
-            let itemLength = value.readInteger(as: UInt32.self),
-            let itemValue = value.readSlice(length: numericCast(itemLength))
+            let itemLength = value.readInteger(as: Int32.self)
         {
+            let itemValue = itemLength == -1 ? nil : value.readSlice(length: numericCast(itemLength))
             let data = PostgresData(
                 type: type,
                 typeModifier: nil,
