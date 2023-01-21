@@ -1,6 +1,6 @@
 import NIOCore
 
-extension Float: PostgresEncodable {
+extension Float: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .float4
     }
@@ -48,7 +48,7 @@ extension Float: PostgresDecodable {
     }
 }
 
-extension Double: PostgresEncodable {
+extension Double: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .float8
     }

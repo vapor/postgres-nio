@@ -124,6 +124,43 @@ extension Array: PostgresEncodable where Element: PostgresArrayEncodable {
     }
 }
 
+extension Array: PostgresNonThrowingEncodable where Element: PostgresArrayEncodable & PostgresNonThrowingEncodable {
+    public static var psqlType: PostgresDataType {
+        Element.psqlArrayType
+    }
+
+    public static var psqlFormat: PostgresFormat {
+        .binary
+    }
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        // 0 if empty, 1 if not
+        buffer.writeInteger(self.isEmpty ? 0 : 1, as: UInt32.self)
+        // b
+        buffer.writeInteger(0, as: Int32.self)
+        // array element type
+        buffer.writeInteger(Element.psqlType.rawValue)
+
+        // continue if the array is not empty
+        guard !self.isEmpty else {
+            return
+        }
+
+        // length of array
+        buffer.writeInteger(numericCast(self.count), as: Int32.self)
+        // dimensions
+        buffer.writeInteger(1, as: Int32.self)
+
+        self.forEach { element in
+            element.encodeRaw(into: &buffer, context: context)
+        }
+    }
+}
+
 
 extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Element == Element._DecodableType {
     public init<JSONDecoder: PostgresJSONDecoder>(

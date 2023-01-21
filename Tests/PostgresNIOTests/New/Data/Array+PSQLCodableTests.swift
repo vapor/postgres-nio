@@ -61,7 +61,7 @@ class Array_PSQLCodableTests: XCTestCase {
         let values = ["foo", "bar", "hello", "world"]
 
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
+        values.encode(into: &buffer, context: .default)
 
         var result: [String]?
         XCTAssertNoThrow(result = try [String](from: &buffer, type: .textArray, format: .binary, context: .default))
@@ -72,7 +72,7 @@ class Array_PSQLCodableTests: XCTestCase {
         let values: [String] = []
 
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try values.encode(into: &buffer, context: .default))
+        values.encode(into: &buffer, context: .default)
 
         var result: [String]?
         XCTAssertNoThrow(result = try [String](from: &buffer, type: .textArray, format: .binary, context: .default))

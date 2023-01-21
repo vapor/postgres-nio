@@ -3,6 +3,8 @@ import Foundation
 
 /// A type that can encode itself to a postgres wire binary representation.
 public protocol PostgresEncodable {
+    // TODO: Rename to `PostgresThrowingEncodable` with next major release
+
     /// identifies the data type that we will encode into `byteBuffer` in `encode`
     static var psqlType: PostgresDataType { get }
 
@@ -12,6 +14,16 @@ public protocol PostgresEncodable {
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the ``PostgresBindings``.
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
+}
+
+/// A type that can encode itself to a postgres wire binary representation. It enforces that the
+/// ``PostgresEncodable/encode(into:context:)`` does not throw. This allows users
+/// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without
+/// having to spell `try`.
+public protocol PostgresNonThrowingEncodable: PostgresEncodable {
+    // TODO: Rename to `PostgresEncodable` with next major release
+
+    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>)
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
@@ -84,6 +96,26 @@ extension PostgresEncodable {
         // The value of the parameter, in the format indicated by the associated format
         // code. n is the above length.
         try self.encode(into: &buffer, context: context)
+
+        // overwrite the empty length, with the real value
+        buffer.setInteger(numericCast(buffer.writerIndex - startIndex), at: lengthIndex, as: Int32.self)
+    }
+}
+
+extension PostgresNonThrowingEncodable {
+    @inlinable
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        // The length of the parameter value, in bytes (this count does not include
+        // itself). Can be zero.
+        let lengthIndex = buffer.writerIndex
+        buffer.writeInteger(0, as: Int32.self)
+        let startIndex = buffer.writerIndex
+        // The value of the parameter, in the format indicated by the associated format
+        // code. n is the above length.
+        self.encode(into: &buffer, context: context)
 
         // overwrite the empty length, with the real value
         buffer.setInteger(numericCast(buffer.writerIndex - startIndex), at: lengthIndex, as: Int32.self)

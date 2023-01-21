@@ -6,7 +6,7 @@ extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
     public static var psqlType: PostgresDataType {
         .bytea
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -20,7 +20,9 @@ extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
     }
 }
 
-extension ByteBuffer: PostgresEncodable {
+extension PostgresNonThrowingEncodable where Self: Sequence, Self.Element == UInt8 {}
+
+extension ByteBuffer: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .bytea
     }

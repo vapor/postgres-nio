@@ -7,8 +7,8 @@ class BindTests: XCTestCase {
     func testEncodeBind() {
         let encoder = PSQLFrontendMessageEncoder()
         var bindings = PostgresBindings()
-        XCTAssertNoThrow(try bindings.append("Hello", context: .default))
-        XCTAssertNoThrow(try bindings.append("World", context: .default))
+        bindings.append("Hello", context: .default)
+        bindings.append("World", context: .default)
         var byteBuffer = ByteBuffer()
         let bind = PostgresFrontendMessage.Bind(portalName: "", preparedStatementName: "", bind: bindings)
         let message = PostgresFrontendMessage.bind(bind)

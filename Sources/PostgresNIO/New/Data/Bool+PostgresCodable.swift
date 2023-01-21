@@ -43,7 +43,7 @@ extension Bool: PostgresDecodable {
     }
 }
 
-extension Bool: PostgresEncodable {
+extension Bool: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .bool
     }

@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.UUID
 
-extension String: PostgresEncodable {
+extension String: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .text
     }
