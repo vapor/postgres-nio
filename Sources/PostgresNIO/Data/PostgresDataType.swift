@@ -3,7 +3,7 @@
 /// Currently there a two wire formats supported:
 ///  - text
 ///  - binary
-public enum PostgresFormat: Int16 {
+public enum PostgresFormat: Int16, Sendable {
     case text = 0
     case binary = 1
 }
@@ -31,7 +31,7 @@ public typealias PostgresFormatCode = PostgresFormat
 
 /// The data type's raw object ID.
 /// Use `select * from pg_type where oid = <idhere>;` to lookup more information.
-public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConvertible {
+public struct PostgresDataType: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     /// `0`
     public static let null = PostgresDataType(0)
     /// `16`
