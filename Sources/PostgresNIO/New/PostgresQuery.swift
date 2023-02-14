@@ -177,3 +177,9 @@ public struct PostgresBindings: Hashable {
         self.metadata.append(.init(dataType: postgresData.type, format: .binary))
     }
 }
+
+#if swift(>=5.6)
+extension PostgresQuery: Sendable {}
+extension PostgresBindings: Sendable {}
+extension PostgresBindings.Metadata: Sendable {}
+#endif
