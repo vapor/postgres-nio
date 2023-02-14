@@ -1,5 +1,5 @@
 /// A Postgres SQL query, that can be executed on a Postgres server. Contains the raw sql string and bindings.
-public struct PostgresQuery: Hashable {
+public struct PostgresQuery: Hashable, Sendable {
     /// The query string
     public var sql: String
     /// The query binds
@@ -102,9 +102,9 @@ struct PSQLExecuteStatement {
     var rowDescription: RowDescription?
 }
 
-public struct PostgresBindings: Hashable {
+public struct PostgresBindings: Hashable, Sendable {
     @usableFromInline
-    struct Metadata: Hashable {
+    struct Metadata: Hashable, Sendable {
         @usableFromInline
         var dataType: PostgresDataType
         @usableFromInline
