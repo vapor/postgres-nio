@@ -1,4 +1,5 @@
 @testable import PostgresNIO
+import NIOCore
 
 struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
     typealias InboundOut = PostgresFrontendMessage

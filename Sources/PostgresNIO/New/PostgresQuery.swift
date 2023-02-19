@@ -1,3 +1,5 @@
+import NIOCore
+
 /// A Postgres SQL query, that can be executed on a Postgres server. Contains the raw sql string and bindings.
 public struct PostgresQuery: Hashable {
     /// The query string

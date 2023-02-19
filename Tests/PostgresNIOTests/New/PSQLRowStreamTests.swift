@@ -2,6 +2,8 @@ import NIOCore
 import Logging
 import XCTest
 @testable import PostgresNIO
+import NIOCore
+import NIOEmbedded
 
 class PSQLRowStreamTests: XCTestCase {
     func testEmptyStream() {

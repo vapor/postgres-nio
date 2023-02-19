@@ -1,6 +1,7 @@
 import PostgresNIO
 import XCTest
 import NIOTestUtils
+import NIOCore
 
 class PostgresMessageDecoderTests: XCTestCase {
     @available(*, deprecated, message: "Tests deprecated API")
