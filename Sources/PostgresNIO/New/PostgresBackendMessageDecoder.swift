@@ -1,3 +1,5 @@
+import NIOCore
+
 struct PostgresBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
     typealias InboundOut = PostgresBackendMessage
     

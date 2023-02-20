@@ -3,6 +3,8 @@ import NIOEmbedded
 import Dispatch
 import XCTest
 @testable import PostgresNIO
+import NIOCore
+import Logging
 
 #if canImport(_Concurrency)
 final class PostgresRowSequenceTests: XCTestCase {

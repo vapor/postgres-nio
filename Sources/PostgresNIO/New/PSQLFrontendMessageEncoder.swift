@@ -1,3 +1,4 @@
+import NIOCore
 
 struct PSQLFrontendMessageEncoder: MessageToByteEncoder {
     typealias OutboundIn = PostgresFrontendMessage

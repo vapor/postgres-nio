@@ -4,6 +4,7 @@ import XCTest
 import NIOCore
 import NIOPosix
 import NIOTestUtils
+import NIOSSL
 
 final class PostgresNIOTests: XCTestCase {
     

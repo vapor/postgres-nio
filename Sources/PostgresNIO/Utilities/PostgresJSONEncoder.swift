@@ -1,5 +1,6 @@
 import Foundation
 import NIOFoundationCompat
+import NIOCore
 
 /// A protocol that mimicks the Foundation `JSONEncoder.encode(_:)` function.
 /// Conform a non-Foundation JSON encoder to this protocol if you want PostgresNIO to be

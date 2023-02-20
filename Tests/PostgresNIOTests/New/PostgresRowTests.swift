@@ -1,5 +1,6 @@
 import XCTest
 @testable import PostgresNIO
+import NIOCore
 
 final class PostgresRowTests: XCTestCase {
 

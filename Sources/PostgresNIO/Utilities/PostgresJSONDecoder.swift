@@ -1,6 +1,7 @@
 import class Foundation.JSONDecoder
 import struct Foundation.Data
 import NIOFoundationCompat
+import NIOCore
 
 /// A protocol that mimicks the Foundation `JSONDecoder.decode(_:from:)` function.
 /// Conform a non-Foundation JSON decoder to this protocol if you want PostgresNIO to be

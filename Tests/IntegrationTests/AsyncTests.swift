@@ -4,6 +4,8 @@ import PostgresNIO
 #if canImport(Network)
 import NIOTransportServices
 #endif
+import NIOPosix
+import NIOCore
 
 #if canImport(_Concurrency)
 final class AsyncPostgresConnectionTests: XCTestCase {
