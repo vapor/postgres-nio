@@ -120,6 +120,8 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
     public static let jsonb = PostgresDataType(3802)
     /// `3807` _jsonb
     public static let jsonbArray = PostgresDataType(3807)
+    /// `3926`
+    public static let int8Range = PostgresDataType(3926)
 
     /// The raw data type code recognized by PostgreSQL.
     public var rawValue: UInt32

@@ -341,6 +341,23 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(UUID(uuidString: row?[data: "id"].string ?? ""), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
     }
 
+    func testInt8Range() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        struct Model: Decodable {
+            let range: Range<Int64>
+        }
+        var results: PostgresQueryResult?
+        XCTAssertNoThrow(results = try conn?.query("""
+        SELECT
+            '[-9223372036854775808, 9223372036854775807)'::int8range AS range
+        """).wait())
+        XCTAssertEqual(results?.count, 1)
+        let row = results?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "range"].int8Range, -9223372036854775808..<9223372036854775807)
+    }
+
     func testDates() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
