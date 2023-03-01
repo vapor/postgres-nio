@@ -70,6 +70,10 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
             description = self.array(of: String.self)?.description
         case .jsonbArray:
             description = self.array?.description
+        case .int8Range:
+            description = self.int8Range?.description
+        case .int8RangeArray:
+            description = self.array(of: Range<Int64>.self)?.description
         default:
             if self.type.isUserDefined {
                 // custom type
