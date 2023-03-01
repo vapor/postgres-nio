@@ -354,8 +354,19 @@ final class PostgresNIOTests: XCTestCase {
             '[-9223372036854775808, 9223372036854775807)'::int8range AS range
         """).wait())
         XCTAssertEqual(results?.count, 1)
-        let row = results?.first?.makeRandomAccess()
+        var row = results?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "range"].int8Range, -9223372036854775808..<9223372036854775807)
+
+        XCTAssertNoThrow(results = try conn?.query("""
+        SELECT
+            ARRAY[
+                '[0, 1)'::int8range,
+                '[10, 11)'::int8range
+            ] AS ranges
+        """).wait())
+        XCTAssertEqual(results?.count, 1)
+        row = results?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "ranges"].array(of: Range<Int64>.self), [0..<1, 10..<11])
     }
 
     func testDates() {
