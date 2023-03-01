@@ -17,7 +17,7 @@ extension PostgresData {
         switch self.formatCode {
         case .binary:
             switch self.type {
-            case PostgresDataType(3926):
+            case .int8Range:
                 guard value.readInteger(as: Int8.self) == 2 else {
                     return nil
                 }
