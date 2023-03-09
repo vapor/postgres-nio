@@ -26,7 +26,7 @@ extension PostgresEncodable where Self: Encodable {
 }
 
 extension PostgresDecodable where Self: Decodable {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
