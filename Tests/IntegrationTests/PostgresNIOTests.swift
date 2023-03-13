@@ -367,6 +367,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(results?.count, 1)
         row = results?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "ranges"].array(of: Range<Int64>.self), [0..<1, 10..<11])
+        XCTAssertEqual(row?[data: "ranges"].array(of: ClosedRange<Int64>.self), [0...0, 10...10])
     }
 
     func testDates() {

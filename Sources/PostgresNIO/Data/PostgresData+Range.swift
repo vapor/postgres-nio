@@ -64,3 +64,20 @@ extension Range: PostgresDataConvertible where Element == Int64 {
         return .init(int8Range: self)
     }
 }
+
+extension ClosedRange: PostgresDataConvertible where Element == Int64 {
+    public static var postgresDataType: PostgresDataType {
+        return .int8Range
+    }
+    
+    public init?(postgresData: PostgresData) {
+        guard let range: Range<Int64> = postgresData.int8Range else {
+            return nil
+        }
+        self = ClosedRange(range)
+    }
+
+    public var postgresData: PostgresData? {
+        return .init(int8Range: Range(self))
+    }
+}
