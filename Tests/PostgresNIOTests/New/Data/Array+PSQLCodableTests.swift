@@ -55,6 +55,14 @@ class Array_PSQLCodableTests: XCTestCase {
         XCTAssertEqual(UUID.psqlArrayType, .uuidArray)
         XCTAssertEqual(UUID.psqlType, .uuid)
         XCTAssertEqual([UUID].psqlType, .uuidArray)
+
+        XCTAssertEqual(Range<Int64>.psqlArrayType, .int8RangeArray)
+        XCTAssertEqual(Range<Int64>.psqlType, .int8Range)
+        XCTAssertEqual([Range<Int64>].psqlType, .int8RangeArray)
+
+        XCTAssertEqual(ClosedRange<Int64>.psqlArrayType, .int8RangeArray)
+        XCTAssertEqual(ClosedRange<Int64>.psqlType, .int8Range)
+        XCTAssertEqual([ClosedRange<Int64>].psqlType, .int8RangeArray)
     }
 
     func testStringArrayRoundTrip() {

@@ -48,7 +48,7 @@ extension PostgresData {
     }
 }
 
-extension Range: PostgresDataConvertible where Element == Int64 {
+extension Range: PostgresDataConvertible where Bound == Int64 {
     public static var postgresDataType: PostgresDataType {
         return .int8Range
     }
@@ -65,7 +65,7 @@ extension Range: PostgresDataConvertible where Element == Int64 {
     }
 }
 
-extension ClosedRange: PostgresDataConvertible where Element == Int64 {
+extension ClosedRange: PostgresDataConvertible where Bound == Int64 {
     public static var postgresDataType: PostgresDataType {
         return .int8Range
     }

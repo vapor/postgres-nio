@@ -351,11 +351,11 @@ final class PostgresNIOTests: XCTestCase {
         var results: PostgresQueryResult?
         XCTAssertNoThrow(results = try conn?.query("""
         SELECT
-            '[-9223372036854775808, 9223372036854775807)'::int8range AS range
+            '[\(Int64.min), \(Int64.max))'::int8range AS range
         """).wait())
         XCTAssertEqual(results?.count, 1)
         var row = results?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "range"].int8Range, -9223372036854775808..<9223372036854775807)
+        XCTAssertEqual(row?[data: "range"].int8Range, Int64.min..<Int64.max)
 
         XCTAssertNoThrow(results = try conn?.query("""
         SELECT
