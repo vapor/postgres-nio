@@ -168,7 +168,7 @@ public struct PostgresBindings: Hashable {
         self.metadata.append(.init(value: value))
     }
 
-    mutating func append(_ postgresData: PostgresData) {
+    public mutating func append(_ postgresData: PostgresData) {
         switch postgresData.value {
         case .none:
             self.bytes.writeInteger(-1, as: Int32.self)
