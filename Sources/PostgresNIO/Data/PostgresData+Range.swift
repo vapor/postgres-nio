@@ -1,7 +1,7 @@
 import NIOCore
 
 // MARK: Postgres range types
-public protocol PostgresRangeExpression<Bound>: PostgresDataConvertible {
+public protocol PostgresRangeExpression: PostgresDataConvertible {
     associatedtype Bound: PostgresRangeBound
 
     var postgresLowerBound: Bound? { get }
