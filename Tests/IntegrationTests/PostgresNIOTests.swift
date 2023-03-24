@@ -355,7 +355,9 @@ final class PostgresNIOTests: XCTestCase {
         """).wait())
         XCTAssertEqual(results?.count, 1)
         var row = results?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "range"].int8Range as? Range<Int64>, Int64.min..<Int64.max)
+        let expectedRange: Range<Int64> = Int64.min..<Int64.max
+        XCTAssertEqual(row?[data: "range"].int8Range as? Range<Int64>, expectedRange)
+        XCTAssertEqual(row?[data: "range"].value, PostgresData(range: expectedRange).value)
 
         XCTAssertNoThrow(results = try conn?.query("""
         SELECT

@@ -1,49 +1,53 @@
 import NIOCore
 
-public protocol PostgresInt8RangeExpression: PostgresDataConvertible, CustomStringConvertible {
+// MARK: Postgres range types
+public protocol PostgresRangeExpression<Bound>: PostgresDataConvertible {
+    associatedtype Bound: PostgresRangeBound
+
+    var postgresLowerBound: Bound? { get }
+    var postgresUpperBound: Bound? { get }
+    var isLowerBoundInclusive: Bool { get }
+    var isUpperBoundInclusive: Bool { get }
+}
+
+public protocol PostgresRangeBound: PostgresDataConvertible {}
+
+public protocol PostgresInt8RangeExpression: CustomStringConvertible {
     var postgresLowerBound: Int64? { get }
     var postgresUpperBound: Int64? { get }
 }
 
-extension PostgresInt8RangeExpression {
-    public static var postgresDataType: PostgresDataType {
-        return .int8Range
-    }
-
-    public var postgresData: PostgresData? {
-        return .init(int8Range: self)
-    }
-}
+// MARK: PostgresData
 
 extension PostgresData {
-    public init<R: PostgresInt8RangeExpression>(int8Range: R) {
-        guard let lowerBound: Int64 = int8Range.postgresLowerBound else {
-            fatalError("Unexpected type \(Swift.type(of: int8Range))")
+    public init<R: PostgresRangeExpression>(range: R) {
+        var buffer: ByteBuffer = ByteBuffer()
+
+        // flags byte contains certain properties of the range
+        var flags: UInt8 = 0
+        if range.isLowerBoundInclusive {
+            flags |= _isLowerBoundInclusive
+        }
+        if range.isUpperBoundInclusive {
+            flags |= _isUpperBoundInclusive
         }
 
-        guard let upperBound: Int64 = int8Range.postgresUpperBound else {
-            fatalError("Unexpected type \(Swift.type(of: int8Range))")
-        }
+        let boundMemorySize = Int32(MemoryLayout<R.Bound>.size)
 
-        var buffer = ByteBufferAllocator().buffer(capacity: 25)
-        
-        if int8Range is Range<Int64> {
-            buffer.writeInteger(2, as: Int8.self)
-        } else if int8Range is ClosedRange<Int64> {
-            buffer.writeInteger(6, as: Int8.self)
-        } else {
-            fatalError("Unexpected type \(Swift.type(of: int8Range))")
+        buffer.writeInteger(flags)
+        if var lowerBoundValue: ByteBuffer = range.postgresLowerBound.postgresData?.value {
+            buffer.writeInteger(boundMemorySize)
+            buffer.writeBuffer(&lowerBoundValue)
         }
-
-        buffer.writeInteger(8, as: Int32.self)
-        buffer.writeInteger(lowerBound)
-        buffer.writeInteger(8, as: Int32.self)
-        buffer.writeInteger(upperBound)
+        if var upperBoundValue: ByteBuffer = range.postgresUpperBound.postgresData?.value {
+            buffer.writeInteger(boundMemorySize)
+            buffer.writeBuffer(&upperBoundValue)
+        }    
         self.init(type: .int8Range, formatCode: .binary, value: buffer)
     }
     
     public var int8Range: PostgresInt8RangeExpression? {
-        guard var value = self.value else {
+        guard var value: ByteBuffer = self.value else {
             return nil
         }
         
@@ -51,33 +55,65 @@ extension PostgresData {
         case .binary:
             switch self.type {
             case .int8Range:
-                guard value.readInteger(as: Int8.self) == 2 else {
+                // flags byte contains certain properties of the range
+                guard let flags: UInt8 = value.readInteger(as: UInt8.self) else {
                     return nil
                 }
 
-                guard value.readInteger(as: Int32.self) == 8 else {
+                guard let lowerBoundSize = value.readInteger(as: Int32.self),
+                    Int(lowerBoundSize) == MemoryLayout<Int64>.size
+                else {
                     return nil
                 }
 
-                guard let lowerBound: Int64 = value.readInteger() else {
+                let lowerBound: Int64? = value.readInteger(as: Int64.self)
+
+                guard let upperBoundSize = value.readInteger(as: Int32.self),
+                    Int(upperBoundSize) == MemoryLayout<Int64>.size
+                else {
                     return nil
                 }
 
-                guard value.readInteger(as: Int32.self) == 8 else {
-                    return nil
-                }
+                let upperBound: Int64? = value.readInteger(as: Int64.self)
 
-                guard let upperBound: Int64 = value.readInteger() else {
+                if flags & _isLowerBoundInclusive != 0,
+                    let lowerBound: Int64,
+                    flags & _isUpperBoundInclusive == 0,
+                    let upperBound: Int64
+                {
+                    return lowerBound..<upperBound
+                } else {
                     return nil
                 }
                 
-                return lowerBound..<upperBound
             default:
                 return nil
             }
         case .text:
             return nil
         }
+    }
+}
+
+extension PostgresInt8RangeExpression where Self: PostgresRangeExpression {
+    public static var postgresDataType: PostgresDataType {
+        return .int8Range
+    }
+
+    public var postgresData: PostgresData? {
+        return .init(range: self)
+    }
+}
+
+// MARK: Swift representations of Postgres type int8range
+
+extension Range: PostgresRangeExpression where Bound == Int64 {
+    public var isLowerBoundInclusive: Bool {
+        return true
+    }
+
+    public var isUpperBoundInclusive: Bool {
+        return false
     }
 }
 
@@ -100,6 +136,16 @@ extension Range: PostgresDataConvertible where Bound == Int64 {
     }
 }
 
+extension ClosedRange: PostgresRangeExpression where Bound == Int64 {
+    public var isLowerBoundInclusive: Bool {
+        return true
+    }
+
+    public var isUpperBoundInclusive: Bool {
+        return true
+    }
+}
+
 extension ClosedRange: PostgresInt8RangeExpression where Bound == Int64 {
     public var postgresLowerBound: Int64? {
         return self.lowerBound
@@ -118,3 +164,9 @@ extension ClosedRange: PostgresDataConvertible where Bound == Int64 {
         self = ClosedRange(range)
     }
 }
+
+extension Int64: PostgresRangeBound {}
+
+// MARK: Private
+private let _isLowerBoundInclusive: UInt8 = 0x02
+private let _isUpperBoundInclusive: UInt8 = 0x04
