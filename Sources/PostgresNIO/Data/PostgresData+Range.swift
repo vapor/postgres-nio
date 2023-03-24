@@ -66,7 +66,9 @@ extension PostgresData {
                     return nil
                 }
 
-                let lowerBound: Int64? = value.readInteger(as: Int64.self)
+                guard let lowerBound: Int64 = value.readInteger(as: Int64.self) else {
+                    return nil
+                }
 
                 guard let upperBoundSize = value.readInteger(as: Int32.self),
                     Int(upperBoundSize) == MemoryLayout<Int64>.size
@@ -74,12 +76,12 @@ extension PostgresData {
                     return nil
                 }
 
-                let upperBound: Int64? = value.readInteger(as: Int64.self)
+                guard let upperBound: Int64 = value.readInteger(as: Int64.self) else {
+                    return nil
+                }
 
                 if flags & _isLowerBoundInclusive != 0,
-                    let lowerBound: Int64,
-                    flags & _isUpperBoundInclusive == 0,
-                    let upperBound: Int64
+                    flags & _isUpperBoundInclusive == 0
                 {
                     return lowerBound..<upperBound
                 } else {
