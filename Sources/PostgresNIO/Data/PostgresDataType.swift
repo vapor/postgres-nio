@@ -120,6 +120,10 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
     public static let jsonb = PostgresDataType(3802)
     /// `3807` _jsonb
     public static let jsonbArray = PostgresDataType(3807)
+    /// `3904`
+    public static let int4Range = PostgresDataType(3904)
+    /// `3905` _int4range
+    public static let int4RangeArray = PostgresDataType(3905)
     /// `3926`
     public static let int8Range = PostgresDataType(3926)
     /// `3927` _int8range
@@ -189,6 +193,8 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
         case .uuidArray: return "UUID[]"
         case .jsonb: return "JSONB"
         case .jsonbArray: return "JSONB[]"
+        case .int4Range: return "INT4RANGE"
+        case .int4RangeArray: return "INT4RANGE[]"
         case .int8Range: return "INT8RANGE"
         case .int8RangeArray: return "INT8RANGE[]"
         default: return nil
@@ -212,6 +218,7 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
         case .jsonb: return .jsonbArray
         case .text: return .textArray
         case .varchar: return .varcharArray
+        case .int4Range: return .int4RangeArray
         case .int8Range: return .int8RangeArray
         default: return nil
         }
@@ -235,6 +242,7 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
         case .jsonbArray: return .jsonb
         case .textArray: return .text
         case .varcharArray: return .varchar
+        case .int4RangeArray: return .int4Range
         case .int8RangeArray: return .int8Range
         default: return nil
         }

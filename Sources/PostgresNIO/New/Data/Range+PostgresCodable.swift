@@ -1,30 +1,27 @@
 import NIOCore
 
-extension Range: PostgresEncodable where Bound == Int64 {
-    public static var psqlType: PostgresDataType {
-        .int8Range
-    }
+extension RangeExpression where Bound: PostgresRangeBound {
+    public static var psqlFormat: PostgresFormat { return .binary }
+}
 
-    public static var psqlFormat: PostgresFormat {
-        .binary
-    }
+// MARK: Range
+
+extension Range: PostgresEncodable where Bound: PostgresRangeBound {
+    public static var psqlType: PostgresDataType { return Bound.rangeType }
 
     @inlinable
     public func encode<JSONEncoder: PostgresJSONEncoder>(
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
-        byteBuffer.writeInteger(2, as: Int8.self)
-        byteBuffer.writeInteger(8, as: Int32.self)
-        byteBuffer.writeInteger(self.lowerBound)
-        byteBuffer.writeInteger(8, as: Int32.self)
-        byteBuffer.writeInteger(self.upperBound)
+        let postgresRange = PostgresRange<Bound>(range: self)
+        postgresRange.encode(into: &byteBuffer)
     }
 }
 
-extension Range: PostgresNonThrowingEncodable where Bound == Int64 {}
+extension Range: PostgresNonThrowingEncodable where Bound: PostgresRangeBound {}
 
-extension Range: PostgresDecodable where Bound == Int64 {
+extension Range: PostgresDecodable where Bound: PostgresRangeBound {
     @inlinable
     public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
@@ -32,81 +29,76 @@ extension Range: PostgresDecodable where Bound == Int64 {
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
     ) throws {
-        guard type == .int8Range else {
+        guard type == Bound.rangeType else {
             throw PostgresDecodingError.Code.typeMismatch
         }
 
-        switch format {
-        case .binary:
-            guard buffer.readableBytes == 25 else {
-                throw PostgresDecodingError.Code.failure
-            }
-
-            guard buffer.readInteger(as: Int8.self) == 2 else {
-                throw PostgresDecodingError.Code.failure
-            }
-
-            guard buffer.readInteger(as: Int32.self) == 8 else {
-                throw PostgresDecodingError.Code.failure
-            }
-
-            guard let lowerBound: Int64 = buffer.readInteger() else {
-                throw PostgresDecodingError.Code.failure
-            }
-
-            guard buffer.readInteger(as: Int32.self) == 8 else {
-                throw PostgresDecodingError.Code.failure
-            }
-
-            guard let upperBound: Int64 = buffer.readInteger() else {
-                throw PostgresDecodingError.Code.failure
-            }
-
-            self = lowerBound..<upperBound
-        default:
-            throw PostgresDecodingError.Code.typeMismatch
-        }
-    }
-}
-
-extension ClosedRange: PostgresEncodable where Bound == Int64 {
-    public static var psqlType: PostgresDataType {
-        .int8Range
-    }
-
-    public static var psqlFormat: PostgresFormat {
-        .binary
-    }
-
-    @inlinable
-    public func encode<JSONEncoder: PostgresJSONEncoder>(
-        into byteBuffer: inout ByteBuffer,
-        context: PostgresEncodingContext<JSONEncoder>
-    ) {
-        Range(self).encode(
-            into: &byteBuffer,
-            context: context
-        )
-    }
-}
-
-extension ClosedRange: PostgresNonThrowingEncodable where Bound == Int64 {}
-
-extension ClosedRange: PostgresDecodable where Bound == Int64 {
-    @inlinable
-    public init<JSONDecoder: PostgresJSONDecoder>(
-        from buffer: inout ByteBuffer,
-        type: PostgresDataType,
-        format: PostgresFormat,
-        context: PostgresDecodingContext<JSONDecoder>
-    ) throws {
-        let range = try Range<Int64>(
+        guard let postgresRange = PostgresRange<Bound>(
             from: &buffer,
-            type: type,
-            format: format,
-            context: context
-        )
+            format: format
+        ) else {
+            throw PostgresDecodingError.Code.failure
+        }
 
-        self = ClosedRange(range)
+        guard let lowerBound: Bound = postgresRange.lowerBound,
+            let upperBound: Bound = postgresRange.upperBound
+        else {
+            throw PostgresDecodingError.Code.failure
+            
+        }
+        
+        self = lowerBound..<upperBound
+    }
+}
+
+// MARK: ClosedRange
+
+extension ClosedRange: PostgresEncodable where Bound: PostgresRangeBound {
+    public static var psqlType: PostgresDataType { return Bound.rangeType }
+
+    @inlinable
+    public func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        let postgresRange = PostgresRange<Bound>(closedRange: self)
+        postgresRange.encode(into: &byteBuffer)
+    }
+}
+
+extension ClosedRange: PostgresNonThrowingEncodable where Bound: PostgresRangeBound {}
+
+extension ClosedRange: PostgresDecodable where Bound: PostgresRangeBound {
+    @inlinable
+    public init<JSONDecoder: PostgresJSONDecoder>(
+        from buffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
+        guard type == Bound.rangeType else {
+            throw PostgresDecodingError.Code.typeMismatch
+        }
+
+        guard let postgresRange = PostgresRange<Bound>(
+            from: &buffer,
+            format: format
+        ) else {
+            throw PostgresDecodingError.Code.failure
+        }
+
+        guard let lowerBound: Bound = postgresRange.lowerBound,
+            var upperBound: Bound = postgresRange.upperBound
+        else {
+            throw PostgresDecodingError.Code.failure
+        }
+
+        if !postgresRange.isUpperBoundInclusive,
+            let steppedDownUpperBound = upperBound.stepDown?()
+        {
+            upperBound = steppedDownUpperBound
+        }
+        
+        self = lowerBound...upperBound
     }
 }

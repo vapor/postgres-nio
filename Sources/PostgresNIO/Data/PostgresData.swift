@@ -58,6 +58,10 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
             var value = value
             value.moveReaderIndex(forwardBy: 1)
             description = String(decoding: value.readableBytesView, as: UTF8.self)
+        case .int4Range:
+            description = PostgresRange<Int32>(from: &value, format: .binary)?.description
+        case .int8Range:
+            description = PostgresRange<Int64>(from: &value, format: .binary)?.description
         case .uuidArray:
             description = self.array(of: UUID.self)?.description
         case .int8Array:
@@ -70,10 +74,10 @@ public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertibl
             description = self.array(of: String.self)?.description
         case .jsonbArray:
             description = self.array?.description
-        case .int8Range:
-            description = self.int8Range?.description
+        case .int4RangeArray:
+            description = self.array(of: PostgresRange<Int32>.self)?.description
         case .int8RangeArray:
-            description = self.array(of: Range<Int64>.self)?.description
+            description = self.array(of: PostgresRange<Int64>.self)?.description
         default:
             if self.type.isUserDefined {
                 // custom type

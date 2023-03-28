@@ -341,6 +341,39 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(UUID(uuidString: row?[data: "id"].string ?? ""), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
     }
 
+    func testInt4Range() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        struct Model: Decodable {
+            let range: Range<Int32>
+        }
+        var results: PostgresQueryResult?
+        XCTAssertNoThrow(results = try conn?.query("""
+        SELECT
+            '[\(Int32.min), \(Int32.max))'::int4range AS range
+        """).wait())
+        XCTAssertEqual(results?.count, 1)
+        var row = results?.first?.makeRandomAccess()
+        let expectedRange: Range<Int32> = Int32.min..<Int32.max
+        let expectedRangeBinaryValue: ByteBuffer? = PostgresData(range: PostgresRange<Int32>(range: expectedRange)).value
+        let postgresRange: PostgresRange<Int32>? = row?[data: "range"].range()
+        XCTAssertEqual(postgresRange!.lowerBound!..<postgresRange!.upperBound!, expectedRange)
+        XCTAssertEqual(row?[data: "range"].value, expectedRangeBinaryValue)
+
+        XCTAssertNoThrow(results = try conn?.query("""
+        SELECT
+            ARRAY[
+                '[0, 1)'::int4range,
+                '[10, 11)'::int4range
+            ] AS ranges
+        """).wait())
+        XCTAssertEqual(results?.count, 1)
+        row = results?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "ranges"].array(of: Range<Int32>.self), [0..<1, 10..<11])
+        XCTAssertEqual(row?[data: "ranges"].array(of: ClosedRange<Int32>.self), [0...0, 10...10])
+    }
+
     func testInt8Range() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -356,8 +389,11 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(results?.count, 1)
         var row = results?.first?.makeRandomAccess()
         let expectedRange: Range<Int64> = Int64.min..<Int64.max
-        XCTAssertEqual(row?[data: "range"].int8Range as? Range<Int64>, expectedRange)
-        XCTAssertEqual(row?[data: "range"].value, PostgresData(range: expectedRange).value)
+        let expectedRangeBinaryValue: ByteBuffer? = PostgresData(range: PostgresRange<Int64>(range: expectedRange)).value
+        let postgresRange: PostgresRange<Int64>? = row?[data: "range"].range()
+        XCTAssertEqual(postgresRange!.lowerBound!..<postgresRange!.upperBound!, expectedRange)
+        XCTAssertEqual(row?[data: "range"].value, expectedRangeBinaryValue)
+        XCTAssertEqual(row?[data: "range"].value, expectedRangeBinaryValue)
 
         XCTAssertNoThrow(results = try conn?.query("""
         SELECT
