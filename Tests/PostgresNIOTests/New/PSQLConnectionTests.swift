@@ -22,7 +22,7 @@ class PSQLConnectionTests: XCTestCase {
         }
         
         let config = PostgresConnection.Configuration(
-            connection: .init(host: "127.0.0.1", port: port),
+            connection: .tcp(host: "127.0.0.1", port: port),
             authentication: .init(username: "postgres", database: "postgres", password: "abc123"),
             tls: .disable
         )

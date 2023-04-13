@@ -10,7 +10,15 @@ import Glibc
 
 extension PostgresConnection {
     static func address() throws -> SocketAddress {
-        try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: 5432)
+        try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)
+    }
+    
+    static func authConfig() -> PostgresConnection.Configuration.Authentication {
+        .init(
+            username: env("POSTGRES_USER") ?? "test_username",
+            database: env("POSTGRES_DB") ?? "test_database",
+            password: env("POSTGRES_PASSWORD") ?? "test_password"
+        )
     }
 
     @available(*, deprecated, message: "Test deprecated functionality")
@@ -29,18 +37,27 @@ extension PostgresConnection {
         logger.logLevel = logLevel
 
         let config = PostgresConnection.Configuration(
-            connection: .init(
+            connection: .tcp(
                 host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: 5432
+                port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432
             ),
-            authentication: .init(
-                username: env("POSTGRES_USER") ?? "test_username",
-                database: env("POSTGRES_DB") ?? "test_database",
-                password: env("POSTGRES_PASSWORD") ?? "test_password"
-            ),
+            authentication: self.authConfig(),
             tls: .disable
         )
 
+        return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
+    
+    static func testUDS(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = logLevel
+        
+        let config = PostgresConnection.Configuration(
+            connection: .unixDomainSocket(path: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)"),
+            authentication: self.authConfig(),
+            tls: .disable
+        )
+        
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
 }

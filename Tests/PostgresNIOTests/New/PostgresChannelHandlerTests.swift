@@ -184,7 +184,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         )
 
         return PostgresConnection.InternalConfiguration(
-            connection: .unresolved(host: host, port: port),
+            connection: .unresolvedTCP(host: host, port: port),
             connectTimeout: connectTimeout,
             authentication: authentication,
             tls: tls,

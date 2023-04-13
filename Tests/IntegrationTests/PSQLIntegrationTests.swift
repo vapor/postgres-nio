@@ -23,7 +23,7 @@ final class IntegrationTests: XCTestCase {
         try XCTSkipIf(env("POSTGRES_HOST_AUTH_METHOD") == "trust")
 
         let config = PostgresConnection.Configuration(
-            connection: .init(
+            connection: .tcp(
                 host: env("POSTGRES_HOSTNAME") ?? "localhost",
                 port: 5432
             ),
