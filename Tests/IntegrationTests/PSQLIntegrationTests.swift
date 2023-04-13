@@ -25,7 +25,7 @@ final class IntegrationTests: XCTestCase {
         let config = PostgresConnection.Configuration(
             connection: .tcp(
                 host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: 5432
+                port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432
             ),
             authentication: .init(
                 username: env("POSTGRES_USER") ?? "test_username",

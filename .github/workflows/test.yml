@@ -58,6 +58,7 @@ jobs:
             dbauth: trust
     container:
       image: swift:5.8-jammy
+      volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -74,10 +75,12 @@ jobs:
       POSTGRES_HOSTNAME: 'psql-a'
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
+      POSTGRES_SOCKET: '/var/run/postgresql/.s.PGSQL.5432'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
     services:
       psql-a:
         image: ${{ matrix.dbimage }}
+        volumes: [ 'pgrunshare:/var/run/postgresql' ]
         env:
           POSTGRES_USER: 'test_username'
           POSTGRES_DB: 'test_database'
@@ -86,6 +89,7 @@ jobs:
           POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
       psql-b:
         image: ${{ matrix.dbimage }}
+        volumes: [ 'pgrunshare:/var/run/postgresql' ]
         env:
           POSTGRES_USER: 'test_username'
           POSTGRES_DB: 'test_database'
@@ -134,6 +138,7 @@ jobs:
       POSTGRES_PASSWORD: 'test_password'
       POSTGRES_DB: 'postgres'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+      POSTGRES_SOCKET: '/tmp/.s.PGSQL.5432'
     steps:
       - name: Select latest available Xcode
         uses: maxim-lobanov/setup-xcode@v1
