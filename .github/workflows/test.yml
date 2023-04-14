@@ -1,4 +1,7 @@
 name: CI
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 on: 
   push:
     branches: 
@@ -13,9 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - swift:5.5-bionic
           - swift:5.6-focal
           - swift:5.7-jammy
+          - swift:5.8-jammy
+          - swiftlang/swift:nightly-5.9-jammy
           - swiftlang/swift:nightly-main-jammy
     container: ${{ matrix.container }}
     runs-on: ubuntu-latest
@@ -27,7 +31,7 @@ jobs:
       - name: Run unit tests with code coverage and Thread Sanitizer
         run: swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
       - name: Submit coverage report to Codecov.io
-        if: "!contains(matrix.container, 'nightly')"
+        if: ${{ !contains(matrix.container, '5.8') }}
         uses: vapor/swift-codecov-action@v0.2
         with:
           cc_flags: 'unittests'
@@ -52,7 +56,8 @@ jobs:
             dbauth: md5
           - dbimage: postgres:11
             dbauth: trust
-    container: swift:5.7-jammy
+    container:
+      image: swift:5.8-jammy
     runs-on: ubuntu-latest
     env:
       LOG_LEVEL: debug
@@ -114,14 +119,13 @@ jobs:
       fail-fast: false
       matrix:
         dbimage:
-          # Only test the lastest version on macOS, let Linux do the rest
+          # Only test one version on macOS, let Linux do the rest
           - postgresql@14
         dbauth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         xcode:
           - latest-stable
-          #- latest
     runs-on: macos-12
     env:
       LOG_LEVEL: debug
@@ -145,14 +149,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Run all tests
-        run: |
-          swift test --enable-test-discovery -Xlinker -rpath \
-                -Xlinker $(xcode-select -p)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx
+        run: swift test
 
   api-breakage:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container: swift:5.7-jammy
+    container: swift:5.8-jammy
     steps:
     - name: Checkout
       uses: actions/checkout@v3
@@ -162,11 +164,12 @@ jobs:
     - name: Mark the workspace as safe
       run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
     - name: API breaking changes
-      run: |
-        swift package diagnose-api-breaking-changes origin/main
+      run: swift package diagnose-api-breaking-changes origin/main
+
   test-exports:
     name: Test exports
     runs-on: ubuntu-latest
+    container: swift:5.8-jammy
     steps:
       - name: Check out package
         uses: actions/checkout@v3
