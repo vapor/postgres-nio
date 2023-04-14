@@ -7,7 +7,7 @@ import class Foundation.JSONDecoder
 /// - Warning: Please note that random access to cells in a ``PostgresRow`` have O(n) time complexity. If you require
 ///            random access to cells in O(1) create a new ``PostgresRandomAccessRow`` with the given row and
 ///            access it instead.
-public struct PostgresRow {
+public struct PostgresRow: Sendable {
     @usableFromInline
     let lookupTable: [String: Int]
     @usableFromInline
@@ -138,7 +138,7 @@ public struct PostgresRandomAccessRow {
     }
 }
 
-extension PostgresRandomAccessRow: RandomAccessCollection {
+extension PostgresRandomAccessRow: Sendable, RandomAccessCollection {
     public typealias Element = PostgresCell
     public typealias Index = Int
 
@@ -320,9 +320,3 @@ extension PostgresRow: CustomStringConvertible {
         return row.description
     }
 }
-
-#if swift(>=5.6)
-extension PostgresRow: Sendable {}
-
-extension PostgresRandomAccessRow: Sendable {}
-#endif

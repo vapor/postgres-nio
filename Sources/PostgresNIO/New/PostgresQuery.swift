@@ -1,7 +1,7 @@
 import NIOCore
 
 /// A Postgres SQL query, that can be executed on a Postgres server. Contains the raw sql string and bindings.
-public struct PostgresQuery: Hashable {
+public struct PostgresQuery: Sendable, Hashable {
     /// The query string
     public var sql: String
     /// The query binds
@@ -104,9 +104,9 @@ struct PSQLExecuteStatement {
     var rowDescription: RowDescription?
 }
 
-public struct PostgresBindings: Hashable {
+public struct PostgresBindings: Sendable, Hashable {
     @usableFromInline
-    struct Metadata: Hashable {
+    struct Metadata: Sendable, Hashable {
         @usableFromInline
         var dataType: PostgresDataType
         @usableFromInline
@@ -179,9 +179,3 @@ public struct PostgresBindings: Hashable {
         self.metadata.append(.init(dataType: postgresData.type, format: .binary))
     }
 }
-
-#if swift(>=5.6)
-extension PostgresQuery: Sendable {}
-extension PostgresBindings: Sendable {}
-extension PostgresBindings.Metadata: Sendable {}
-#endif

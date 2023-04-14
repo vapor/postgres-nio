@@ -7,7 +7,6 @@ import NIOTransportServices
 import NIOPosix
 import NIOCore
 
-#if canImport(_Concurrency)
 final class AsyncPostgresConnectionTests: XCTestCase {
 
     func test1kRoundTrips() async throws {
@@ -164,4 +163,3 @@ extension XCTestCase {
         }
     }
 }
-#endif

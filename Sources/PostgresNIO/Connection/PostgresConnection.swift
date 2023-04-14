@@ -8,7 +8,9 @@ import Logging
 import NIOPosix
 
 /// A Postgres connection. Use it to run queries against a Postgres server.
-public final class PostgresConnection {
+///
+/// Thread safety is achieved by dispatching all access to shared state onto the underlying EventLoop.
+public final class PostgresConnection: @unchecked Sendable {
     /// A Postgres connection ID
     public typealias ID = Int
 
@@ -449,7 +451,6 @@ extension PostgresConnection {
 
 // MARK: Async/Await Interface
 
-#if canImport(_Concurrency)
 extension PostgresConnection {
 
     /// Creates a new connection to a Postgres server.
@@ -513,7 +514,6 @@ extension PostgresConnection {
         return try await promise.futureResult.map({ $0.asyncSequence() }).get()
     }
 }
-#endif
 
 // MARK: EventLoopFuture interface
 
@@ -785,7 +785,3 @@ extension PostgresConnection.InternalConfiguration {
         self.requireBackendKeyData = config.connection.requireBackendKeyData
     }
 }
-
-#if swift(>=5.6)
-extension PostgresConnection: @unchecked Sendable {}
-#endif

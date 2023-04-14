@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.UUID
 
-public struct PostgresData: CustomStringConvertible, CustomDebugStringConvertible {
+public struct PostgresData: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     public static var null: PostgresData {
         return .init(type: .null)
     }
@@ -112,7 +112,3 @@ extension PostgresData: PostgresDataConvertible {
         return self
     }
 }
-
-#if swift(>=5.6)
-extension PostgresData: Sendable {}
-#endif
