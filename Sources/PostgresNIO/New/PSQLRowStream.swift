@@ -1,7 +1,8 @@
 import NIOCore
 import Logging
 
-final class PSQLRowStream {
+// Thread safety is guaranteed in the RowStream through dispatching onto the NIO EventLoop.
+final class PSQLRowStream: @unchecked Sendable {
     private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
 
     enum RowSource {
@@ -23,10 +24,7 @@ final class PSQLRowStream {
         case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, PSQLRowsDataSource)
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, PSQLRowsDataSource)
         case consumed(Result<String, Error>)
-        
-        #if canImport(_Concurrency)
         case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource)
-        #endif
     }
     
     internal let rowDescription: [RowDescription.Column]
@@ -64,8 +62,7 @@ final class PSQLRowStream {
     }
     
     // MARK: Async Sequence
-    
-    #if canImport(_Concurrency)
+
     func asyncSequence() -> PostgresRowSequence {
         self.eventLoop.preconditionInEventLoop()
 
@@ -150,7 +147,6 @@ final class PSQLRowStream {
             preconditionFailure("Invalid state: \(self.downstreamState)")
         }
     }
-    #endif
     
     // MARK: Consume in array
         
@@ -312,12 +308,10 @@ final class PSQLRowStream {
             self.downstreamState = .waitingForAll(rows, promise, dataSource)
             // immediately request more
             dataSource.request(for: self)
-        
-        #if canImport(_Concurrency)
+
         case .asyncSequence(let consumer, let source):
             let yieldResult = consumer.yield(contentsOf: newRows)
             self.executeActionBasedOnYieldResult(yieldResult, source: source)
-        #endif
             
         case .consumed(.success):
             preconditionFailure("How can we receive further rows, if we are supposed to be done")
@@ -353,12 +347,10 @@ final class PSQLRowStream {
         case .waitingForAll(let rows, let promise, _):
             self.downstreamState = .consumed(.success(commandTag))
             promise.succeed(rows)
-            
-        #if canImport(_Concurrency)
+
         case .asyncSequence(let source, _):
             source.finish()
             self.downstreamState = .consumed(.success(commandTag))
-        #endif
             
         case .consumed:
             break
@@ -380,13 +372,11 @@ final class PSQLRowStream {
         case .waitingForAll(_, let promise, _):
             self.downstreamState = .consumed(.failure(error))
             promise.fail(error)
-            
-        #if canImport(_Concurrency)
+
         case .asyncSequence(let consumer, _):
             consumer.finish(error)
             self.downstreamState = .consumed(.failure(error))
-        #endif
-            
+
         case .consumed:
             break
         }
@@ -432,8 +422,3 @@ protocol PSQLRowsDataSource {
     func cancel(for stream: PSQLRowStream)
     
 }
-
-#if swift(>=5.5)
-// Thread safety is guaranteed in the RowStream through dispatching onto the NIO EventLoop.
-extension PSQLRowStream: @unchecked Sendable {}
-#endif

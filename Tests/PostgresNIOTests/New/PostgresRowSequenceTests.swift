@@ -6,7 +6,6 @@ import XCTest
 import NIOCore
 import Logging
 
-#if canImport(_Concurrency)
 final class PostgresRowSequenceTests: XCTestCase {
 
     func testBackpressureWorks() async throws {
@@ -467,4 +466,3 @@ final class MockRowDataSource: PSQLRowsDataSource {
         self._cancelCount.wrappingIncrement(ordering: .relaxed)
     }
 }
-#endif

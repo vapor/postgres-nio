@@ -3,7 +3,7 @@
 /// Currently there a two wire formats supported:
 ///  - text
 ///  - binary
-public enum PostgresFormat: Int16 {
+public enum PostgresFormat: Int16, Sendable {
     case text = 0
     case binary = 1
 }
@@ -17,11 +17,6 @@ extension PostgresFormat: CustomStringConvertible {
     }
 }
 
-#if swift(>=5.6)
-extension PostgresFormat: Sendable {}
-#endif
-
-
 // TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
 extension PostgresFormat: Codable {}
 
@@ -31,7 +26,7 @@ public typealias PostgresFormatCode = PostgresFormat
 
 /// The data type's raw object ID.
 /// Use `select * from pg_type where oid = <idhere>;` to lookup more information.
-public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConvertible {
+public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStringConvertible {
     /// `0`
     public static let null = PostgresDataType(0)
     /// `16`
@@ -237,10 +232,6 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
         return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"
     }
 }
-
-#if swift(>=5.6)
-extension PostgresDataType: Sendable {}
-#endif
 
 // TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
 extension PostgresDataType: Codable {}

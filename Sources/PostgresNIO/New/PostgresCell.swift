@@ -1,7 +1,7 @@
 import NIOCore
 
 /// A representation of a cell value within a ``PostgresRow`` and ``PostgresRandomAccessRow``.
-public struct PostgresCell: Equatable {
+public struct PostgresCell: Sendable, Equatable {
     /// The cell's value as raw bytes.
     public var bytes: ByteBuffer?
     /// The cell's data type. This is important metadata when decoding the cell.
@@ -86,7 +86,3 @@ extension PostgresCell {
         try self.decode(T.self, context: .default, file: file, line: line)
     }
 }
-
-#if swift(>=5.6)
-extension PostgresCell: Sendable {}
-#endif
