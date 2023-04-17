@@ -18,7 +18,7 @@ public protocol PostgresEncodable {
 }
 
 /// A type that can encode itself to a postgres wire binary representation. It enforces that the
-/// ``PostgresEncodable/encode(into:context:)`` does not throw. This allows users
+/// ``PostgresEncodable/encode(into:context:)-1jkcp`` does not throw. This allows users
 /// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without
 /// having to spell `try`.
 public protocol PostgresNonThrowingEncodable: PostgresEncodable {
