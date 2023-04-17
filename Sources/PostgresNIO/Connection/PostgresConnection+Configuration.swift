@@ -45,7 +45,7 @@ extension PostgresConnection {
                     else { return false }
                 }
                 
-                /// The ``NIOSSLContext`` that will be used. `nil` when TLS is disabled.
+                /// The `NIOSSLContext` that will be used. `nil` when TLS is disabled.
                 public var sslContext: NIOSSLContext? {
                     switch self.base {
                     case .prefer(let context), .require(let context): return context
