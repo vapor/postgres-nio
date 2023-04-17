@@ -42,9 +42,8 @@ final class PostgresNIOTests: XCTestCase {
     func testConnectEstablishedChannelAndClose() throws {
         let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
         let config = PostgresConnection.Configuration.init(
-            connection: .establishedChannel(channel: channel),
-            authentication: PostgresConnection.authConfig(),
-            tls: .disable
+            server: .establishedChannel(channel),
+            authentication: PostgresConnection.authConfig()
         )
         let logger = Logger(label: "postgres.connection.test")
         let conn = try PostgresConnection.connect(on: self.eventLoop, configuration: config, id: 0, logger: logger).wait()
@@ -75,9 +74,8 @@ final class PostgresNIOTests: XCTestCase {
     func testSimpleQueryVersionUsingEstablishedChannel() throws {
         let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
         let config = PostgresConnection.Configuration.init(
-            connection: .establishedChannel(channel: channel),
-            authentication: PostgresConnection.authConfig(),
-            tls: .disable
+            server: .establishedChannel(channel),
+            authentication: PostgresConnection.authConfig()
         )
         let logger = Logger(label: "postgres.connection.test")
         let conn = try PostgresConnection.connect(on: self.eventLoop, configuration: config, id: 0, logger: logger).wait()
@@ -790,16 +788,16 @@ final class PostgresNIOTests: XCTestCase {
         let logger = Logger(label: "test")
         let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
         let config = PostgresConnection.Configuration(
-            connection: .tcp(
+            server: .init(
                 host: "elmer.db.elephantsql.com",
-                port: 5432
+                port: 5432,
+                tls: .require(sslContext)
             ),
             authentication: .init(
                 username: "uymgphwj",
-                database: "uymgphwj",
-                password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
-            ),
-            tls: .require(sslContext)
+                password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
+                database: "uymgphwj"
+            )
         )
 
 

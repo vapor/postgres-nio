@@ -36,9 +36,8 @@ class PostgresChannelHandlerTests: XCTestCase {
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.readyForQuery(.idle)))
     }
     
-    func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
-        var config = self.testConnectionConfiguration()
-        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
+    func testEstablishSSLCallbackIsCalledIfSSLIsSupported() throws {
+        let config = self.testConnectionConfiguration(tls: .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         var addSSLCallbackIsHit = false
         let handler = PostgresChannelHandler(configuration: config) { channel in
             addSSLCallbackIsHit = true
@@ -50,15 +49,15 @@ class PostgresChannelHandlerTests: XCTestCase {
         ])
         
         var maybeMessage: PostgresFrontendMessage?
-        XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
-        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
+        embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
+        maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
         guard case .sslRequest(let request) = maybeMessage else {
             return XCTFail("Unexpected message")
         }
         
         XCTAssertEqual(request.code, 80877103)
         
-        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslSupported))
+        try embedded.writeInbound(PostgresBackendMessage.sslSupported)
         
         // a NIOSSLHandler has been added, after it SSL had been negotiated
         XCTAssertTrue(addSSLCallbackIsHit)
@@ -68,7 +67,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         
         // startup message should be issued
         var maybeStartupMessage: PostgresFrontendMessage?
-        XCTAssertNoThrow(maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
+        maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
         guard case .startup(let startupMessage) = maybeStartupMessage else {
             return XCTFail("Unexpected message")
         }
@@ -78,9 +77,8 @@ class PostgresChannelHandlerTests: XCTestCase {
         XCTAssertEqual(startupMessage.parameters.replication, .false)
     }
     
-    func testSSLUnsupportedClosesConnection() {
-        var config = self.testConnectionConfiguration()
-        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
+    func testSSLUnsupportedClosesConnection() throws {
+        let config = self.testConnectionConfiguration(tls: .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         
         let handler = PostgresChannelHandler(configuration: config) { channel in
             XCTFail("This callback should never be exectuded")
@@ -92,14 +90,14 @@ class PostgresChannelHandlerTests: XCTestCase {
             handler
         ])
         let eventHandler = TestEventHandler()
-        XCTAssertNoThrow(try embedded.pipeline.addHandler(eventHandler, position: .last).wait())
+        try embedded.pipeline.addHandler(eventHandler, position: .last).wait()
         
-        XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
+        embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
         XCTAssertTrue(embedded.isActive)
         
         // read the ssl request message
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .sslRequest(.init()))
-        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslUnsupported))
+        try embedded.writeInbound(PostgresBackendMessage.sslUnsupported)
         
         // the event handler should have seen an error
         XCTAssertEqual(eventHandler.errors.count, 1)
@@ -138,9 +136,7 @@ class PostgresChannelHandlerTests: XCTestCase {
     
     func testRunAuthenticateCleartext() {
         let password = "postgres"
-        var config = self.testConnectionConfiguration()
-        config.authentication?.password = password
-        
+        let config = self.testConnectionConfiguration(password: password)
         let authContext = AuthContext(
             username: config.authentication?.username ?? "something wrong",
             password: config.authentication?.password,
@@ -173,22 +169,21 @@ class PostgresChannelHandlerTests: XCTestCase {
         username: String = "test",
         database: String = "postgres",
         password: String = "password",
-        tls: PostgresConnection.Configuration.TLS = .disable,
+        tls: PostgresConnection.Configuration.Server.TLS = .disable,
         connectTimeout: TimeAmount = .seconds(10),
         requireBackendKeyData: Bool = true
     ) -> PostgresConnection.InternalConfiguration {
         let authentication = PostgresConnection.Configuration.Authentication(
             username: username,
-            database: database,
-            password: password
+            password: password,
+            database: database
         )
 
         return PostgresConnection.InternalConfiguration(
             connection: .unresolvedTCP(host: host, port: port),
-            connectTimeout: connectTimeout,
             authentication: authentication,
             tls: tls,
-            requireBackendKeyData: requireBackendKeyData
+            options: .init(connectTimeout: connectTimeout, requireBackendKeyData: requireBackendKeyData)
         )
     }
 }

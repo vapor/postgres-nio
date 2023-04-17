@@ -16,8 +16,8 @@ extension PostgresConnection {
     static func authConfig() -> PostgresConnection.Configuration.Authentication {
         .init(
             username: env("POSTGRES_USER") ?? "test_username",
-            database: env("POSTGRES_DB") ?? "test_database",
-            password: env("POSTGRES_PASSWORD") ?? "test_password"
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database"
         )
     }
 
@@ -37,12 +37,12 @@ extension PostgresConnection {
         logger.logLevel = logLevel
 
         let config = PostgresConnection.Configuration(
-            connection: .tcp(
+            server: .init(
                 host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432
+                port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
+                tls: .disable
             ),
-            authentication: self.authConfig(),
-            tls: .disable
+            authentication: self.authConfig()
         )
 
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
@@ -53,9 +53,8 @@ extension PostgresConnection {
         logger.logLevel = logLevel
         
         let config = PostgresConnection.Configuration(
-            connection: .unixDomainSocket(path: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)"),
-            authentication: self.authConfig(),
-            tls: .disable
+            server: .unixDomainSocket(path: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)"),
+            authentication: self.authConfig()
         )
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
