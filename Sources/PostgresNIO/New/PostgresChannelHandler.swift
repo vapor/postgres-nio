@@ -32,7 +32,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
          logger: Logger,
          configureSSLCallback: ((Channel) throws -> Void)?)
     {
-        self.state = ConnectionStateMachine(requireBackendKeyData: configuration.requireBackendKeyData)
+        self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -576,13 +576,13 @@ private extension Insecure.MD5.Digest {
 }
 
 extension ConnectionStateMachine.TLSConfiguration {
-    fileprivate init(_ tls: PostgresConnection.Configuration.TLS) {
-        switch tls.base {
-        case .disable:
+    fileprivate init(_ tls: PostgresConnection.Configuration.Server.TLS) {
+        switch (tls.isAllowed, tls.isEnforced) {
+        case (false, _):
             self = .disable
-        case .require:
+        case (true, true):
             self = .require
-        case .prefer:
+        case (true, false):
             self = .prefer
         }
     }
