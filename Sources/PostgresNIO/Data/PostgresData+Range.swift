@@ -2,7 +2,7 @@ import NIOCore
 
 // MARK: PostgresRangeBound
 
-public protocol PostgresRangeBound: PostgresDataConvertible, Comparable {
+public protocol PostgresRangeBound: PostgresDataConvertible {
     /// the Postgres range type associated with this bound
     static var rangeType: PostgresDataType { get }
     
@@ -47,20 +47,6 @@ public struct PostgresRange<B: PostgresRangeBound>: CustomStringConvertible {
         self.upperBound = upperBound
         self.isLowerBoundInclusive = isLowerBoundInclusive
         self.isUpperBoundInclusive = isUpperBoundInclusive
-    }
-
-    public init(range: Range<B>) {
-        self.lowerBound = range.lowerBound
-        self.upperBound = range.upperBound
-        self.isLowerBoundInclusive = true
-        self.isUpperBoundInclusive = false
-    }
-
-    public init(closedRange: ClosedRange<B>) {
-        self.lowerBound = closedRange.lowerBound
-        self.upperBound = closedRange.upperBound
-        self.isLowerBoundInclusive = true
-        self.isUpperBoundInclusive = true
     }
 
     public init?(
@@ -141,6 +127,22 @@ public struct PostgresRange<B: PostgresRangeBound>: CustomStringConvertible {
         let lowerBoundString: String = self.lowerBound == nil ? "" : "\(self.lowerBound!)"
         let upperBoundString: String = self.upperBound == nil ? "" : "\(self.upperBound!)"
         return "\(opener)\(lowerBoundString),\(upperBoundString),\(closer)"
+    }
+}
+
+extension PostgresRange where B: PostgresRangeBound & Comparable {
+    public init(range: Range<B>) {
+        self.lowerBound = range.lowerBound
+        self.upperBound = range.upperBound
+        self.isLowerBoundInclusive = true
+        self.isUpperBoundInclusive = false
+    }
+
+    public init(closedRange: ClosedRange<B>) {
+        self.lowerBound = closedRange.lowerBound
+        self.upperBound = closedRange.upperBound
+        self.isLowerBoundInclusive = true
+        self.isUpperBoundInclusive = true
     }
 }
 
