@@ -169,7 +169,6 @@ public final class PostgresConnection: @unchecked Sendable {
                 guard channel.isActive else {
                     return eventLoop.makeFailedFuture(PSQLError.channel(underlying: ChannelError.alreadyClosed))
                 }
-                // TODO: Are there drawbacks to creating a bootstrap we don't end up using?
                 connectFuture = eventLoop.makeSucceededFuture(channel)
             }
 
