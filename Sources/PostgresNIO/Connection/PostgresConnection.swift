@@ -1,5 +1,6 @@
 import Atomics
 import NIOCore
+@_implementationOnly import NIOPosix
 #if canImport(Network)
 import NIOTransportServices
 #endif
