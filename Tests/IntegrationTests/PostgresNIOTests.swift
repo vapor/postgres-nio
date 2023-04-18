@@ -357,7 +357,7 @@ final class PostgresNIOTests: XCTestCase {
         var row = results?.first?.makeRandomAccess()
         let expectedRange: Range<Int32> = Int32.min..<Int32.max
         var expectedRangeBinaryValue = ByteBuffer()
-        PostgresRange<Int32>(range: expectedRange).encode(into: &expectedRangeBinaryValue, context: .default)
+        expectedRange.encode(into: &expectedRangeBinaryValue, context: .default)
         var rangeBytes: ByteBuffer = try XCTUnwrap(row?["range"].bytes)
         let postgresRange: PostgresRange<Int32>? = try PostgresRange<Int32>.init(from: &rangeBytes, type: .int4Range, format: .binary, context: .default)
         XCTAssertEqual(postgresRange!.lowerBound!..<postgresRange!.upperBound!, expectedRange)
@@ -396,7 +396,7 @@ final class PostgresNIOTests: XCTestCase {
         var row = results?.first?.makeRandomAccess()
         let expectedRange: Range<Int64> = Int64.min..<Int64.max
         var expectedRangeBinaryValue = ByteBuffer()
-        PostgresRange<Int64>(range: expectedRange).encode(into: &expectedRangeBinaryValue, context: .default)
+        expectedRange.encode(into: &expectedRangeBinaryValue, context: .default)
         var rangeBytes: ByteBuffer = try XCTUnwrap(row?["range"].bytes)
         let postgresRange: PostgresRange<Int64>? = try PostgresRange<Int64>.init(from: &rangeBytes, type: .int8Range, format: .binary, context: .default)
         XCTAssertEqual(postgresRange!.lowerBound!..<postgresRange!.upperBound!, expectedRange)
