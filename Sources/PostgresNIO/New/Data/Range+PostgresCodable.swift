@@ -15,7 +15,7 @@ extension Range: PostgresEncodable where Bound: PostgresRangeBound {
         context: PostgresEncodingContext<JSONEncoder>
     ) {
         let postgresRange = PostgresRange<Bound>(range: self)
-        postgresRange.encode(into: &byteBuffer)
+        postgresRange.encode(into: &byteBuffer, context: context)
     }
 }
 
@@ -33,18 +33,17 @@ extension Range: PostgresDecodable where Bound: PostgresRangeBound {
             throw PostgresDecodingError.Code.typeMismatch
         }
 
-        guard let postgresRange = PostgresRange<Bound>(
+        let postgresRange = try PostgresRange<Bound>(
             from: &buffer,
-            format: format
-        ) else {
-            throw PostgresDecodingError.Code.failure
-        }
+            type: type,
+            format: format,
+            context: context
+        )
 
         guard let lowerBound: Bound = postgresRange.lowerBound,
             let upperBound: Bound = postgresRange.upperBound
         else {
             throw PostgresDecodingError.Code.failure
-            
         }
         
         self = lowerBound..<upperBound
@@ -62,7 +61,7 @@ extension ClosedRange: PostgresEncodable where Bound: PostgresRangeBound {
         context: PostgresEncodingContext<JSONEncoder>
     ) {
         let postgresRange = PostgresRange<Bound>(closedRange: self)
-        postgresRange.encode(into: &byteBuffer)
+        postgresRange.encode(into: &byteBuffer, context: context)
     }
 }
 
@@ -80,12 +79,12 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeBound {
             throw PostgresDecodingError.Code.typeMismatch
         }
 
-        guard let postgresRange = PostgresRange<Bound>(
+        let postgresRange = try PostgresRange<Bound>(
             from: &buffer,
-            format: format
-        ) else {
-            throw PostgresDecodingError.Code.failure
-        }
+            type: type,
+            format: format,
+            context: context
+        )
 
         guard let lowerBound: Bound = postgresRange.lowerBound,
             var upperBound: Bound = postgresRange.upperBound

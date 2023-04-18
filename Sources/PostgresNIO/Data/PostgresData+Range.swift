@@ -2,7 +2,7 @@ import NIOCore
 
 // MARK: PostgresRangeBound
 
-public protocol PostgresRangeBound: PostgresDataConvertible {
+public protocol PostgresRangeBound: PostgresDecodable, PostgresNonThrowingEncodable {
     /// the Postgres range type associated with this bound
     static var rangeType: PostgresDataType { get }
     
@@ -31,7 +31,7 @@ extension Int64: PostgresRangeBound {
 
 // MARK: PostgresRange
 
-public struct PostgresRange<B: PostgresRangeBound>: CustomStringConvertible {
+public struct PostgresRange<B: PostgresRangeBound> {
     public let lowerBound: B?
     public let upperBound: B?
     public let isLowerBoundInclusive: Bool
@@ -48,43 +48,41 @@ public struct PostgresRange<B: PostgresRangeBound>: CustomStringConvertible {
         self.isLowerBoundInclusive = isLowerBoundInclusive
         self.isUpperBoundInclusive = isUpperBoundInclusive
     }
+}
 
-    public init?(
-        from buffer: inout ByteBuffer,
-        format: PostgresFormat
-    ) {
+extension PostgresRange: PostgresDecodable {
+    public init<JSONDecoder: PostgresJSONDecoder>(
+        from byteBuffer: inout ByteBuffer,
+        type: PostgresDataType,
+        format: PostgresFormat,
+        context: PostgresDecodingContext<JSONDecoder>
+    ) throws {
         guard case .binary = format else {
-            return nil
+            throw PostgresDecodingError.Code.failure
         }
 
         // flags byte contains certain properties of the range
-        guard let flags: UInt8 = buffer.readInteger(as: UInt8.self) else {
-            return nil
+        guard let flags: UInt8 = byteBuffer.readInteger(as: UInt8.self) else {
+            throw PostgresDecodingError.Code.failure
         }
 
-        guard let lowerBoundSize: Int32 = buffer.readInteger(as: Int32.self),
-            Int(lowerBoundSize) == MemoryLayout<B>.size
+        guard let lowerBoundSize: Int32 = byteBuffer.readInteger(as: Int32.self),
+            Int(lowerBoundSize) == MemoryLayout<B>.size,
+            var lowerBoundBytes: ByteBuffer = byteBuffer.readSlice(length: Int(lowerBoundSize))
         else {
-            return nil
+            throw PostgresDecodingError.Code.failure
         }
 
-        guard let lowerBoundBytes = buffer.readSlice(length: Int(lowerBoundSize)),
-            let lowerBound: B = B(postgresData: PostgresData(type: B.postgresDataType, formatCode: format, value: lowerBoundBytes))
+        let lowerBound: B = try B(from: &lowerBoundBytes, type: B.psqlType, format: format, context: context)
+
+        guard let upperBoundSize = byteBuffer.readInteger(as: Int32.self),
+            Int(upperBoundSize) == MemoryLayout<B>.size,
+            var upperBoundBytes: ByteBuffer = byteBuffer.readSlice(length: Int(upperBoundSize))
         else {
-            return nil
+            throw PostgresDecodingError.Code.failure
         }
 
-        guard let upperBoundSize = buffer.readInteger(as: Int32.self),
-            Int(upperBoundSize) == MemoryLayout<B>.size
-        else {
-            return nil
-        }
-
-        guard let upperBoundBytes = buffer.readSlice(length: Int(lowerBoundSize)),
-            let upperBound: B = B(postgresData: PostgresData(type: B.postgresDataType, formatCode: format, value: upperBoundBytes))
-        else {
-            return nil
-        }
+        let upperBound: B = try B(from: &upperBoundBytes, type: B.psqlType, format: format, context: context)
 
         let isLowerBoundInclusive: Bool = flags & _isLowerBoundInclusive != 0
         let isUpperBoundInclusive: Bool = flags & _isUpperBoundInclusive != 0
@@ -97,8 +95,14 @@ public struct PostgresRange<B: PostgresRangeBound>: CustomStringConvertible {
         )
 
     }
+}
 
-    public func encode(into byteBuffer: inout ByteBuffer) {
+extension PostgresRange: PostgresNonThrowingEncodable {
+    public static var psqlType: PostgresDataType { return B.rangeType }
+    
+    public static var psqlFormat: PostgresFormat { return .binary }
+
+    public func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) {
         // flags byte contains certain properties of the range
         var flags: UInt8 = 0
         if self.isLowerBoundInclusive {
@@ -111,16 +115,18 @@ public struct PostgresRange<B: PostgresRangeBound>: CustomStringConvertible {
         let boundMemorySize = Int32(MemoryLayout<B>.size)
 
         byteBuffer.writeInteger(flags)
-        if var lowerBoundValue: ByteBuffer = self.lowerBound.postgresData?.value {
+        if let lowerBound: B = self.lowerBound {
             byteBuffer.writeInteger(boundMemorySize)
-            byteBuffer.writeBuffer(&lowerBoundValue)
+            lowerBound.encode(into: &byteBuffer, context: context)
         }
-        if var upperBoundValue: ByteBuffer = self.upperBound.postgresData?.value {
+        if let upperBound: B = self.upperBound {
             byteBuffer.writeInteger(boundMemorySize)
-            byteBuffer.writeBuffer(&upperBoundValue)
+            upperBound.encode(into: &byteBuffer, context: context)
         }
     }
+}
 
+extension PostgresRange: CustomStringConvertible {
     public var description: String {
         let opener: Character = self.isLowerBoundInclusive ? "[" : "("
         let closer: Character = self.isUpperBoundInclusive ? "]" : ")"
@@ -143,100 +149,6 @@ extension PostgresRange where B: PostgresRangeBound & Comparable {
         self.upperBound = closedRange.upperBound
         self.isLowerBoundInclusive = true
         self.isUpperBoundInclusive = true
-    }
-}
-
-// MARK: PostgresData
-
-extension PostgresData {
-    public func range<B>() -> PostgresRange<B>?
-        where B: PostgresRangeBound
-    {
-        guard var value: ByteBuffer = self.value else {
-            return nil
-        }
-
-        return PostgresRange<B>(
-            from: &value,
-            format: self.formatCode
-        )
-    }
-
-    public init<B>(range: PostgresRange<B>)
-    {
-        var buffer = ByteBufferAllocator().buffer(capacity: 0)
-        range.encode(into: &buffer)
-
-        self.init(
-            type: B.rangeType,
-            typeModifier: nil,
-            formatCode: .binary,
-            value: buffer
-        )
-    }
-}
-
-// MARK: PostgresDataConvertible conformance
-
-extension PostgresRange: PostgresDataConvertible where B: PostgresRangeBound {
-    public static var postgresDataType: PostgresDataType { return B.rangeType }
-    public init?(postgresData: PostgresData) {
-        guard var value = postgresData.value else {
-            return nil
-        }
-        self.init(from: &value, format: .binary)
-    }
-    public var postgresData: PostgresData? {
-        return PostgresData(range: self)
-    }
-}
-
-extension RangeExpression where Bound: PostgresRangeBound {
-    public static var postgresDataType: PostgresDataType {
-        return Bound.postgresDataType
-    }
-}
-
-extension Range: PostgresDataConvertible where Bound: PostgresRangeBound {
-    public init?(postgresData: PostgresData) {
-        guard let postgresRange: PostgresRange<Bound> = postgresData.range(),
-            let lowerBound: Bound = postgresRange.lowerBound,
-            let upperBound: Bound = postgresRange.upperBound,
-            postgresRange.isLowerBoundInclusive,
-            !postgresRange.isUpperBoundInclusive
-        else {
-            return nil
-        }
-
-        self = lowerBound..<upperBound
-    }
-
-    public var postgresData: PostgresData? {
-        return PostgresData(range: PostgresRange<Bound>(range: self))
-    }
-}
-
-extension ClosedRange: PostgresDataConvertible where Bound: PostgresRangeBound {
-    public init?(postgresData: PostgresData) {
-        guard let postgresRange: PostgresRange<Bound> = postgresData.range(),
-            let lowerBound: Bound = postgresRange.lowerBound,
-            var upperBound: Bound = postgresRange.upperBound,
-            postgresRange.isLowerBoundInclusive
-        else {
-            return nil
-        }
-
-        if !postgresRange.isUpperBoundInclusive,
-            let steppedDownUpperBound = upperBound.stepDown?()
-        {
-            upperBound = steppedDownUpperBound
-        }
-
-        self = lowerBound...upperBound
-    }
-
-    public var postgresData: PostgresData? {
-        return PostgresData(range: PostgresRange<Bound>.init(closedRange: self))
     }
 }
 

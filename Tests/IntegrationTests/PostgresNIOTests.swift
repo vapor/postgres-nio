@@ -341,7 +341,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(UUID(uuidString: row?[data: "id"].string ?? ""), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
     }
 
-    func testInt4Range() {
+    func testInt4Range() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
@@ -356,8 +356,10 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(results?.count, 1)
         var row = results?.first?.makeRandomAccess()
         let expectedRange: Range<Int32> = Int32.min..<Int32.max
-        let expectedRangeBinaryValue: ByteBuffer? = PostgresData(range: PostgresRange<Int32>(range: expectedRange)).value
-        let postgresRange: PostgresRange<Int32>? = row?[data: "range"].range()
+        var expectedRangeBinaryValue = ByteBuffer()
+        PostgresRange<Int32>(range: expectedRange).encode(into: &expectedRangeBinaryValue, context: .default)
+        var rangeBytes: ByteBuffer = try XCTUnwrap(row?["range"].bytes)
+        let postgresRange: PostgresRange<Int32>? = try PostgresRange<Int32>.init(from: &rangeBytes, type: .int4Range, format: .binary, context: .default)
         XCTAssertEqual(postgresRange!.lowerBound!..<postgresRange!.upperBound!, expectedRange)
         XCTAssertEqual(row?[data: "range"].value, expectedRangeBinaryValue)
 
@@ -370,11 +372,15 @@ final class PostgresNIOTests: XCTestCase {
         """).wait())
         XCTAssertEqual(results?.count, 1)
         row = results?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "ranges"].array(of: Range<Int32>.self), [0..<1, 10..<11])
-        XCTAssertEqual(row?[data: "ranges"].array(of: ClosedRange<Int32>.self), [0...0, 10...10])
+        var rangeArrayBytes: ByteBuffer = try XCTUnwrap(row?["ranges"].bytes)
+        var closedRangeArrayBytes: ByteBuffer = rangeArrayBytes
+        let rangeArray = try [Range<Int32>](from: &rangeArrayBytes, type: .int4RangeArray, format: .binary, context: .default)
+        let closedRangeArray = try [ClosedRange<Int32>](from: &closedRangeArrayBytes, type: .int4RangeArray, format: .binary, context: .default)
+        XCTAssertEqual(rangeArray, [0..<1, 10..<11])
+        XCTAssertEqual(closedRangeArray, [0...0, 10...10])
     }
 
-    func testInt8Range() {
+    func testInt8Range() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
@@ -389,8 +395,10 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(results?.count, 1)
         var row = results?.first?.makeRandomAccess()
         let expectedRange: Range<Int64> = Int64.min..<Int64.max
-        let expectedRangeBinaryValue: ByteBuffer? = PostgresData(range: PostgresRange<Int64>(range: expectedRange)).value
-        let postgresRange: PostgresRange<Int64>? = row?[data: "range"].range()
+        var expectedRangeBinaryValue = ByteBuffer()
+        PostgresRange<Int64>(range: expectedRange).encode(into: &expectedRangeBinaryValue, context: .default)
+        var rangeBytes: ByteBuffer = try XCTUnwrap(row?["range"].bytes)
+        let postgresRange: PostgresRange<Int64>? = try PostgresRange<Int64>.init(from: &rangeBytes, type: .int8Range, format: .binary, context: .default)
         XCTAssertEqual(postgresRange!.lowerBound!..<postgresRange!.upperBound!, expectedRange)
         XCTAssertEqual(row?[data: "range"].value, expectedRangeBinaryValue)
         XCTAssertEqual(row?[data: "range"].value, expectedRangeBinaryValue)
@@ -404,8 +412,12 @@ final class PostgresNIOTests: XCTestCase {
         """).wait())
         XCTAssertEqual(results?.count, 1)
         row = results?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "ranges"].array(of: Range<Int64>.self), [0..<1, 10..<11])
-        XCTAssertEqual(row?[data: "ranges"].array(of: ClosedRange<Int64>.self), [0...0, 10...10])
+        var rangeArrayBytes: ByteBuffer = try XCTUnwrap(row?["ranges"].bytes)
+        var closedRangeArrayBytes: ByteBuffer = rangeArrayBytes
+        let rangeArray = try [Range<Int64>](from: &rangeArrayBytes, type: .int8RangeArray, format: .binary, context: .default)
+        let closedRangeArray = try [ClosedRange<Int64>](from: &closedRangeArrayBytes, type: .int8RangeArray, format: .binary, context: .default)
+        XCTAssertEqual(rangeArray, [0..<1, 10..<11])
+        XCTAssertEqual(closedRangeArray, [0...0, 10...10])
     }
 
     func testDates() {
