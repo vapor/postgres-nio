@@ -41,7 +41,9 @@ extension Range: PostgresDecodable where Bound: PostgresRangeBound {
         )
 
         guard let lowerBound: Bound = postgresRange.lowerBound,
-            let upperBound: Bound = postgresRange.upperBound
+            let upperBound: Bound = postgresRange.upperBound,
+            postgresRange.isLowerBoundInclusive,
+            !postgresRange.isUpperBoundInclusive
         else {
             throw PostgresDecodingError.Code.failure
         }
@@ -87,7 +89,8 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeBound {
         )
 
         guard let lowerBound: Bound = postgresRange.lowerBound,
-            var upperBound: Bound = postgresRange.upperBound
+            var upperBound: Bound = postgresRange.upperBound,
+            postgresRange.isLowerBoundInclusive
         else {
             throw PostgresDecodingError.Code.failure
         }
