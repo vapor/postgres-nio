@@ -72,7 +72,7 @@ class Range_PSQLCodableTests: XCTestCase {
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
         XCTAssertThrowsError(try Range<Int64>(from: &buffer, type: .int8, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .typeMismatch)
+            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
 

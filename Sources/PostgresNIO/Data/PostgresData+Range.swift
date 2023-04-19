@@ -1,38 +1,8 @@
 import NIOCore
 
-// MARK: PostgresRangeBound
-
-public protocol PostgresRangeBound: PostgresDecodable, PostgresNonThrowingEncodable {
-    /// the Postgres range type associated with this bound
-    static var rangeType: PostgresDataType { get }
-    
-    /// If a Postgres range type has a well-defined step,
-    /// Postgres automatically converts it to a canonical form.
-    /// Types such as `int4range` get converted to upper-bound-exclusive.
-    /// This method is needed when converting an upper bound to inclusive.
-    /// It should throw if the type lacks a well-defined step.
-    func stepDown() throws -> Self
-}
-
-extension Int32: PostgresRangeBound {
-    public static var rangeType: PostgresDataType { return .int4Range }
-
-    public func stepDown() -> Self {
-        return self - 1
-    }
-}
-
-extension Int64: PostgresRangeBound {
-    public static var rangeType: PostgresDataType { return .int8Range }
-
-    public func stepDown() -> Self {
-        return self - 1
-    }
-}
-
 // MARK: PostgresRange
 
-public struct PostgresRange<B: PostgresRangeBound> {
+public struct PostgresRange<B> {
     public let lowerBound: B?
     public let upperBound: B?
     public let isLowerBoundInclusive: Bool
@@ -51,7 +21,7 @@ public struct PostgresRange<B: PostgresRangeBound> {
     }
 }
 
-extension PostgresRange: PostgresDecodable {
+extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
     public init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
@@ -59,6 +29,10 @@ extension PostgresRange: PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws {
         guard case .binary = format else {
+            throw PostgresDecodingError.Code.failure
+        }
+
+        guard let boundType: PostgresDataType = type.boundType else {
             throw PostgresDecodingError.Code.failure
         }
 
@@ -74,7 +48,7 @@ extension PostgresRange: PostgresDecodable {
             throw PostgresDecodingError.Code.failure
         }
 
-        let lowerBound: B = try B(from: &lowerBoundBytes, type: B.psqlType, format: format, context: context)
+        let lowerBound: B = try B(from: &lowerBoundBytes, type: boundType, format: format, context: context)
 
         guard let upperBoundSize = byteBuffer.readInteger(as: Int32.self),
             Int(upperBoundSize) == MemoryLayout<B>.size,
@@ -83,7 +57,7 @@ extension PostgresRange: PostgresDecodable {
             throw PostgresDecodingError.Code.failure
         }
 
-        let upperBound: B = try B(from: &upperBoundBytes, type: B.psqlType, format: format, context: context)
+        let upperBound: B = try B(from: &upperBoundBytes, type: boundType, format: format, context: context)
 
         let isLowerBoundInclusive: Bool = flags & _isLowerBoundInclusive != 0
         let isUpperBoundInclusive: Bool = flags & _isUpperBoundInclusive != 0
@@ -98,8 +72,8 @@ extension PostgresRange: PostgresDecodable {
     }
 }
 
-extension PostgresRange: PostgresNonThrowingEncodable {
-    public static var psqlType: PostgresDataType { return B.rangeType }
+extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where B: PostgresNonThrowingEncodable {
+    public static var psqlType: PostgresDataType { return B.psqlType.rangeType! }
     
     public static var psqlFormat: PostgresFormat { return .binary }
 
@@ -137,7 +111,7 @@ extension PostgresRange: CustomStringConvertible {
     }
 }
 
-extension PostgresRange where B: PostgresRangeBound & Comparable {
+extension PostgresRange where B: Comparable {
     public init(range: Range<B>) {
         self.lowerBound = range.lowerBound
         self.upperBound = range.upperBound
