@@ -15,7 +15,7 @@ struct RowDescription: PostgresBackendMessage.PayloadDecodable, Sendable, Equata
     var columns: [Column]
 
     @usableFromInline
-    struct Column: Equatable {
+    struct Column: Equatable, Sendable {
         /// The field name.
         @usableFromInline
         var name: String
