@@ -34,19 +34,13 @@ final class PostgresNIOTests: XCTestCase {
     
     func testConnectUDSAndClose() throws {
         try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.testUDS(on: eventLoop).wait())
-        XCTAssertNoThrow(try conn?.close().wait())
+        let conn = try PostgresConnection.testUDS(on: eventLoop).wait()
+        try conn.close().wait()
     }
     
     func testConnectEstablishedChannelAndClose() throws {
         let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
-        let config = PostgresConnection.Configuration.init(
-            server: .establishedChannel(channel),
-            authentication: PostgresConnection.authConfig()
-        )
-        let logger = Logger(label: "postgres.connection.test")
-        let conn = try PostgresConnection.connect(on: self.eventLoop, configuration: config, id: 0, logger: logger).wait()
+        let conn = try PostgresConnection.testChannel(channel, on: self.eventLoop).wait()
         try conn.close().wait()
     }
 
@@ -73,12 +67,7 @@ final class PostgresNIOTests: XCTestCase {
 
     func testSimpleQueryVersionUsingEstablishedChannel() throws {
         let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
-        let config = PostgresConnection.Configuration.init(
-            server: .establishedChannel(channel),
-            authentication: PostgresConnection.authConfig()
-        )
-        let logger = Logger(label: "postgres.connection.test")
-        let conn = try PostgresConnection.connect(on: self.eventLoop, configuration: config, id: 0, logger: logger).wait()
+        let conn = try PostgresConnection.testChannel(channel, on: self.eventLoop).wait()
         defer { XCTAssertNoThrow(try conn.close().wait()) }
 
         let rows = try conn.simpleQuery("SELECT version()").wait()
@@ -788,19 +777,13 @@ final class PostgresNIOTests: XCTestCase {
         let logger = Logger(label: "test")
         let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
         let config = PostgresConnection.Configuration(
-            server: .init(
-                host: "elmer.db.elephantsql.com",
-                port: 5432,
-                tls: .require(sslContext)
-            ),
-            authentication: .init(
-                username: "uymgphwj",
-                password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
-                database: "uymgphwj"
-            )
+            host: "elmer.db.elephantsql.com",
+            port: 5432,
+            username: "uymgphwj",
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
+            database: "uymgphwj",
+            tls: .require(sslContext)
         )
-
-
         XCTAssertNoThrow(conn = try PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         var rows: [PostgresRow]?

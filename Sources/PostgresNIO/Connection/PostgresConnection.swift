@@ -97,7 +97,7 @@ public final class PostgresConnection: @unchecked Sendable {
         }
 
         let startupFuture: EventLoopFuture<Void>
-        if configuration.authentication == nil {
+        if configuration.username == nil {
             startupFuture = eventHandler.readyForStartupFuture
         } else {
             startupFuture = eventHandler.authenticateFuture
@@ -292,7 +292,7 @@ extension PostgresConnection {
         logger: Logger = .init(label: "codes.vapor.postgres"),
         on eventLoop: EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
-        var tlsFuture: EventLoopFuture<PostgresConnection.Configuration.Server.TLS>
+        var tlsFuture: EventLoopFuture<PostgresConnection.Configuration.TLS>
 
         if let tlsConfiguration = tlsConfiguration {
             tlsFuture = eventLoop.makeSucceededVoidFuture().flatMapBlocking(onto: .global(qos: .default)) {
@@ -303,11 +303,15 @@ extension PostgresConnection {
         }
 
         return tlsFuture.flatMap { tls in
+            var options = PostgresConnection.Configuration.Options()
+            options.tlsServerName = serverHostname
             let configuration = PostgresConnection.InternalConfiguration(
                 connection: .resolved(address: socketAddress),
-                authentication: nil,
+                username: nil,
+                password: nil,
+                database: nil,
                 tls: tls,
-                options: .init(tlsServerName: serverHostname)
+                options: options
             )
 
             return PostgresConnection.connect(

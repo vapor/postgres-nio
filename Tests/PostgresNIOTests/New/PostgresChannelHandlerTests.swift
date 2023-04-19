@@ -26,8 +26,8 @@ class PostgresChannelHandlerTests: XCTestCase {
             return XCTFail("Unexpected message")
         }
         
-        XCTAssertEqual(startup.parameters.user, config.authentication?.username)
-        XCTAssertEqual(startup.parameters.database, config.authentication?.database)
+        XCTAssertEqual(startup.parameters.user, config.username)
+        XCTAssertEqual(startup.parameters.database, config.database)
         XCTAssertEqual(startup.parameters.options, nil)
         XCTAssertEqual(startup.parameters.replication, .false)
         
@@ -72,8 +72,8 @@ class PostgresChannelHandlerTests: XCTestCase {
             return XCTFail("Unexpected message")
         }
         
-        XCTAssertEqual(startupMessage.parameters.user, config.authentication?.username)
-        XCTAssertEqual(startupMessage.parameters.database, config.authentication?.database)
+        XCTAssertEqual(startupMessage.parameters.user, config.username)
+        XCTAssertEqual(startupMessage.parameters.database, config.database)
         XCTAssertEqual(startupMessage.parameters.replication, .false)
     }
     
@@ -111,9 +111,9 @@ class PostgresChannelHandlerTests: XCTestCase {
     func testRunAuthenticateMD5Password() {
         let config = self.testConnectionConfiguration()
         let authContext = AuthContext(
-            username: config.authentication?.username ?? "something wrong",
-            password: config.authentication?.password,
-            database: config.authentication?.database
+            username: config.username ?? "something wrong",
+            password: config.password,
+            database: config.database
         )
         let state = ConnectionStateMachine(.waitingToStartAuthentication)
         let handler = PostgresChannelHandler(configuration: config, state: state, configureSSLCallback: nil)
@@ -138,9 +138,9 @@ class PostgresChannelHandlerTests: XCTestCase {
         let password = "postgres"
         let config = self.testConnectionConfiguration(password: password)
         let authContext = AuthContext(
-            username: config.authentication?.username ?? "something wrong",
-            password: config.authentication?.password,
-            database: config.authentication?.database
+            username: config.username ?? "something wrong",
+            password: config.password,
+            database: config.database
         )
         let state = ConnectionStateMachine(.waitingToStartAuthentication)
         let handler = PostgresChannelHandler(configuration: config, state: state, configureSSLCallback: nil)
@@ -169,21 +169,21 @@ class PostgresChannelHandlerTests: XCTestCase {
         username: String = "test",
         database: String = "postgres",
         password: String = "password",
-        tls: PostgresConnection.Configuration.Server.TLS = .disable,
+        tls: PostgresConnection.Configuration.TLS = .disable,
         connectTimeout: TimeAmount = .seconds(10),
         requireBackendKeyData: Bool = true
     ) -> PostgresConnection.InternalConfiguration {
-        let authentication = PostgresConnection.Configuration.Authentication(
-            username: username,
-            password: password,
-            database: database
-        )
+        var options = PostgresConnection.Configuration.Options()
+        options.connectTimeout = connectTimeout
+        options.requireBackendKeyData = requireBackendKeyData
 
         return PostgresConnection.InternalConfiguration(
             connection: .unresolvedTCP(host: host, port: port),
-            authentication: authentication,
+            username: username,
+            password: password,
+            database: database,
             tls: tls,
-            options: .init(connectTimeout: connectTimeout, requireBackendKeyData: requireBackendKeyData)
+            options: options
         )
     }
 }

@@ -23,16 +23,12 @@ final class IntegrationTests: XCTestCase {
         try XCTSkipIf(env("POSTGRES_HOST_AUTH_METHOD") == "trust")
 
         let config = PostgresConnection.Configuration(
-            server: .init(
-                host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
-                tls: .disable
-            ),
-            authentication: .init(
-                username: env("POSTGRES_USER") ?? "test_username",
-                password: "wrong_password",
-                database: env("POSTGRES_DB") ?? "test_database"
-            )
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: "wrong_password",
+            database: env("POSTGRES_DB") ?? "test_database",
+            tls: .disable
         )
 
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)

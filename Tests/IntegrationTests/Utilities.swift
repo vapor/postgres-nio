@@ -13,14 +13,6 @@ extension PostgresConnection {
         try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)
     }
     
-    static func authConfig() -> PostgresConnection.Configuration.Authentication {
-        .init(
-            username: env("POSTGRES_USER") ?? "test_username",
-            password: env("POSTGRES_PASSWORD") ?? "test_password",
-            database: env("POSTGRES_DB") ?? "test_database"
-        )
-    }
-
     @available(*, deprecated, message: "Test deprecated functionality")
     static func testUnauthenticated(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
         var logger = Logger(label: "postgres.connection.test")
@@ -37,12 +29,12 @@ extension PostgresConnection {
         logger.logLevel = logLevel
 
         let config = PostgresConnection.Configuration(
-            server: .init(
-                host: env("POSTGRES_HOSTNAME") ?? "localhost",
-                port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
-                tls: .disable
-            ),
-            authentication: self.authConfig()
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database",
+            tls: .disable
         )
 
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
@@ -53,8 +45,24 @@ extension PostgresConnection {
         logger.logLevel = logLevel
         
         let config = PostgresConnection.Configuration(
-            server: .unixDomainSocket(path: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)"),
-            authentication: self.authConfig()
+            unixSocketPath: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)",
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database"
+        )
+        
+        return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
+    
+    static func testChannel(_ channel: Channel, on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
+        var logger = Logger(label: "postgres.connection.test")
+        logger.logLevel = logLevel
+        
+        let config = PostgresConnection.Configuration(
+            establishedChannel: channel,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database"
         )
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)

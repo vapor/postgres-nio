@@ -284,11 +284,11 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case .provideAuthenticationContext:
             context.fireUserInboundEventTriggered(PSQLEvent.readyForStartup)
             
-            if let authentication = self.configuration.authentication {
+            if let username = self.configuration.username {
                 let authContext = AuthContext(
-                    username: authentication.username,
-                    password: authentication.password,
-                    database: authentication.database
+                    username: username,
+                    password: self.configuration.password,
+                    database: self.configuration.database
                 )
                 let action = self.state.provideAuthenticationContext(authContext)
                 return self.run(action, with: context)
@@ -517,16 +517,6 @@ extension PostgresChannelHandler: PSQLRowsDataSource {
     }
 }
 
-extension PostgresConnection.Configuration.Authentication {
-    func toAuthContext() -> AuthContext {
-        AuthContext(
-            username: self.username,
-            password: self.password,
-            database: self.database
-        )
-    }
-}
-
 extension AuthContext {
     func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
         PostgresFrontendMessage.Startup.Parameters(
@@ -576,7 +566,7 @@ private extension Insecure.MD5.Digest {
 }
 
 extension ConnectionStateMachine.TLSConfiguration {
-    fileprivate init(_ tls: PostgresConnection.Configuration.Server.TLS) {
+    fileprivate init(_ tls: PostgresConnection.Configuration.TLS) {
         switch (tls.isAllowed, tls.isEnforced) {
         case (false, _):
             self = .disable

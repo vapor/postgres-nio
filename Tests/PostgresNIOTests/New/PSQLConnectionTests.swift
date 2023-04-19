@@ -22,8 +22,9 @@ class PSQLConnectionTests: XCTestCase {
         }
         
         let config = PostgresConnection.Configuration(
-            server: .init(host: "127.0.0.1", port: port, tls: .disable),
-            authentication: .init(username: "postgres", password: "abc123", database: "postgres")
+            host: "127.0.0.1", port: port,
+            username: "postgres", password: "abc123", database: "postgres",
+            tls: .disable
         )
         
         var logger = Logger.psqlTest
