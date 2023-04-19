@@ -33,7 +33,7 @@ class BackendKeyDataTests: XCTestCase {
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: expected,
             decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
-            XCTAssert($0 is PSQLDecodingError)
+            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 }

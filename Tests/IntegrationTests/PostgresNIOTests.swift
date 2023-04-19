@@ -1093,7 +1093,7 @@ final class PostgresNIOTests: XCTestCase {
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         let binds = [PostgresData].init(repeating: .null, count: Int(UInt16.max) + 1)
         XCTAssertThrowsError(try conn?.query("SELECT version()", binds).wait()) { error in
-            guard case .tooManyParameters = (error as? PSQLError)?.base else {
+            guard case .tooManyParameters = (error as? PSQLError)?.code.base else {
                 return XCTFail("Unexpected error: \(error)")
             }
         }

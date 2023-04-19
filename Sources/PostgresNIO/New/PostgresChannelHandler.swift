@@ -91,7 +91,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
         self.logger.debug("Channel error caught.", metadata: [.error: "\(error)"])
-        let action = self.state.errorHappened(.channel(underlying: error))
+        let action = self.state.errorHappened(.connectionError(underlying: error))
         self.run(action, with: context)
     }
     
@@ -146,8 +146,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 
                 self.run(action, with: context)
             }
-        } catch let error as PSQLDecodingError {
-            let action = self.state.errorHappened(.decoding(error))
+        } catch let error as PostgresMessageDecodingError {
+            let action = self.state.errorHappened(.messageDecodingFailure(error))
             self.run(action, with: context)
         } catch {
             preconditionFailure("Expected to only get PSQLDecodingErrors from the PSQLBackendMessageDecoder.")

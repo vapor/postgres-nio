@@ -1076,15 +1076,15 @@ extension ConnectionStateMachine {
 
 extension ConnectionStateMachine {
     func shouldCloseConnection(reason error: PSQLError) -> Bool {
-        switch error.base {
+        switch error.code.base {
         case .sslUnsupported:
             return true
         case .failedToAddSSLHandler:
             return true
         case .queryCancelled:
             return false
-        case .server(let message):
-            guard let sqlState = message.fields[.sqlState] else {
+        case .server:
+            guard let sqlState = error.serverInfo?[.sqlState] else {
                 // any error message that doesn't have a sql state field, is unexpected by default.
                 return true
             }
@@ -1095,7 +1095,7 @@ extension ConnectionStateMachine {
             }
             
             return false
-        case .decoding:
+        case .messageDecodingFailure:
             return true
         case .unexpectedBackendMessage:
             return true
@@ -1115,8 +1115,6 @@ extension ConnectionStateMachine {
             preconditionFailure("Pure client error, that is thrown directly and should never ")
         case .connectionError:
             return true
-        case .casting(_):
-            preconditionFailure("Pure client error, that is thrown directly in PSQLRows")
         case .uncleanShutdown:
             return true
         }
@@ -1142,7 +1140,7 @@ extension ConnectionStateMachine {
         self.state = .error(error)
         
         var action = ConnectionAction.CleanUpContext.Action.close
-        if case .uncleanShutdown = error.base {
+        if case .uncleanShutdown = error.code.base {
             action = .fireChannelInactive
         }
         
