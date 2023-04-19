@@ -95,10 +95,8 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeBound {
             throw PostgresDecodingError.Code.failure
         }
 
-        if !postgresRange.isUpperBoundInclusive,
-            let steppedDownUpperBound = upperBound.stepDown?()
-        {
-            upperBound = steppedDownUpperBound
+        if !postgresRange.isUpperBoundInclusive {
+            upperBound = try upperBound.stepDown()
         }
         
         self = lowerBound...upperBound

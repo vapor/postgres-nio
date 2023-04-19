@@ -10,22 +10,23 @@ public protocol PostgresRangeBound: PostgresDecodable, PostgresNonThrowingEncoda
     /// Postgres automatically converts it to a canonical form.
     /// Types such as `int4range` get converted to upper-bound-exclusive.
     /// This method is needed when converting an upper bound to inclusive.
-    var stepDown: (() -> Self)? { get }
+    /// It should throw if the type lacks a well-defined step.
+    func stepDown() throws -> Self
 }
 
 extension Int32: PostgresRangeBound {
     public static var rangeType: PostgresDataType { return .int4Range }
 
-    public var stepDown: (() -> Int32)? {
-        { self - 1 }
+    public func stepDown() -> Self {
+        return self - 1
     }
 }
 
 extension Int64: PostgresRangeBound {
     public static var rangeType: PostgresDataType { return .int8Range }
 
-    public var stepDown: (() -> Int64)? {
-        { self - 1 }
+    public func stepDown() -> Self {
+        return self - 1
     }
 }
 
