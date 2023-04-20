@@ -21,11 +21,14 @@ extension PSQLError {
         case .failedToAddSSLHandler:
             return self.underlying ?? self
         case .messageDecodingFailure:
-            return PostgresError.protocol("Error decoding message: \(String(describing: self.underlying))")
+            let message = self.underlying != nil ? String(describing: self.underlying!) : "no message"
+            return PostgresError.protocol("Error decoding message: \(message)")
         case .unexpectedBackendMessage:
-            return PostgresError.protocol("Unexpected message: \(String(describing: self.backendMessage))")
+            let message = self.backendMessage != nil ? String(describing: self.backendMessage!) : "no message"
+            return PostgresError.protocol("Unexpected message: \(message)")
         case .unsupportedAuthMechanism:
-            return PostgresError.protocol("Unsupported auth scheme: \(String(describing: self.unsupportedAuthScheme))")
+            let message = self.unsupportedAuthScheme != nil ? String(describing: self.unsupportedAuthScheme!) : "no scheme"
+            return PostgresError.protocol("Unsupported auth scheme: \(message)")
         case .authMechanismRequiresPassword:
             return PostgresError.protocol("Unable to authenticate without password")
         case .saslError:

@@ -1,5 +1,6 @@
 import NIOCore
 
+/// An error that is thrown from the PostgresClient.
 public struct PSQLError: Error {
 
     public struct Code: Sendable, Hashable, CustomStringConvertible {
@@ -82,122 +83,93 @@ public struct PSQLError: Error {
 
     private var backing: Backing
 
+    private mutating func copyBackingStoriageIfNecessary() {
+        if !isKnownUniquelyReferenced(&self.backing) {
+            self.backing = self.backing.copy()
+        }
+    }
+
+    /// The ``PSQLError/Code-swift.struct`` code
     public internal(set) var code: Code {
         get { self.backing.code }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.code = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.code = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.code = newValue
         }
     }
 
-    // The info that was received from the server
+    /// The info that was received from the server
     public internal(set) var serverInfo: ServerInfo? {
         get { self.backing.serverInfo }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.serverInfo = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.serverInfo = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.serverInfo = newValue
         }
     }
 
-    // The underlying error
+    /// The underlying error
     public internal(set) var underlying: Error? {
         get { self.backing.underlying }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.underlying = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.underlying = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.underlying = newValue
         }
     }
 
-    // The file in which the Postgres operation was triggered that failed
+    /// The file in which the Postgres operation was triggered that failed
     public internal(set) var file: String? {
         get { self.backing.file }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.file = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.file = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.file = newValue
         }
     }
 
-    // The line in which the Postgres operation was triggered that failed
+    /// The line in which the Postgres operation was triggered that failed
     public internal(set) var line: Int? {
         get { self.backing.line }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.line = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.line = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.line = newValue
         }
     }
 
-    // The query that failed
+    /// The query that failed
     public internal(set) var query: PostgresQuery? {
         get { self.backing.query }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.query = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.query = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.query = newValue
         }
     }
 
-    // the backend message... we should keep this internal but we can use it to print more
-    // advanced debug reasons.
-    internal var backendMessage: PostgresBackendMessage? {
+    /// the backend message... we should keep this internal but we can use it to print more
+    /// advanced debug reasons.
+    var backendMessage: PostgresBackendMessage? {
         get { self.backing.backendMessage }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.backendMessage = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.backendMessage = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.backendMessage = newValue
         }
     }
 
     /// the unsupported auth scheme... we should keep this internal but we can use it to print more
     /// advanced debug reasons.
-    internal var unsupportedAuthScheme: UnsupportedAuthScheme? {
+    var unsupportedAuthScheme: UnsupportedAuthScheme? {
         get { self.backing.unsupportedAuthScheme }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.unsupportedAuthScheme = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.unsupportedAuthScheme = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.unsupportedAuthScheme = newValue
         }
     }
 
     /// the invalid command tag... we should keep this internal but we can use it to print more
     /// advanced debug reasons.
-    internal var invalidCommandTag: String? {
+    var invalidCommandTag: String? {
         get { self.backing.invalidCommandTag }
         set {
-            if isKnownUniquelyReferenced(&self.backing) {
-                self.backing.invalidCommandTag = newValue
-            } else {
-                self.backing = self.backing.copy()
-                self.backing.invalidCommandTag = newValue
-            }
+            self.copyBackingStoriageIfNecessary()
+            self.backing.invalidCommandTag = newValue
         }
     }
 
@@ -334,11 +306,13 @@ public struct PSQLError: Error {
 
         let underlying: PostgresBackendMessage.ErrorResponse
 
-        init(_ underlying: PostgresBackendMessage.ErrorResponse) {
+        fileprivate init(_ underlying: PostgresBackendMessage.ErrorResponse) {
             self.underlying = underlying
         }
 
-        subscript(field: Field) -> String? {
+        /// The detailed server error information. This field is set if the ``PSQLError/code-swift.property`` is
+        /// ``PSQLError/Code-swift.struct/server``.
+        public subscript(field: Field) -> String? {
             self.underlying.fields[field.backing]
         }
     }
