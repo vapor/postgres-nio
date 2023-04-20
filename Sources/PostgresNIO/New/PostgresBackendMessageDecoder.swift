@@ -56,7 +56,7 @@ struct PostgresBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         guard let messageID = PostgresBackendMessage.ID(rawValue: idByte) else {
             buffer.moveReaderIndex(to: startReaderIndex)
             let completeMessage = buffer.readSlice(length: Int(length) + 1)!
-            throw PSQLDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessage)
+            throw PostgresMessageDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessage)
         }
         
         // 3. decode the message
@@ -69,7 +69,7 @@ struct PostgresBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         } catch let error as PSQLPartialDecodingError {
             buffer.moveReaderIndex(to: startReaderIndex)
             let completeMessage = buffer.readSlice(length: Int(length) + 1)!
-            throw PSQLDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessage)
+            throw PostgresMessageDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessage)
         } catch {
             preconditionFailure("Expected to only see `PartialDecodingError`s here.")
         }
@@ -87,7 +87,7 @@ struct PostgresBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
 ///
 /// If you encounter a `DecodingError` when using a trusted Postgres server please make to file an issue at:
 /// [https://github.com/vapor/postgres-nio/issues](https://github.com/vapor/postgres-nio/issues)
-struct PSQLDecodingError: Error {
+struct PostgresMessageDecodingError: Error {
     
     /// The backend message ID bytes
     let messageID: UInt8
@@ -112,7 +112,7 @@ struct PSQLDecodingError: Error {
         var byteBuffer = messageBytes
         let data = byteBuffer.readData(length: byteBuffer.readableBytes)!
         
-        return PSQLDecodingError(
+        return PostgresMessageDecodingError(
             messageID: messageID,
             payload: data.base64EncodedString(),
             description: partialError.description,
@@ -129,7 +129,7 @@ struct PSQLDecodingError: Error {
         var byteBuffer = messageBytes
         let data = byteBuffer.readData(length: byteBuffer.readableBytes)!
         
-        return PSQLDecodingError(
+        return PostgresMessageDecodingError(
             messageID: messageID,
             payload: data.base64EncodedString(),
             description: "Received a message with messageID '\(Character(UnicodeScalar(messageID)))'. There is no message type associated with this message identifier.",

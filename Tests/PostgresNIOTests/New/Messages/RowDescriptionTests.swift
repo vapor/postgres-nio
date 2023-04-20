@@ -60,7 +60,7 @@ class RowDescriptionTests: XCTestCase {
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, [])],
             decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PSQLDecodingError)
+            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
     
@@ -82,7 +82,7 @@ class RowDescriptionTests: XCTestCase {
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, [])],
             decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PSQLDecodingError)
+            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
     
@@ -105,7 +105,7 @@ class RowDescriptionTests: XCTestCase {
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, [])],
             decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PSQLDecodingError)
+            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
     
@@ -128,7 +128,7 @@ class RowDescriptionTests: XCTestCase {
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, [])],
             decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PSQLDecodingError)
+            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 

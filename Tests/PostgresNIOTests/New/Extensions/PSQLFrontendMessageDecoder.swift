@@ -77,7 +77,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
                 return .startup(startup)
                 
             default:
-                throw PSQLDecodingError.unknownStartupCodeReceived(code: code, messageBytes: messageSlice)
+                throw PostgresMessageDecodingError.unknownStartupCodeReceived(code: code, messageBytes: messageSlice)
             }
         }
         
@@ -97,7 +97,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
         
         // 2. make sure we have a known message identifier
         guard let messageID = PostgresFrontendMessage.ID(rawValue: idByte) else {
-            throw PSQLDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessageBuffer)
+            throw PostgresMessageDecodingError.unknownMessageIDReceived(messageID: idByte, messageBytes: completeMessageBuffer)
         }
         
         // 3. decode the message
@@ -109,7 +109,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
             
             return try PostgresFrontendMessage.decode(from: &slice, for: messageID)
         } catch let error as PSQLPartialDecodingError {
-            throw PSQLDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessageBuffer)
+            throw PostgresMessageDecodingError.withPartialError(error, messageID: messageID.rawValue, messageBytes: completeMessageBuffer)
         } catch {
             preconditionFailure("Expected to only see `PartialDecodingError`s here.")
         }
@@ -153,7 +153,7 @@ extension PostgresFrontendMessage {
     }
 }
 
-extension PSQLDecodingError {
+extension PostgresMessageDecodingError {
     static func unknownStartupCodeReceived(
         code: UInt32,
         messageBytes: ByteBuffer,
@@ -163,7 +163,7 @@ extension PSQLDecodingError {
         var byteBuffer = messageBytes
         let data = byteBuffer.readData(length: byteBuffer.readableBytes)!
         
-        return PSQLDecodingError(
+        return PostgresMessageDecodingError(
             messageID: 0,
             payload: data.base64EncodedString(),
             description: "Received a startup code '\(code)'. There is no message associated with this code.",

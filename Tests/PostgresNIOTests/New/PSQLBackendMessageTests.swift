@@ -196,7 +196,7 @@ class PSQLBackendMessageTests: XCTestCase {
             XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
-                XCTAssert($0 is PSQLDecodingError)
+                XCTAssert($0 is PostgresMessageDecodingError)
             }
         }
     }
@@ -238,7 +238,7 @@ class PSQLBackendMessageTests: XCTestCase {
             XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(failBuffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
-                XCTAssert($0 is PSQLDecodingError)
+                XCTAssert($0 is PostgresMessageDecodingError)
             }
         }
     }
@@ -251,7 +251,7 @@ class PSQLBackendMessageTests: XCTestCase {
         XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, [])],
             decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
-            XCTAssert($0 is PSQLDecodingError)
+            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
     
