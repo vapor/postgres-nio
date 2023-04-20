@@ -1,5 +1,6 @@
 import NIOCore
-import Foundation
+import class Foundation.JSONEncoder
+import class Foundation.JSONDecoder
 
 /// A type that can encode itself to a postgres wire binary representation.
 public protocol PostgresEncodable {
