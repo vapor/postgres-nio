@@ -40,7 +40,7 @@ jobs:
         shell: bash
         run: |
           coverage=$( [[ '${{ matrix.coverage }}' == 'true' ]] && echo -n '--enable-code-coverage' || true )
-          swift test --enable-test-discovery --filter=^PostgresNIOTests --sanitize=thread ${coverage}
+          swift test --filter=^PostgresNIOTests --sanitize=thread ${coverage}
       - name: Submit coverage report to Codecov.io
         if: ${{ matrix.coverage }}
         uses: vapor/swift-codecov-action@v0.2
