@@ -2,13 +2,14 @@ import NIOCore
 
 // MARK: PostgresRange
 
-public struct PostgresRange<B> {
-    public let lowerBound: B?
-    public let upperBound: B?
-    public let isLowerBoundInclusive: Bool
-    public let isUpperBoundInclusive: Bool
+@usableFromInline
+struct PostgresRange<B> {
+    @usableFromInline let lowerBound: B?
+    @usableFromInline let upperBound: B?
+    @usableFromInline let isLowerBoundInclusive: Bool
+    @usableFromInline let isUpperBoundInclusive: Bool
 
-    public init(
+    init(
         lowerBound: B?,
         upperBound: B?,
         isLowerBoundInclusive: Bool,
@@ -22,7 +23,8 @@ public struct PostgresRange<B> {
 }
 
 extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
-    public init<JSONDecoder: PostgresJSONDecoder>(
+    @usableFromInline
+    init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
@@ -73,11 +75,14 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
 }
 
 extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where B: PostgresNonThrowingEncodable {
-    public static var psqlType: PostgresDataType { return B.psqlType.rangeType! }
+    @usableFromInline
+    static var psqlType: PostgresDataType { return B.psqlType.rangeType! }
     
-    public static var psqlFormat: PostgresFormat { return .binary }
+    @usableFromInline
+    static var psqlFormat: PostgresFormat { return .binary }
 
-    public func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) {
+    @usableFromInline
+    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) {
         // flags byte contains certain properties of the range
         var flags: UInt8 = 0
         if self.isLowerBoundInclusive {
@@ -102,14 +107,16 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
 }
 
 extension PostgresRange where B: Comparable {
-    public init(range: Range<B>) {
+    @usableFromInline
+    init(range: Range<B>) {
         self.lowerBound = range.lowerBound
         self.upperBound = range.upperBound
         self.isLowerBoundInclusive = true
         self.isUpperBoundInclusive = false
     }
 
-    public init(closedRange: ClosedRange<B>) {
+    @usableFromInline
+    init(closedRange: ClosedRange<B>) {
         self.lowerBound = closedRange.lowerBound
         self.upperBound = closedRange.upperBound
         self.isLowerBoundInclusive = true
