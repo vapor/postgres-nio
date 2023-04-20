@@ -175,7 +175,7 @@ public final class PostgresConnection: @unchecked Sendable {
                 connectFuture = bootstrap.connect(unixDomainSocketPath: path)
             case .bootstrapped(let channel):
                 guard channel.isActive else {
-                    return eventLoop.makeFailedFuture(PSQLError.channel(underlying: ChannelError.alreadyClosed))
+                    return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
                 }
                 connectFuture = eventLoop.makeSucceededFuture(channel)
             }
