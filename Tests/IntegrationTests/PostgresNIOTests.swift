@@ -558,7 +558,8 @@ final class PostgresNIOTests: XCTestCase {
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
-    
+
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testOptionalIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -617,7 +618,8 @@ final class PostgresNIOTests: XCTestCase {
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
-    
+
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testOptionalIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
