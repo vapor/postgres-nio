@@ -58,16 +58,12 @@ To create a connection, first create a connection configuration object:
 import PostgresNIO
 
 let config = PostgresConnection.Configuration(
-   connection: .init(
-     host: "localhost",
-     port: 5432
-   ),
-   authentication: .init(
-     username: "my_username",
-     database: "my_database",
-     password: "my_password"
-   ),
-   tls: .disable
+  host: "localhost",
+  port: 5432,
+  username: "my_username",
+  password: "my_password",
+  database: "my_database",
+  tls: .disable
 )
 ```
 
@@ -102,16 +98,12 @@ let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 let logger = Logger(label: "postgres-logger")
 
 let config = PostgresConnection.Configuration(
-   connection: .init(
-     host: "localhost",
-     port: 5432
-   ),
-   authentication: .init(
-     username: "my_username",
-     database: "my_database",
-     password: "my_password"
-   ),
-   tls: .disable
+  host: "localhost",
+  port: 5432,
+  username: "my_username",
+  password: "my_password",
+  database: "my_database",
+  tls: .disable
 )
 
 let connection = try await PostgresConnection.connect(
