@@ -5,7 +5,7 @@
 [![Team Chat](https://img.shields.io/discord/431917998102675485.svg)][Team Chat]
 [![MIT License](http://img.shields.io/badge/license-MIT-brightgreen.svg)][MIT License]
 [![Continuous Integration](https://github.com/vapor/postgres-nio/actions/workflows/test.yml/badge.svg)][Continuous Integration]
-[![Swift 5.5](http://img.shields.io/badge/swift-5.5-brightgreen.svg)][Swift 5.5]
+[![Swift 5.6](http://img.shields.io/badge/swift-5.6-brightgreen.svg)][Swift 5.6]
 <br>
 <br>
 
@@ -19,6 +19,7 @@ Features:
 - Integrated with the Swift server ecosystem, including use of [SwiftLog].
 - Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
 - Support for `Network.framework` when available (e.g. on Apple platforms)
+- Supports running on Unix Domain Sockets
 
 PostgresNIO does not provide a `ConnectionPool` as of today, but this is a [feature high on our list](https://github.com/vapor/postgres-nio/issues/256). If you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
 
@@ -35,7 +36,7 @@ Add `PostgresNIO` as dependency to your `Package.swift`:
 
 ```swift
   dependencies: [
-    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.8.0"),
+    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.14.0"),
     ...
   ]
 ```
@@ -79,7 +80,7 @@ import NIOPosix
 let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
 // Much later
-try eventLoopGroup.syncShutdown()
+try await eventLoopGroup.shutdownGracefully()
 ```
 
 A [`Logger`] is also required.
@@ -124,7 +125,7 @@ let connection = try await PostgresConnection.connect(
 try await connection.close()
 
 // Shutdown the EventLoopGroup, once all connections are closed.
-try eventLoopGroup.syncShutdown()
+try await eventLoopGroup.shutdownGracefully()
 ```
 
 #### Querying
@@ -148,7 +149,7 @@ for try await row in rows {
 However, in most cases it is much easier to request a row's fields as a set of Swift types:
 
 ```swift
-for try await (id, username, birthday) in rows.decode((Int, String, Date).self, context: .default) {
+for try await (id, username, birthday) in rows.decode((Int, String, Date).self) {
   // do something with the datatypes.
 }
 ```
@@ -191,7 +192,7 @@ Please see [SECURITY.md] for details on the security process.
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
-[Swift 5.5]: https://swift.org
+[Swift 5.6]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
 [`PostgresConnection`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/
