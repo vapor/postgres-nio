@@ -9,7 +9,7 @@ final class PostgresQueryTests: XCTestCase {
         let null: UUID? = nil
         let uuid: UUID? = UUID()
 
-        var query: PostgresQuery = """
+        let query: PostgresQuery = """
             INSERT INTO foo (id, title, something) SET (\(uuid), \(string), \(null));
             """
 

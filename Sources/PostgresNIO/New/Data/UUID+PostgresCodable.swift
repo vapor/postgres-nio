@@ -1,6 +1,7 @@
 import NIOCore
 import struct Foundation.UUID
 import typealias Foundation.uuid_t
+import NIOFoundationCompat
 
 extension UUID: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
