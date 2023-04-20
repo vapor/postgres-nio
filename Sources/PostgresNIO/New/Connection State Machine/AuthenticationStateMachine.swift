@@ -51,7 +51,7 @@ struct AuthenticationStateMachine {
                 return .authenticated
             case .md5(let salt):
                 guard self.authContext.password != nil else {
-                    return self.setAndFireError(.authMechanismRequiresPassword)
+                    return self.setAndFireError(PSQLError(code: .authMechanismRequiresPassword))
                 }
                 self.state = .passwordAuthenticationSent
                 return .sendPassword(.md5(salt: salt), self.authContext)

@@ -132,7 +132,7 @@ class ConnectionStateMachineTests: XCTestCase {
         // test ignore unclean shutdown when closing connection
         var stateIgnoreChannelError = ConnectionStateMachine(.closing)
         
-        XCTAssertEqual(stateIgnoreChannelError.errorHappened(PSQLError.channel(underlying: NIOSSLError.uncleanShutdown)), .wait)
+        XCTAssertEqual(stateIgnoreChannelError.errorHappened(.connectionError(underlying: NIOSSLError.uncleanShutdown)), .wait)
         XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
         
         // test ignore any other error when closing connection

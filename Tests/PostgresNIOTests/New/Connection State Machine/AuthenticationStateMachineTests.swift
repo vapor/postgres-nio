@@ -69,7 +69,7 @@ class AuthenticationStateMachineTests: XCTestCase {
     // MARK: Test unsupported messages
     
     func testUnsupportedAuthMechanism() {
-        let unsupported: [(PostgresBackendMessage.Authentication, PSQLAuthScheme)] = [
+        let unsupported: [(PostgresBackendMessage.Authentication, PSQLError.UnsupportedAuthScheme)] = [
             (.kerberosV5, .kerberosV5),
             (.scmCredential, .scmCredential),
             (.gss, .gss),

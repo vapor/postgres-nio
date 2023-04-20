@@ -283,7 +283,7 @@ public final class PostgresConnection: @unchecked Sendable {
                 case is PSQLError:
                     throw error
                 default:
-                    throw PSQLError.channel(underlying: error)
+                    throw PSQLError.connectionError(underlying: error)
                 }
             }
         }
@@ -312,7 +312,7 @@ public final class PostgresConnection: @unchecked Sendable {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
         guard query.binds.count <= Int(UInt16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
+            return self.channel.eventLoop.makeFailedFuture(PSQLError(code: .tooManyParameters, query: query))
         }
 
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
@@ -344,7 +344,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     func execute(_ executeStatement: PSQLExecuteStatement, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
         guard executeStatement.binds.count <= Int(UInt16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError.tooManyParameters)
+            return self.channel.eventLoop.makeFailedFuture(PSQLError(code: .tooManyParameters))
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -493,14 +493,14 @@ extension PostgresConnection {
     public func query(
         _ query: PostgresQuery,
         logger: Logger,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line
     ) async throws -> PostgresRowSequence {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
         guard query.binds.count <= Int(UInt16.max) else {
-            throw PSQLError.tooManyParameters
+            throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -511,7 +511,14 @@ extension PostgresConnection {
 
         self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
 
-        return try await promise.futureResult.map({ $0.asyncSequence() }).get()
+        do {
+            return try await promise.futureResult.map({ $0.asyncSequence() }).get()
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
     }
 }
 
@@ -530,7 +537,7 @@ extension PostgresConnection {
     public func query(
         _ query: PostgresQuery,
         logger: Logger,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line
     ) -> EventLoopFuture<PostgresQueryResult> {
         self.queryStream(query, logger: logger).flatMap { rowStream in
@@ -540,7 +547,7 @@ extension PostgresConnection {
                 }
                 return PostgresQueryResult(metadata: metadata, rows: rows)
             }
-        }
+        }.enrichPSQLError(query: query, file: file, line: line)
     }
 
     /// Run a query on the Postgres server the connection is connected to and iterate the rows in a callback.
@@ -557,7 +564,7 @@ extension PostgresConnection {
     public func query(
         _ query: PostgresQuery,
         logger: Logger,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line,
         _ onRow: @escaping (PostgresRow) throws -> ()
     ) -> EventLoopFuture<PostgresQueryMetadata> {
@@ -568,7 +575,7 @@ extension PostgresConnection {
                 }
                 return metadata
             }
-        }
+        }.enrichPSQLError(query: query, file: file, line: line)
     }
 }
 
@@ -783,5 +790,20 @@ extension PostgresConnection.InternalConfiguration {
         self.connectTimeout = config.connection.connectTimeout
         self.tls = config.tls
         self.requireBackendKeyData = config.connection.requireBackendKeyData
+    }
+}
+
+extension EventLoopFuture {
+    func enrichPSQLError(query: PostgresQuery, file: String, line: Int) -> EventLoopFuture<Value> {
+        return self.flatMapErrorThrowing { error in
+            if var error = error as? PSQLError {
+                error.file = file
+                error.line = line
+                error.query = query
+                throw error
+            } else {
+                throw error
+            }
+        }
     }
 }
