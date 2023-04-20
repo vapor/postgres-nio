@@ -101,16 +101,6 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
     }
 }
 
-extension PostgresRange: CustomStringConvertible {
-    public var description: String {
-        let opener: Character = self.isLowerBoundInclusive ? "[" : "("
-        let closer: Character = self.isUpperBoundInclusive ? "]" : ")"
-        let lowerBoundString: String = self.lowerBound == nil ? "" : "\(self.lowerBound!)"
-        let upperBoundString: String = self.upperBound == nil ? "" : "\(self.upperBound!)"
-        return "\(opener)\(lowerBoundString),\(upperBoundString),\(closer)"
-    }
-}
-
 extension PostgresRange where B: Comparable {
     public init(range: Range<B>) {
         self.lowerBound = range.lowerBound
