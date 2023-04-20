@@ -265,6 +265,7 @@ extension PostgresRandomAccessRow {
 // MARK: Deprecated API
 
 extension PostgresRow {
+    @available(*, deprecated, message: "Will be removed from public API.")
     public var rowDescription: PostgresMessage.RowDescription {
         let fields = self.columns.map { column in
             PostgresMessage.RowDescription.Field(
@@ -280,6 +281,7 @@ extension PostgresRow {
         return PostgresMessage.RowDescription(fields: fields)
     }
 
+    @available(*, deprecated, message: "Iterate the cells on `PostgresRow` instead.")
     public var dataRow: PostgresMessage.DataRow {
         let columns = self.data.map {
             PostgresMessage.DataRow.Column(value: $0)

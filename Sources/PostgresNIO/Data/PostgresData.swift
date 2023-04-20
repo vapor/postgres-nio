@@ -1,7 +1,7 @@
 import NIOCore
 import struct Foundation.UUID
 
-public struct PostgresData: Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+public struct PostgresData: Sendable {
     public static var null: PostgresData {
         return .init(type: .null)
     }
@@ -26,7 +26,10 @@ public struct PostgresData: Sendable, CustomStringConvertible, CustomDebugString
         self.formatCode = formatCode
         self.value = value
     }
-    
+}
+
+@available(*, deprecated, message: "Deprecating conformance to `CustomStringConvertible` as a first step of deprecating `PostgresData`. Please use `PostgresBindings` or `PostgresCell` instead.")
+extension PostgresData: CustomStringConvertible {
     public var description: String {
         guard var value = self.value else {
             return "<null>"
@@ -93,12 +96,16 @@ public struct PostgresData: Sendable, CustomStringConvertible, CustomDebugString
             return "\(raw) (\(self.type))"
         }
     }
+}
 
+@available(*, deprecated, message: "Deprecating conformance to `CustomDebugStringConvertible` as a first step of deprecating `PostgresData`. Please use `PostgresBindings` or `PostgresCell` instead.")
+extension PostgresData: CustomDebugStringConvertible {
     public var debugDescription: String {
         return self.description
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension PostgresData: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         fatalError("PostgresData cannot be statically represented as a single data type")

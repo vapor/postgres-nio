@@ -37,8 +37,10 @@ extension PostgresData {
     }
 }
 
+@available(*, deprecated, message: "This protocol is going to be replaced with ``PostgresEncodable`` and ``PostgresDecodable`` and conforming to ``Codable`` at the same time")
 public protocol PostgresJSONCodable: Codable, PostgresDataConvertible { }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension PostgresJSONCodable {
     public static var postgresDataType: PostgresDataType {
         return .json

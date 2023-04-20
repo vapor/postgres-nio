@@ -531,6 +531,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "e"].string, "12345678.90")
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -544,6 +545,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [1, 2, 3])
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testEmptyIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -556,7 +558,8 @@ final class PostgresNIOTests: XCTestCase {
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
-    
+
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testOptionalIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -570,6 +573,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "array"].array(of: Int?.self), [1, 2, nil, 4])
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testNullIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -583,6 +587,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), nil)
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -598,6 +603,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [1, 2, 3])
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testEmptyIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -612,7 +618,8 @@ final class PostgresNIOTests: XCTestCase {
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
-    
+
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testOptionalIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -855,6 +862,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "t2_dateValue"].date, dateInTable2)
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testStringArrays() {
         let query = """
         SELECT
@@ -936,6 +944,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "char"].string, "*")
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testDoubleArraySerialization() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -1057,6 +1066,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "foo"].string, "qux")
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testNullBind() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -1106,6 +1116,7 @@ final class PostgresNIOTests: XCTestCase {
     }
 
     // https://github.com/vapor/postgres-nio/issues/113
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testVaryingCharArray() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())

@@ -1,3 +1,4 @@
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension RawRepresentable where Self.RawValue: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         RawValue.postgresDataType

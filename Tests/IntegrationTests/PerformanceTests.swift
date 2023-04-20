@@ -73,6 +73,7 @@ final class PerformanceTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testPerformanceSelectMediumModel() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
@@ -115,6 +116,7 @@ final class PerformanceTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Testing deprecated functionality")
     func testPerformanceSelectLargeModel() throws {
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }

@@ -94,6 +94,7 @@ extension PostgresData: ExpressibleByStringLiteral {
     }
 }
 
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension String: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return .text

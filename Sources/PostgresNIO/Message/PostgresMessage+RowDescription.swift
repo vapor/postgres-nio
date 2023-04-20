@@ -2,12 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     /// Identifies the message as a row description.
-    public struct RowDescription: PostgresMessageType {
-        /// See `PostgresMessageType`.
-        public static var identifier: PostgresMessage.Identifier {
-            return .rowDescription
-        }
-        
+    public struct RowDescription {
         /// Describes a single field returns in a `RowDescription` message.
         public struct Field: CustomStringConvertible {
             static func parse(from buffer: inout ByteBuffer) throws -> Field {
@@ -73,15 +68,7 @@ extension PostgresMessage {
             }
         }
         
-        /// Parses an instance of this message type from a byte buffer.
-        public static func parse(from buffer: inout ByteBuffer) throws -> RowDescription {
-            guard let fields = try buffer.read(array: Field.self, { buffer in
-                return try.parse(from: &buffer)
-            }) else {
-                throw PostgresError.protocol("Could not read row description fields")
-            }
-            return .init(fields: fields)
-        }
+
         
         /// The fields supplied in the row description.
         public var fields: [Field]
@@ -90,5 +77,23 @@ extension PostgresMessage {
         public var description: String {
             return "Row(\(self.fields)"
         }
+    }
+}
+
+@available(*, deprecated, message: "Deprecating conformance to `PostgresMessageType` since it is deprecated.")
+extension PostgresMessage.RowDescription: PostgresMessageType {
+    /// See `PostgresMessageType`.
+    public static var identifier: PostgresMessage.Identifier {
+        return .rowDescription
+    }
+
+    /// Parses an instance of this message type from a byte buffer.
+    public static func parse(from buffer: inout ByteBuffer) throws -> Self {
+        guard let fields = try buffer.read(array: Field.self, { buffer in
+            return try.parse(from: &buffer)
+        }) else {
+            throw PostgresError.protocol("Could not read row description fields")
+        }
+        return .init(fields: fields)
     }
 }

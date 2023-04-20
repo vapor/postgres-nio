@@ -1,3 +1,4 @@
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Optional: PostgresDataConvertible where Wrapped: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return Wrapped.postgresDataType

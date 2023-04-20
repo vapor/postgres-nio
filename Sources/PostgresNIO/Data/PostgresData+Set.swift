@@ -1,3 +1,4 @@
+@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension Set: PostgresDataConvertible where Element: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         [Element].postgresDataType
