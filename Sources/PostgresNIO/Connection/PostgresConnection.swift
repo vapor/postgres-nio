@@ -1,11 +1,11 @@
 import Atomics
 import NIOCore
+import NIOPosix
 #if canImport(Network)
 import NIOTransportServices
 #endif
 import NIOSSL
 import Logging
-import NIOPosix
 
 /// A Postgres connection. Use it to run queries against a Postgres server.
 ///
@@ -13,108 +13,6 @@ import NIOPosix
 public final class PostgresConnection: @unchecked Sendable {
     /// A Postgres connection ID
     public typealias ID = Int
-
-    /// A configuration object for a connection
-    public struct Configuration {
-        /// A structure to configure the connection's authentication properties
-        public struct Authentication {
-            /// The username to connect with.
-            ///
-            /// - Default: postgres
-            public var username: String
-
-            /// The database to open on the server
-            ///
-            /// - Default: `nil`
-            public var database: Optional<String>
-
-            /// The database user's password.
-            ///
-            /// - Default: `nil`
-            public var password: Optional<String>
-
-            public init(username: String, database: String?, password: String?) {
-                self.username = username
-                self.database = database
-                self.password = password
-            }
-        }
-
-        public struct TLS {
-            enum Base {
-                case disable
-                case prefer(NIOSSLContext)
-                case require(NIOSSLContext)
-            }
-
-            var base: Base
-
-            private init(_ base: Base) {
-                self.base = base
-            }
-
-            /// Do not try to create a TLS connection to the server.
-            public static var disable: Self = Self.init(.disable)
-
-            /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
-            /// If the server does not support TLS, create an insecure connection.
-            public static func prefer(_ sslContext: NIOSSLContext) -> Self {
-                self.init(.prefer(sslContext))
-            }
-
-            /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
-            /// If the server does not support TLS, fail the connection creation.
-            public static func require(_ sslContext: NIOSSLContext) -> Self {
-                self.init(.require(sslContext))
-            }
-        }
-
-        public struct Connection {
-            /// The server to connect to
-            ///
-            /// - Default: localhost
-            public var host: String
-
-            /// The server port to connect to.
-            ///
-            /// - Default: 5432
-            public var port: Int
-
-            /// Require connection to provide `BackendKeyData`.
-            /// For use with Amazon RDS Proxy, this must be set to false.
-            ///
-            /// - Default: true
-            public var requireBackendKeyData: Bool = true
-
-            /// Specifies a timeout to apply to a connection attempt.
-            ///
-            /// - Default: 10 seconds
-            public var connectTimeout: TimeAmount
-
-            public init(host: String, port: Int = 5432) {
-                self.host = host
-                self.port = port
-                self.connectTimeout = .seconds(10)
-            }
-        }
-
-        public var connection: Connection
-
-        /// The authentication properties to send to the Postgres server during startup auth handshake
-        public var authentication: Authentication
-
-        public var tls: TLS
-
-        public init(
-            connection: Connection,
-            authentication: Authentication,
-            tls: TLS
-        ) {
-            self.connection = connection
-            self.authentication = authentication
-            self.tls = tls
-        }
-    }
 
     /// The connection's underlying channel
     ///
@@ -170,21 +68,21 @@ public final class PostgresConnection: @unchecked Sendable {
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
-        var configureSSLCallback: ((Channel) throws -> ())? = nil
+        let configureSSLCallback: ((Channel) throws -> ())?
+        
         switch configuration.tls.base {
-        case .disable:
-            break
-
-        case .prefer(let sslContext), .require(let sslContext):
+        case .prefer(let context), .require(let context):
             configureSSLCallback = { channel in
                 channel.eventLoop.assertInEventLoop()
 
                 let sslHandler = try NIOSSLClientHandler(
-                    context: sslContext,
-                    serverHostname: configuration.sslServerHostname
+                    context: context,
+                    serverHostname: configuration.serverNameForTLS
                 )
                 try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
             }
+        case .disable:
+            configureSSLCallback = nil
         }
 
         let channelHandler = PostgresChannelHandler(
@@ -206,7 +104,7 @@ public final class PostgresConnection: @unchecked Sendable {
         }
 
         let startupFuture: EventLoopFuture<Void>
-        if configuration.authentication == nil {
+        if configuration.username == nil {
             startupFuture = eventHandler.readyForStartupFuture
         } else {
             startupFuture = eventHandler.authenticateFuture
@@ -269,10 +167,17 @@ public final class PostgresConnection: @unchecked Sendable {
             let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
 
             switch configuration.connection {
-            case .resolved(let address, _):
+            case .resolved(let address):
                 connectFuture = bootstrap.connect(to: address)
-            case .unresolved(let host, let port):
+            case .unresolvedTCP(let host, let port):
                 connectFuture = bootstrap.connect(host: host, port: port)
+            case .unresolvedUDS(let path):
+                connectFuture = bootstrap.connect(unixDomainSocketPath: path)
+            case .bootstrapped(let channel):
+                guard channel.isActive else {
+                    return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
+                }
+                connectFuture = eventLoop.makeSucceededFuture(channel)
             }
 
             return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
@@ -295,12 +200,12 @@ public final class PostgresConnection: @unchecked Sendable {
     ) -> NIOClientTCPBootstrapProtocol {
         #if canImport(Network)
         if let tsBootstrap = NIOTSConnectionBootstrap(validatingGroup: eventLoop) {
-            return tsBootstrap.connectTimeout(configuration.connectTimeout)
+            return tsBootstrap.connectTimeout(configuration.options.connectTimeout)
         }
         #endif
 
         if let nioBootstrap = ClientBootstrap(validatingGroup: eventLoop) {
-            return nioBootstrap.connectTimeout(configuration.connectTimeout)
+            return nioBootstrap.connectTimeout(configuration.options.connectTimeout)
         }
 
         fatalError("No matching bootstrap found")
@@ -398,19 +303,22 @@ extension PostgresConnection {
 
         if let tlsConfiguration = tlsConfiguration {
             tlsFuture = eventLoop.makeSucceededVoidFuture().flatMapBlocking(onto: .global(qos: .default)) {
-                try PostgresConnection.Configuration.TLS.require(.init(configuration: tlsConfiguration))
+                try .require(.init(configuration: tlsConfiguration))
             }
         } else {
             tlsFuture = eventLoop.makeSucceededFuture(.disable)
         }
 
         return tlsFuture.flatMap { tls in
+            var options = PostgresConnection.Configuration.Options()
+            options.tlsServerName = serverHostname
             let configuration = PostgresConnection.InternalConfiguration(
-                connection: .resolved(address: socketAddress, serverName: serverHostname),
-                connectTimeout: .seconds(10),
-                authentication: nil,
+                connection: .resolved(address: socketAddress),
+                username: nil,
+                password: nil,
+                database: nil,
                 tls: tls,
-                requireBackendKeyData: true
+                options: options
             )
 
             return PostgresConnection.connect(
@@ -731,66 +639,6 @@ extension PostgresConnection: PSQLChannelHandlerNotificationDelegate {
 enum CloseTarget {
     case preparedStatement(String)
     case portal(String)
-}
-
-extension PostgresConnection.InternalConfiguration {
-    var sslServerHostname: String? {
-        switch self.connection {
-        case .unresolved(let host, _):
-            guard !host.isIPAddress() else {
-                return nil
-            }
-            return host
-        case .resolved(_, let serverName):
-            return serverName
-        }
-    }
-}
-
-// copy and pasted from NIOSSL:
-private extension String {
-    func isIPAddress() -> Bool {
-        // We need some scratch space to let inet_pton write into.
-        var ipv4Addr = in_addr()
-        var ipv6Addr = in6_addr()
-
-        return self.withCString { ptr in
-            return inet_pton(AF_INET, ptr, &ipv4Addr) == 1 ||
-                   inet_pton(AF_INET6, ptr, &ipv6Addr) == 1
-        }
-    }
-}
-
-extension PostgresConnection {
-    /// A configuration object to bring the new ``PostgresConnection.Configuration`` together with
-    /// the deprecated configuration.
-    ///
-    /// TODO: Drop with next major release
-    struct InternalConfiguration {
-        enum Connection {
-            case unresolved(host: String, port: Int)
-            case resolved(address: SocketAddress, serverName: String?)
-        }
-
-        var connection: Connection
-        var connectTimeout: TimeAmount
-
-        var authentication: Configuration.Authentication?
-
-        var tls: Configuration.TLS
-        
-        var requireBackendKeyData: Bool
-    }
-}
-
-extension PostgresConnection.InternalConfiguration {
-    init(_ config: PostgresConnection.Configuration) {
-        self.authentication = config.authentication
-        self.connection = .unresolved(host: config.connection.host, port: config.connection.port)
-        self.connectTimeout = config.connection.connectTimeout
-        self.tls = config.tls
-        self.requireBackendKeyData = config.connection.requireBackendKeyData
-    }
 }
 
 extension EventLoopFuture {

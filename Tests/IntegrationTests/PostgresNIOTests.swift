@@ -31,6 +31,18 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         XCTAssertNoThrow(try conn?.close().wait())
     }
+    
+    func testConnectUDSAndClose() throws {
+        try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
+        let conn = try PostgresConnection.testUDS(on: eventLoop).wait()
+        try conn.close().wait()
+    }
+    
+    func testConnectEstablishedChannelAndClose() throws {
+        let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
+        let conn = try PostgresConnection.testChannel(channel, on: self.eventLoop).wait()
+        try conn.close().wait()
+    }
 
     func testSimpleQueryVersion() {
         var conn: PostgresConnection?
@@ -40,6 +52,27 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
         XCTAssertEqual(rows?.count, 1)
         XCTAssertEqual(try rows?.first?.decode(String.self, context: .default).contains("PostgreSQL"), true)
+    }
+
+    func testSimpleQueryVersionUsingUDS() throws {
+        try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.testUDS(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        var rows: [PostgresRow]?
+        XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
+        XCTAssertEqual(rows?.count, 1)
+        XCTAssertEqual(try rows?.first?.decode(String.self, context: .default).contains("PostgreSQL"), true)
+    }
+
+    func testSimpleQueryVersionUsingEstablishedChannel() throws {
+        let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
+        let conn = try PostgresConnection.testChannel(channel, on: self.eventLoop).wait()
+        defer { XCTAssertNoThrow(try conn.close().wait()) }
+
+        let rows = try conn.simpleQuery("SELECT version()").wait()
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(try rows.first?.decode(String.self, context: .default).contains("PostgreSQL"), true)
     }
 
     func testQueryVersion() {
@@ -744,19 +777,13 @@ final class PostgresNIOTests: XCTestCase {
         let logger = Logger(label: "test")
         let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
         let config = PostgresConnection.Configuration(
-            connection: .init(
-                host: "elmer.db.elephantsql.com",
-                port: 5432
-            ),
-            authentication: .init(
-                username: "uymgphwj",
-                database: "uymgphwj",
-                password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA"
-            ),
+            host: "elmer.db.elephantsql.com",
+            port: 5432,
+            username: "uymgphwj",
+            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
+            database: "uymgphwj",
             tls: .require(sslContext)
         )
-
-
         XCTAssertNoThrow(conn = try PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         var rows: [PostgresRow]?
