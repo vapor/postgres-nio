@@ -1,6 +1,6 @@
 import Atomics
 import NIOCore
-@_implementationOnly import NIOPosix
+import NIOPosix
 #if canImport(Network)
 import NIOTransportServices
 #endif
@@ -68,15 +68,22 @@ public final class PostgresConnection: @unchecked Sendable {
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
-        let configureSSLCallback: ((Channel) throws -> ())? = configuration.tls.sslContext.map { sslContext in { channel in
-            channel.eventLoop.assertInEventLoop()
+        let configureSSLCallback: ((Channel) throws -> ())?
+        
+        switch configuration.tls.base {
+        case .prefer(let context), .require(let context):
+            configureSSLCallback = { channel in
+                channel.eventLoop.assertInEventLoop()
 
-            let sslHandler = try NIOSSLClientHandler(
-                context: sslContext,
-                serverHostname: configuration.serverNameForSNI
-            )
-            try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
-        } }
+                let sslHandler = try NIOSSLClientHandler(
+                    context: context,
+                    serverHostname: configuration.serverNameForTLS
+                )
+                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
+            }
+        case .disable:
+            configureSSLCallback = nil
+        }
 
         let channelHandler = PostgresChannelHandler(
             configuration: configuration,

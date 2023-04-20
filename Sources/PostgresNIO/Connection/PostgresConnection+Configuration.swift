@@ -1,5 +1,5 @@
 import NIOCore
-@_implementationOnly import NIOPosix // inet_pton() et al.
+import NIOPosix // inet_pton() et al.
 import NIOSSL
 
 extension PostgresConnection {
@@ -51,12 +51,12 @@ extension PostgresConnection {
 
             // MARK: Implementation details
             
-            fileprivate enum Base {
+            enum Base {
                 case disable
                 case prefer(NIOSSLContext)
                 case require(NIOSSLContext)
             }
-            fileprivate let base: Base
+            let base: Base
             private init(base: Base) { self.base = base }
         }
         
@@ -70,23 +70,20 @@ extension PostgresConnection {
             /// ``PostgresConnection/Configuration/init(establishedChannel:username:password:database:)``.)
             public var connectTimeout: TimeAmount
             
-            /// The name to use for SNI (Server Name Indication) when TLS is enabled. Defaults to none (but see below).
+            /// The server name to use for certificate validation and SNI (Server Name Indication) when TLS is enabled.
+            /// Defaults to none (but see below).
             ///
             /// > When set to `nil`:
             /// If the connection is made to a server over TCP using
             /// ``PostgresConnection/Configuration/init(host:port:username:password:database:tls:)``, the given `host`
             /// is used, unless it was an IP address string. If it _was_ an IP, or the connection is made by any other
             /// method, SNI is disabled.
-            ///
-            /// - Warning: This name is not validated in any way; in particular, there is no attempt to check that it
-            ///   matches the server's TLS certificate, nor is it in any way impacted by the validation setting in the
-            ///   TLS configuration (see ``PostgresConnection/Configuration/TLS-swift.struct``).
             public var tlsServerName: String?
             
             /// Whether the connection is required to provide backend key data (internal Postgres stuff).
             ///
             /// This property is provided for compatibility with Amazon RDS Proxy, which requires it to be `false`.
-            /// If you are not using Amazon RDS Proxy, you should probably leave this set to `true` (the default).
+            /// If you are not using Amazon RDS Proxy, you should leave this set to `true` (the default).
             public var requireBackendKeyData: Bool
             
             /// Create an options structure with default values.
@@ -196,17 +193,16 @@ extension PostgresConnection {
         }
 
         // MARK: - Implementation details
-        // TODO: Make these `private` once the deprecated ``Connection`` struct is gone.
 
-        /*private*/ enum EndpointInfo {
+        enum EndpointInfo {
             case configureChannel(Channel)
             case bindUnixDomainSocket(path: String)
             case connectTCP(host: String, port: Int)
         }
 
-        /*private*/ var endpointInfo: EndpointInfo
+        var endpointInfo: EndpointInfo
 
-        /*private*/ init(endpointInfo: EndpointInfo, tls: TLS, username: String, password: String?, database: String?) {
+        init(endpointInfo: EndpointInfo, tls: TLS, username: String, password: String?, database: String?) {
             self.endpointInfo = endpointInfo
             self.tls = tls
             self.username = username
@@ -235,7 +231,7 @@ extension PostgresConnection {
         let username: String?
         let password: String?
         let database: String?
-        let tls: Configuration.TLS
+        var tls: Configuration.TLS
         let options: Configuration.Options
     }
 }
@@ -254,7 +250,7 @@ extension PostgresConnection.InternalConfiguration {
         self.options = config.options
     }
     
-    var serverNameForSNI: String? {
+    var serverNameForTLS: String? {
         // If a name was explicitly configured, always use it.
         if let tlsServerName = self.options.tlsServerName { return tlsServerName }
         
