@@ -273,7 +273,7 @@ private func prepareTableToMeasureSelectPerformance(
     schema: String,
     fixtureData: [PostgresData],
     on eventLoop: EventLoop,
-    file: StaticString = #file,
+    file: StaticString = #filePath,
     line: UInt = #line
 ) throws {
     XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: (file), line: line)

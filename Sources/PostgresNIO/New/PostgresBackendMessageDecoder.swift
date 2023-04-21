@@ -123,7 +123,7 @@ struct PostgresMessageDecodingError: Error {
     static func unknownMessageIDReceived(
         messageID: UInt8,
         messageBytes: ByteBuffer,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line) -> Self
     {
         var byteBuffer = messageBytes
@@ -152,7 +152,7 @@ struct PSQLPartialDecodingError: Error {
     static func valueNotRawRepresentable<Target: RawRepresentable>(
         value: Target.RawValue,
         asType: Target.Type,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line) -> Self
     {
         return PSQLPartialDecodingError(
@@ -160,31 +160,31 @@ struct PSQLPartialDecodingError: Error {
             file: file, line: line)
     }
     
-    static func unexpectedValue(value: Any, file: String = #file, line: Int = #line) -> Self {
+    static func unexpectedValue(value: Any, file: String = #fileID, line: Int = #line) -> Self {
         return PSQLPartialDecodingError(
             description: "Value '\(value)' is not expected.",
             file: file, line: line)
     }
     
-    static func expectedAtLeastNRemainingBytes(_ expected: Int, actual: Int, file: String = #file, line: Int = #line) -> Self {
+    static func expectedAtLeastNRemainingBytes(_ expected: Int, actual: Int, file: String = #fileID, line: Int = #line) -> Self {
         return PSQLPartialDecodingError(
             description: "Expected at least '\(expected)' remaining bytes. But only found \(actual).",
             file: file, line: line)
     }
     
-    static func expectedExactlyNRemainingBytes(_ expected: Int, actual: Int, file: String = #file, line: Int = #line) -> Self {
+    static func expectedExactlyNRemainingBytes(_ expected: Int, actual: Int, file: String = #fileID, line: Int = #line) -> Self {
         return PSQLPartialDecodingError(
             description: "Expected exactly '\(expected)' remaining bytes. But found \(actual).",
             file: file, line: line)
     }
     
-    static func fieldNotDecodable(type: Any.Type, file: String = #file, line: Int = #line) -> Self {
+    static func fieldNotDecodable(type: Any.Type, file: String = #fileID, line: Int = #line) -> Self {
         return PSQLPartialDecodingError(
             description: "Could not read '\(type)' from ByteBuffer.",
             file: file, line: line)
     }
     
-    static func integerMustBePositiveOrNull<Number: FixedWidthInteger>(_ actual: Number, file: String = #file, line: Int = #line) -> Self {
+    static func integerMustBePositiveOrNull<Number: FixedWidthInteger>(_ actual: Number, file: String = #fileID, line: Int = #line) -> Self {
         return PSQLPartialDecodingError(
             description: "Expected the integer to be positive or null, but got \(actual).",
             file: file, line: line)
@@ -192,14 +192,14 @@ struct PSQLPartialDecodingError: Error {
 }
 
 extension ByteBuffer {
-    mutating func throwingReadInteger<I: FixedWidthInteger>(as: I.Type, file: String = #file, line: Int = #line) throws -> I {
+    mutating func throwingReadInteger<I: FixedWidthInteger>(as: I.Type, file: String = #fileID, line: Int = #line) throws -> I {
         guard let result = self.readInteger(endianness: .big, as: I.self) else {
             throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(MemoryLayout<I>.size, actual: self.readableBytes, file: file, line: line)
         }
         return result
     }
     
-    mutating func throwingMoveReaderIndex(forwardBy offset: Int, file: String = #file, line: Int = #line) throws {
+    mutating func throwingMoveReaderIndex(forwardBy offset: Int, file: String = #fileID, line: Int = #line) throws {
         guard self.readSlice(length: offset) != nil else {
             throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(offset, actual: self.readableBytes, file: file, line: line)
         }

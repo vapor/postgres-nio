@@ -217,7 +217,7 @@ extension PostgresRandomAccessRow {
         column: String,
         as type: T.Type,
         context: PostgresDecodingContext<JSONDecoder>,
-        file: String = #file, line: Int = #line
+        file: String = #fileID, line: Int = #line
     ) throws -> T {
         guard let index = self.lookupTable[column] else {
             fatalError(#"A column "\#(column)" does not exist."#)
@@ -237,7 +237,7 @@ extension PostgresRandomAccessRow {
         column index: Int,
         as type: T.Type,
         context: PostgresDecodingContext<JSONDecoder>,
-        file: String = #file, line: Int = #line
+        file: String = #fileID, line: Int = #line
     ) throws -> T {
         precondition(index < self.columns.count)
 

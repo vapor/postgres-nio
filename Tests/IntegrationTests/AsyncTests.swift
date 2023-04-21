@@ -146,7 +146,7 @@ extension XCTestCase {
 
     func withTestConnection<Result>(
         on eventLoop: EventLoop,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line,
         _ closure: (PostgresConnection) async throws -> Result
     ) async throws -> Result  {

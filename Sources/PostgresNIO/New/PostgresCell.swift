@@ -43,7 +43,7 @@ extension PostgresCell {
     public func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(
         _: T.Type,
         context: PostgresDecodingContext<JSONDecoder>,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line
     ) throws -> T {
         var copy = self.bytes
@@ -80,7 +80,7 @@ extension PostgresCell {
     @inlinable
     public func decode<T: PostgresDecodable>(
         _: T.Type,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line
     ) throws -> T {
         try self.decode(T.self, context: .default, file: file, line: line)
