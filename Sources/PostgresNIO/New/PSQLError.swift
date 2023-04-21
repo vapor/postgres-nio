@@ -432,15 +432,16 @@ public struct PostgresDecodingError: Error, Equatable {
     /// The line the decoding was attempted in
     public let line: Int
 
-    /// Create a new ``PostgresDecodingError``
+    /// Create a new ``PostgresDecodingError``.
+
     /// - Parameters:
     ///   - code: The reason for the decoding error
     ///   - columnName: The cell's column name for which the decoding failed
     ///   - columnIndex: The cell's column index for which the decoding failed
-    ///   - targetType: The Swift type which the data should have been decoded to
+    ///   - targetType: The Swift type to which the data was to be decoded
     ///   - postgresType: The ``PostgresDataType`` as sent from the database
     ///   - postgresFormat: The ``PostgresFormat`` the data is received in
-    ///   - postgresData: The actual bytes that were attempted to decode
+    ///   - postgresData: The actual bytes on which decoding was tried
     ///   - file: The calling file (in user code) which requested the decoding
     ///   - line: The calling line (in user code) which requested the decoding
     public init(
