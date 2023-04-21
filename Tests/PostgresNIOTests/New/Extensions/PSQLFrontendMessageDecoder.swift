@@ -157,7 +157,7 @@ extension PostgresMessageDecodingError {
     static func unknownStartupCodeReceived(
         code: UInt32,
         messageBytes: ByteBuffer,
-        file: String = #file,
+        file: String = #fileID,
         line: Int = #line) -> Self
     {
         var byteBuffer = messageBytes

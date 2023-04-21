@@ -22,7 +22,7 @@ function genWithContextParameter() {
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n))"
     done
-    echo -n ").Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #file, line: Int = #line) throws"
+    echo -n ").Type, context: PostgresDecodingContext<JSONDecoder>, file: String = #fileID, line: Int = #line) throws"
 
     echo -n " -> (T0"
     for ((n = 1; n<$how_many; n +=1)); do
@@ -97,7 +97,7 @@ function genWithoutContextParameter() {
     for ((n = 1; n<$how_many; n +=1)); do
         echo -n ", T$(($n))"
     done
-    echo -n ").Type, file: String = #file, line: Int = #line) throws"
+    echo -n ").Type, file: String = #fileID, line: Int = #line) throws"
 
     echo -n " -> (T0"
     for ((n = 1; n<$how_many; n +=1)); do

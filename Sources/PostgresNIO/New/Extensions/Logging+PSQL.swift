@@ -86,7 +86,7 @@ extension Logger {
     func trace(_ message: @autoclosure () -> Logger.Message,
                metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
-               file: String = #file, function: String = #function, line: UInt = #line) {
+               file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .trace, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 
@@ -95,7 +95,7 @@ extension Logger {
     func debug(_ message: @autoclosure () -> Logger.Message,
                metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
-               file: String = #file, function: String = #function, line: UInt = #line) {
+               file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .debug, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 
@@ -104,7 +104,7 @@ extension Logger {
     func info(_ message: @autoclosure () -> Logger.Message,
               metadata: @autoclosure () -> PSQLLoggingMetadata,
               source: @autoclosure () -> String? = nil,
-              file: String = #file, function: String = #function, line: UInt = #line) {
+              file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .info, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 
@@ -113,7 +113,7 @@ extension Logger {
     func notice(_ message: @autoclosure () -> Logger.Message,
                 metadata: @autoclosure () -> PSQLLoggingMetadata,
                 source: @autoclosure () -> String? = nil,
-                file: String = #file, function: String = #function, line: UInt = #line) {
+                file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .notice, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 
@@ -122,7 +122,7 @@ extension Logger {
     func warning(_ message: @autoclosure () -> Logger.Message,
                  metadata: @autoclosure () -> PSQLLoggingMetadata,
                  source: @autoclosure () -> String? = nil,
-                 file: String = #file, function: String = #function, line: UInt = #line) {
+                 file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .warning, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 
@@ -131,7 +131,7 @@ extension Logger {
     func error(_ message: @autoclosure () -> Logger.Message,
                metadata: @autoclosure () -> PSQLLoggingMetadata,
                source: @autoclosure () -> String? = nil,
-               file: String = #file, function: String = #function, line: UInt = #line) {
+               file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .error, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 
@@ -140,7 +140,7 @@ extension Logger {
     func critical(_ message: @autoclosure () -> Logger.Message,
                   metadata: @autoclosure () -> PSQLLoggingMetadata,
                   source: @autoclosure () -> String? = nil,
-                  file: String = #file, function: String = #function, line: UInt = #line) {
+                  file: String = #fileID, function: String = #function, line: UInt = #line) {
         self.log(level: .critical, message(), metadata: metadata().representation, source: source(), file: file, function: function, line: line)
     }
 }

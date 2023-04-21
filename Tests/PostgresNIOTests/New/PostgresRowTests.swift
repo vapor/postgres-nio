@@ -191,7 +191,7 @@ final class PostgresRowTests: XCTestCase {
             XCTAssertEqual(psqlError.columnName, "name")
             XCTAssertEqual(psqlError.columnIndex, 1)
             XCTAssertEqual(psqlError.line, #line - 5)
-            XCTAssertEqual(psqlError.file, #file)
+            XCTAssertEqual(psqlError.file, #fileID)
             XCTAssertEqual(psqlError.postgresData, ByteBuffer(integer: 123))
             XCTAssertEqual(psqlError.postgresFormat, .binary)
             XCTAssertEqual(psqlError.postgresType, .int8)

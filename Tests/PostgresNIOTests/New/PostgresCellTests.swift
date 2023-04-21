@@ -45,7 +45,7 @@ final class PostgresCellTests: XCTestCase {
                 return XCTFail("Unexpected error")
             }
 
-            XCTAssertEqual(error.file, #file)
+            XCTAssertEqual(error.file, #fileID)
             XCTAssertEqual(error.line, #line - 6)
             XCTAssertEqual(error.code, .typeMismatch)
             XCTAssertEqual(error.columnName, "hello")

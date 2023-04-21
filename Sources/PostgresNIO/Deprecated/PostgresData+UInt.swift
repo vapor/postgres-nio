@@ -1,6 +1,6 @@
 private func warn(
     _ old: Any.Type, mustBeConvertedTo new: Any.Type,
-    file: StaticString = #file, line: UInt = #line
+    file: StaticString = #filePath, line: UInt = #line
 ) {
     assertionFailure("""
     Integer conversion unsafe.
