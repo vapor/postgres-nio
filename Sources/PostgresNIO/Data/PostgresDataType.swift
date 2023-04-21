@@ -260,6 +260,7 @@ public struct PostgresDataType: RawRepresentable, Hashable, CustomStringConverti
 
     /// Returns the bound type for this type if one is known.
     /// Returns nil if this is not a range type.
+    @usableFromInline
     internal var boundType: PostgresDataType? {
         switch self {
         case .int4Range: return .int4
