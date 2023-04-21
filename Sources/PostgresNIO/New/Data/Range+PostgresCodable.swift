@@ -14,30 +14,28 @@ public protocol PostgresRangeDecodable: PostgresDecodable {
     /// Types such as `int4range` get converted to upper-bound-exclusive.
     /// This method is needed when converting an upper bound to inclusive.
     /// It should throw if the type lacks a well-defined step.
-    func stepDown() throws -> Self
+    func upperBoundExclusiveToUpperBoundInclusive() throws -> Self
 }
 
 // MARK: Bound conformances
+
+extension FixedWidthInteger {
+    public func upperBoundExclusiveToUpperBoundInclusive() -> Self {
+        return self - 1
+    }
+}
 
 extension Int32: PostgresRangeEncodable {
     public static var psqlRangeType: PostgresDataType { return .int4Range }
 }
 
-extension Int32: PostgresRangeDecodable {
-    public func stepDown() -> Self {
-        return self - 1
-    }
-}
+extension Int32: PostgresRangeDecodable {}
 
 extension Int64: PostgresRangeEncodable {
     public static var psqlRangeType: PostgresDataType { return .int8Range }
 }
 
-extension Int64: PostgresRangeDecodable {
-    public func stepDown() -> Self {
-        return self - 1
-    }
-}
+extension Int64: PostgresRangeDecodable {}
 
 // MARK: PostgresRange
 
@@ -249,7 +247,7 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
         }
 
         if !postgresRange.isUpperBoundInclusive {
-            upperBound = try upperBound.stepDown()
+            upperBound = try upperBound.upperBoundExclusiveToUpperBoundInclusive()
         }
         
         self = lowerBound...upperBound
