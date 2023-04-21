@@ -23,7 +23,7 @@ struct PostgresRange<B> {
 }
 
 extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
-    @usableFromInline
+    @inlinable
     init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
@@ -81,7 +81,7 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
     @usableFromInline
     static var psqlFormat: PostgresFormat { return .binary }
 
-    @usableFromInline
+    @inlinable
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) {
         // flags byte contains certain properties of the range
         var flags: UInt8 = 0
@@ -107,7 +107,7 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
 }
 
 extension PostgresRange where B: Comparable {
-    @usableFromInline
+    @inlinable
     init(range: Range<B>) {
         self.lowerBound = range.lowerBound
         self.upperBound = range.upperBound
@@ -115,7 +115,7 @@ extension PostgresRange where B: Comparable {
         self.isUpperBoundInclusive = false
     }
 
-    @usableFromInline
+    @inlinable
     init(closedRange: ClosedRange<B>) {
         self.lowerBound = closedRange.lowerBound
         self.upperBound = closedRange.upperBound
