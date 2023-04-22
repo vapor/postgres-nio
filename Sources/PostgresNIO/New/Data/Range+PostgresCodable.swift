@@ -15,6 +15,10 @@ public protocol PostgresRangeDecodable: PostgresDecodable {
     /// This method is needed when converting an upper bound to inclusive.
     /// It should throw if the type lacks a well-defined step.
     func upperBoundExclusiveToUpperBoundInclusive() throws -> Self
+
+    /// Postgres does not store any bound values for empty ranges,
+    /// but Swift requires a value to initialize an empty Range<Bound>.
+    static var defaultBoundValueForEmptyRange: Self { get }
 }
 
 // MARK: Bound conformances
@@ -22,6 +26,10 @@ public protocol PostgresRangeDecodable: PostgresDecodable {
 extension FixedWidthInteger {
     public func upperBoundExclusiveToUpperBoundInclusive() -> Self {
         return self - 1
+    }
+
+    public static var defaultBoundValueForEmptyRange: Self {
+        return .zero
     }
 }
 
@@ -79,6 +87,17 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
         // flags byte contains certain properties of the range
         guard let flags: UInt8 = byteBuffer.readInteger(as: UInt8.self) else {
             throw PostgresDecodingError.Code.failure
+        }
+
+        let isEmpty: Bool = flags & _isEmpty != 0
+        if isEmpty {
+            self = PostgresRange<B>(
+                lowerBound: B.defaultBoundValueForEmptyRange,
+                upperBound: B.defaultBoundValueForEmptyRange,
+                isLowerBoundInclusive: true,
+                isUpperBoundInclusive: false
+            )
+            return
         }
 
         guard let lowerBoundSize: Int32 = byteBuffer.readInteger(as: Int32.self),
@@ -256,5 +275,6 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
 }
 
 // MARK: Private
+@usableFromInline let _isEmpty: UInt8 = 0x01
 @usableFromInline let _isLowerBoundInclusive: UInt8 = 0x02
 @usableFromInline let _isUpperBoundInclusive: UInt8 = 0x04

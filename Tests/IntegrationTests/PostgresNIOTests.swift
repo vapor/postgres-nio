@@ -374,6 +374,26 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(decodedClosedRangeArray, [0...0, 10...10])
     }
 
+    func testEmptyInt4Range() throws {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        struct Model: Decodable {
+            let range: Range<Int32>
+        }
+        var results: PostgresQueryResult?
+        let randomValue = Int32.random(in: Int32.min...Int32.max)
+        XCTAssertNoThrow(results = try conn?.query("""
+        SELECT
+            '[\(randomValue),\(randomValue))'::int4range AS range
+        """).wait())
+        XCTAssertEqual(results?.count, 1)
+        let row = results?.first?.makeRandomAccess()
+        let expectedRange: Range<Int32> = Int32.defaultBoundValueForEmptyRange..<Int32.defaultBoundValueForEmptyRange
+        let decodedRange = try row?.decode(column: "range", as: Range<Int32>.self, context: .default)
+        XCTAssertEqual(decodedRange, expectedRange)
+    }
+
     func testInt8Range() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -405,6 +425,26 @@ final class PostgresNIOTests: XCTestCase {
         let decodedClosedRangeArray = try row?.decode(column: "ranges", as: [ClosedRange<Int64>].self, context: .default)
         XCTAssertEqual(decodedRangeArray, [0..<1, 10..<11])
         XCTAssertEqual(decodedClosedRangeArray, [0...0, 10...10])
+    }
+
+    func testEmptyInt8Range() throws {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        struct Model: Decodable {
+            let range: Range<Int64>
+        }
+        var results: PostgresQueryResult?
+        let randomValue = Int64.random(in: Int64.min...Int64.max)
+        XCTAssertNoThrow(results = try conn?.query("""
+        SELECT
+            '[\(randomValue),\(randomValue))'::int8range AS range
+        """).wait())
+        XCTAssertEqual(results?.count, 1)
+        let row = results?.first?.makeRandomAccess()
+        let expectedRange: Range<Int64> = Int64.defaultBoundValueForEmptyRange..<Int64.defaultBoundValueForEmptyRange
+        let decodedRange = try row?.decode(column: "range", as: Range<Int64>.self, context: .default)
+        XCTAssertEqual(decodedRange, expectedRange)
     }
 
     func testDates() {

@@ -57,6 +57,7 @@ class Range_PSQLCodableTests: XCTestCase {
 
     func testInt64RangeDecodeFailureInvalidLength() {
         var buffer = ByteBuffer()
+        buffer.writeInteger(0)
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
