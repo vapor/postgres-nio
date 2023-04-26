@@ -269,6 +269,10 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
         if !postgresRange.isUpperBoundInclusive {
             upperBound = try upperBound.upperBoundExclusiveToUpperBoundInclusive()
         }
+
+        if lowerBound > upperBound {
+            throw PostgresDecodingError.Code.failure
+        }
         
         self = lowerBound...upperBound
     }

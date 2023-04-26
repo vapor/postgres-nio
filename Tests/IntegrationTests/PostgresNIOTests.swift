@@ -392,6 +392,10 @@ final class PostgresNIOTests: XCTestCase {
         let expectedRange: Range<Int32> = Int32.defaultBoundValueForEmptyRange..<Int32.defaultBoundValueForEmptyRange
         let decodedRange = try row?.decode(column: "range", as: Range<Int32>.self, context: .default)
         XCTAssertEqual(decodedRange, expectedRange)
+
+        XCTAssertThrowsError(
+            try row?.decode(column: "range", as: ClosedRange<Int32>.self, context: .default)
+        )
     }
 
     func testInt8Range() throws {
@@ -445,6 +449,10 @@ final class PostgresNIOTests: XCTestCase {
         let expectedRange: Range<Int64> = Int64.defaultBoundValueForEmptyRange..<Int64.defaultBoundValueForEmptyRange
         let decodedRange = try row?.decode(column: "range", as: Range<Int64>.self, context: .default)
         XCTAssertEqual(decodedRange, expectedRange)
+
+        XCTAssertThrowsError(
+            try row?.decode(column: "range", as: ClosedRange<Int64>.self, context: .default)
+        )
     }
 
     func testDates() {
