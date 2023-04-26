@@ -21,6 +21,11 @@ public protocol PostgresRangeDecodable: PostgresDecodable {
     static var defaultBoundValueForEmptyRange: Self { get }
 }
 
+/// A type that can be encoded into a Postgres range array type where it is the bound type
+public protocol PostgresRangeArrayEncodable {
+    static var psqlRangeArrayType: PostgresDataType { get }
+}
+
 // MARK: Bound conformances
 
 extension FixedWidthInteger {
@@ -39,11 +44,19 @@ extension Int32: PostgresRangeEncodable {
 
 extension Int32: PostgresRangeDecodable {}
 
+extension Int32: PostgresRangeArrayEncodable {
+    public static var psqlRangeArrayType: PostgresDataType { return .int4RangeArray }
+}
+
 extension Int64: PostgresRangeEncodable {
     public static var psqlRangeType: PostgresDataType { return .int8Range }
 }
 
 extension Int64: PostgresRangeDecodable {}
+
+extension Int64: PostgresRangeArrayEncodable {
+    public static var psqlRangeArrayType: PostgresDataType { return .int8RangeArray }
+}
 
 // MARK: PostgresRange
 
@@ -131,9 +144,9 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
     }
 }
 
-extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where B: PostgresNonThrowingEncodable {
+extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where B: PostgresRangeEncodable {
     @usableFromInline
-    static var psqlType: PostgresDataType { return B.psqlType.rangeType! }
+    static var psqlType: PostgresDataType { return B.psqlRangeType }
     
     @usableFromInline
     static var psqlFormat: PostgresFormat { return .binary }

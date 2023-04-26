@@ -87,14 +87,14 @@ extension UUID: PostgresArrayEncodable {
 
 extension Range: PostgresArrayDecodable where Bound: PostgresRangeDecodable {}
 
-extension Range: PostgresArrayEncodable where Bound: PostgresRangeEncodable {
-    public static var psqlArrayType: PostgresDataType { Bound.psqlRangeType.arrayType! }
+extension Range: PostgresArrayEncodable where Bound: PostgresRangeEncodable & PostgresRangeArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { Bound.psqlRangeArrayType }
 }
 
 extension ClosedRange: PostgresArrayDecodable where Bound: PostgresRangeDecodable {}
 
-extension ClosedRange: PostgresArrayEncodable where Bound: PostgresRangeEncodable {
-    public static var psqlArrayType: PostgresDataType { Bound.psqlRangeType.arrayType! }
+extension ClosedRange: PostgresArrayEncodable where Bound: PostgresRangeEncodable & PostgresRangeArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { Bound.psqlRangeArrayType }
 }
 
 // MARK: Array conformances
