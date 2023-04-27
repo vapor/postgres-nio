@@ -181,4 +181,100 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.commandCompletedReceived("SELECT 4"), .wait)
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
+
+    func testCancelQueryAfterServerError() {
+        var state = ConnectionStateMachine.readyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "SELECT version()"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.parseCompleteReceived(), .wait)
+        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+
+        // We need to ensure that even though the row description from the wire says that we
+        // will receive data in `.text` format, we will actually receive it in binary format,
+        // since we requested it in binary with our bind message.
+        let input: [RowDescription.Column] = [
+            .init(name: "version", tableOID: 0, columnAttributeNumber: 0, dataType: .text, dataTypeSize: -1, dataTypeModifier: -1, format: .text)
+        ]
+        let expected: [RowDescription.Column] = input.map {
+            .init(name: $0.name, tableOID: $0.tableOID, columnAttributeNumber: $0.columnAttributeNumber, dataType: $0.dataType,
+                  dataTypeSize: $0.dataTypeSize, dataTypeModifier: $0.dataTypeModifier, format: .binary)
+        }
+
+        XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
+        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
+        let dataRows1: [DataRow] = [
+            [ByteBuffer(string: "test1")],
+            [ByteBuffer(string: "test2")],
+            [ByteBuffer(string: "test3")]
+        ]
+        for row in dataRows1 {
+            XCTAssertEqual(state.dataRowReceived(row), .wait)
+        }
+        XCTAssertEqual(state.channelReadComplete(), .forwardRows(dataRows1))
+        XCTAssertEqual(state.readEventCaught(), .wait)
+        XCTAssertEqual(state.requestQueryRows(), .read)
+        let dataRows2: [DataRow] = [
+            [ByteBuffer(string: "test4")],
+            [ByteBuffer(string: "test5")],
+            [ByteBuffer(string: "test6")]
+        ]
+        for row in dataRows2 {
+            XCTAssertEqual(state.dataRowReceived(row), .wait)
+        }
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "Error", .sqlState: "123"])
+        XCTAssertEqual(state.errorReceived(serverError), .forwardStreamError(.server(serverError), read: false, cleanupContext: .none))
+
+        XCTAssertEqual(state.channelReadComplete(), .wait)
+        XCTAssertEqual(state.readEventCaught(), .read)
+
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+    }
+
+    func testQueryErrorDoesNotKillConnection() {
+        var state = ConnectionStateMachine.readyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "SELECT version()"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.parseCompleteReceived(), .wait)
+        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "Error", .sqlState: "123"])
+        XCTAssertEqual(
+            state.errorReceived(serverError), .failQuery(queryContext, with: .server(serverError), cleanupContext: .none)
+        )
+
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+    }
+
+    func testQueryErrorAfterCancelDoesNotKillConnection() {
+        var state = ConnectionStateMachine.readyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "SELECT version()"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.parseCompleteReceived(), .wait)
+        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+        XCTAssertEqual(state.cancelQueryStream(), .failQuery(queryContext, with: .queryCancelled, cleanupContext: .none))
+
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "Error", .sqlState: "123"])
+        XCTAssertEqual(state.errorReceived(serverError), .wait)
+
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+    }
+
 }

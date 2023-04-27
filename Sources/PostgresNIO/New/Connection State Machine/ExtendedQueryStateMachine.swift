@@ -32,7 +32,9 @@ struct ExtendedQueryStateMachine {
         case failQuery(ExtendedQueryContext, with: PSQLError)
         case succeedQuery(ExtendedQueryContext, columns: [RowDescription.Column])
         case succeedQueryNoRowsComming(ExtendedQueryContext, commandTag: String)
-        
+
+        case evaluateErrorAtConnectionLevel(PSQLError)
+
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
         case forwardRows([DataRow])
@@ -422,11 +424,15 @@ struct ExtendedQueryStateMachine {
              .noDataMessageReceived(let context),
              .bindCompleteReceived(let context):
             self.state = .error(error)
-            return .failQuery(context, with: error)
+            if self.isCancelled {
+                return .evaluateErrorAtConnectionLevel(error)
+            } else {
+                return .failQuery(context, with: error)
+            }
 
         case .drain:
             self.state = .error(error)
-            return .forwardStreamError(error, read: false)
+            return .evaluateErrorAtConnectionLevel(error)
             
         case .streaming(_, var streamStateMachine):
             self.state = .error(error)
