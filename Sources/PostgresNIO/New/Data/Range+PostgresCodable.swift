@@ -18,7 +18,7 @@ public protocol PostgresRangeDecodable: PostgresDecodable {
 
     /// Postgres does not store any bound values for empty ranges,
     /// but Swift requires a value to initialize an empty Range<Bound>.
-    static var defaultBoundValueForEmptyRange: Self { get }
+    static var valueForEmptyRange: Self { get }
 }
 
 /// A type that can be encoded into a Postgres range array type where it is the bound type
@@ -33,7 +33,7 @@ extension FixedWidthInteger {
         return self - 1
     }
 
-    public static var defaultBoundValueForEmptyRange: Self {
+    public static var valueForEmptyRange: Self {
         return .zero
     }
 }
@@ -105,8 +105,8 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
         let isEmpty: Bool = flags & _isEmpty != 0
         if isEmpty {
             self = PostgresRange<B>(
-                lowerBound: B.defaultBoundValueForEmptyRange,
-                upperBound: B.defaultBoundValueForEmptyRange,
+                lowerBound: B.valueForEmptyRange,
+                upperBound: B.valueForEmptyRange,
                 isLowerBoundInclusive: true,
                 isUpperBoundInclusive: false
             )

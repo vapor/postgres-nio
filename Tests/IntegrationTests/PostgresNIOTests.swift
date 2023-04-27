@@ -389,7 +389,7 @@ final class PostgresNIOTests: XCTestCase {
         """).wait())
         XCTAssertEqual(results?.count, 1)
         let row = results?.first?.makeRandomAccess()
-        let expectedRange: Range<Int32> = Int32.defaultBoundValueForEmptyRange..<Int32.defaultBoundValueForEmptyRange
+        let expectedRange: Range<Int32> = Int32.valueForEmptyRange..<Int32.valueForEmptyRange
         let decodedRange = try row?.decode(column: "range", as: Range<Int32>.self, context: .default)
         XCTAssertEqual(decodedRange, expectedRange)
 
@@ -446,7 +446,7 @@ final class PostgresNIOTests: XCTestCase {
         """).wait())
         XCTAssertEqual(results?.count, 1)
         let row = results?.first?.makeRandomAccess()
-        let expectedRange: Range<Int64> = Int64.defaultBoundValueForEmptyRange..<Int64.defaultBoundValueForEmptyRange
+        let expectedRange: Range<Int64> = Int64.valueForEmptyRange..<Int64.valueForEmptyRange
         let decodedRange = try row?.decode(column: "range", as: Range<Int64>.self, context: .default)
         XCTAssertEqual(decodedRange, expectedRange)
 
@@ -875,7 +875,7 @@ final class PostgresNIOTests: XCTestCase {
             var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
             let row: PostgresRow? = try await rowIterator?.next()
             let decodedEmptyRange: Range<Int32>? = try row?.decode(Range<Int32>.self, context: .default)
-            let expectedRange: Range<Int32> = Int32.defaultBoundValueForEmptyRange..<Int32.defaultBoundValueForEmptyRange
+            let expectedRange: Range<Int32> = Int32.valueForEmptyRange..<Int32.valueForEmptyRange
             XCTAssertNotEqual(emptyRange, expectedRange)
             XCTAssertEqual(expectedRange, decodedEmptyRange)
         }
@@ -925,7 +925,7 @@ final class PostgresNIOTests: XCTestCase {
             var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
             let row: PostgresRow? = try await rowIterator?.next()
             let decodedEmptyRange: Range<Int64>? = try row?.decode(Range<Int64>.self, context: .default)
-            let expectedRange: Range<Int64> = Int64.defaultBoundValueForEmptyRange..<Int64.defaultBoundValueForEmptyRange
+            let expectedRange: Range<Int64> = Int64.valueForEmptyRange..<Int64.valueForEmptyRange
             XCTAssertNotEqual(emptyRange, expectedRange)
             XCTAssertEqual(expectedRange, decodedEmptyRange)
         }
