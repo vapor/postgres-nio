@@ -262,7 +262,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             
         case .forwardStreamComplete(let buffer, let commandTag):
             guard let rowStream = self.rowStream else {
-                // if the stream was cancelled we don't have it here anymore.
+                // If the stream was cancelled, we don't have it here anymore.
                 return
             }
             self.rowStream = nil
@@ -273,9 +273,11 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             
             
         case .forwardStreamError(let error, let read, let cleanupContext):
-            let rowStream = self.rowStream!
-            self.rowStream = nil
-            rowStream.receive(completion: .failure(error))
+            if let rowStream = self.rowStream {
+                // If the error case was reentered, the stream might already be gone.
+                self.rowStream = nil
+                rowStream.receive(completion: .failure(error))
+            }
             if let cleanupContext = cleanupContext {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             } else if read {
