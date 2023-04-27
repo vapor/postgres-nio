@@ -36,13 +36,45 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 
         try await withTestConnection(on: eventLoop) { connection in
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
-            var counter = 1
+            var counter = 0
             for try await element in rows.decode(Int.self, context: .default) {
-                XCTAssertEqual(element, counter)
+                XCTAssertEqual(element, counter + 1)
                 counter += 1
             }
 
-            XCTAssertEqual(counter, end + 1)
+            XCTAssertEqual(counter, end)
+        }
+    }
+
+    func testSelectTimeoutWhileLongRunningQuery() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let start = 1
+        let end = 10000000
+
+        try await withTestConnection(on: eventLoop) { connection -> () in
+            try await connection.query("SET statement_timeout=1000;", logger: .psqlTest)
+
+            let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
+            var counter = 0
+            do {
+                for try await element in rows.decode(Int.self, context: .default) {
+                    XCTAssertEqual(element, counter + 1)
+                    counter += 1
+                }
+                XCTFail("Expected to get cancelled while reading the query")
+            } catch {
+                guard let error = error as? PSQLError else { return XCTFail("Unexpected error type") }
+
+                print(error)
+
+                XCTAssertEqual(error.code, .server)
+                XCTAssertEqual(error.serverInfo?[.severity], "ERROR")
+            }
+
+            XCTAssertFalse(connection.isClosed, "Connection should survive!")
         }
     }
 
