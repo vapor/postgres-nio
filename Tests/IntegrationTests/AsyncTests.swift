@@ -215,13 +215,16 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
+        // we cancel the query after 400ms.
+        // the server times out the query after 1sec.
+
         try await withTestConnection(on: eventLoop) { connection -> () in
-            try await connection.query("SET statement_timeout=1000;", logger: .psqlTest)
+            try await connection.query("SET statement_timeout=1000;", logger: .psqlTest) // 1000 milliseconds
 
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     let start = 1
-                    let end = 10000000000
+                    let end = 100_000_000
 
                     let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
                     var counter = 0
@@ -231,8 +234,11 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                             counter += 1
                         }
                         XCTFail("Expected to get cancelled while reading the query")
-                    } catch is CancellationError {
+                        XCTAssertEqual(counter, end)
+                    } catch let error as CancellationError {
+                        XCTAssertGreaterThanOrEqual(counter, 1)
                         // Expected
+                        print("\(error)")
                     } catch {
                         XCTFail("Unexpected error: \(error)")
                     }
@@ -241,7 +247,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                     XCTAssertFalse(connection.isClosed, "Connection should survive!")
                 }
 
-                let delay = UInt64(0.2 * 1_000_000_000)
+                let delay: UInt64 = 400_000_000 // 400 milliseconds
                 try await Task.sleep(nanoseconds: delay)
 
                 group.cancelAll()
