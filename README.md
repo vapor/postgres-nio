@@ -1,4 +1,9 @@
-<img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/72786/235198640-0a4d6ebe-a04e-48a6-8d71-9988093a3c55.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png">
+  <img src="https://user-images.githubusercontent.com/1342803/59061804-5548e280-8872-11e9-819f-14f19f16fcb6.png" height="64" alt="PostgresNIO">
+</picture>
 
 [![SSWG Incubating Badge](https://img.shields.io/badge/sswg-incubating-green.svg)][SSWG Incubation]
 [![Documentation](http://img.shields.io/badge/read_the-docs-2196f3.svg)][Documentation]
