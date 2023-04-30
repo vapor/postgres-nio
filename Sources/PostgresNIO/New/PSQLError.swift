@@ -476,3 +476,23 @@ extension PostgresDecodingError: CustomStringConvertible {
         "Database error"
     }
 }
+
+extension PostgresDecodingError: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        var result = #"PostgresDecodingError(code: \#(self.code)"#
+        
+        result.append(#", columnName: \#(self.columnName)"#)
+        result.append(#", columnIndex: \#(self.columnIndex)"#)
+        result.append(#", targetType: \#(self.targetType)"#)
+        result.append(#", postgresType: \#(self.postgresType)"#)
+        result.append(#", postgresFormat: \#(self.postgresFormat)"#)
+        if let postgresData = self.postgresData {
+            result.append(#", postgresData: \#(postgresData)"#)
+        }
+        result.append(#", file: \#(self.file), line: \#(self.line)"#)
+        result.append(")")
+
+        return result
+    }
+}
+
