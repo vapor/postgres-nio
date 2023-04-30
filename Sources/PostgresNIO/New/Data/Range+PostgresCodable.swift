@@ -31,7 +31,7 @@ public protocol PostgresRangeArrayDecodable: PostgresRangeDecodable {}
 
 // MARK: Bound conformances
 
-extension FixedWidthInteger {
+extension FixedWidthInteger where Self: PostgresRangeDecodable {
     public func upperBoundExclusiveToUpperBoundInclusive() -> Self {
         return self - 1
     }
