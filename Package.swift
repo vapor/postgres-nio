@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.1.0"),
-        .package(url: "https://github.com/apple/swift-nio.git", branch: "main"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.51.1"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.16.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.23.1"),
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "3.0.0"),
