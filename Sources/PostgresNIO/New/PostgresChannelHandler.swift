@@ -273,9 +273,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             
             
         case .forwardStreamError(let error, let read, let cleanupContext):
-            let rowStream = self.rowStream!
+            self.rowStream!.receive(completion: .failure(error))
             self.rowStream = nil
-            rowStream.receive(completion: .failure(error))
             if let cleanupContext = cleanupContext {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             } else if read {
@@ -512,7 +511,6 @@ extension PostgresChannelHandler: PSQLRowsDataSource {
         guard self.rowStream === stream, let handlerContext = self.handlerContext else {
             return
         }
-        // we ignore this right now :)
         let action = self.state.cancelQueryStream()
         self.run(action, with: handlerContext)
     }

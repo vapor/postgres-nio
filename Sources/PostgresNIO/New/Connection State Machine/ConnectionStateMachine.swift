@@ -841,7 +841,7 @@ struct ConnectionStateMachine {
     // MARK: Consumer
     
     mutating func cancelQueryStream() -> ConnectionAction {
-        guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
             preconditionFailure("Tried to cancel stream without active query")
         }
 
@@ -926,6 +926,8 @@ struct ConnectionStateMachine {
                  .wait,
                  .read:
                 preconditionFailure("Expecting only failure actions if an error happened")
+            case .evaluateErrorAtConnectionLevel:
+                return .closeConnectionAndCleanup(cleanupContext)
             case .failQuery(let queryContext, with: let error):
                 return .failQuery(queryContext, with: error, cleanupContext: cleanupContext)
             case .forwardStreamError(let error, let read):
@@ -1169,6 +1171,12 @@ extension ConnectionStateMachine {
         case .forwardStreamError(let error, let read):
             let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
             return .forwardStreamError(error, read: read, cleanupContext: cleanupContext)
+
+        case .evaluateErrorAtConnectionLevel(let error):
+            if let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error) {
+                return .closeConnectionAndCleanup(cleanupContext)
+            }
+            return .wait
         case .read:
             return .read
         case .wait:
