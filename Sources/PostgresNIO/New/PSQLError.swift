@@ -393,7 +393,7 @@ public struct PSQLError: Error {
 
 /// An error that may happen when a ``PostgresRow`` or ``PostgresCell`` is decoded to native Swift types.
 public struct PostgresDecodingError: Error, Equatable {
-    public struct Code: Hashable, Error {
+    public struct Code: Hashable, Error, CustomStringConvertible {
         enum Base {
             case missingData
             case typeMismatch
@@ -409,6 +409,17 @@ public struct PostgresDecodingError: Error, Equatable {
         public static let missingData = Self.init(.missingData)
         public static let typeMismatch = Self.init(.typeMismatch)
         public static let failure = Self.init(.failure)
+        
+        public var description: String {
+            switch self.base {
+            case .missingData:
+                return "missingData"
+            case .typeMismatch:
+                return "typeMismatch"
+            case .failure:
+                return "failure"
+            }
+        }
     }
 
     /// The decoding error code
@@ -476,3 +487,24 @@ extension PostgresDecodingError: CustomStringConvertible {
         "Database error"
     }
 }
+
+extension PostgresDecodingError: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        var result = #"PostgresDecodingError(code: \#(self.code)"#
+        
+        result.append(#", columnName: \#(String(reflecting: self.columnName))"#)
+        result.append(#", columnIndex: \#(self.columnIndex)"#)
+        result.append(#", targetType: \#(String(reflecting: self.targetType))"#)
+        result.append(#", postgresType: \#(self.postgresType)"#)
+        result.append(#", postgresFormat: \#(self.postgresFormat)"#)
+        if let postgresData = self.postgresData {
+            result.append(#", postgresData: \#(postgresData.debugDescription)"#) // https://github.com/apple/swift-nio/pull/2418
+        }
+        result.append(#", file: \#(self.file)"#)
+        result.append(#", line: \#(self.line)"#)
+        result.append(")")
+
+        return result
+    }
+}
+
