@@ -26,9 +26,6 @@ jobs:
           # https://github.com/apple/swift-package-manager/issues/5853
           - container: swift:5.8-jammy
             coverage: false
-          # https://github.com/apple/swift/issues/65064
-          - container: swiftlang/swift:nightly-main-jammy
-            coverage: false
     container: ${{ matrix.container }}
     runs-on: ubuntu-latest
     env:
@@ -181,15 +178,3 @@ jobs:
       run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
     - name: API breaking changes
       run: swift package diagnose-api-breaking-changes origin/main
-
-  test-exports:
-    name: Test exports
-    runs-on: ubuntu-latest
-    container: swift:5.8-jammy
-    steps:
-      - name: Check out package
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Build
-        run: swift build -Xswiftc -DBUILDING_DOCC

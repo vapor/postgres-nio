@@ -4,7 +4,7 @@
 @_documentation(visibility: internal) @_exported import NIOSSL
 @_documentation(visibility: internal) @_exported import struct Logging.Logger
 
-#elseif !BUILDING_DOCC
+#else
 
 // TODO: Remove this with the next major release!
 @_exported import NIO
