@@ -34,7 +34,7 @@ final class PostgresDecodingErrorTests: XCTestCase {
     }
 
     func testPostgresDecodingErrorDescription() {
-        let error = PostgresDecodingError(
+        let error1 = PostgresDecodingError(
             code: .typeMismatch,
             columnName: "column",
             columnIndex: 0,
@@ -46,6 +46,39 @@ final class PostgresDecodingErrorTests: XCTestCase {
             line: 123
         )
 
-        XCTAssertEqual("\(error)", "Database error")
+        let error2 = PostgresDecodingError(
+            code: .missingData,
+            columnName: "column",
+            columnIndex: 0,
+            targetType: [[String: String]].self,
+            postgresType: .jsonbArray,
+            postgresFormat: .binary,
+            postgresData: nil,
+            file: "bar.swift",
+            line: 123
+        )
+
+        // Plain description
+        XCTAssertEqual(String(describing: error1), "Database error")
+        XCTAssertEqual(String(describing: error2), "Database error")
+        
+        // Extended debugDescription
+        XCTAssertEqual(String(reflecting: error1), """
+            PostgresDecodingError(code: typeMismatch,\
+             columnName: "column", columnIndex: 0,\
+             targetType: Swift.String,\
+             postgresType: TEXT, postgresFormat: binary,\
+             postgresData: \(error1.postgresData?.debugDescription ?? "nil"),\
+             file: foo.swift, line: 123\
+            )
+            """)
+        XCTAssertEqual(String(reflecting: error2), """
+            PostgresDecodingError(code: missingData,\
+             columnName: "column", columnIndex: 0,\
+             targetType: Swift.Array<Swift.Dictionary<Swift.String, Swift.String>>,\
+             postgresType: JSONB[], postgresFormat: binary,\
+             file: bar.swift, line: 123\
+            )
+            """)
     }
 }
