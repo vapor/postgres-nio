@@ -5,8 +5,7 @@ on:
     types: [reopened, closed, labeled, unlabeled, assigned, unassigned]
 
 jobs:
-  manage_project_issues:
-    uses: vapor/ci/.github/workflows/issues-to-project-board.yml@reusable-workflows
-    with:
-      labelsJson: ${{ toJSON(github.event.issue.labels.*.name || []) }}
+  update_project_boards:
+    name: Update project boards
+    uses: vapor/ci/.github/workflows/update-project-boards-for-issue.yml@reusable-workflows
     secrets: inherit
