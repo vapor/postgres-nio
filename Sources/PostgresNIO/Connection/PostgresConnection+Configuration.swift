@@ -4,12 +4,12 @@ import NIOSSL
 
 extension PostgresConnection {
     /// A configuration object for a connection
-    public struct Configuration {
-    
+    public struct Configuration: Sendable {
+
         // MARK: - TLS
         
         /// The possible modes of operation for TLS encapsulation of a connection.
-        public struct TLS {
+        public struct TLS: Sendable {
             // MARK: Initializers
             
             /// Do not try to create a TLS connection to the server.
@@ -63,7 +63,7 @@ extension PostgresConnection {
         // MARK: - Connection options
         
         /// Describes options affecting how the underlying connection is made.
-        public struct Options {
+        public struct Options: Sendable {
             /// A timeout for connection attempts. Defaults to ten seconds.
             ///
             /// Ignored when using a preexisting communcation channel. (See
@@ -85,7 +85,11 @@ extension PostgresConnection {
             /// This property is provided for compatibility with Amazon RDS Proxy, which requires it to be `false`.
             /// If you are not using Amazon RDS Proxy, you should leave this set to `true` (the default).
             public var requireBackendKeyData: Bool
-            
+
+            /// Additional parameters to send to the server on startup. The name value pairs are added to the initial
+            /// startup message that the client sends to the server.
+            public var additionalStartupParameters: [(String, String)]
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -93,6 +97,7 @@ extension PostgresConnection {
                 self.connectTimeout = .seconds(10)
                 self.tlsServerName = nil
                 self.requireBackendKeyData = true
+                self.additionalStartupParameters = []
             }
         }
         

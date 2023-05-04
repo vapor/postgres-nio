@@ -25,7 +25,7 @@ struct PostgresFrontendMessageEncoder {
         self.buffer = buffer
     }
 
-    mutating func startup(user: String, database: String?) {
+    mutating func startup(user: String, database: String?, options: [(String, String)]) {
         self.clearIfNeeded()
         self.buffer.psqlLengthPrefixed { buffer in
             buffer.writeInteger(Self.startupVersionThree)
@@ -35,6 +35,11 @@ struct PostgresFrontendMessageEncoder {
             if let database = database {
                 buffer.writeNullTerminatedString("database")
                 buffer.writeNullTerminatedString(database)
+            }
+
+            for (key, value) in options {
+                buffer.writeNullTerminatedString(key)
+                buffer.writeNullTerminatedString(value)
             }
 
             buffer.writeInteger(UInt8(0))

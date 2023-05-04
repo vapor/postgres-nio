@@ -39,8 +39,8 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
             case 196608:
                 var user: String?
                 var database: String?
-                var options: String?
-                
+                var options = [(String, String)]()
+
                 while let name = messageSlice.readNullTerminatedString(), messageSlice.readerIndex < finalIndex {
                     let value = messageSlice.readNullTerminatedString()
                     
@@ -51,11 +51,10 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
                     case "database":
                         database = value
                         
-                    case "options":
-                        options = value
-                        
                     default:
-                        break
+                        if let value = value {
+                            options.append((name, value))
+                        }
                     }
                 }
                 

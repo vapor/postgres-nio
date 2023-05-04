@@ -37,9 +37,8 @@ class PostgresChannelHandlerTests: XCTestCase {
         
         XCTAssertEqual(startup.parameters.user, config.username)
         XCTAssertEqual(startup.parameters.database, config.database)
-        XCTAssertEqual(startup.parameters.options, nil)
-        XCTAssertEqual(startup.parameters.replication, .false)
-        
+        XCTAssert(startup.parameters.options.isEmpty)
+
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.ok)))
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678))))
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.readyForQuery(.idle)))
@@ -209,7 +208,7 @@ class PostgresChannelHandlerTests: XCTestCase {
 
         XCTAssertEqual(startup.parameters.user, config.username)
         XCTAssertEqual(startup.parameters.database, config.database)
-        XCTAssertEqual(startup.parameters.options, nil)
+        XCTAssert(startup.parameters.options.isEmpty)
         XCTAssertEqual(startup.parameters.replication, .false)
 
         var buffer = ByteBuffer()
@@ -282,7 +281,7 @@ extension AuthContext {
         PostgresFrontendMessage.Startup.Parameters(
             user: self.username,
             database: self.database,
-            options: nil,
+            options: self.additionalParameters,
             replication: .false
         )
     }

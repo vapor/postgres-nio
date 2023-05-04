@@ -103,7 +103,7 @@ enum PostgresFrontendMessage: Equatable {
         static let requestCode: Int32 = 80877103
     }
 
-    struct Startup: Hashable {
+    struct Startup: Equatable {
         static let versionThree: Int32 = 0x00_03_00_00
 
         /// Creates a `Startup` with "3.0" as the protocol version.
@@ -119,7 +119,7 @@ enum PostgresFrontendMessage: Equatable {
         /// The protocol version number is followed by one or more pairs of parameter
         /// name and value strings. A zero byte is required as a terminator after
         /// the last name/value pair. `user` is required, others are optional.
-        struct Parameters: Hashable {
+        struct Parameters: Equatable {
             enum Replication {
                 case `true`
                 case `false`
@@ -136,12 +136,33 @@ enum PostgresFrontendMessage: Equatable {
             /// of setting individual run-time parameters.) Spaces within this string are
             /// considered to separate arguments, unless escaped with a
             /// backslash (\); write \\ to represent a literal backslash.
-            var options: String?
+            var options: [(String, String)]
 
             /// Used to connect in streaming replication mode, where a small set of
             /// replication commands can be issued instead of SQL statements. Value
             /// can be true, false, or database, and the default is false.
             var replication: Replication
+
+            static func ==(lhs: Self, rhs: Self) -> Bool {
+                guard lhs.user == rhs.user
+                        && lhs.database == rhs.database
+                        && lhs.replication == rhs.replication
+                        && lhs.options.count == rhs.options.count
+                else {
+                    return false
+                }
+
+                var lhsIterator = lhs.options.makeIterator()
+                var rhsIterator = rhs.options.makeIterator()
+
+                while let lhsNext = lhsIterator.next(), let rhsNext = rhsIterator.next() {
+                    guard lhsNext.0 == rhsNext.0 && lhsNext.1 == rhsNext.1 else {
+                        return false
+                    }
+                }
+                return true
+            }
+
         }
 
         var parameters: Parameters
