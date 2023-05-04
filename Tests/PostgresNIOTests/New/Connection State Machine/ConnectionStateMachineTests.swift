@@ -19,20 +19,27 @@ class ConnectionStateMachineTests: XCTestCase {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
-        XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
+        XCTAssertEqual(state.sslSupportedReceived(unprocessedBytes: 0), .establishSSLConnection)
         XCTAssertEqual(state.sslHandlerAdded(), .wait)
         XCTAssertEqual(state.sslEstablished(), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
         let salt: (UInt8, UInt8, UInt8, UInt8) = (0,1,2,3)
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
     }
-    
+
+    func testSSLStartupFailureTooManyBytesRemaining() {
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
+        XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
+        let failError = PSQLError.receivedUnencryptedDataAfterSSLRequest
+        XCTAssertEqual(state.sslSupportedReceived(unprocessedBytes: 1), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
+    }
+
     func testSSLStartupFailHandler() {
         struct SSLHandlerAddError: Error, Equatable {}
         
         var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
-        XCTAssertEqual(state.sslSupportedReceived(), .establishSSLConnection)
+        XCTAssertEqual(state.sslSupportedReceived(unprocessedBytes: 0), .establishSSLConnection)
         let failError = PSQLError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
         XCTAssertEqual(state.errorHappened(failError), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }

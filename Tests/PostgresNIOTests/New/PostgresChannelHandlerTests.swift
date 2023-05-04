@@ -77,7 +77,44 @@ class PostgresChannelHandlerTests: XCTestCase {
         XCTAssertEqual(startupMessage.parameters.database, config.database)
         XCTAssertEqual(startupMessage.parameters.replication, .false)
     }
-    
+
+    func testEstablishSSLCallbackIsNotCalledIfSSLIsSupportedButAnotherMEssageIsSentAsWell() {
+        var config = self.testConnectionConfiguration()
+        XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
+        var addSSLCallbackIsHit = false
+        let handler = PostgresChannelHandler(configuration: config) { channel in
+            addSSLCallbackIsHit = true
+        }
+        let eventHandler = TestEventHandler()
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+            handler,
+            eventHandler
+        ])
+
+        var maybeMessage: PostgresFrontendMessage?
+        XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
+        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
+        guard case .sslRequest(let request) = maybeMessage else {
+            return XCTFail("Unexpected message")
+        }
+
+        XCTAssertEqual(request.code, 80877103)
+
+        var responseBuffer = ByteBuffer()
+        responseBuffer.writeInteger(UInt8(ascii: "S"))
+        responseBuffer.writeInteger(UInt8(ascii: "1"))
+        XCTAssertNoThrow(try embedded.writeInbound(responseBuffer))
+
+        XCTAssertFalse(addSSLCallbackIsHit)
+
+        // the event handler should have seen an error
+        XCTAssertEqual(eventHandler.errors.count, 1)
+
+        // the connections should be closed
+        XCTAssertFalse(embedded.isActive)
+    }
+
     func testSSLUnsupportedClosesConnection() throws {
         let config = self.testConnectionConfiguration(tls: .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         

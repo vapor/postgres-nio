@@ -7,6 +7,7 @@ public struct PSQLError: Error {
         enum Base: Sendable, Hashable {
             case sslUnsupported
             case failedToAddSSLHandler
+            case receivedUnencryptedDataAfterSSLRequest
             case server
             case messageDecodingFailure
             case unexpectedBackendMessage
@@ -31,6 +32,7 @@ public struct PSQLError: Error {
 
         public static let sslUnsupported = Self.init(.sslUnsupported)
         public static let failedToAddSSLHandler = Self(.failedToAddSSLHandler)
+        public static let receivedUnencryptedDataAfterSSLRequest = Self(.receivedUnencryptedDataAfterSSLRequest)
         public static let server = Self(.server)
         public static let messageDecodingFailure = Self(.messageDecodingFailure)
         public static let unexpectedBackendMessage = Self(.unexpectedBackendMessage)
@@ -51,6 +53,8 @@ public struct PSQLError: Error {
                 return "sslUnsupported"
             case .failedToAddSSLHandler:
                 return "failedToAddSSLHandler"
+            case .receivedUnencryptedDataAfterSSLRequest:
+                return "receivedUnencryptedDataAfterSSLRequest"
             case .server:
                 return "server"
             case .messageDecodingFailure:
@@ -342,6 +346,8 @@ public struct PSQLError: Error {
     static var queryCancelled: PSQLError { PSQLError(code: .queryCancelled) }
 
     static var uncleanShutdown: PSQLError { PSQLError(code: .uncleanShutdown) }
+
+    static var receivedUnencryptedDataAfterSSLRequest: PSQLError { PSQLError(code: .receivedUnencryptedDataAfterSSLRequest) }
 
     static func server(_ response: PostgresBackendMessage.ErrorResponse) -> PSQLError {
         var error = PSQLError(code: .server)

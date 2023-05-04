@@ -228,9 +228,12 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func sslSupportedReceived() -> ConnectionAction {
+    mutating func sslSupportedReceived(unprocessedBytes: Int) -> ConnectionAction {
         switch self.state {
         case .sslRequestSent:
+            if unprocessedBytes > 0 {
+                return self.closeConnectionAndCleanup(.receivedUnencryptedDataAfterSSLRequest)
+            }
             self.state = .sslNegotiated
             return .establishSSLConnection
             
@@ -1079,9 +1082,18 @@ extension ConnectionStateMachine {
 extension ConnectionStateMachine {
     func shouldCloseConnection(reason error: PSQLError) -> Bool {
         switch error.code.base {
-        case .sslUnsupported:
-            return true
-        case .failedToAddSSLHandler:
+        case .failedToAddSSLHandler,
+             .receivedUnencryptedDataAfterSSLRequest,
+             .sslUnsupported,
+             .messageDecodingFailure,
+             .unexpectedBackendMessage,
+             .unsupportedAuthMechanism,
+             .authMechanismRequiresPassword,
+             .saslError,
+             .tooManyParameters,
+             .invalidCommandTag,
+             .connectionError,
+             .uncleanShutdown:
             return true
         case .queryCancelled:
             return false
@@ -1097,28 +1109,10 @@ extension ConnectionStateMachine {
             }
             
             return false
-        case .messageDecodingFailure:
-            return true
-        case .unexpectedBackendMessage:
-            return true
-        case .unsupportedAuthMechanism:
-            return true
-        case .authMechanismRequiresPassword:
-            return true
-        case .saslError:
-            return true
-        case .tooManyParameters:
-            return true
-        case .invalidCommandTag:
-            return true
         case .connectionQuiescing:
             preconditionFailure("Pure client error, that is thrown directly in PostgresConnection")
         case .connectionClosed:
             preconditionFailure("Pure client error, that is thrown directly and should never ")
-        case .connectionError:
-            return true
-        case .uncleanShutdown:
-            return true
         }
     }
 

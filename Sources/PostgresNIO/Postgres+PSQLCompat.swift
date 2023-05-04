@@ -31,6 +31,8 @@ extension PSQLError {
             return PostgresError.protocol("Unsupported auth scheme: \(message)")
         case .authMechanismRequiresPassword:
             return PostgresError.protocol("Unable to authenticate without password")
+        case .receivedUnencryptedDataAfterSSLRequest:
+            return PostgresError.protocol("Received unencrypted data after SSL request")
         case .saslError:
             return self.underlying ?? self
         case .tooManyParameters, .invalidCommandTag:
