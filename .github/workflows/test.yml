@@ -21,11 +21,6 @@ jobs:
           - swift:5.8-jammy
           - swiftlang/swift:nightly-5.9-jammy
           - swiftlang/swift:nightly-main-jammy
-        include:
-          - coverage: true
-          # https://github.com/apple/swift-package-manager/issues/5853
-          - container: swift:5.8-jammy
-            coverage: false
     container: ${{ matrix.container }}
     runs-on: ubuntu-latest
     env:
@@ -34,19 +29,12 @@ jobs:
       - name: Check out package
         uses: actions/checkout@v3
       - name: Run unit tests with code coverage and Thread Sanitizer
-        shell: bash
-        run: |
-          coverage=$( [[ '${{ matrix.coverage }}' == 'true' ]] && echo -n '--enable-code-coverage' || true )
-          swift test --filter=^PostgresNIOTests --sanitize=thread ${coverage}
+        run: swift test --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
       - name: Submit coverage report to Codecov.io
-        if: ${{ matrix.coverage }}
         uses: vapor/swift-codecov-action@v0.2
         with:
-          cc_flags: 'unittests'
           cc_env_vars: 'SWIFT_VERSION,SWIFT_PLATFORM,RUNNER_OS,RUNNER_ARCH'
-          cc_fail_ci_if_error: true
-          cc_verbose: true
-          cc_dry_run: false
+          cc_fail_ci_if_error: false
 
   linux-integration-and-dependencies:
     if: github.event_name == 'pull_request'
