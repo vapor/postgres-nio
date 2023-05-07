@@ -81,7 +81,7 @@ extension PostgresDecodable {
 }
 
 /// A type that can be encoded into and decoded from a postgres binary format
-typealias PostgresCodable = PostgresEncodable & PostgresDecodable
+public typealias PostgresCodable = PostgresEncodable & PostgresDecodable
 
 extension PostgresEncodable {
     @inlinable
