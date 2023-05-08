@@ -88,6 +88,14 @@ struct PostgresRange<B> {
     }
 }
 
+/// Used by Postgres to represent certain range properties
+@usableFromInline
+struct PostgresRangeFlag {
+    @usableFromInline static let isEmpty: UInt8 = 0x01
+    @usableFromInline static let isLowerBoundInclusive: UInt8 = 0x02
+    @usableFromInline static let isUpperBoundInclusive: UInt8 = 0x04
+}
+
 extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
     @inlinable
     init<JSONDecoder: PostgresJSONDecoder>(
@@ -109,7 +117,7 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
             throw PostgresDecodingError.Code.failure
         }
 
-        let isEmpty: Bool = flags & _isEmpty != 0
+        let isEmpty: Bool = flags & PostgresRangeFlag.isEmpty != 0
         if isEmpty {
             self = PostgresRange<B>(
                 lowerBound: B.valueForEmptyRange,
@@ -138,8 +146,8 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
 
         let upperBound: B = try B(from: &upperBoundBytes, type: boundType, format: format, context: context)
 
-        let isLowerBoundInclusive: Bool = flags & _isLowerBoundInclusive != 0
-        let isUpperBoundInclusive: Bool = flags & _isUpperBoundInclusive != 0
+        let isLowerBoundInclusive: Bool = flags & PostgresRangeFlag.isLowerBoundInclusive != 0
+        let isUpperBoundInclusive: Bool = flags & PostgresRangeFlag.isUpperBoundInclusive != 0
 
         self = PostgresRange<B>(
             lowerBound: lowerBound,
@@ -163,10 +171,10 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
         // flags byte contains certain properties of the range
         var flags: UInt8 = 0
         if self.isLowerBoundInclusive {
-            flags |= _isLowerBoundInclusive
+            flags |= PostgresRangeFlag.isLowerBoundInclusive
         }
         if self.isUpperBoundInclusive {
-            flags |= _isUpperBoundInclusive
+            flags |= PostgresRangeFlag.isUpperBoundInclusive
         }
 
         let boundMemorySize = Int32(MemoryLayout<B>.size)
@@ -297,8 +305,3 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
         self = lowerBound...upperBound
     }
 }
-
-// MARK: Private
-@usableFromInline let _isEmpty: UInt8 = 0x01
-@usableFromInline let _isLowerBoundInclusive: UInt8 = 0x02
-@usableFromInline let _isUpperBoundInclusive: UInt8 = 0x04
