@@ -46,6 +46,44 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testSelectActiveConnection() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let query: PostgresQuery = """
+            SELECT
+                pid
+                ,datname
+                ,usename
+                ,application_name
+                ,client_hostname
+                ,client_port
+                ,backend_start
+                ,query_start
+                ,query
+                ,state
+            FROM pg_stat_activity
+            WHERE state = 'active';
+            """
+
+        try await withTestConnection(on: eventLoop) { connection in
+            let rows = try await connection.query(query, logger: .psqlTest)
+            var counter = 0
+
+            for try await element in rows.decode((Int, String, String, String, String?, Int, Date, Date, String, String).self) {
+                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "localhost")
+                XCTAssertEqual(element.2, env("POSTGRES_USER") ?? "test_username")
+
+                XCTAssertEqual(element.8, query.sql)
+                XCTAssertEqual(element.9, "active")
+                counter += 1
+            }
+
+            XCTAssertGreaterThanOrEqual(counter, 1)
+        }
+    }
+
     func testSelectTimeoutWhileLongRunningQuery() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -273,7 +311,7 @@ extension XCTestCase {
             try await connection.close()
             return result
         } catch {
-            XCTFail("Unexpected error: \(error)", file: file, line: line)
+            XCTFail("Unexpected error: \(String(reflecting: error))", file: file, line: line)
             try await connection.close()
             throw error
         }
