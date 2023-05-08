@@ -74,7 +74,7 @@ struct PostgresRange<B> {
     @usableFromInline let isLowerBoundInclusive: Bool
     @usableFromInline let isUpperBoundInclusive: Bool
 
-    @usableFromInline
+    @inlinable
     init(
         lowerBound: B?,
         upperBound: B?,
