@@ -44,13 +44,13 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Value) throws {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresEncodable>(_ value: Optional<Value>) throws {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Optional<Value>) throws {
             switch value {
             case .none:
                 self.binds.appendNull()
@@ -62,13 +62,15 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresNonThrowingEncodable>(_ value: Value) {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeNonThrowingEncodable>(_ value: Value) {
             self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresNonThrowingEncodable>(_ value: Optional<Value>) {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeNonThrowingEncodable>(
+            _ value: Optional<Value>
+        ) {
             switch value {
             case .none:
                 self.binds.appendNull()
@@ -80,19 +82,7 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeThrowingEncodable>(_ value: Value) throws {
-            try self.binds.append(value, context: .default)
-            self.sql.append(contentsOf: "$\(self.binds.count)")
-        }
-
-        @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeNonThrowingEncodable>(_ value: Value) {
-            self.binds.append(value, context: .default)
-            self.sql.append(contentsOf: "$\(self.binds.count)")
-        }
-
-        @inlinable
-        public mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PostgresEncodingContext<JSONEncoder>
         ) throws {
@@ -131,12 +121,7 @@ public struct PostgresBindings: Sendable, Hashable {
         }
 
         @inlinable
-        init<Value: PostgresEncodable>(value: Value) {
-            self.init(dataType: Value.psqlType, format: Value.psqlFormat)
-        }
-
-        @inlinable
-        init<Value: PostgresDynamicTypeThrowingEncodable>(value: Value) {
+        init<Value: PostgresDynamicTypeEncodable>(value: Value) {
             self.init(dataType: value.psqlType, format: value.psqlFormat)
         }
     }
@@ -168,25 +153,7 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
-    public mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
-        _ value: Value,
-        context: PostgresEncodingContext<JSONEncoder>
-    ) throws {
-        try value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(value: value))
-    }
-
-    @inlinable
-    public mutating func append<Value: PostgresNonThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
-        _ value: Value,
-        context: PostgresEncodingContext<JSONEncoder>
-    ) {
-        value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(value: value))
-    }
-
-    @inlinable
-    public mutating func append<Value: PostgresDynamicTypeThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
+    public mutating func append<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {

@@ -3,7 +3,7 @@ import class Foundation.JSONEncoder
 import class Foundation.JSONDecoder
 
 /// A type that can encode itself to a postgres wire binary representation.
-public protocol PostgresEncodable {
+public protocol PostgresEncodable: PostgresDynamicTypeEncodable {
     // TODO: Rename to `PostgresThrowingEncodable` with next major release
 
     /// Identifies the data type that we will encode into `byteBuffer` in `encode`
@@ -23,7 +23,7 @@ public protocol PostgresEncodable {
 /// A type that can encode itself to a Postgres wire binary representation.
 /// Dynamic types are types that are not known at compile time. For example, a custom type that is created
 /// at runtime.
-public protocol PostgresDynamicTypeThrowingEncodable {
+public protocol PostgresDynamicTypeEncodable {
     /// Identifies the data type that we will encode into `byteBuffer` in `encode`
     ///
     /// This is not static because the type is not known at compile time.
@@ -45,7 +45,7 @@ public protocol PostgresDynamicTypeThrowingEncodable {
 /// ``PostgresEncodable/encode(into:context:)-1jkcp`` does not throw. This allows users
 /// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without
 /// having to spell `try`.
-public protocol PostgresNonThrowingEncodable: PostgresEncodable {
+public protocol PostgresNonThrowingEncodable: PostgresEncodable, PostgresDynamicTypeNonThrowingEncodable {
     // TODO: Rename to `PostgresEncodable` with next major release
 
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>)
@@ -55,9 +55,9 @@ public protocol PostgresNonThrowingEncodable: PostgresEncodable {
 /// Dynamic types are types that are not known at compile time. For example, a custom type that is created
 /// at runtime.
 ///
-/// This is the non-throwing alternative to ``PostgresDynamicTypeThrowingEncodable``. It allows users
+/// This is the non-throwing alternative to ``PostgresDynamicTypeEncodable``. It allows users
 /// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without having to spell `try`.
-public protocol PostgresDynamicTypeNonThrowingEncodable: PostgresDynamicTypeThrowingEncodable {
+public protocol PostgresDynamicTypeNonThrowingEncodable: PostgresDynamicTypeEncodable {
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the ``PostgresBindings``.
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -123,6 +123,16 @@ extension PostgresDecodable {
 public typealias PostgresCodable = PostgresEncodable & PostgresDecodable
 
 extension PostgresEncodable {
+    public var psqlType: PostgresDataType { Self.psqlType }
+    public var psqlFormat: PostgresFormat { Self.psqlFormat }
+}
+
+extension PostgresNonThrowingEncodable {
+    public var psqlType: PostgresDataType { Self.psqlType }
+    public var psqlFormat: PostgresFormat { Self.psqlFormat }
+}
+
+extension PostgresEncodable {
     @inlinable
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
@@ -162,7 +172,7 @@ extension PostgresNonThrowingEncodable {
     }
 }
 
-extension PostgresDynamicTypeThrowingEncodable {
+extension PostgresDynamicTypeEncodable {
     @inlinable
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
