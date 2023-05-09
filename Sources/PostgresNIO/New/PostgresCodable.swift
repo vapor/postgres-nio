@@ -40,8 +40,6 @@ public protocol PostgresDynamicTypeThrowingEncodable {
 /// having to spell `try`.
 public protocol PostgresNonThrowingEncodable: PostgresEncodable, PostgresDynamicTypeEncodable {
     // TODO: Rename to `PostgresEncodable` with next major release
-
-    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>)
 }
 
 /// A type that can encode itself to a Postgres wire binary representation.
