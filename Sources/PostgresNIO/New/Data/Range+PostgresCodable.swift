@@ -191,6 +191,9 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
     }
 }
 
+extension PostgresRange: PostgresDynamicTypeEncodable where B: PostgresRangeEncodable {}
+extension PostgresRange: PostgresDynamicTypeThrowingEncodable where B: PostgresRangeEncodable {}
+
 extension PostgresRange where B: Comparable {
     @inlinable
     init(range: Range<B>) {
@@ -226,6 +229,9 @@ extension Range: PostgresEncodable where Bound: PostgresRangeEncodable {
 }
 
 extension Range: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
+
+extension Range: PostgresDynamicTypeThrowingEncodable where Bound: PostgresRangeEncodable {}
+extension Range: PostgresDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
 
 extension Range: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
@@ -271,6 +277,9 @@ extension ClosedRange: PostgresEncodable where Bound: PostgresRangeEncodable {
 }
 
 extension ClosedRange: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
+
+extension ClosedRange: PostgresDynamicTypeThrowingEncodable where Bound: PostgresRangeEncodable {}
+extension ClosedRange: PostgresDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
 
 extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
