@@ -44,13 +44,13 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value) throws {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeThrowingEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Optional<Value>) throws {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeThrowingEncodable>(_ value: Optional<Value>) throws {
             switch value {
             case .none:
                 self.binds.appendNull()
@@ -62,13 +62,13 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeNonThrowingEncodable>(_ value: Value) {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value) {
             self.binds.append(value, context: .default)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeNonThrowingEncodable>(
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(
             _ value: Optional<Value>
         ) {
             switch value {
@@ -82,7 +82,7 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PostgresEncodingContext<JSONEncoder>
         ) throws {
@@ -121,7 +121,7 @@ public struct PostgresBindings: Sendable, Hashable {
         }
 
         @inlinable
-        init<Value: PostgresDynamicTypeEncodable>(value: Value) {
+        init<Value: PostgresDynamicTypeThrowingEncodable>(value: Value) {
             self.init(dataType: value.psqlType, format: value.psqlFormat)
         }
     }
@@ -153,7 +153,7 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
-    public mutating func append<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
+    public mutating func append<Value: PostgresDynamicTypeThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
@@ -162,7 +162,7 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
-    public mutating func append<Value: PostgresDynamicTypeNonThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
+    public mutating func append<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PostgresEncodingContext<JSONEncoder>
     ) {

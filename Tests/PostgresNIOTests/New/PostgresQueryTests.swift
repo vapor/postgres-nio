@@ -109,7 +109,7 @@ final class PostgresQueryTests: XCTestCase {
 }
 
 extension PostgresQueryTests {
-    struct DynamicString: PostgresDynamicTypeNonThrowingEncodable {
+    struct DynamicString: PostgresDynamicTypeEncodable {
         let value: String
 
         var psqlType: PostgresDataType

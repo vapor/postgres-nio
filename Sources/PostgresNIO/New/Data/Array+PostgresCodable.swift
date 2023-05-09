@@ -161,8 +161,8 @@ extension Array: PostgresNonThrowingEncodable where Element: PostgresArrayEncoda
     }
 }
 
-extension Array: PostgresDynamicTypeEncodable where Element: PostgresArrayEncodable {}
-extension Array: PostgresDynamicTypeNonThrowingEncodable where Element: PostgresArrayEncodable & PostgresNonThrowingEncodable {}
+extension Array: PostgresDynamicTypeThrowingEncodable where Element: PostgresArrayEncodable {}
+extension Array: PostgresDynamicTypeEncodable where Element: PostgresArrayEncodable & PostgresNonThrowingEncodable {}
 
 extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Element == Element._DecodableType {
     public init<JSONDecoder: PostgresJSONDecoder>(
