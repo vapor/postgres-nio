@@ -85,6 +85,18 @@ extension UUID: PostgresArrayEncodable {
     public static var psqlArrayType: PostgresDataType { .uuidArray }
 }
 
+extension Range: PostgresArrayDecodable where Bound: PostgresRangeArrayDecodable {}
+
+extension Range: PostgresArrayEncodable where Bound: PostgresRangeArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { Bound.psqlRangeArrayType }
+}
+
+extension ClosedRange: PostgresArrayDecodable where Bound: PostgresRangeArrayDecodable {}
+
+extension ClosedRange: PostgresArrayEncodable where Bound: PostgresRangeArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { Bound.psqlRangeArrayType }
+}
+
 // MARK: Array conformances
 
 extension Array: PostgresEncodable where Element: PostgresArrayEncodable {

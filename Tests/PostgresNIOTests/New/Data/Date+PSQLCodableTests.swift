@@ -68,7 +68,7 @@ class Date_PSQLCodableTests: XCTestCase {
         XCTAssertNotNil(lastDate)
     }
 
-    func testDecodeDateFailsWithToMuchData() {
+    func testDecodeDateFailsWithTooMuchData() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(0))
 

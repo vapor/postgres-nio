@@ -374,6 +374,120 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(UUID(uuidString: row?[data: "id"].string ?? ""), UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
     }
 
+    func testInt4Range() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        struct Model: Decodable {
+            let range: Range<Int32>
+        }
+        let results1: PostgresQueryResult = try await conn.query("""
+        SELECT
+            '[\(Int32.min), \(Int32.max))'::int4range AS range
+        """).get()
+        XCTAssertEqual(results1.count, 1)
+        var row = results1.first?.makeRandomAccess()
+        let expectedRange: Range<Int32> = Int32.min..<Int32.max
+        let decodedRange = try row?.decode(column: "range", as: Range<Int32>.self, context: .default)
+        XCTAssertEqual(decodedRange, expectedRange)
+
+        let results2 = try await conn.query("""
+        SELECT
+            ARRAY[
+                '[0, 1)'::int4range,
+                '[10, 11)'::int4range
+            ] AS ranges
+        """).get()
+        XCTAssertEqual(results2.count, 1)
+        row = results2.first?.makeRandomAccess()
+        let decodedRangeArray = try row?.decode(column: "ranges", as: [Range<Int32>].self, context: .default)
+        let decodedClosedRangeArray = try row?.decode(column: "ranges", as: [ClosedRange<Int32>].self, context: .default)
+        XCTAssertEqual(decodedRangeArray, [0..<1, 10..<11])
+        XCTAssertEqual(decodedClosedRangeArray, [0...0, 10...10])
+    }
+
+    func testEmptyInt4Range() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        struct Model: Decodable {
+            let range: Range<Int32>
+        }
+        let randomValue = Int32.random(in: Int32.min...Int32.max)
+        let results: PostgresQueryResult = try await conn.query("""
+        SELECT
+            '[\(randomValue),\(randomValue))'::int4range AS range
+        """).get()
+        XCTAssertEqual(results.count, 1)
+        let row = results.first?.makeRandomAccess()
+        let expectedRange: Range<Int32> = Int32.valueForEmptyRange..<Int32.valueForEmptyRange
+        let decodedRange = try row?.decode(column: "range", as: Range<Int32>.self, context: .default)
+        XCTAssertEqual(decodedRange, expectedRange)
+
+        XCTAssertThrowsError(
+            try row?.decode(column: "range", as: ClosedRange<Int32>.self, context: .default)
+        )
+    }
+
+    func testInt8Range() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        struct Model: Decodable {
+            let range: Range<Int64>
+        }
+        let results1: PostgresQueryResult = try await conn.query("""
+        SELECT
+            '[\(Int64.min), \(Int64.max))'::int8range AS range
+        """).get()
+        XCTAssertEqual(results1.count, 1)
+        var row = results1.first?.makeRandomAccess()
+        let expectedRange: Range<Int64> = Int64.min..<Int64.max
+        let decodedRange = try row?.decode(column: "range", as: Range<Int64>.self, context: .default)
+        XCTAssertEqual(decodedRange, expectedRange)
+
+        let results2: PostgresQueryResult = try await conn.query("""
+        SELECT
+            ARRAY[
+                '[0, 1)'::int8range,
+                '[10, 11)'::int8range
+            ] AS ranges
+        """).get()
+        XCTAssertEqual(results2.count, 1)
+        row = results2.first?.makeRandomAccess()
+        let decodedRangeArray = try row?.decode(column: "ranges", as: [Range<Int64>].self, context: .default)
+        let decodedClosedRangeArray = try row?.decode(column: "ranges", as: [ClosedRange<Int64>].self, context: .default)
+        XCTAssertEqual(decodedRangeArray, [0..<1, 10..<11])
+        XCTAssertEqual(decodedClosedRangeArray, [0...0, 10...10])
+    }
+
+    func testEmptyInt8Range() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        struct Model: Decodable {
+            let range: Range<Int64>
+        }
+        let randomValue = Int64.random(in: Int64.min...Int64.max)
+        let results: PostgresQueryResult = try await conn.query("""
+        SELECT
+            '[\(randomValue),\(randomValue))'::int8range AS range
+        """).get()
+        XCTAssertEqual(results.count, 1)
+        let row = results.first?.makeRandomAccess()
+        let expectedRange: Range<Int64> = Int64.valueForEmptyRange..<Int64.valueForEmptyRange
+        let decodedRange = try row?.decode(column: "range", as: Range<Int64>.self, context: .default)
+        XCTAssertEqual(decodedRange, expectedRange)
+
+        XCTAssertThrowsError(
+            try row?.decode(column: "range", as: ClosedRange<Int64>.self, context: .default)
+        )
+    }
+
     func testDates() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
@@ -768,6 +882,108 @@ final class PostgresNIOTests: XCTestCase {
             XCTAssertNoThrow(object = try rows?.first?.decode(Object.self, context: .default))
             XCTAssertEqual(object?.foo, 1)
             XCTAssertEqual(object?.bar, 2)
+        }
+    }
+
+    func testInt4RangeSerialize() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        do {
+            let range: Range<Int32> = Int32.min..<Int32.max
+            var binds = PostgresBindings()
+            binds.append(range, context: .default)
+            let query = PostgresQuery(
+                unsafeSQL: "select $1::int4range as range",
+                binds: binds
+            )
+            let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+            var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+            let row: PostgresRow? = try await rowIterator?.next()
+            let decodedRange: Range<Int32>? = try row?.decode(Range<Int32>.self, context: .default)
+            XCTAssertEqual(range, decodedRange)
+        }
+        do {
+            let emptyRange: Range<Int32> = Int32.min..<Int32.min
+            var binds = PostgresBindings()
+            binds.append(emptyRange, context: .default)
+            let query = PostgresQuery(
+                unsafeSQL: "select $1::int4range as range",
+                binds: binds
+            )
+            let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+            var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+            let row: PostgresRow? = try await rowIterator?.next()
+            let decodedEmptyRange: Range<Int32>? = try row?.decode(Range<Int32>.self, context: .default)
+            let expectedRange: Range<Int32> = Int32.valueForEmptyRange..<Int32.valueForEmptyRange
+            XCTAssertNotEqual(emptyRange, expectedRange)
+            XCTAssertEqual(expectedRange, decodedEmptyRange)
+        }
+        do {
+            let closedRange: ClosedRange<Int32> = Int32.min...(Int32.max - 1)
+            var binds = PostgresBindings()
+            binds.append(closedRange, context: .default)
+            let query = PostgresQuery(
+                unsafeSQL: "select $1::int4range as range",
+                binds: binds
+            )
+            let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+            var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+            let row: PostgresRow? = try await rowIterator?.next()
+            let decodedClosedRange: ClosedRange<Int32>? = try row?.decode(ClosedRange<Int32>.self, context: .default)
+            XCTAssertEqual(closedRange, decodedClosedRange)
+        }
+    }
+
+    func testInt8RangeSerialize() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        do {
+            let range: Range<Int64> = Int64.min..<Int64.max
+            var binds = PostgresBindings()
+            binds.append(range, context: .default)
+            let query = PostgresQuery(
+                unsafeSQL: "select $1::int8range as range",
+                binds: binds
+            )
+            let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+            var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+            let row: PostgresRow? = try await rowIterator?.next()
+            let decodedRange: Range<Int64>? = try row?.decode(Range<Int64>.self, context: .default)
+            XCTAssertEqual(range, decodedRange)
+        }
+        do {
+            let emptyRange: Range<Int64> = Int64.min..<Int64.min
+            var binds = PostgresBindings()
+            binds.append(emptyRange, context: .default)
+            let query = PostgresQuery(
+                unsafeSQL: "select $1::int8range as range",
+                binds: binds
+            )
+            let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+            var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+            let row: PostgresRow? = try await rowIterator?.next()
+            let decodedEmptyRange: Range<Int64>? = try row?.decode(Range<Int64>.self, context: .default)
+            let expectedRange: Range<Int64> = Int64.valueForEmptyRange..<Int64.valueForEmptyRange
+            XCTAssertNotEqual(emptyRange, expectedRange)
+            XCTAssertEqual(expectedRange, decodedEmptyRange)
+        }
+        do {
+            let closedRange: ClosedRange<Int64> = Int64.min...(Int64.max - 1)
+            var binds = PostgresBindings()
+            binds.append(closedRange, context: .default)
+            let query = PostgresQuery(
+                unsafeSQL: "select $1::int8range as range",
+                binds: binds
+            )
+            let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+            var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+            let row: PostgresRow? = try await rowIterator?.next()
+            let decodedClosedRange: ClosedRange<Int64>? = try row?.decode(ClosedRange<Int64>.self, context: .default)
+            XCTAssertEqual(closedRange, decodedClosedRange)
         }
     }
 
