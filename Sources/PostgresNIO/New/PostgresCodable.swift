@@ -11,13 +11,6 @@ public protocol PostgresEncodable: PostgresDynamicTypeThrowingEncodable {
 
     /// Identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
     static var psqlFormat: PostgresFormat { get }
-
-    /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
-    /// the byte count. This method is called from the ``PostgresBindings``.
-    func encode<JSONEncoder: PostgresJSONEncoder>(
-        into byteBuffer: inout ByteBuffer,
-        context: PostgresEncodingContext<JSONEncoder>
-    ) throws
 }
 
 /// A type that can encode itself to a Postgres wire binary representation.
