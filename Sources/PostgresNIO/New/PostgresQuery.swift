@@ -80,6 +80,18 @@ extension PostgresQuery {
         }
 
         @inlinable
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeThrowingEncodable>(_ value: Value) throws {
+            try self.binds.append(value, context: .default)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        @inlinable
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeNonThrowingEncodable>(_ value: Value) {
+            self.binds.append(value, context: .default)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        @inlinable
         public mutating func appendInterpolation<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
             _ value: Value,
             context: PostgresEncodingContext<JSONEncoder>
@@ -122,6 +134,11 @@ public struct PostgresBindings: Sendable, Hashable {
         init<Value: PostgresEncodable>(value: Value) {
             self.init(dataType: Value.psqlType, format: Value.psqlFormat)
         }
+
+        @inlinable
+        init<Value: PostgresDynamicTypeThrowingEncodable>(value: Value) {
+            self.init(dataType: value.psqlType, format: value.psqlFormat)
+        }
     }
 
     @usableFromInline
@@ -161,6 +178,24 @@ public struct PostgresBindings: Sendable, Hashable {
 
     @inlinable
     public mutating func append<Value: PostgresNonThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Value,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        value.encodeRaw(into: &self.bytes, context: context)
+        self.metadata.append(.init(value: value))
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresDynamicTypeThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Value,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
+        try value.encodeRaw(into: &self.bytes, context: context)
+        self.metadata.append(.init(value: value))
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresDynamicTypeNonThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PostgresEncodingContext<JSONEncoder>
     ) {

@@ -6,15 +6,39 @@ import class Foundation.JSONDecoder
 public protocol PostgresEncodable {
     // TODO: Rename to `PostgresThrowingEncodable` with next major release
 
-    /// identifies the data type that we will encode into `byteBuffer` in `encode`
+    /// Identifies the data type that we will encode into `byteBuffer` in `encode`
     static var psqlType: PostgresDataType { get }
 
-    /// identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
+    /// Identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
     static var psqlFormat: PostgresFormat { get }
 
     /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
     /// the byte count. This method is called from the ``PostgresBindings``.
-    func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>) throws
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws
+}
+
+/// A type that can encode itself to a Postgres wire binary representation.
+/// Dynamic types are types that are not known at compile time. For example, a custom type that is created
+/// at runtime.
+public protocol PostgresDynamicTypeThrowingEncodable {
+    /// Identifies the data type that we will encode into `byteBuffer` in `encode`
+    ///
+    /// This is not static because the type is not known at compile time.
+    var psqlType: PostgresDataType { get }
+    /// identifies the postgres format that is used to encode the value into `byteBuffer` in `encode`
+    ///
+    /// This is not static because the type is not known at compile time.
+    var psqlFormat: PostgresFormat { get }
+
+    /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
+    /// the byte count. This method is called from the ``PostgresBindings``.
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws
 }
 
 /// A type that can encode itself to a postgres wire binary representation. It enforces that the
@@ -25,6 +49,21 @@ public protocol PostgresNonThrowingEncodable: PostgresEncodable {
     // TODO: Rename to `PostgresEncodable` with next major release
 
     func encode<JSONEncoder: PostgresJSONEncoder>(into byteBuffer: inout ByteBuffer, context: PostgresEncodingContext<JSONEncoder>)
+}
+
+/// A type that can encode itself to a Postgres wire binary representation.
+/// Dynamic types are types that are not known at compile time. For example, a custom type that is created
+/// at runtime.
+///
+/// This is the non-throwing alternative to ``PostgresDynamicTypeThrowingEncodable``. It allows users
+/// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without having to spell `try`.
+public protocol PostgresDynamicTypeNonThrowingEncodable: PostgresDynamicTypeThrowingEncodable {
+    /// Encode the entity into the `byteBuffer` in Postgres binary format, without setting
+    /// the byte count. This method is called from the ``PostgresBindings``.
+    func encode<JSONEncoder: PostgresJSONEncoder>(
+        into byteBuffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    )
 }
 
 /// A type that can decode itself from a postgres wire binary representation.
@@ -104,6 +143,46 @@ extension PostgresEncodable {
 }
 
 extension PostgresNonThrowingEncodable {
+    @inlinable
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        // The length of the parameter value, in bytes (this count does not include
+        // itself). Can be zero.
+        let lengthIndex = buffer.writerIndex
+        buffer.writeInteger(0, as: Int32.self)
+        let startIndex = buffer.writerIndex
+        // The value of the parameter, in the format indicated by the associated format
+        // code. n is the above length.
+        self.encode(into: &buffer, context: context)
+
+        // overwrite the empty length, with the real value
+        buffer.setInteger(numericCast(buffer.writerIndex - startIndex), at: lengthIndex, as: Int32.self)
+    }
+}
+
+extension PostgresDynamicTypeThrowingEncodable {
+    @inlinable
+    func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
+        into buffer: inout ByteBuffer,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
+        // The length of the parameter value, in bytes (this count does not include
+        // itself). Can be zero.
+        let lengthIndex = buffer.writerIndex
+        buffer.writeInteger(0, as: Int32.self)
+        let startIndex = buffer.writerIndex
+        // The value of the parameter, in the format indicated by the associated format
+        // code. n is the above length.
+        try self.encode(into: &buffer, context: context)
+
+        // overwrite the empty length, with the real value
+        buffer.setInteger(numericCast(buffer.writerIndex - startIndex), at: lengthIndex, as: Int32.self)
+    }
+}
+
+extension PostgresDynamicTypeNonThrowingEncodable {
     @inlinable
     func encodeRaw<JSONEncoder: PostgresJSONEncoder>(
         into buffer: inout ByteBuffer,
