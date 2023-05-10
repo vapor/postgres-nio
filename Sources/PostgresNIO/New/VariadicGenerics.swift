@@ -47,7 +47,7 @@ extension PostgresRow {
     }
     // --- snap TODO: Remove once bug is fixed, that disallows tuples of one
 
-//    @inlinable // <--- commenting this in, crashes the compiler
+    @inlinable
     public func decode<each Column: PostgresDecodable>(
         _ columnType: (repeat each Column).Type,
         context: PostgresDecodingContext<some PostgresJSONDecoder>,
@@ -102,7 +102,7 @@ extension PostgresRow {
         }
     }
 
-//    @inlinable // <--- commenting this in, crashes the compiler
+    @inlinable
     public func decode<each Column: PostgresDecodable>(
         _ columnType: (repeat each Column).Type,
         file: String = #fileID,

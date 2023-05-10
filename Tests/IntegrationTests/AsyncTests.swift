@@ -8,7 +8,6 @@ import NIOPosix
 import NIOCore
 
 final class AsyncPostgresConnectionTests: XCTestCase {
-
     func test1kRoundTrips() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
