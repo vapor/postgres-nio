@@ -99,9 +99,7 @@ extension ClosedRange: PostgresArrayEncodable where Bound: PostgresRangeArrayEnc
 
 // MARK: Array conformances
 
-// explicitly conforming to PostgresDynamicTypeThrowingEncodable because of:
-// https://github.com/apple/swift/issues/54132
-extension Array: PostgresDynamicTypeThrowingEncodable & PostgresEncodable where Element: PostgresArrayEncodable {
+extension Array: PostgresEncodable where Element: PostgresArrayEncodable {
     public static var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
@@ -138,9 +136,11 @@ extension Array: PostgresDynamicTypeThrowingEncodable & PostgresEncodable where 
     }
 }
 
-// explicitly conforming to PostgresDynamicTypeEncodable because of:
+// explicitly conforming to PostgresDynamicTypeThrowingEncodable because of:
 // https://github.com/apple/swift/issues/54132
-extension Array: PostgresDynamicTypeEncodable & PostgresNonThrowingEncodable where Element: PostgresArrayEncodable & PostgresNonThrowingEncodable {
+extension Array: PostgresDynamicTypeThrowingEncodable where Element: PostgresArrayEncodable {}
+
+extension Array: PostgresNonThrowingEncodable where Element: PostgresArrayEncodable & PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         Element.psqlArrayType
     }
@@ -176,6 +176,10 @@ extension Array: PostgresDynamicTypeEncodable & PostgresNonThrowingEncodable whe
         }
     }
 }
+
+// explicitly conforming to PostgresDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension Array: PostgresDynamicTypeEncodable where Element: PostgresArrayEncodable & PostgresNonThrowingEncodable {}
 
 extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Element == Element._DecodableType {
     public init<JSONDecoder: PostgresJSONDecoder>(
