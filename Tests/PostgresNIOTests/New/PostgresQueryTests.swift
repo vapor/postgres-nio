@@ -42,11 +42,14 @@ final class PostgresQueryTests: XCTestCase {
 
         XCTAssertEqual(query.sql, "INSERT INTO foo (dynamicType) SET ($1);")
 
-        var expected = ByteBuffer()
-        expected.writeInteger(Int32(dynamicString.value.utf8.count))
-        expected.writeString(dynamicString.value)
+        var expectedBindsBytes = ByteBuffer()
+        expectedBindsBytes.writeInteger(Int32(dynamicString.value.utf8.count))
+        expectedBindsBytes.writeString(dynamicString.value)
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        let expectedMetadata: [PostgresBindings.Metadata] = [.init(dataType: type, format: format)]
+
+        XCTAssertEqual(query.binds.bytes, expectedBindsBytes)
+        XCTAssertEqual(query.binds.metadata, expectedMetadata)
     }
 
     func testStringInterpolationWithCustomJSONEncoder() {
