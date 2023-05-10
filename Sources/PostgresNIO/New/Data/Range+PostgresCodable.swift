@@ -159,7 +159,15 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
     }
 }
 
-extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where B: PostgresRangeEncodable {
+// explicitly conforming to PostgresDynamicTypeEncodable and PostgresDynamicTypeThrowingEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension PostgresRange: PostgresDynamicTypeThrowingEncodable &
+    PostgresEncodable &
+    PostgresDynamicTypeEncodable &
+    PostgresNonThrowingEncodable
+where
+    B: PostgresRangeEncodable
+{
     @usableFromInline
     static var psqlType: PostgresDataType { return B.psqlRangeType }
     
@@ -191,9 +199,6 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
     }
 }
 
-extension PostgresRange: PostgresDynamicTypeEncodable where B: PostgresRangeEncodable {}
-extension PostgresRange: PostgresDynamicTypeThrowingEncodable where B: PostgresRangeEncodable {}
-
 extension PostgresRange where B: Comparable {
     @inlinable
     init(range: Range<B>) {
@@ -214,7 +219,9 @@ extension PostgresRange where B: Comparable {
 
 // MARK: Range
 
-extension Range: PostgresEncodable where Bound: PostgresRangeEncodable {
+// explicitly conforming to PostgresDynamicTypeThrowingEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension Range: PostgresDynamicTypeThrowingEncodable & PostgresEncodable where Bound: PostgresRangeEncodable {
     public static var psqlType: PostgresDataType { return Bound.psqlRangeType }
     public static var psqlFormat: PostgresFormat { return .binary }
 
@@ -228,10 +235,9 @@ extension Range: PostgresEncodable where Bound: PostgresRangeEncodable {
     }
 }
 
-extension Range: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
-
-extension Range: PostgresDynamicTypeThrowingEncodable where Bound: PostgresRangeEncodable {}
-extension Range: PostgresDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
+// explicitly conforming to PostgresDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension Range: PostgresDynamicTypeEncodable & PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
 
 extension Range: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
@@ -262,7 +268,9 @@ extension Range: PostgresDecodable where Bound: PostgresRangeDecodable {
 
 // MARK: ClosedRange
 
-extension ClosedRange: PostgresEncodable where Bound: PostgresRangeEncodable {
+// explicitly conforming to PostgresDynamicTypeThrowingEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension ClosedRange: PostgresDynamicTypeThrowingEncodable & PostgresEncodable where Bound: PostgresRangeEncodable {
     public static var psqlType: PostgresDataType { return Bound.psqlRangeType }
     public static var psqlFormat: PostgresFormat { return .binary }
 
@@ -276,10 +284,10 @@ extension ClosedRange: PostgresEncodable where Bound: PostgresRangeEncodable {
     }
 }
 
-extension ClosedRange: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
-
-extension ClosedRange: PostgresDynamicTypeThrowingEncodable where Bound: PostgresRangeEncodable {}
-extension ClosedRange: PostgresDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
+// explicitly conforming to PostgresDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension ClosedRange: PostgresDynamicTypeEncodable &
+    PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
 
 extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
