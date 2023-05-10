@@ -68,16 +68,16 @@ extension Int64: PostgresRangeArrayDecodable {}
 // MARK: PostgresRange
 
 @usableFromInline
-struct PostgresRange<B> {
-    @usableFromInline let lowerBound: B?
-    @usableFromInline let upperBound: B?
+struct PostgresRange<Bound> {
+    @usableFromInline let lowerBound: Bound?
+    @usableFromInline let upperBound: Bound?
     @usableFromInline let isLowerBoundInclusive: Bool
     @usableFromInline let isUpperBoundInclusive: Bool
 
     @inlinable
     init(
-        lowerBound: B?,
-        upperBound: B?,
+        lowerBound: Bound?,
+        upperBound: Bound?,
         isLowerBoundInclusive: Bool,
         isUpperBoundInclusive: Bool
     ) {
@@ -96,7 +96,7 @@ struct PostgresRangeFlag {
     @usableFromInline static let isUpperBoundInclusive: UInt8 = 0x04
 }
 
-extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
+extension PostgresRange: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
     init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
@@ -119,9 +119,9 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
 
         let isEmpty: Bool = flags & PostgresRangeFlag.isEmpty != 0
         if isEmpty {
-            self = PostgresRange<B>(
-                lowerBound: B.valueForEmptyRange,
-                upperBound: B.valueForEmptyRange,
+            self = PostgresRange(
+                lowerBound: Bound.valueForEmptyRange,
+                upperBound: Bound.valueForEmptyRange,
                 isLowerBoundInclusive: true,
                 isUpperBoundInclusive: false
             )
@@ -129,27 +129,27 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
         }
 
         guard let lowerBoundSize: Int32 = byteBuffer.readInteger(as: Int32.self),
-            Int(lowerBoundSize) == MemoryLayout<B>.size,
+            Int(lowerBoundSize) == MemoryLayout<Bound>.size,
             var lowerBoundBytes: ByteBuffer = byteBuffer.readSlice(length: Int(lowerBoundSize))
         else {
             throw PostgresDecodingError.Code.failure
         }
 
-        let lowerBound: B = try B(from: &lowerBoundBytes, type: boundType, format: format, context: context)
+        let lowerBound = try Bound(from: &lowerBoundBytes, type: boundType, format: format, context: context)
 
         guard let upperBoundSize = byteBuffer.readInteger(as: Int32.self),
-            Int(upperBoundSize) == MemoryLayout<B>.size,
+            Int(upperBoundSize) == MemoryLayout<Bound>.size,
             var upperBoundBytes: ByteBuffer = byteBuffer.readSlice(length: Int(upperBoundSize))
         else {
             throw PostgresDecodingError.Code.failure
         }
 
-        let upperBound: B = try B(from: &upperBoundBytes, type: boundType, format: format, context: context)
+        let upperBound = try Bound(from: &upperBoundBytes, type: boundType, format: format, context: context)
 
         let isLowerBoundInclusive: Bool = flags & PostgresRangeFlag.isLowerBoundInclusive != 0
         let isUpperBoundInclusive: Bool = flags & PostgresRangeFlag.isUpperBoundInclusive != 0
 
-        self = PostgresRange<B>(
+        self = PostgresRange(
             lowerBound: lowerBound,
             upperBound: upperBound,
             isLowerBoundInclusive: isLowerBoundInclusive,
@@ -159,10 +159,10 @@ extension PostgresRange: PostgresDecodable where B: PostgresRangeDecodable {
     }
 }
 
-extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where B: PostgresRangeEncodable {
+extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {
     @usableFromInline
-    static var psqlType: PostgresDataType { return B.psqlRangeType }
-    
+    static var psqlType: PostgresDataType { return Bound.psqlRangeType }
+
     @usableFromInline
     static var psqlFormat: PostgresFormat { return .binary }
 
@@ -177,23 +177,23 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
             flags |= PostgresRangeFlag.isUpperBoundInclusive
         }
 
-        let boundMemorySize = Int32(MemoryLayout<B>.size)
+        let boundMemorySize = Int32(MemoryLayout<Bound>.size)
 
         byteBuffer.writeInteger(flags)
-        if let lowerBound: B = self.lowerBound {
+        if let lowerBound = self.lowerBound {
             byteBuffer.writeInteger(boundMemorySize)
             lowerBound.encode(into: &byteBuffer, context: context)
         }
-        if let upperBound: B = self.upperBound {
+        if let upperBound = self.upperBound {
             byteBuffer.writeInteger(boundMemorySize)
             upperBound.encode(into: &byteBuffer, context: context)
         }
     }
 }
 
-extension PostgresRange where B: Comparable {
+extension PostgresRange where Bound: Comparable {
     @inlinable
-    init(range: Range<B>) {
+    init(range: Range<Bound>) {
         self.lowerBound = range.lowerBound
         self.upperBound = range.upperBound
         self.isLowerBoundInclusive = true
@@ -201,7 +201,7 @@ extension PostgresRange where B: Comparable {
     }
 
     @inlinable
-    init(closedRange: ClosedRange<B>) {
+    init(closedRange: ClosedRange<Bound>) {
         self.lowerBound = closedRange.lowerBound
         self.upperBound = closedRange.upperBound
         self.isLowerBoundInclusive = true
