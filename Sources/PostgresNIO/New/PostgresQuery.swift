@@ -68,9 +68,7 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(
-            _ value: Optional<Value>
-        ) {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Optional<Value>) {
             switch value {
             case .none:
                 self.binds.appendNull()
