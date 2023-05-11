@@ -9,6 +9,8 @@ on:
   pull_request:
     branches: 
       - "*"
+env:
+  LOG_LEVEL: info
 
 jobs:
   linux-unit:
@@ -23,9 +25,14 @@ jobs:
           - swiftlang/swift:nightly-main-jammy
     container: ${{ matrix.container }}
     runs-on: ubuntu-latest
-    env:
-      LOG_LEVEL: debug
     steps:
+      - name: Display OS and Swift versions
+        run: |
+          if [[ '${{ contains('nightly', matrix.container) }}' == 'true' ]]; then
+            SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
+            printf 'SWIFT_PLATFORM=%s\nSWIFT_VERSION=%s\n' "${SWIFT_PLATFORM}" "${SWIFT_VERSION}" >>"${GITHUB_ENV}"
+          fi
+          printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
         uses: actions/checkout@v3
       - name: Run unit tests with code coverage and Thread Sanitizer
@@ -57,7 +64,6 @@ jobs:
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
-      LOG_LEVEL: debug
       # Unfortunately, fluent-postgres-driver details leak through here
       POSTGRES_DB: 'test_database'
       POSTGRES_DB_A: 'test_database'
@@ -93,6 +99,13 @@ jobs:
           POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
           POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
     steps:
+      - name: Display OS and Swift versions
+        run: |
+          if [[ '${{ contains('nightly', matrix.container) }}' == 'true' ]]; then
+            SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
+            printf 'SWIFT_PLATFORM=%s\nSWIFT_VERSION=%s\n' "${SWIFT_PLATFORM}" "${SWIFT_VERSION}" >>"${GITHUB_ENV}"
+          fi
+          printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
         uses: actions/checkout@v3
         with: { path: 'postgres-nio' }
@@ -126,9 +139,8 @@ jobs:
           - scram-sha-256
         xcode:
           - latest-stable
-    runs-on: macos-12
+    runs-on: macos-13
     env:
-      LOG_LEVEL: debug
       POSTGRES_HOSTNAME: 127.0.0.1
       POSTGRES_USER: 'test_username'
       POSTGRES_PASSWORD: 'test_password'
@@ -143,8 +155,8 @@ jobs:
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
           export PATH="$(brew --prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          (brew unlink postgresql || true) && brew install ${{ matrix.dbimage }} && brew link --force ${{ matrix.dbimage }}
-          initdb --locale=C --auth-host ${{ matrix.dbauth }} -U $POSTGRES_USER --pwfile=<(echo $POSTGRES_PASSWORD)
+          (brew unlink postgresql || true) && brew install '${{ matrix.dbimage }}' && brew link --force '${{ matrix.dbimage }}'
+          initdb --locale=C --auth-host '${{ matrix.dbauth }}' -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
         timeout-minutes: 2
       - name: Checkout code
@@ -157,12 +169,12 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:5.8-jammy
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    # https://github.com/actions/checkout/issues/766
-    - name: Mark the workspace as safe
-      run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
-    - name: API breaking changes
-      run: swift package diagnose-api-breaking-changes origin/main
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      # https://github.com/actions/checkout/issues/766
+      - name: Mark the workspace as safe
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+      - name: API breaking changes
+        run: swift package diagnose-api-breaking-changes origin/main
