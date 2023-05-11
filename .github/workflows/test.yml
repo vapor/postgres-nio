@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Display OS and Swift versions
+        shell: bash
         run: |
           if [[ '${{ contains('nightly', matrix.container) }}' == 'true' ]]; then
             SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
@@ -100,6 +101,7 @@ jobs:
           POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
     steps:
       - name: Display OS and Swift versions
+        shell: bash
         run: |
           if [[ '${{ contains('nightly', matrix.container) }}' == 'true' ]]; then
             SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
