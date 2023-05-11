@@ -29,7 +29,7 @@ jobs:
       - name: Display OS and Swift versions
         shell: bash
         run: |
-          if [[ '${{ contains('nightly', matrix.container) }}' == 'true' ]]; then
+          if [[ '${{ contains(matrix.container, 'nightly') }}' == 'true' ]]; then
             SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
             printf 'SWIFT_PLATFORM=%s\nSWIFT_VERSION=%s\n' "${SWIFT_PLATFORM}" "${SWIFT_VERSION}" >>"${GITHUB_ENV}"
           fi
@@ -101,12 +101,7 @@ jobs:
           POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
     steps:
       - name: Display OS and Swift versions
-        shell: bash
         run: |
-          if [[ '${{ contains('nightly', matrix.container) }}' == 'true' ]]; then
-            SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
-            printf 'SWIFT_PLATFORM=%s\nSWIFT_VERSION=%s\n' "${SWIFT_PLATFORM}" "${SWIFT_VERSION}" >>"${GITHUB_ENV}"
-          fi
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
         uses: actions/checkout@v3
