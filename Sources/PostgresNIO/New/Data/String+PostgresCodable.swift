@@ -30,6 +30,7 @@ extension String: PostgresDecodable {
     ) throws {
         switch (format, type) {
         case (_, .varchar),
+             (_, .bpchar),
              (_, .text),
              (_, .name):
             // we can force unwrap here, since this method only fails if there are not enough

@@ -20,7 +20,7 @@ class String_PSQLCodableTests: XCTestCase {
         buffer.writeString(expected)
 
         let dataTypes: [PostgresDataType] = [
-            .text, .varchar, .name
+            .text, .varchar, .name, .bpchar
         ]
 
         for dataType in dataTypes {
@@ -33,7 +33,7 @@ class String_PSQLCodableTests: XCTestCase {
 
     func testDecodeFailureFromInvalidType() {
         let buffer = ByteBuffer()
-        let dataTypes: [PostgresDataType] = [.bool, .float4Array, .float8Array, .bpchar]
+        let dataTypes: [PostgresDataType] = [.bool, .float4Array, .float8Array]
 
         for dataType in dataTypes {
             var loopBuffer = buffer
