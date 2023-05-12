@@ -191,9 +191,9 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
     }
 }
 
-// explicitly conforming to PostgresDynamicTypeEncodable and PostgresDynamicTypeThrowingEncodable because of:
+// explicitly conforming to PostgresDynamicTypeEncodable and PostgresThrowingDynamicTypeEncodable because of:
 // https://github.com/apple/swift/issues/54132
-extension PostgresRange: PostgresDynamicTypeThrowingEncodable & PostgresDynamicTypeEncodable
+extension PostgresRange: PostgresThrowingDynamicTypeEncodable & PostgresDynamicTypeEncodable
     where Bound: PostgresRangeEncodable {}
 
 extension PostgresRange where Bound: Comparable {
@@ -232,9 +232,9 @@ extension Range: PostgresEncodable where Bound: PostgresRangeEncodable {
 
 extension Range: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
 
-// explicitly conforming to PostgresDynamicTypeEncodable and PostgresDynamicTypeThrowingEncodable because of:
+// explicitly conforming to PostgresDynamicTypeEncodable and PostgresThrowingDynamicTypeEncodable because of:
 // https://github.com/apple/swift/issues/54132
-extension Range: PostgresDynamicTypeEncodable & PostgresDynamicTypeThrowingEncodable
+extension Range: PostgresDynamicTypeEncodable & PostgresThrowingDynamicTypeEncodable
     where Bound: PostgresRangeEncodable {}
 
 extension Range: PostgresDecodable where Bound: PostgresRangeDecodable {
@@ -280,9 +280,9 @@ extension ClosedRange: PostgresEncodable where Bound: PostgresRangeEncodable {
     }
 }
 
-// explicitly conforming to PostgresDynamicTypeThrowingEncodable because of:
+// explicitly conforming to PostgresThrowingDynamicTypeEncodable because of:
 // https://github.com/apple/swift/issues/54132
-extension ClosedRange: PostgresDynamicTypeThrowingEncodable where Bound: PostgresRangeEncodable {}
+extension ClosedRange: PostgresThrowingDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
 
 extension ClosedRange: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
 
