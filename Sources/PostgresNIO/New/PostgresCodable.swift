@@ -24,8 +24,8 @@ public protocol PostgresDynamicTypeThrowingEncodable {
 }
 
 /// A type that can encode itself to a Postgres wire binary representation.
-/// Dynamic types are types that don't have a known Postgres type at compile time. For example, a custom
-/// type that is created at runtime.
+/// Dynamic types are types that don't have a well-known Postgres type OID at compile time.
+/// For example, custom types created at runtime, such as enums, or extension types whose OID is not stable between databases.
 ///
 /// This is the non-throwing alternative to ``PostgresDynamicTypeThrowingEncodable``. It allows users
 /// to create ``PostgresQuery``s using the `ExpressibleByStringInterpolation` without having to spell `try`.
