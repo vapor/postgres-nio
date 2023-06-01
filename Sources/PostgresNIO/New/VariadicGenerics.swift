@@ -1,7 +1,6 @@
 #if compiler(>=5.9)
 #if hasFeature(VariadicGenerics)
 extension PostgresRow {
-
     // --- snip TODO: Remove once bug is fixed, that disallows tuples of one
     @inlinable
     public func decode<Column: PostgresDecodable>(
@@ -113,6 +112,7 @@ extension PostgresRow {
 }
 
 extension AsyncSequence where Element == PostgresRow {
+    // --- snip TODO: Remove once bug is fixed, that disallows tuples of one
     @inlinable
     public func decode<Column: PostgresDecodable>(
         _: Column.Type,
@@ -133,14 +133,14 @@ extension AsyncSequence where Element == PostgresRow {
     ) -> AsyncThrowingMapSequence<Self, (Column)> {
         self.decode(Column.self, context: .default, file: file, line: line)
     }
+    // --- snap TODO: Remove once bug is fixed, that disallows tuples of one
 
-    #if false // commented out since, the AsyncSequence map currently crashes the compiler
     public func decode<each Column: PostgresDecodable>(
         _ columnType: (repeat each Column).Type,
         context: PostgresDecodingContext<some PostgresJSONDecoder>,
         file: String = #fileID,
         line: Int = #line
-    ) throws -> AsyncThrowingMapSequence<Self, (repeat each Column)> {
+    ) -> AsyncThrowingMapSequence<Self, (repeat each Column)> {
         self.map { row in
             try row.decode(columnType, context: context, file: file, line: line)
         }
@@ -150,10 +150,9 @@ extension AsyncSequence where Element == PostgresRow {
         _ columnType: (repeat each Column).Type,
         file: String = #fileID,
         line: Int = #line
-    ) throws -> AsyncThrowingMapSequence<Self, (repeat each Column)> {
-        try self.decode(columnType, context: .default, file: file, line: line)
+    ) -> AsyncThrowingMapSequence<Self, (repeat each Column)> {
+        self.decode(columnType, context: .default, file: file, line: line)
     }
-    #endif // AsyncSequence extension
 }
 
 #endif // hasFeature
