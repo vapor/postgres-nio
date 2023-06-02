@@ -95,6 +95,20 @@ extension PostgresQuery {
     }
 }
 
+extension PostgresQuery: CustomStringConvertible {
+    /// See ``Swift/CustomStringConvertible/description``.
+    public var description: String {
+        #""\#(self.sql)" \#(self.binds)"#
+    }
+}
+
+extension PostgresQuery: CustomDebugStringConvertible {
+    /// See ``Swift/CustomDebugStringConvertible/debugDescription``.
+    public var debugDescription: String {
+        #"PostgresQuery(sql: \#(String(reflecting: self.sql)), binds: \#(String(reflecting: self.binds)))"#
+    }
+}
+
 struct PSQLExecuteStatement {
     /// The statements name
     var name: String
@@ -106,7 +120,7 @@ struct PSQLExecuteStatement {
 
 public struct PostgresBindings: Sendable, Hashable {
     @usableFromInline
-    struct Metadata: Sendable, Hashable {
+    struct Metadata: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible {
         @usableFromInline
         var dataType: PostgresDataType
         @usableFromInline
@@ -121,6 +135,16 @@ public struct PostgresBindings: Sendable, Hashable {
         @inlinable
         init<Value: PostgresEncodable>(value: Value) {
             self.init(dataType: Value.psqlType, format: Value.psqlFormat)
+        }
+        
+        @usableFromInline
+        var description: String {
+            "\(self.format)(\(self.dataType))"
+        }
+        
+        @usableFromInline
+        var debugDescription: String {
+            "format: \(self.format), type: \(self.dataType)"
         }
     }
 
@@ -177,5 +201,19 @@ public struct PostgresBindings: Sendable, Hashable {
             self.bytes.writeBuffer(&input)
         }
         self.metadata.append(.init(dataType: postgresData.type, format: .binary))
+    }
+}
+
+extension PostgresBindings: CustomStringConvertible {
+    /// See ``Swift/CustomStringConvertible/description``.
+    public var description: String {
+        "[\(self.metadata.map { "\($0)" }.joined(separator: ", "))]"
+    }
+}
+
+extension PostgresBindings: CustomDebugStringConvertible {
+    /// See ``Swift/CustomDebugStringConvertible/debugDescription``.
+    public var debugDescription: String {
+        #"PostgresBindings(metadata: [ \#(self.metadata.map { String(reflecting: $0) }.joined(separator: "; ")) ], bytes: \#(String(reflecting: self.bytes))"#
     }
 }
