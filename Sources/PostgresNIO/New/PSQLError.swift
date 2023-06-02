@@ -462,7 +462,7 @@ extension PSQLError: CustomDebugStringConvertible {
         }
 
         if let backendMessage = self.backendMessage {
-            result.append(", backendMessage: \(backendMessage)")
+            result.append(", backendMessage: \(String(reflecting: backendMessage))")
         }
 
         if let unsupportedAuthScheme = self.unsupportedAuthScheme {
@@ -485,7 +485,7 @@ extension PSQLError: CustomDebugStringConvertible {
         }
 
         if let query = self.query {
-            result.append(", query: \(query)")
+            result.append(", query: \(String(reflecting: query))")
         }
 
         result.append(")")
@@ -601,7 +601,7 @@ extension PostgresDecodingError: CustomDebugStringConvertible {
         result.append(#", postgresType: \#(self.postgresType)"#)
         result.append(#", postgresFormat: \#(self.postgresFormat)"#)
         if let postgresData = self.postgresData {
-            result.append(#", postgresData: \#(postgresData.debugDescription)"#) // https://github.com/apple/swift-nio/pull/2418
+            result.append(#", postgresData: \#(String(reflecting: postgresData))"#)
         }
         result.append(#", file: \#(self.file)"#)
         result.append(#", line: \#(self.line)"#)
