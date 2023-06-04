@@ -190,21 +190,13 @@ public struct PSQLError: Error {
 
     private final class Backing {
         fileprivate var code: Code
-
         fileprivate var serverInfo: ServerInfo?
-
         fileprivate var underlying: Error?
-
         fileprivate var file: String?
-
         fileprivate var line: Int?
-
         fileprivate var query: PostgresQuery?
-
         fileprivate var backendMessage: PostgresBackendMessage?
-
         fileprivate var unsupportedAuthScheme: UnsupportedAuthScheme?
-
         fileprivate var invalidCommandTag: String?
 
         init(code: Code) {
@@ -455,6 +447,7 @@ extension PSQLError: CustomDebugStringConvertible {
             result.append(", serverInfo: [")
             result.append(
                 serverInfo.fields
+                    .sorted(by: { $0.key.rawValue < $1.key.rawValue })
                     .map { "\(PSQLError.ServerInfo.Field($0.0)): \($0.1)" }
                     .joined(separator: ", ")
             )

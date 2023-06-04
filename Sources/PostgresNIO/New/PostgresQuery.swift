@@ -98,14 +98,14 @@ extension PostgresQuery {
 extension PostgresQuery: CustomStringConvertible {
     /// See ``Swift/CustomStringConvertible/description``.
     public var description: String {
-        #""\#(self.sql)" \#(self.binds)"#
+        "\(self.sql) \(self.binds)"
     }
 }
 
 extension PostgresQuery: CustomDebugStringConvertible {
     /// See ``Swift/CustomDebugStringConvertible/debugDescription``.
     public var debugDescription: String {
-        #"PostgresQuery(sql: \#(String(reflecting: self.sql)), binds: \#(String(reflecting: self.binds)))"#
+        "PostgresQuery(sql: \(String(describing: self.sql)), binds: \(String(reflecting: self.binds)))"
     }
 }
 
@@ -139,12 +139,12 @@ public struct PostgresBindings: Sendable, Hashable {
         
         @usableFromInline
         var description: String {
-            "\(self.format)(\(self.dataType))"
+            "\(self.dataType)"
         }
         
         @usableFromInline
         var debugDescription: String {
-            "format: \(self.format), type: \(self.dataType)"
+            "\(self.format == .text ? "text" : "bin")(\(self.dataType))"
         }
     }
 
@@ -214,6 +214,11 @@ extension PostgresBindings: CustomStringConvertible {
 extension PostgresBindings: CustomDebugStringConvertible {
     /// See ``Swift/CustomDebugStringConvertible/debugDescription``.
     public var debugDescription: String {
-        #"PostgresBindings(metadata: [ \#(self.metadata.map { String(reflecting: $0) }.joined(separator: "; ")) ], bytes: \#(String(reflecting: self.bytes))"#
+        """
+        PostgresBindings(\
+        metadata: [\(self.metadata.map { String(reflecting: $0) }.joined(separator: "; "))], \
+        bytes: \(self.bytes.readableBytes) [\(Array(self.bytes.readableBytesView).prefix(8).map(\.description).joined(separator: ","))\(self.bytes.readableBytes > 8 ?",..." : "")]\
+        )
+        """
     }
 }
