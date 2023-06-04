@@ -72,7 +72,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             var counter = 0
 
             for try await element in rows.decode((Int, String, String, String, String?, Int, Date, Date, String, String).self) {
-                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "localhost")
+                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
                 XCTAssertEqual(element.2, env("POSTGRES_USER") ?? "test_username")
 
                 XCTAssertEqual(element.8, query.sql)
