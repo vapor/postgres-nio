@@ -106,8 +106,6 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             } catch {
                 guard let error = error as? PSQLError else { return XCTFail("Unexpected error type") }
 
-                print(String(reflecting: error))
-
                 XCTAssertEqual(error.code, .server)
                 XCTAssertEqual(error.serverInfo?[.severity], "ERROR")
             }
