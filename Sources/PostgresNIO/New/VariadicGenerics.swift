@@ -1,5 +1,4 @@
 #if compiler(>=5.9)
-#if hasFeature(VariadicGenerics)
 extension PostgresRow {
     // --- snip TODO: Remove once bug is fixed, that disallows tuples of one
     @inlinable
@@ -154,6 +153,4 @@ extension AsyncSequence where Element == PostgresRow {
         self.decode(columnType, context: .default, file: file, line: line)
     }
 }
-
-#endif // hasFeature
 #endif // compiler(>=5.9)
