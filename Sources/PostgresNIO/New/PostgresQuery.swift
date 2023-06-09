@@ -125,16 +125,19 @@ public struct PostgresBindings: Sendable, Hashable {
         var dataType: PostgresDataType
         @usableFromInline
         var format: PostgresFormat
+        @usableFromInline
+        var protected: Bool
 
         @inlinable
-        init(dataType: PostgresDataType, format: PostgresFormat) {
+        init(dataType: PostgresDataType, format: PostgresFormat, protected: Bool) {
             self.dataType = dataType
             self.format = format
+            self.protected = protected
         }
 
         @inlinable
-        init<Value: PostgresEncodable>(value: Value) {
-            self.init(dataType: Value.psqlType, format: Value.psqlFormat)
+        init<Value: PostgresEncodable>(value: Value, protected: Bool) {
+            self.init(dataType: Value.psqlType, format: Value.psqlFormat, protected: protected)
         }
     }
 
@@ -161,7 +164,7 @@ public struct PostgresBindings: Sendable, Hashable {
 
     public mutating func appendNull() {
         self.bytes.writeInteger(-1, as: Int32.self)
-        self.metadata.append(.init(dataType: .null, format: .binary))
+        self.metadata.append(.init(dataType: .null, format: .binary, protected: true))
     }
 
     @inlinable
@@ -170,7 +173,7 @@ public struct PostgresBindings: Sendable, Hashable {
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         try value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(value: value))
+        self.metadata.append(.init(value: value, protected: true))
     }
 
     @inlinable
@@ -179,7 +182,25 @@ public struct PostgresBindings: Sendable, Hashable {
         context: PostgresEncodingContext<JSONEncoder>
     ) {
         value.encodeRaw(into: &self.bytes, context: context)
-        self.metadata.append(.init(value: value))
+        self.metadata.append(.init(value: value, protected: true))
+    }
+
+    @inlinable
+    mutating func appendUnprotected<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Value,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
+        try value.encodeRaw(into: &self.bytes, context: context)
+        self.metadata.append(.init(value: value, protected: false))
+    }
+
+    @inlinable
+    mutating func appendUnprotected<Value: PostgresNonThrowingEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Value,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        value.encodeRaw(into: &self.bytes, context: context)
+        self.metadata.append(.init(value: value, protected: false))
     }
 
     public mutating func append(_ postgresData: PostgresData) {
@@ -190,25 +211,94 @@ public struct PostgresBindings: Sendable, Hashable {
             self.bytes.writeInteger(Int32(input.readableBytes))
             self.bytes.writeBuffer(&input)
         }
-        self.metadata.append(.init(dataType: postgresData.type, format: .binary))
+        self.metadata.append(.init(dataType: postgresData.type, format: .binary, protected: true))
     }
 }
 
-extension PostgresBindings: CustomStringConvertible {
+extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertible {
     /// See ``Swift/CustomStringConvertible/description``.
     public var description: String {
-        "[\(self.metadata.map { "\($0.dataType)" }.joined(separator: ", "))]"
+        """
+        [\(zip(self.metadata, BindingsReader(buffer: self.bytes))
+            .lazy.map({ Self.makeBindingPrintable(protected: $0.protected, type: $0.dataType, format: $0.format, buffer: $1) })
+            .joined(separator: ", "))]
+        """
+    }
+
+    /// See ``Swift/CustomDebugStringConvertible/description``.
+    public var debugDescription: String {
+        """
+        [\(zip(self.metadata, BindingsReader(buffer: self.bytes))
+            .lazy.map({ Self.makeDebugDescription(protected: $0.protected, type: $0.dataType, format: $0.format, buffer: $1) })
+            .joined(separator: ", "))]
+        """
+    }
+
+    private static func makeDebugDescription(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String {
+        "(\(Self.makeBindingPrintable(protected: protected, type: type, format: format, buffer: buffer)); \(type); format: \(format))"
+    }
+
+    private static func makeBindingPrintable(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String {
+        print(protected)
+        if protected {
+            return "****"
+        }
+
+        guard var buffer = buffer else {
+            return "null"
+        }
+
+        do {
+            switch (type, format) {
+            case (.int4, _), (.int2, _), (.int8, _):
+                let number = try Int64.init(from: &buffer, type: type, format: format, context: .default)
+                return String(describing: number)
+
+            case (.bool, _):
+                let bool = try Bool.init(from: &buffer, type: type, format: format, context: .default)
+                return String(describing: bool)
+
+            case (.varchar, _), (.bpchar, _), (.text, _), (.name, _):
+                let value = try String.init(from: &buffer, type: type, format: format, context: .default)
+                return String(reflecting: value) // adds quotes
+
+            default:
+                return "\(buffer.readableBytes) bytes"
+            }
+        } catch {
+            return "\(buffer.readableBytes) bytes"
+        }
     }
 }
 
-extension PostgresBindings: CustomDebugStringConvertible {
-    /// See ``Swift/CustomDebugStringConvertible/debugDescription``.
-    public var debugDescription: String {
-        """
-        PostgresBindings(\
-        metadata: [\(self.metadata.map { "\($0.format == .text ? "text" : "bin")(\($0.dataType))" }.joined(separator: "; "))], \
-        bytes: \(self.bytes.readableBytes) [\(Array(self.bytes.readableBytesView).prefix(8).map(\.description).joined(separator: ","))\(self.bytes.readableBytes > 8 ?",..." : "")]\
-        )
-        """
+/// A small helper to inspect encoded bindings
+private struct BindingsReader: Sequence {
+    typealias Element = Optional<ByteBuffer>
+
+    var buffer: ByteBuffer
+
+    struct Iterator: IteratorProtocol {
+        typealias Element = Optional<ByteBuffer>
+        private var buffer: ByteBuffer
+
+        init(buffer: ByteBuffer) {
+            self.buffer = buffer
+        }
+
+        mutating func next() -> Optional<Optional<ByteBuffer>> {
+            guard let length = self.buffer.readInteger(as: Int32.self) else {
+                return .none
+            }
+
+            if length < 0 {
+                return .some(.none)
+            }
+
+            return .some(self.buffer.readSlice(length: Int(length))!)
+        }
+    }
+
+    func makeIterator() -> Iterator {
+        Iterator(buffer: self.buffer)
     }
 }

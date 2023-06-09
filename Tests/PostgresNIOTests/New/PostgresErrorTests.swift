@@ -6,12 +6,18 @@ final class PSQLErrorTests: XCTestCase {
     func testPostgresBindingsDescription() {
         let testBinds1 = PostgresBindings(capacity: 0)
         var testBinds2 = PostgresBindings(capacity: 1)
+        var testBinds3 = PostgresBindings(capacity: 2)
         testBinds2.append(1, context: .default)
-        
+        testBinds3.appendUnprotected(1, context: .default)
+        testBinds3.appendUnprotected("foo", context: .default)
+        testBinds3.append("secret", context: .default)
+
         XCTAssertEqual(String(describing: testBinds1), "[]")
-        XCTAssertEqual(String(reflecting: testBinds1), "PostgresBindings(metadata: [], bytes: 0 [])")
-        XCTAssertEqual(String(describing: testBinds2), "[BIGINT]")
-        XCTAssertEqual(String(reflecting: testBinds2), "PostgresBindings(metadata: [bin(BIGINT)], bytes: 12 [0,0,0,8,0,0,0,0,...])")
+        XCTAssertEqual(String(reflecting: testBinds1), "[]")
+        XCTAssertEqual(String(describing: testBinds2), "[****]")
+        XCTAssertEqual(String(reflecting: testBinds2), "[(****; BIGINT; format: binary)]")
+        XCTAssertEqual(String(describing: testBinds3), #"[1, "foo", ****]"#)
+        XCTAssertEqual(String(reflecting: testBinds3), #"[(1; BIGINT; format: binary), ("foo"; TEXT; format: binary), (****; TEXT; format: binary)]"#)
     }
 
     func testPostgresQueryDescription() {
@@ -23,11 +29,11 @@ final class PSQLErrorTests: XCTestCase {
         let testQuery3 = PostgresQuery(unsafeSQL: "TEST QUERY", binds: testBinds2)
         
         XCTAssertEqual(String(describing: testQuery1), "TEST QUERY []")
-        XCTAssertEqual(String(reflecting: testQuery1), "PostgresQuery(sql: TEST QUERY, binds: PostgresBindings(metadata: [], bytes: 0 []))")
+        XCTAssertEqual(String(reflecting: testQuery1), "PostgresQuery(sql: TEST QUERY, binds: [])")
         XCTAssertEqual(String(describing: testQuery2), "TEST QUERY []")
-        XCTAssertEqual(String(reflecting: testQuery2), "PostgresQuery(sql: TEST QUERY, binds: PostgresBindings(metadata: [], bytes: 0 []))")
-        XCTAssertEqual(String(describing: testQuery3), "TEST QUERY [BIGINT]")
-        XCTAssertEqual(String(reflecting: testQuery3), "PostgresQuery(sql: TEST QUERY, binds: PostgresBindings(metadata: [bin(BIGINT)], bytes: 12 [0,0,0,8,0,0,0,0,...]))")
+        XCTAssertEqual(String(reflecting: testQuery2), "PostgresQuery(sql: TEST QUERY, binds: [])")
+        XCTAssertEqual(String(describing: testQuery3), "TEST QUERY [****]")
+        XCTAssertEqual(String(reflecting: testQuery3), "PostgresQuery(sql: TEST QUERY, binds: [(****; BIGINT; format: binary)])")
     }
 
     func testPSQLErrorDescription() {
@@ -38,7 +44,7 @@ final class PSQLErrorTests: XCTestCase {
         
         XCTAssertEqual(String(describing: error1), "Database error")
         XCTAssertEqual(String(reflecting: error1), """
-            PSQLError(code: server, serverInfo: [sqlState: 00000, detail: More test message, file: PostgresNIOTests/PostgresErrorTests.swift, hint: It's a test, that's your hint, line: 0, message: Test message, position: 1, routine: testPSQLErrorDescription(), localizedSeverity: ERROR, severity: ERROR, columnName: testcol, dataTypeName: testtyp, constraintName: testcon, schemaName: testsch, tableName: testtab], query: PostgresQuery(sql: TEST QUERY, binds: PostgresBindings(metadata: [bin(BIGINT)], bytes: 12 [0,0,0,8,0,0,0,0,...])))
+            PSQLError(code: server, serverInfo: [sqlState: 00000, detail: More test message, file: PostgresNIOTests/PostgresErrorTests.swift, hint: It's a test, that's your hint, line: 0, message: Test message, position: 1, routine: testPSQLErrorDescription(), localizedSeverity: ERROR, severity: ERROR, columnName: testcol, dataTypeName: testtyp, constraintName: testcon, schemaName: testsch, tableName: testtab], query: PostgresQuery(sql: TEST QUERY, binds: [(****; BIGINT; format: binary)]))
             """)
     }
 }
