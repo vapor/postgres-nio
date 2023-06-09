@@ -190,21 +190,13 @@ public struct PSQLError: Error {
 
     private final class Backing {
         fileprivate var code: Code
-
         fileprivate var serverInfo: ServerInfo?
-
         fileprivate var underlying: Error?
-
         fileprivate var file: String?
-
         fileprivate var line: Int?
-
         fileprivate var query: PostgresQuery?
-
         fileprivate var backendMessage: PostgresBackendMessage?
-
         fileprivate var unsupportedAuthScheme: UnsupportedAuthScheme?
-
         fileprivate var invalidCommandTag: String?
 
         init(code: Code) {
@@ -224,10 +216,10 @@ public struct PSQLError: Error {
     }
 
     public struct ServerInfo {
-        public struct Field: Hashable, Sendable {
+        public struct Field: Hashable, Sendable, CustomStringConvertible {
             fileprivate let backing: PostgresBackendMessage.Field
 
-            private init(_ backing: PostgresBackendMessage.Field) {
+            fileprivate init(_ backing: PostgresBackendMessage.Field) {
                 self.backing = backing
             }
 
@@ -306,6 +298,47 @@ public struct PSQLError: Error {
 
             /// Routine: the name of the source-code routine reporting the error.
             public static let routine = Self(.routine)
+
+            public var description: String {
+                switch self.backing {
+                case .localizedSeverity:
+                    return "localizedSeverity"
+                case .severity:
+                    return "severity"
+                case .sqlState:
+                    return "sqlState"
+                case .message:
+                    return "message"
+                case .detail:
+                    return "detail"
+                case .hint:
+                    return "hint"
+                case .position:
+                    return "position"
+                case .internalPosition:
+                    return "internalPosition"
+                case .internalQuery:
+                    return "internalQuery"
+                case .locationContext:
+                    return "locationContext"
+                case .schemaName:
+                    return "schemaName"
+                case .tableName:
+                    return "tableName"
+                case .columnName:
+                    return "columnName"
+                case .dataTypeName:
+                    return "dataTypeName"
+                case .constraintName:
+                    return "constraintName"
+                case .file:
+                    return "file"
+                case .line:
+                    return "line"
+                case .routine:
+                    return "routine"
+                }
+            }
         }
 
         let underlying: PostgresBackendMessage.ErrorResponse
@@ -394,6 +427,65 @@ public struct PSQLError: Error {
         case gss
         case sspi
         case sasl(mechanisms: [String])
+    }
+}
+
+extension PSQLError: CustomStringConvertible {
+    public var description: String {
+        // This may seem very odd... But we are afraid that users might accidentally send the
+        // unfiltered errors out to end-users. This may leak security relevant information. For this
+        // reason we overwrite the error description by default to this generic "Database error"
+        """
+        PSQLError – Generic description to prevent accidental leakage of sensitive data. For debugging details, use `String(reflecting: error)`.
+        """
+    }
+}
+
+extension PSQLError: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        var result = #"PSQLError(code: \#(self.code)"#
+
+        if let serverInfo = self.serverInfo?.underlying {
+            result.append(", serverInfo: [")
+            result.append(
+                serverInfo.fields
+                    .sorted(by: { $0.key.rawValue < $1.key.rawValue })
+                    .map { "\(PSQLError.ServerInfo.Field($0.0)): \($0.1)" }
+                    .joined(separator: ", ")
+            )
+            result.append("]")
+        }
+
+        if let backendMessage = self.backendMessage {
+            result.append(", backendMessage: \(String(reflecting: backendMessage))")
+        }
+
+        if let unsupportedAuthScheme = self.unsupportedAuthScheme {
+            result.append(", unsupportedAuthScheme: \(unsupportedAuthScheme)")
+        }
+
+        if let invalidCommandTag = self.invalidCommandTag {
+            result.append(", invalidCommandTag: \(invalidCommandTag)")
+        }
+
+        if let underlying = self.underlying {
+            result.append(", underlying: \(String(reflecting: underlying))")
+        }
+
+        if let file = self.file {
+            result.append(", triggeredFromRequestInFile: \(file)")
+            if let line = self.line {
+                result.append(", line: \(line)")
+            }
+        }
+
+        if let query = self.query {
+            result.append(", query: \(String(reflecting: query))")
+        }
+
+        result.append(")")
+
+        return result
     }
 }
 
@@ -490,7 +582,9 @@ extension PostgresDecodingError: CustomStringConvertible {
         // This may seem very odd... But we are afraid that users might accidentally send the
         // unfiltered errors out to end-users. This may leak security relevant information. For this
         // reason we overwrite the error description by default to this generic "Database error"
-        "Database error"
+        """
+        PostgresDecodingError – Generic description to prevent accidental leakage of sensitive data. For debugging details, use `String(reflecting: error)`.
+        """
     }
 }
 
@@ -504,7 +598,7 @@ extension PostgresDecodingError: CustomDebugStringConvertible {
         result.append(#", postgresType: \#(self.postgresType)"#)
         result.append(#", postgresFormat: \#(self.postgresFormat)"#)
         if let postgresData = self.postgresData {
-            result.append(#", postgresData: \#(postgresData.debugDescription)"#) // https://github.com/apple/swift-nio/pull/2418
+            result.append(#", postgresData: \#(String(reflecting: postgresData))"#)
         }
         result.append(#", file: \#(self.file)"#)
         result.append(#", line: \#(self.line)"#)
