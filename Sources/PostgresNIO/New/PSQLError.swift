@@ -436,8 +436,7 @@ extension PSQLError: CustomStringConvertible {
         // unfiltered errors out to end-users. This may leak security relevant information. For this
         // reason we overwrite the error description by default to this generic "Database error"
         """
-        PSQLError – This error description is generic on purpose to prevent leakage of impl. details \
-        to upstream services. For debugging details use String(reflecting: error) on PSQLError.
+        PSQLError – Generic description to prevent accidental leakage of sensitive data. For debugging details, use `String(reflecting: error)`.
         """
     }
 }
@@ -584,9 +583,7 @@ extension PostgresDecodingError: CustomStringConvertible {
         // unfiltered errors out to end-users. This may leak security relevant information. For this
         // reason we overwrite the error description by default to this generic "Database error"
         """
-        PostgresDecodingError – This error description is generic on purpose to prevent leakage of \
-        impl. details to upstream services. For debugging details use String(reflecting: error) on \
-        PostgresDecodingError.
+        PostgresDecodingError – Generic description to prevent accidental leakage of sensitive data. For debugging details, use `String(reflecting: error)`.
         """
     }
 }
