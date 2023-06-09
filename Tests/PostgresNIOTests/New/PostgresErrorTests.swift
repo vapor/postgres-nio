@@ -42,7 +42,11 @@ final class PSQLErrorTests: XCTestCase {
         testBinds.append(1, context: .default)
         error1.query = .init(unsafeSQL: "TEST QUERY", binds: testBinds)
         
-        XCTAssertEqual(String(describing: error1), "Database error")
+        XCTAssertEqual(String(describing: error1), """
+        PSQLError – This error description is generic on purpose to prevent leakage of
+        impl. details to upstream services. For debugging details use String(reflecting: error) on
+        PSQLError.
+        """)
         XCTAssertEqual(String(reflecting: error1), """
             PSQLError(code: server, serverInfo: [sqlState: 00000, detail: More test message, file: PostgresNIOTests/PostgresErrorTests.swift, hint: It's a test, that's your hint, line: 0, message: Test message, position: 1, routine: testPSQLErrorDescription(), localizedSeverity: ERROR, severity: ERROR, columnName: testcol, dataTypeName: testtyp, constraintName: testcon, schemaName: testsch, tableName: testtab], query: PostgresQuery(sql: TEST QUERY, binds: [(****; BIGINT; format: binary)]))
             """)
@@ -106,9 +110,17 @@ final class PostgresDecodingErrorTests: XCTestCase {
         )
 
         // Plain description
-        XCTAssertEqual(String(describing: error1), "Database error")
-        XCTAssertEqual(String(describing: error2), "Database error")
-        
+        XCTAssertEqual(String(describing: error1), """
+        PostgresDecodingError – This error description is generic on purpose to prevent leakage of
+        impl. details to upstream services. For debugging details use String(reflecting: error) on
+        PostgresDecodingError.
+        """)
+        XCTAssertEqual(String(describing: error2), """
+        PostgresDecodingError – This error description is generic on purpose to prevent leakage of
+        impl. details to upstream services. For debugging details use String(reflecting: error) on
+        PostgresDecodingError.
+        """)
+
         // Extended debugDescription
         XCTAssertEqual(String(reflecting: error1), """
             PostgresDecodingError(code: typeMismatch,\

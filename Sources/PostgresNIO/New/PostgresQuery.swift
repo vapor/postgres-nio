@@ -239,7 +239,6 @@ extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertibl
     }
 
     private static func makeBindingPrintable(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String {
-        print(protected)
         if protected {
             return "****"
         }
