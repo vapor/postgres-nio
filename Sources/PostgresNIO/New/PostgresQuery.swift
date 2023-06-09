@@ -120,7 +120,7 @@ struct PSQLExecuteStatement {
 
 public struct PostgresBindings: Sendable, Hashable {
     @usableFromInline
-    struct Metadata: Sendable, Hashable, CustomStringConvertible, CustomDebugStringConvertible {
+    struct Metadata: Sendable, Hashable {
         @usableFromInline
         var dataType: PostgresDataType
         @usableFromInline
@@ -135,16 +135,6 @@ public struct PostgresBindings: Sendable, Hashable {
         @inlinable
         init<Value: PostgresEncodable>(value: Value) {
             self.init(dataType: Value.psqlType, format: Value.psqlFormat)
-        }
-        
-        @usableFromInline
-        var description: String {
-            "\(self.dataType)"
-        }
-        
-        @usableFromInline
-        var debugDescription: String {
-            "\(self.format == .text ? "text" : "bin")(\(self.dataType))"
         }
     }
 
@@ -207,7 +197,7 @@ public struct PostgresBindings: Sendable, Hashable {
 extension PostgresBindings: CustomStringConvertible {
     /// See ``Swift/CustomStringConvertible/description``.
     public var description: String {
-        "[\(self.metadata.map { "\($0)" }.joined(separator: ", "))]"
+        "[\(self.metadata.map { "\($0.dataType)" }.joined(separator: ", "))]"
     }
 }
 
@@ -216,7 +206,7 @@ extension PostgresBindings: CustomDebugStringConvertible {
     public var debugDescription: String {
         """
         PostgresBindings(\
-        metadata: [\(self.metadata.map { String(reflecting: $0) }.joined(separator: "; "))], \
+        metadata: [\(self.metadata.map { "\($0.format == .text ? "text" : "bin")(\($0.dataType))" }.joined(separator: "; "))], \
         bytes: \(self.bytes.readableBytes) [\(Array(self.bytes.readableBytesView).prefix(8).map(\.description).joined(separator: ","))\(self.bytes.readableBytes > 8 ?",..." : "")]\
         )
         """
