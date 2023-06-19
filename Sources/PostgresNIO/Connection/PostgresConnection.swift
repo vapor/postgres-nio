@@ -428,6 +428,25 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
     }
+
+    /// Run a query on the Postgres server the connection is connected to.
+    ///
+    /// - Parameters:
+    ///   - query: A ``PostgresTypedQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file, the query was started in. Used for better error reporting.
+    ///   - line: The line, the query was started in. Used for better error reporting.
+    /// - Returns: A ``PostgresTypedSequence`` containing typed rows the server sent as the query result.
+    @discardableResult
+    public func query<T: PostgresTypedQuery>(
+        _ query: T,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> PostgresTypedSequence<T.Row> {
+        let rowSequence = try await self.query(query.sql, logger: logger, file: file, line: line)
+        return PostgresTypedSequence(rowSequence: rowSequence)
+    }
 }
 
 // MARK: EventLoopFuture interface

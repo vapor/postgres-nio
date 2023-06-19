@@ -13,6 +13,12 @@ public struct PostgresQuery: Sendable, Hashable {
     }
 }
 
+public protocol PostgresTypedQuery {
+    associatedtype Row: PostgresTypedRow
+
+    var sql: PostgresQuery { get }
+}
+
 extension PostgresQuery: ExpressibleByStringInterpolation {
     public init(stringInterpolation: StringInterpolation) {
         self.sql = stringInterpolation.sql
