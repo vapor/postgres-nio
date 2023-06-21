@@ -13,6 +13,37 @@ public struct PostgresQuery: Sendable, Hashable {
     }
 }
 
+struct PostgresMacroQuery: ExpressibleByStringInterpolation {
+    var sql: String
+
+    public init(stringInterpolation: StringInterpolation) {
+        sql = stringInterpolation.sql
+    }
+
+    public init(stringLiteral value: String) {
+        sql = value
+    }
+
+    struct StringInterpolation: StringInterpolationProtocol {
+        typealias StringLiteralType = String
+
+        var sql: String
+
+        init(literalCapacity: Int, interpolationCount: Int) {
+            sql = ""
+        }
+
+        mutating func appendLiteral(_ literal: String) {
+            sql.append(contentsOf: literal)
+        }
+
+        mutating func appendInterpolation<T: PostgresDecodable>(_ sql: String, type: T.Type) {}
+    }
+}
+
+@Query("SELECT \("id", type: Int.self) FROM users")
+struct GetAllUsersQuery {}
+
 public protocol PostgresTypedQuery {
     associatedtype Row: PostgresTypedRow
 

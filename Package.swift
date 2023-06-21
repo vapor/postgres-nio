@@ -1,5 +1,7 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.9
+
 import PackageDescription
+import CompilerPluginSupport
 
 let package = Package(
     name: "postgres-nio",
@@ -20,6 +22,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "3.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.2"),
+        .package(url: "https://github.com/apple/swift-syntax.git", branch: "main")
     ],
     targets: [
         .target(
@@ -36,6 +39,14 @@ let package = Package(
                 .product(name: "NIOTLS", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
+                .target(name: "PostgresNIOMacros")
+            ]
+        ),
+        .macro(
+            name: "PostgresNIOMacros",
+            dependencies: [
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
             ]
         ),
         .testTarget(
@@ -44,6 +55,7 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+                .product(name: "SwiftSyntaxMacrosTestSupport", package: "swift-syntax"),
             ]
         ),
         .testTarget(
