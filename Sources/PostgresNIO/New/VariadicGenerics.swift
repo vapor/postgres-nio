@@ -52,6 +52,9 @@ extension PostgresRow {
         file: String = #fileID,
         line: Int = #line
     ) throws -> (repeat each Column) {
+        let packCount = ComputeParameterPackLength.count(ofPack: repeat (each Column).self)
+        precondition(self.columns.count >= packCount)
+
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
         var columnIterator = self.columns.makeIterator()
@@ -153,4 +156,19 @@ extension AsyncSequence where Element == PostgresRow {
         self.decode(columnType, context: .default, file: file, line: line)
     }
 }
+
+@usableFromInline
+enum ComputeParameterPackLength {
+    @usableFromInline
+    enum BoolConverter<T> {
+        @usableFromInline
+        typealias Bool = Swift.Bool
+    }
+
+    @inlinable
+    static func count<each T>(ofPack t: repeat each T) -> Int {
+        MemoryLayout<(repeat BoolConverter<each T>.Bool)>.size / MemoryLayout<Bool>.stride
+    }
+}
 #endif // compiler(>=5.9)
+
