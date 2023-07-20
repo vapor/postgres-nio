@@ -13,7 +13,7 @@ extension PostgresConnection {
             // MARK: Initializers
             
             /// Do not try to create a TLS connection to the server.
-            public static let disable: Self = .init(base: .disable)
+            public static var disable: Self { .init(base: .disable) }
 
             /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
             /// If the server does not support TLS, create an insecure connection.
