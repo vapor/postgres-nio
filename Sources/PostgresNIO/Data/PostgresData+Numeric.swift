@@ -1,5 +1,5 @@
 import NIOCore
-import Foundation.Decimal
+import struct Foundation.Decimal
 
 public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible, ExpressibleByStringLiteral {
     /// The number of digits after this metadata
