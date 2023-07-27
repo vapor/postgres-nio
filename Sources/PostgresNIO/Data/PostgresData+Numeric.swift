@@ -1,4 +1,5 @@
 import NIOCore
+import Foundation.Decimal
 
 public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible, ExpressibleByStringLiteral {
     /// The number of digits after this metadata
@@ -36,6 +37,11 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         return Double(self.string)
     }
     
+    
+    public init(decimal: Decimal) {
+        self.init(decimalString: decimal.description)
+    }
+
     public init?(string: String) {
         // validate string contents are decimal
         // TODO: this won't work for all Big decimals
@@ -113,6 +119,13 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         self.sign = isNegative ? 0x4000 : 0
         self.dscale = numericCast(dscale)
         self.value = buffer
+    }
+
+    
+    public var decimal: Decimal {
+        // force cast should always succeed since we know
+        // string returns a valid decimal
+        return Decimal(string: self.string)!
     }
 
     public var string: String {
