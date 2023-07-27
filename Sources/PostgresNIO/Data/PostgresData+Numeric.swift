@@ -37,7 +37,6 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         return Double(self.string)
     }
     
-    
     public init(decimal: Decimal) {
         self.init(decimalString: decimal.description)
     }
