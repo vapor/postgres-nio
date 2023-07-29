@@ -763,7 +763,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         }
     }
     
-    /// See ``Swift/CustomStringConvertible/description``.
+    // See `CustomStringConvertible.description`.
     public var description: String {
         return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"
     }

@@ -26,13 +26,13 @@ jobs:
     container: ${{ matrix.container }}
     runs-on: ubuntu-latest
     steps:
-      - name: Display OS and Swift versions
-        shell: bash
+      - name: Note Swift version
+        if: ${{ contains(matrix.swiftver, 'nightly') }}
         run: |
-          if [[ '${{ contains(matrix.container, 'nightly') }}' == 'true' ]]; then
-            SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
-            printf 'SWIFT_PLATFORM=%s\nSWIFT_VERSION=%s\n' "${SWIFT_PLATFORM}" "${SWIFT_VERSION}" >>"${GITHUB_ENV}"
-          fi
+          echo "SWIFT_PLATFORM=$(. /etc/os-release && echo "${ID}${VERSION_ID}")" >>"${GITHUB_ENV}"
+          echo "SWIFT_VERSION=$(cat /.swift_tag)" >>"${GITHUB_ENV}"
+      - name: Display OS and Swift versions
+        run: |
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
         uses: actions/checkout@v3
@@ -144,6 +144,7 @@ jobs:
       POSTGRES_DB: 'postgres'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
       POSTGRES_SOCKET: '/tmp/.s.PGSQL.5432'
+      POSTGRES_VERSION: ${{ matrix.dbimage }}
     steps:
       - name: Select latest available Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -151,9 +152,9 @@ jobs:
           xcode-version: ${{ matrix.xcode }}
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
-          export PATH="$(brew --prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          (brew unlink postgresql || true) && brew install '${{ matrix.dbimage }}' && brew link --force '${{ matrix.dbimage }}'
-          initdb --locale=C --auth-host '${{ matrix.dbauth }}' -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
+          export PATH="$(brew --prefix)/opt/${POSTGRES_VERSION}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
+          (brew unlink postgresql || true) && brew install "${POSTGRES_VERSION}" && brew link --force "${POSTGRES_VERSION}"
+          initdb --locale=C --auth-host "${POSTGRES_HOST_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
         timeout-minutes: 2
       - name: Checkout code
@@ -175,3 +176,4 @@ jobs:
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: API breaking changes
         run: swift package diagnose-api-breaking-changes origin/main
+
