@@ -6,7 +6,7 @@ which use the ``PostgresRow/column(_:)`` API today.
 ## TLDR
 
 1. Map your sequence of ``PostgresRow``s to ``PostgresRandomAccessRow``s.
-2. Use the ``PostgresRandomAccessRow/subscript(name:)`` API to receive a ``PostgresCell``
+2. Use the ``PostgresRandomAccessRow/subscript(_:)-3facl`` API to receive a ``PostgresCell``
 3. Decode the ``PostgresCell`` into a Swift type using the ``PostgresCell/decode(_:file:line:)`` method.
 
 ```swift

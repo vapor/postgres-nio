@@ -96,14 +96,14 @@ extension PostgresQuery {
 }
 
 extension PostgresQuery: CustomStringConvertible {
-    /// See ``Swift/CustomStringConvertible/description``.
+    // See `CustomStringConvertible.description`.
     public var description: String {
         "\(self.sql) \(self.binds)"
     }
 }
 
 extension PostgresQuery: CustomDebugStringConvertible {
-    /// See ``Swift/CustomDebugStringConvertible/debugDescription``.
+    // See `CustomDebugStringConvertible.debugDescription`.
     public var debugDescription: String {
         "PostgresQuery(sql: \(String(describing: self.sql)), binds: \(String(reflecting: self.binds)))"
     }
@@ -216,7 +216,7 @@ public struct PostgresBindings: Sendable, Hashable {
 }
 
 extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertible {
-    /// See ``Swift/CustomStringConvertible/description``.
+    // See `CustomStringConvertible.description`.
     public var description: String {
         """
         [\(zip(self.metadata, BindingsReader(buffer: self.bytes))
@@ -225,7 +225,7 @@ extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertibl
         """
     }
 
-    /// See ``Swift/CustomDebugStringConvertible/description``.
+    // See `CustomDebugStringConvertible.description`.
     public var debugDescription: String {
         """
         [\(zip(self.metadata, BindingsReader(buffer: self.bytes))
