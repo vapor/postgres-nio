@@ -977,8 +977,9 @@ struct ConnectionStateMachine {
         case .error, .closing, .closed:
             // We might run into this case because of reentrancy. For example: After we received an
             // backend unexpected message, that we read of the wire, we bring this connection into
-            // the error state and will try to close the connection. The call to close() might be
-            // executed sync. This means that we received a `channelInactive` before we 
+            // the error state and will try to close the connection. However the server might have
+            // send further follow up messages. In those cases we will run into this method again
+            // and again. We should just ignore those events.
             return .wait
 
         case .modifying:
