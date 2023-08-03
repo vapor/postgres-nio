@@ -928,7 +928,7 @@ struct ConnectionStateMachine {
                  .forwardStreamComplete,
                  .wait,
                  .read:
-                preconditionFailure("Expecting only failure actions if an error happened")
+                preconditionFailure("Invalid state: \(self.state)")
             case .evaluateErrorAtConnectionLevel:
                 return .closeConnectionAndCleanup(cleanupContext)
             case .failQuery(let queryContext, with: let error):
@@ -951,7 +951,7 @@ struct ConnectionStateMachine {
                  .succeedPreparedStatementCreation,
                  .read,
                  .wait:
-                preconditionFailure("Expecting only failure actions if an error happened")
+                preconditionFailure("Invalid state: \(self.state)")
             case .failPreparedStatementCreation(let preparedStatementContext, with: let error):
                 return .failPreparedStatementCreation(preparedStatementContext, with: error, cleanupContext: cleanupContext)
             }
@@ -970,22 +970,19 @@ struct ConnectionStateMachine {
                  .succeedClose,
                  .read,
                  .wait:
-                preconditionFailure("Expecting only failure actions if an error happened")
+                preconditionFailure("Invalid state: \(self.state)")
             case .failClose(let closeCommandContext, with: let error):
                 return .failClose(closeCommandContext, with: error, cleanupContext: cleanupContext)
             }
-        case .error:
-            // TBD: this is an interesting case. why would this case happen?
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            return .closeConnectionAndCleanup(cleanupContext)
-            
-        case .closing:
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            return .closeConnectionAndCleanup(cleanupContext)
-        case .closed:
-            preconditionFailure("How can an error occur if the connection is already closed?")
+        case .error, .closing, .closed:
+            // We might run into this case because of reentrancy. For example: After we received an
+            // backend unexpected message, that we read of the wire, we bring this connection into
+            // the error state and will try to close the connection. The call to close() might be
+            // executed sync. This means that we received a `channelInactive` before we 
+            return .wait
+
         case .modifying:
-            preconditionFailure("Invalid state")
+            preconditionFailure("Invalid state: \(self.state)")
         }
     }
     
