@@ -84,6 +84,17 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     }
     
     func channelInactive(context: ChannelHandlerContext) {
+        do {
+            try self.decoder.finishProcessing(seenEOF: true) { message in
+                self.handleMessage(message, context: context)
+            }
+        } catch let error as PostgresMessageDecodingError {
+            let action = self.state.errorHappened(.messageDecodingFailure(error))
+            self.run(action, with: context)
+        } catch {
+            preconditionFailure("Expected to only get PSQLDecodingErrors from the PSQLBackendMessageDecoder.")
+        }
+
         self.logger.trace("Channel inactive.")
         let action = self.state.closed()
         self.run(action, with: context)
@@ -100,51 +111,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         
         do {
             try self.decoder.process(buffer: buffer) { message in
-                self.logger.trace("Backend message received", metadata: [.message: "\(message)"])
-                let action: ConnectionStateMachine.ConnectionAction
-                
-                switch message {
-                case .authentication(let authentication):
-                    action = self.state.authenticationMessageReceived(authentication)
-                case .backendKeyData(let keyData):
-                    action = self.state.backendKeyDataReceived(keyData)
-                case .bindComplete:
-                    action = self.state.bindCompleteReceived()
-                case .closeComplete:
-                    action = self.state.closeCompletedReceived()
-                case .commandComplete(let commandTag):
-                    action = self.state.commandCompletedReceived(commandTag)
-                case .dataRow(let dataRow):
-                    action = self.state.dataRowReceived(dataRow)
-                case .emptyQueryResponse:
-                    action = self.state.emptyQueryResponseReceived()
-                case .error(let errorResponse):
-                    action = self.state.errorReceived(errorResponse)
-                case .noData:
-                    action = self.state.noDataReceived()
-                case .notice(let noticeResponse):
-                    action = self.state.noticeReceived(noticeResponse)
-                case .notification(let notification):
-                    action = self.state.notificationReceived(notification)
-                case .parameterDescription(let parameterDescription):
-                    action = self.state.parameterDescriptionReceived(parameterDescription)
-                case .parameterStatus(let parameterStatus):
-                    action = self.state.parameterStatusReceived(parameterStatus)
-                case .parseComplete:
-                    action = self.state.parseCompleteReceived()
-                case .portalSuspended:
-                    action = self.state.portalSuspendedReceived()
-                case .readyForQuery(let transactionState):
-                    action = self.state.readyForQueryReceived(transactionState)
-                case .rowDescription(let rowDescription):
-                    action = self.state.rowDescriptionReceived(rowDescription)
-                case .sslSupported:
-                    action = self.state.sslSupportedReceived(unprocessedBytes: self.decoder.unprocessedBytes)
-                case .sslUnsupported:
-                    action = self.state.sslUnsupportedReceived()
-                }
-                
-                self.run(action, with: context)
+                self.handleMessage(message, context: context)
             }
         } catch let error as PostgresMessageDecodingError {
             let action = self.state.errorHappened(.messageDecodingFailure(error))
@@ -153,7 +120,55 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             preconditionFailure("Expected to only get PSQLDecodingErrors from the PSQLBackendMessageDecoder.")
         }
     }
-    
+
+    private func handleMessage(_ message: PostgresBackendMessage, context: ChannelHandlerContext) {
+        self.logger.trace("Backend message received", metadata: [.message: "\(message)"])
+        let action: ConnectionStateMachine.ConnectionAction
+
+        switch message {
+        case .authentication(let authentication):
+            action = self.state.authenticationMessageReceived(authentication)
+        case .backendKeyData(let keyData):
+            action = self.state.backendKeyDataReceived(keyData)
+        case .bindComplete:
+            action = self.state.bindCompleteReceived()
+        case .closeComplete:
+            action = self.state.closeCompletedReceived()
+        case .commandComplete(let commandTag):
+            action = self.state.commandCompletedReceived(commandTag)
+        case .dataRow(let dataRow):
+            action = self.state.dataRowReceived(dataRow)
+        case .emptyQueryResponse:
+            action = self.state.emptyQueryResponseReceived()
+        case .error(let errorResponse):
+            action = self.state.errorReceived(errorResponse)
+        case .noData:
+            action = self.state.noDataReceived()
+        case .notice(let noticeResponse):
+            action = self.state.noticeReceived(noticeResponse)
+        case .notification(let notification):
+            action = self.state.notificationReceived(notification)
+        case .parameterDescription(let parameterDescription):
+            action = self.state.parameterDescriptionReceived(parameterDescription)
+        case .parameterStatus(let parameterStatus):
+            action = self.state.parameterStatusReceived(parameterStatus)
+        case .parseComplete:
+            action = self.state.parseCompleteReceived()
+        case .portalSuspended:
+            action = self.state.portalSuspendedReceived()
+        case .readyForQuery(let transactionState):
+            action = self.state.readyForQueryReceived(transactionState)
+        case .rowDescription(let rowDescription):
+            action = self.state.rowDescriptionReceived(rowDescription)
+        case .sslSupported:
+            action = self.state.sslSupportedReceived(unprocessedBytes: self.decoder.unprocessedBytes)
+        case .sslUnsupported:
+            action = self.state.sslUnsupportedReceived()
+        }
+
+        self.run(action, with: context)
+    }
+
     func channelReadComplete(context: ChannelHandlerContext) {
         let action = self.state.channelReadComplete()
         self.run(action, with: context)

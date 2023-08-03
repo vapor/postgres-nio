@@ -198,7 +198,44 @@ class PostgresChannelHandlerTests: XCTestCase {
         
         XCTAssertEqual(message, .password(.init(value: password)))
     }
-    
+
+    func testHandlerThatSendsMultipleWrongMessages() {
+        let config = self.testConnectionConfiguration()
+        let handler = PostgresChannelHandler(configuration: config, configureSSLCallback: nil)
+        let embedded = EmbeddedChannel(handlers: [
+            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+            handler
+        ])
+
+        var maybeMessage: PostgresFrontendMessage?
+        XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
+        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
+        guard case .startup(let startup) = maybeMessage else {
+            return XCTFail("Unexpected message")
+        }
+
+        XCTAssertEqual(startup.parameters.user, config.username)
+        XCTAssertEqual(startup.parameters.database, config.database)
+        XCTAssertEqual(startup.parameters.options, nil)
+        XCTAssertEqual(startup.parameters.replication, .false)
+
+        var buffer = ByteBuffer()
+        buffer.writeMultipleIntegers(UInt8(ascii: "R"), UInt32(8), Int32(0))
+        buffer.writeMultipleIntegers(UInt8(ascii: "K"), UInt32(12), Int32(1234), Int32(5678))
+        buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
+        XCTAssertNoThrow(try embedded.writeInbound(buffer))
+        XCTAssertTrue(embedded.isActive)
+
+        buffer.clear()
+        buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
+        buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
+        buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
+        buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
+
+        XCTAssertThrowsError(try embedded.writeInbound(buffer))
+        XCTAssertFalse(embedded.isActive)
+    }
+
     // MARK: Helpers
     
     func testConnectionConfiguration(
