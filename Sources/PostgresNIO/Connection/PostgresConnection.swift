@@ -79,6 +79,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
         let channelHandler = PostgresChannelHandler(
             configuration: configuration,
+            eventLoop: channel.eventLoop,
             logger: logger,
             configureSSLCallback: configureSSLCallback
         )

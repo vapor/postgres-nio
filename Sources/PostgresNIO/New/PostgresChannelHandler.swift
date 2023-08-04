@@ -9,6 +9,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     typealias OutboundOut = ByteBuffer
 
     private let logger: Logger
+    private let eventLoop: EventLoop
     private var state: ConnectionStateMachine
     
     /// A `ChannelHandlerContext` to be used for non channel related events. (for example: More rows needed).
@@ -25,10 +26,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
+        eventLoop: EventLoop,
         logger: Logger,
         configureSSLCallback: ((Channel) throws -> Void)?
     ) {
         self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
+        self.eventLoop = eventLoop
         self.listenState = ListenStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
@@ -40,11 +43,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     /// for testing purposes only
     init(
         configuration: PostgresConnection.InternalConfiguration,
+        eventLoop: EventLoop,
         state: ConnectionStateMachine = .init(.initialized),
         logger: Logger = .psqlNoOpLogger,
         configureSSLCallback: ((Channel) throws -> Void)?
     ) {
         self.state = state
+        self.eventLoop = eventLoop
         self.listenState = ListenStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
@@ -223,7 +228,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 return
 
             case .stopListening(let channel, let listener):
-                psqlTask = self.makeStopListeningQuery(channel: channel, context: context)
+                psqlTask = self.makeUnlistenQuery(channel: channel, context: context)
                 listener.failed(CancellationError())
 
             case .cancelListener(let listener):
@@ -263,12 +268,31 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     // MARK: Listening
 
     func cancelNotificationListener(channel: String, id: Int) {
-        self.listenState.cancelNotificationListener(channel: channel, id: id)
+        self.eventLoop.preconditionInEventLoop()
+
+        switch self.listenState.cancelNotificationListener(channel: channel, id: id) {
+        case .cancelListener(let listener):
+            listener.cancelled()
+
+        case .stopListening(let channel, cancelListener: let listener):
+            listener.cancelled()
+
+            guard let context = self.handlerContext else {
+                return
+            }
+
+            let query = self.makeUnlistenQuery(channel: channel, context: context)
+            let action = self.state.enqueue(task: query)
+            self.run(action, with: context)
+
+        case .none:
+            break
+        }
     }
 
     // MARK: Channel handler actions
     
-    func run(_ action: ConnectionStateMachine.ConnectionAction, with context: ChannelHandlerContext) {
+    private func run(_ action: ConnectionStateMachine.ConnectionAction, with context: ChannelHandlerContext) {
         self.logger.trace("Run action", metadata: [.connectionAction: "\(action)"])
         
         switch action {
@@ -376,16 +400,14 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
         case .forwardNotificationToListeners(let notification):
-            self.forwardNotificationToListeners(notification)
+            self.forwardNotificationToListeners(notification, context: context)
         }
     }
     
     // MARK: - Private Methods -
     
     private func connected(context: ChannelHandlerContext) {
-
         let action = self.state.connected(tls: .init(self.configuration.tls))
-        
         self.run(action, with: context)
     }
     
@@ -405,8 +427,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private func sendPasswordMessage(
         mode: PasswordAuthencationMode,
         authContext: AuthContext,
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         switch mode {
         case .md5(let salt):
             let hash1 = (authContext.password ?? "") + authContext.username
@@ -566,20 +588,29 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 }
 
             case .stopListening:
-                let task = self.makeStopListeningQuery(channel: channel, context: context)
+                let task = self.makeUnlistenQuery(channel: channel, context: context)
                 let action = self.state.enqueue(task: task)
                 self.run(action, with: context)
             }
 
         case .failure(let error):
-            let listeners = self.listenState.startListeningFailed(channel: channel, error: error)
+            let finalError: PSQLError
+            if var psqlError = error as? PSQLError {
+                psqlError.code = .listenFailed
+                finalError = psqlError
+            } else {
+                var psqlError = PSQLError(code: .listenFailed)
+                psqlError.underlying = error
+                finalError = psqlError
+            }
+            let listeners = self.listenState.startListeningFailed(channel: channel, error: finalError)
             for list in listeners {
-                list.failed(error)
+                list.failed(finalError)
             }
         }
     }
 
-    private func makeStopListeningQuery(channel: String, context: ChannelHandlerContext) -> PSQLTask {
+    private func makeUnlistenQuery(channel: String, context: ChannelHandlerContext) -> PSQLTask {
         let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
         let query = ExtendedQueryContext(
             query: PostgresQuery(unsafeSQL: "UNLISTEN \(channel);"),
@@ -593,21 +624,40 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         return .extendedQuery(query)
     }
 
-    private func stopListenCompleted(_ result: Result<PSQLRowStream, Error>, for channel: String, context: ChannelHandlerContext) {
-        #warning("TODO: What do we want to do in the error case here?")
-        switch self.listenState.stopListeningSucceeded(channel: channel) {
-        case .none:
-            break
+    private func stopListenCompleted(
+        _ result: Result<PSQLRowStream, Error>,
+        for channel: String,
+        context: ChannelHandlerContext
+    ) {
+        switch result {
+        case .success:
+            switch self.listenState.stopListeningSucceeded(channel: channel) {
+            case .none:
+                break
 
-        case .startListening:
-            let task = self.makeStartListeningQuery(channel: channel, context: context)
-            let action = self.state.enqueue(task: task)
+            case .startListening:
+                let task = self.makeStartListeningQuery(channel: channel, context: context)
+                let action = self.state.enqueue(task: task)
+                self.run(action, with: context)
+            }
+
+        case .failure(let error):
+            let action = self.state.errorHappened(.unlistenError(underlying: error))
             self.run(action, with: context)
         }
     }
 
-    private func forwardNotificationToListeners(_ notification: PostgresBackendMessage.NotificationResponse) {
+    private func forwardNotificationToListeners(
+        _ notification: PostgresBackendMessage.NotificationResponse,
+        context: ChannelHandlerContext
+    ) {
         switch self.listenState.notificationReceived(channel: notification.channel) {
+        case .unexpectedMessage:
+            self.logger.error("Received a notification for a channel, that the client did not start listening on", metadata: [
+                "psql-channel": "\(notification.channel)"
+            ])
+            self.errorCaught(context: context, error: PSQLError.unexpectedBackendMessage(.notification(notification)))
+
         case .none:
             break
 

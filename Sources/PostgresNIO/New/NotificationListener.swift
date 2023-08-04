@@ -116,6 +116,27 @@ final class NotificationListener {
             break // ignore
         }
     }
+
+    func cancelled() {
+        self.eventLoop.preconditionInEventLoop()
+
+        switch self.state {
+        case .streamInitialized(let checkedContinuation):
+            self.state = .done
+            checkedContinuation.resume(throwing: PSQLError(code: .queryCancelled))
+
+        case .streamListening(let continuation):
+            self.state = .done
+            continuation.finish()
+
+        case .closure(let postgresListenContext, _):
+            self.state = .done
+            postgresListenContext.cancel()
+
+        case .done:
+            break // ignore
+        }
+    }
 }
 
 

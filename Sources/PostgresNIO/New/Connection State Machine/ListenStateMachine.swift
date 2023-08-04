@@ -23,11 +23,11 @@ struct ListenStateMachine {
     }
 
     mutating func startListeningSucceeded(channel: String) -> StartListeningSuccessAction {
-        return self.channels[channel, default: .init()].startListeningSucceeded()
+        return self.channels[channel]!.startListeningSucceeded()
     }
 
     mutating func startListeningFailed(channel: String, error: Error) -> Dictionary<Int, NotificationListener>.Values {
-        return self.channels[channel, default: .init()].startListeningFailed(error)
+        return self.channels[channel]!.startListeningFailed(error)
     }
 
     enum StopListeningSuccessAction {
@@ -64,12 +64,13 @@ struct ListenStateMachine {
     }
 
     enum ReceivedAction {
-        case notify(Dictionary<Int, NotificationListener>.Values)
         case none
+        case notify(Dictionary<Int, NotificationListener>.Values)
+        case unexpectedMessage
     }
 
     func notificationReceived(channel: String) -> ReceivedAction {
-        return self.channels[channel]?.notificationReceived() ?? .none
+        return self.channels[channel]?.notificationReceived() ?? .unexpectedMessage
     }
 }
 
@@ -111,14 +112,13 @@ extension ListenStateMachine {
                 return .none
 
             case .failed:
-                preconditionFailure("Invalid state: \(self.state)")
+                fatalError("Invalid state: \(self.state)")
             }
         }
 
         mutating func startListeningSucceeded() -> StartListeningSuccessAction {
             switch self.state {
             case .initialized, .listening, .stopping:
-                #warning("TODO: Throw error, close connection, instead of crashing")
                 fatalError("Invalid state: \(self.state)")
                 
             case .starting(let listeners):
@@ -131,14 +131,13 @@ extension ListenStateMachine {
                 }
                 
             case .failed:
-                preconditionFailure("Invalid state: \(self.state)")
+                fatalError("Invalid state: \(self.state)")
             }
         }
         
         mutating func startListeningFailed(_ error: Error) -> Dictionary<Int, NotificationListener>.Values {
             switch self.state {
             case .initialized, .listening, .stopping:
-                #warning("TODO: Throw error, close connection, instead of crashing")
                 fatalError("Invalid state: \(self.state)")
                 
             case .starting(let listeners):
@@ -146,7 +145,7 @@ extension ListenStateMachine {
                 return listeners.values
                 
             case .failed:
-                preconditionFailure("Invalid state: \(self.state)")
+                fatalError("Invalid state: \(self.state)")
             }
         }
         
