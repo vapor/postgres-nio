@@ -23,30 +23,30 @@ class PSQLFrontendMessageTests: XCTestCase {
     // MARK: Encoder
     
     func testEncodeFlush() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        encoder.encode(data: .flush, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.flush()
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PostgresFrontendMessage.ID.flush.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
     
     func testEncodeSync() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        encoder.encode(data: .sync, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.sync()
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PostgresFrontendMessage.ID.sync.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
     }
     
     func testEncodeTerminate() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        encoder.encode(data: .terminate, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.terminate()
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PostgresFrontendMessage.ID.terminate.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length

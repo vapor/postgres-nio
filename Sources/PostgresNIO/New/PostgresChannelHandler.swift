@@ -21,7 +21,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private var handlerContext: ChannelHandlerContext?
     private var rowStream: PSQLRowStream?
     private var decoder: NIOSingleStepByteToMessageProcessor<PostgresBackendMessageDecoder>
-    private var encoder: BufferedMessageEncoder!
+    private var encoder: PostgresFrontendMessageEncoder!
     private let configuration: PostgresConnection.InternalConfiguration
     private let configureSSLCallback: ((Channel) throws -> Void)?
     
@@ -58,10 +58,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     
     func handlerAdded(context: ChannelHandlerContext) {
         self.handlerContext = context
-        self.encoder = BufferedMessageEncoder(
-            buffer: context.channel.allocator.buffer(capacity: 256),
-            encoder: PSQLFrontendMessageEncoder()
-        )
+        self.encoder = PostgresFrontendMessageEncoder(buffer: context.channel.allocator.buffer(capacity: 256))
         
         if context.channel.isActive {
             self.connected(context: context)
@@ -239,19 +236,19 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case .wait:
             break
         case .sendStartupMessage(let authContext):
-            self.encoder.encode(.startup(.versionThree(parameters: authContext.toStartupParameters())))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.startup(authContext.toStartupParameters())
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .sendSSLRequest:
-            self.encoder.encode(.sslRequest(.init()))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.ssl()
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .sendPasswordMessage(let mode, let authContext):
             self.sendPasswordMessage(mode: mode, authContext: authContext, context: context)
         case .sendSaslInitialResponse(let name, let initialResponse):
-            self.encoder.encode(.saslInitialResponse(.init(saslMechanism: name, initialData: initialResponse)))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.saslInitialResponse(mechanism: name, bytes: initialResponse)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .sendSaslResponse(let bytes):
-            self.encoder.encode(.saslResponse(.init(data: bytes)))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.saslResponse(bytes)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .closeConnectionAndCleanup(let cleanupContext):
             self.closeConnectionAndCleanup(cleanupContext, context: context)
         case .fireChannelInactive:
@@ -315,8 +312,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 // The normal, graceful termination procedure is that the frontend sends a Terminate
                 // message and immediately closes the connection. On receipt of this message, the
                 // backend closes the connection and terminates.
-                self.encoder.encode(.terminate)
-                context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+                self.encoder.terminate()
+                context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
             }
             context.close(mode: .all, promise: promise)
         case .succeedPreparedStatementCreation(let preparedContext, with: let rowDescription):
@@ -381,89 +378,79 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             hash2.append(salt.3)
             let hash = Insecure.MD5.hash(data: hash2).md5PrefixHexdigest()
             
-            self.encoder.encode(.password(.init(value: hash)))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.password(hash.utf8)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
 
         case .cleartext:
-            self.encoder.encode(.password(.init(value: authContext.password ?? "")))
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.password((authContext.password ?? "").utf8)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         }
     }
     
     private func sendCloseAndSyncMessage(_ sendClose: CloseTarget, context: ChannelHandlerContext) {
         switch sendClose {
         case .preparedStatement(let name):
-            self.encoder.encode(.close(.preparedStatement(name)))
-            self.encoder.encode(.sync)
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.closePreparedStatement(name)
+            self.encoder.sync()
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
             
         case .portal(let name):
-            self.encoder.encode(.close(.portal(name)))
-            self.encoder.encode(.sync)
-            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            self.encoder.closePortal(name)
+            self.encoder.sync()
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         }
     }
     
     private func sendParseDecribeAndSyncMessage(
         statementName: String,
         query: String,
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-        let parse = PostgresFrontendMessage.Parse(
-            preparedStatementName: statementName,
-            query: query,
-            parameters: [])
 
-        self.encoder.encode(.parse(parse))
-        self.encoder.encode(.describe(.preparedStatement(statementName)))
-        self.encoder.encode(.sync)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+        self.encoder.parse(preparedStatementName: statementName, query: query, parameters: [])
+        self.encoder.describePreparedStatement(statementName)
+        self.encoder.sync()
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
     }
     
     private func sendBindExecuteAndSyncMessage(
         executeStatement: PSQLExecuteStatement,
         context: ChannelHandlerContext
     ) {
-        let bind = PostgresFrontendMessage.Bind(
+        self.encoder.bind(
             portalName: "",
             preparedStatementName: executeStatement.name,
-            bind: executeStatement.binds)
-
-        self.encoder.encode(.bind(bind))
-        self.encoder.encode(.execute(.init(portalName: "")))
-        self.encoder.encode(.sync)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            bind: executeStatement.binds
+        )
+        self.encoder.execute(portalName: "")
+        self.encoder.sync()
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
     }
     
     private func sendParseDescribeBindExecuteAndSyncMessage(
         query: PostgresQuery,
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
         let unnamedStatementName = ""
-        let parse = PostgresFrontendMessage.Parse(
+        self.encoder.parse(
             preparedStatementName: unnamedStatementName,
             query: query.sql,
-            parameters: query.binds.metadata.map(\.dataType))
-        let bind = PostgresFrontendMessage.Bind(
-            portalName: "",
-            preparedStatementName: unnamedStatementName,
-            bind: query.binds)
-
-        self.encoder.encode(.parse(parse))
-        self.encoder.encode(.describe(.preparedStatement("")))
-        self.encoder.encode(.bind(bind))
-        self.encoder.encode(.execute(.init(portalName: "")))
-        self.encoder.encode(.sync)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flush()), promise: nil)
+            parameters: query.binds.metadata.lazy.map(\.dataType)
+        )
+        self.encoder.describePreparedStatement(unnamedStatementName)
+        self.encoder.bind(portalName: "", preparedStatementName: unnamedStatementName, bind: query.binds)
+        self.encoder.execute(portalName: "")
+        self.encoder.sync()
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
     }
     
     private func succeedQueryWithRowStream(
         _ queryContext: ExtendedQueryContext,
         columns: [RowDescription.Column],
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         let rows = PSQLRowStream(
             rowDescription: columns,
             queryContext: queryContext,
@@ -477,8 +464,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private func succeedQueryWithoutRowStream(
         _ queryContext: ExtendedQueryContext,
         commandTag: String,
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         let rows = PSQLRowStream(
             rowDescription: [],
             queryContext: queryContext,
@@ -490,8 +477,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     
     private func closeConnectionAndCleanup(
         _ cleanup: ConnectionStateMachine.ConnectionAction.CleanUpContext,
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         self.logger.debug("Cleaning up and closing connection.", metadata: [.error: "\(cleanup.error)"])
         
         // 1. fail all tasks

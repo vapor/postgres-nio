@@ -34,7 +34,7 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
             switch code {
             case 80877103:
                 self.isInStartup = true
-                return .sslRequest(.init())
+                return .sslRequest
                 
             case 196608:
                 var user: String?
