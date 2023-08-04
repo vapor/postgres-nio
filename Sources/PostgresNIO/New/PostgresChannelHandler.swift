@@ -472,7 +472,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext
     ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-
         self.encoder.parse(preparedStatementName: statementName, query: query, parameters: [])
         self.encoder.describePreparedStatement(statementName)
         self.encoder.sync()

@@ -156,14 +156,16 @@ public final class PostgresConnection: @unchecked Sendable {
         // thread and the EventLoop.
         return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
             let connectFuture: EventLoopFuture<Channel>
-            let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
 
             switch configuration.connection {
             case .resolved(let address):
+                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
                 connectFuture = bootstrap.connect(to: address)
             case .unresolvedTCP(let host, let port):
+                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
                 connectFuture = bootstrap.connect(host: host, port: port)
             case .unresolvedUDS(let path):
+                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
                 connectFuture = bootstrap.connect(unixDomainSocketPath: path)
             case .bootstrapped(let channel):
                 guard channel.isActive else {
