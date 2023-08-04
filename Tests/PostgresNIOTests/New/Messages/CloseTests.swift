@@ -3,13 +3,11 @@ import NIOCore
 @testable import PostgresNIO
 
 class CloseTests: XCTestCase {
-    
     func testEncodeClosePortal() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        let message = PostgresFrontendMessage.close(.portal("Hello"))
-        encoder.encode(data: message, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.closePortal("Hello")
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 12)
         XCTAssertEqual(PostgresFrontendMessage.ID.close.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(11, byteBuffer.readInteger(as: Int32.self))
@@ -19,11 +17,10 @@ class CloseTests: XCTestCase {
     }
     
     func testEncodeCloseUnnamedStatement() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        let message = PostgresFrontendMessage.close(.preparedStatement(""))
-        encoder.encode(data: message, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.closePreparedStatement("")
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 7)
         XCTAssertEqual(PostgresFrontendMessage.ID.close.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(6, byteBuffer.readInteger(as: Int32.self))
@@ -31,5 +28,4 @@ class CloseTests: XCTestCase {
         XCTAssertEqual("", byteBuffer.readNullTerminatedString())
         XCTAssertEqual(byteBuffer.readableBytes, 0)
     }
-    
 }

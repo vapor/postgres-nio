@@ -5,7 +5,7 @@ import NIOCore
 class StartupTests: XCTestCase {
     
     func testStartupMessage() {
-        let encoder = PSQLFrontendMessageEncoder()
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         var byteBuffer = ByteBuffer()
         
         let replicationValues: [PostgresFrontendMessage.Startup.Parameters.Replication] = [
@@ -22,13 +22,12 @@ class StartupTests: XCTestCase {
                 replication: replication
             )
             
-            let startup = PostgresFrontendMessage.Startup.versionThree(parameters: parameters)
-            let message = PostgresFrontendMessage.startup(startup)
-            encoder.encode(data: message, out: &byteBuffer)
-            
+            encoder.startup(parameters)
+            byteBuffer = encoder.flushBuffer()
+
             let byteBufferLength = Int32(byteBuffer.readableBytes)
             XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())
-            XCTAssertEqual(startup.protocolVersion, byteBuffer.readInteger())
+            XCTAssertEqual(PostgresFrontendMessage.Startup.versionThree, byteBuffer.readInteger())
             XCTAssertEqual(byteBuffer.readNullTerminatedString(), "user")
             XCTAssertEqual(byteBuffer.readNullTerminatedString(), "test")
             XCTAssertEqual(byteBuffer.readNullTerminatedString(), "database")

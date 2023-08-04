@@ -49,15 +49,9 @@ class PostgresChannelHandlerTests: XCTestCase {
             handler
         ])
         
-        var maybeMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
-        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
-        guard case .sslRequest(let request) = maybeMessage else {
-            return XCTFail("Unexpected message")
-        }
-        
-        XCTAssertEqual(request.code, 80877103)
-        
+        XCTAssertEqual(.sslRequest, try embedded.readOutbound(as: PostgresFrontendMessage.self))
+
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslSupported))
         
         // a NIOSSLHandler has been added, after it SSL had been negotiated
@@ -92,14 +86,8 @@ class PostgresChannelHandlerTests: XCTestCase {
             eventHandler
         ])
 
-        var maybeMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
-        XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
-        guard case .sslRequest(let request) = maybeMessage else {
-            return XCTFail("Unexpected message")
-        }
-
-        XCTAssertEqual(request.code, 80877103)
+        XCTAssertEqual(.sslRequest, try embedded.readOutbound(as: PostgresFrontendMessage.self))
 
         var responseBuffer = ByteBuffer()
         responseBuffer.writeInteger(UInt8(ascii: "S"))
@@ -134,7 +122,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         XCTAssertTrue(embedded.isActive)
         
         // read the ssl request message
-        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .sslRequest(.init()))
+        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .sslRequest)
         try embedded.writeInbound(PostgresBackendMessage.sslUnsupported)
         
         // the event handler should have seen an error

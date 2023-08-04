@@ -1,13 +1,14 @@
 import NIOCore
 
 extension PostgresFrontendMessage {
-    struct Startup: PSQLMessagePayloadEncodable, Equatable {
+    struct Startup: Hashable {
+        static let versionThree: Int32 = 0x00_03_00_00
 
         /// Creates a `Startup` with "3.0" as the protocol version.
         static func versionThree(parameters: Parameters) -> Startup {
-            return .init(protocolVersion: 0x00_03_00_00, parameters: parameters)
+            return .init(protocolVersion: Self.versionThree, parameters: parameters)
         }
-        
+
         /// The protocol version number. The most significant 16 bits are the major
         /// version number (3 for the protocol described here). The least significant
         /// 16 bits are the minor version number (0 for the protocol described here).
@@ -16,7 +17,7 @@ extension PostgresFrontendMessage {
         /// The protocol version number is followed by one or more pairs of parameter
         /// name and value strings. A zero byte is required as a terminator after
         /// the last name/value pair. `user` is required, others are optional.
-        struct Parameters: Equatable {
+        struct Parameters: Hashable {
             enum Replication {
                 case `true`
                 case `false`
@@ -47,36 +48,5 @@ extension PostgresFrontendMessage {
             self.protocolVersion = protocolVersion
             self.parameters = parameters
         }
-        
-        /// Serializes this message into a byte buffer.
-        func encode(into buffer: inout ByteBuffer) {
-            buffer.writeInteger(self.protocolVersion)
-            buffer.writeNullTerminatedString("user")
-            buffer.writeNullTerminatedString(self.parameters.user)
-            
-            if let database = self.parameters.database {
-                buffer.writeNullTerminatedString("database")
-                buffer.writeNullTerminatedString(database)
-            }
-            
-            if let options = self.parameters.options {
-                buffer.writeNullTerminatedString("options")
-                buffer.writeNullTerminatedString(options)
-            }
-            
-            switch self.parameters.replication {
-            case .database:
-                buffer.writeNullTerminatedString("replication")
-                buffer.writeNullTerminatedString("replication")
-            case .true:
-                buffer.writeNullTerminatedString("replication")
-                buffer.writeNullTerminatedString("true")
-            case .false:
-                break
-            }
-            
-            buffer.writeInteger(UInt8(0))
-        }
     }
-
 }

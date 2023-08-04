@@ -5,11 +5,10 @@ import NIOCore
 class DescribeTests: XCTestCase {
     
     func testEncodeDescribePortal() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        let message = PostgresFrontendMessage.describe(.portal("Hello"))
-        encoder.encode(data: message, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.describePortal("Hello")
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 12)
         XCTAssertEqual(PostgresFrontendMessage.ID.describe.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(11, byteBuffer.readInteger(as: Int32.self))
@@ -19,11 +18,10 @@ class DescribeTests: XCTestCase {
     }
     
     func testEncodeDescribeUnnamedStatement() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        let message = PostgresFrontendMessage.describe(.preparedStatement(""))
-        encoder.encode(data: message, out: &byteBuffer)
-        
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.describePreparedStatement("")
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 7)
         XCTAssertEqual(PostgresFrontendMessage.ID.describe.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(6, byteBuffer.readInteger(as: Int32.self))
