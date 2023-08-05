@@ -66,11 +66,12 @@ struct ListenStateMachine {
     enum ReceivedAction {
         case none
         case notify(Dictionary<Int, NotificationListener>.Values)
-        case unexpectedMessage
     }
 
     func notificationReceived(channel: String) -> ReceivedAction {
-        return self.channels[channel]?.notificationReceived() ?? .unexpectedMessage
+        // TODO: Do we want to close the connection, if we receive a notification on a channel that we don't listen to?
+        //       We can only change this with the next major release, as it would break current functionality.
+        return self.channels[channel]?.notificationReceived() ?? .none
     }
 }
 

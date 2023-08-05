@@ -549,11 +549,16 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         cleanup.tasks.forEach { task in
             task.failWithError(cleanup.error)
         }
-        
-        // 2. fire an error
+
+        // 2. stop all listeners
+        for listener in self.listenState.fail(cleanup.error) {
+            listener.failed(cleanup.error)
+        }
+
+        // 3. fire an error
         context.fireErrorCaught(cleanup.error)
         
-        // 3. close the connection or fire channel inactive
+        // 4. close the connection or fire channel inactive
         switch cleanup.action {
         case .close:
             context.close(mode: .all, promise: cleanup.closePromise)
@@ -651,12 +656,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext
     ) {
         switch self.listenState.notificationReceived(channel: notification.channel) {
-        case .unexpectedMessage:
-            self.logger.error("Received a notification for a channel, that the client did not start listening on", metadata: [
-                "psql-channel": "\(notification.channel)"
-            ])
-            self.errorCaught(context: context, error: PSQLError.unexpectedBackendMessage(.notification(notification)))
-
         case .none:
             break
 
