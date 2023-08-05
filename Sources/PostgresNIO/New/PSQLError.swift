@@ -22,6 +22,9 @@ public struct PSQLError: Error {
             case connectionClosed
             case connectionError
             case uncleanShutdown
+
+            case listenFailed
+            case unlistenFailed
         }
 
         internal var base: Base
@@ -46,6 +49,8 @@ public struct PSQLError: Error {
         public static let connectionClosed = Self(.connectionClosed)
         public static let connectionError = Self(.connectionError)
         public static let uncleanShutdown = Self.init(.uncleanShutdown)
+        public static let listenFailed = Self.init(.listenFailed)
+        public static let unlistenFailed = Self.init(.unlistenFailed)
 
         public var description: String {
             switch self.base {
@@ -81,6 +86,10 @@ public struct PSQLError: Error {
                 return "connectionError"
             case .uncleanShutdown:
                 return "uncleanShutdown"
+            case .listenFailed:
+                return "listenFailed"
+            case .unlistenFailed:
+                return "unlistenFailed"
             }
         }
     }
@@ -415,6 +424,12 @@ public struct PSQLError: Error {
     static func invalidCommandTag(_ value: String) -> PSQLError {
         var error = PSQLError(code: .invalidCommandTag)
         error.invalidCommandTag = value
+        return error
+    }
+
+    static func unlistenError(underlying: Error) -> PSQLError {
+        var error = PSQLError(code: .unlistenFailed)
+        error.underlying = underlying
         return error
     }
 

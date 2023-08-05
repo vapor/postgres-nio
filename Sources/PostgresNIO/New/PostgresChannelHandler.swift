@@ -3,16 +3,13 @@ import NIOTLS
 import Crypto
 import Logging
 
-protocol PSQLChannelHandlerNotificationDelegate: AnyObject {
-    func notificationReceived(_: PostgresBackendMessage.NotificationResponse)
-}
-
 final class PostgresChannelHandler: ChannelDuplexHandler {
-    typealias OutboundIn = PSQLTask
+    typealias OutboundIn = HandlerTask
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer
 
     private let logger: Logger
+    private let eventLoop: EventLoop
     private var state: ConnectionStateMachine
     
     /// A `ChannelHandlerContext` to be used for non channel related events. (for example: More rows needed).
@@ -24,15 +21,18 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private var encoder: PostgresFrontendMessageEncoder!
     private let configuration: PostgresConnection.InternalConfiguration
     private let configureSSLCallback: ((Channel) throws -> Void)?
-    
-    /// this delegate should only be accessed on the connections `EventLoop`
-    weak var notificationDelegate: PSQLChannelHandlerNotificationDelegate?
-    
-    init(configuration: PostgresConnection.InternalConfiguration,
-         logger: Logger,
-         configureSSLCallback: ((Channel) throws -> Void)?)
-    {
+
+    private var listenState: ListenStateMachine
+
+    init(
+        configuration: PostgresConnection.InternalConfiguration,
+        eventLoop: EventLoop,
+        logger: Logger,
+        configureSSLCallback: ((Channel) throws -> Void)?
+    ) {
         self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
+        self.eventLoop = eventLoop
+        self.listenState = ListenStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -41,12 +41,16 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     
     #if DEBUG
     /// for testing purposes only
-    init(configuration: PostgresConnection.InternalConfiguration,
-         state: ConnectionStateMachine = .init(.initialized),
-         logger: Logger = .psqlNoOpLogger,
-         configureSSLCallback: ((Channel) throws -> Void)?)
-    {
+    init(
+        configuration: PostgresConnection.InternalConfiguration,
+        eventLoop: EventLoop,
+        state: ConnectionStateMachine = .init(.initialized),
+        logger: Logger = .psqlNoOpLogger,
+        configureSSLCallback: ((Channel) throws -> Void)?
+    ) {
         self.state = state
+        self.eventLoop = eventLoop
+        self.listenState = ListenStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -194,8 +198,46 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     }
     
     func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
-        let task = self.unwrapOutboundIn(data)
-        let action = self.state.enqueue(task: task)
+        let handlerTask = self.unwrapOutboundIn(data)
+        let psqlTask: PSQLTask
+
+        switch handlerTask {
+        case .closeCommand(let command):
+            psqlTask = .closeCommand(command)
+        case .extendedQuery(let query):
+            psqlTask = .extendedQuery(query)
+        case .preparedStatement(let statement):
+            psqlTask = .preparedStatement(statement)
+
+        case .startListening(let listener):
+            switch self.listenState.startListening(listener) {
+            case .startListening(let channel):
+                psqlTask = self.makeStartListeningQuery(channel: channel, context: context)
+
+            case .none:
+                return
+
+            case .succeedListenStart(let listener):
+                listener.startListeningSucceeded(handler: self)
+                return
+            }
+
+        case .cancelListening(let channel, let id):
+            switch self.listenState.cancelNotificationListener(channel: channel, id: id) {
+            case .none:
+                return
+
+            case .stopListening(let channel, let listener):
+                psqlTask = self.makeUnlistenQuery(channel: channel, context: context)
+                listener.failed(CancellationError())
+
+            case .cancelListener(let listener):
+                listener.failed(CancellationError())
+                return
+            }
+        }
+
+        let action = self.state.enqueue(task: psqlTask)
         self.run(action, with: context)
     }
     
@@ -223,9 +265,34 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         }
     }
 
+    // MARK: Listening
+
+    func cancelNotificationListener(channel: String, id: Int) {
+        self.eventLoop.preconditionInEventLoop()
+
+        switch self.listenState.cancelNotificationListener(channel: channel, id: id) {
+        case .cancelListener(let listener):
+            listener.cancelled()
+
+        case .stopListening(let channel, cancelListener: let listener):
+            listener.cancelled()
+
+            guard let context = self.handlerContext else {
+                return
+            }
+
+            let query = self.makeUnlistenQuery(channel: channel, context: context)
+            let action = self.state.enqueue(task: query)
+            self.run(action, with: context)
+
+        case .none:
+            break
+        }
+    }
+
     // MARK: Channel handler actions
     
-    func run(_ action: ConnectionStateMachine.ConnectionAction, with context: ChannelHandlerContext) {
+    private func run(_ action: ConnectionStateMachine.ConnectionAction, with context: ChannelHandlerContext) {
         self.logger.trace("Run action", metadata: [.connectionAction: "\(action)"])
         
         switch action {
@@ -333,16 +400,14 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
         case .forwardNotificationToListeners(let notification):
-            self.notificationDelegate?.notificationReceived(notification)
+            self.forwardNotificationToListeners(notification, context: context)
         }
     }
     
     // MARK: - Private Methods -
     
     private func connected(context: ChannelHandlerContext) {
-
         let action = self.state.connected(tls: .init(self.configuration.tls))
-        
         self.run(action, with: context)
     }
     
@@ -362,8 +427,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private func sendPasswordMessage(
         mode: PasswordAuthencationMode,
         authContext: AuthContext,
-        context: ChannelHandlerContext)
-    {
+        context: ChannelHandlerContext
+    ) {
         switch mode {
         case .md5(let salt):
             let hash1 = (authContext.password ?? "") + authContext.username
@@ -407,7 +472,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext
     ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-
         self.encoder.parse(preparedStatementName: statementName, query: query, parameters: [])
         self.encoder.describePreparedStatement(statementName)
         self.encoder.sync()
@@ -485,11 +549,16 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         cleanup.tasks.forEach { task in
             task.failWithError(cleanup.error)
         }
-        
-        // 2. fire an error
+
+        // 2. stop all listeners
+        for listener in self.listenState.fail(cleanup.error) {
+            listener.failed(cleanup.error)
+        }
+
+        // 3. fire an error
         context.fireErrorCaught(cleanup.error)
         
-        // 3. close the connection or fire channel inactive
+        // 4. close the connection or fire channel inactive
         switch cleanup.action {
         case .close:
             context.close(mode: .all, promise: cleanup.closePromise)
@@ -498,6 +567,105 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             context.fireChannelInactive()
         }
     }
+
+    private func makeStartListeningQuery(channel: String, context: ChannelHandlerContext) -> PSQLTask {
+        let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
+        let query = ExtendedQueryContext(
+            query: PostgresQuery(unsafeSQL: "LISTEN \(channel);"),
+            logger: self.logger,
+            promise: promise
+        )
+        promise.futureResult.whenComplete { result in
+            self.startListenCompleted(result, for: channel, context: context)
+        }
+
+        return .extendedQuery(query)
+    }
+
+    private func startListenCompleted(_ result: Result<PSQLRowStream, Error>, for channel: String, context: ChannelHandlerContext) {
+        switch result {
+        case .success:
+            switch self.listenState.startListeningSucceeded(channel: channel) {
+            case .activateListeners(let listeners):
+                for list in listeners {
+                    list.startListeningSucceeded(handler: self)
+                }
+
+            case .stopListening:
+                let task = self.makeUnlistenQuery(channel: channel, context: context)
+                let action = self.state.enqueue(task: task)
+                self.run(action, with: context)
+            }
+
+        case .failure(let error):
+            let finalError: PSQLError
+            if var psqlError = error as? PSQLError {
+                psqlError.code = .listenFailed
+                finalError = psqlError
+            } else {
+                var psqlError = PSQLError(code: .listenFailed)
+                psqlError.underlying = error
+                finalError = psqlError
+            }
+            let listeners = self.listenState.startListeningFailed(channel: channel, error: finalError)
+            for list in listeners {
+                list.failed(finalError)
+            }
+        }
+    }
+
+    private func makeUnlistenQuery(channel: String, context: ChannelHandlerContext) -> PSQLTask {
+        let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
+        let query = ExtendedQueryContext(
+            query: PostgresQuery(unsafeSQL: "UNLISTEN \(channel);"),
+            logger: self.logger,
+            promise: promise
+        )
+        promise.futureResult.whenComplete { result in
+            self.stopListenCompleted(result, for: channel, context: context)
+        }
+
+        return .extendedQuery(query)
+    }
+
+    private func stopListenCompleted(
+        _ result: Result<PSQLRowStream, Error>,
+        for channel: String,
+        context: ChannelHandlerContext
+    ) {
+        switch result {
+        case .success:
+            switch self.listenState.stopListeningSucceeded(channel: channel) {
+            case .none:
+                break
+
+            case .startListening:
+                let task = self.makeStartListeningQuery(channel: channel, context: context)
+                let action = self.state.enqueue(task: task)
+                self.run(action, with: context)
+            }
+
+        case .failure(let error):
+            let action = self.state.errorHappened(.unlistenError(underlying: error))
+            self.run(action, with: context)
+        }
+    }
+
+    private func forwardNotificationToListeners(
+        _ notification: PostgresBackendMessage.NotificationResponse,
+        context: ChannelHandlerContext
+    ) {
+        switch self.listenState.notificationReceived(channel: notification.channel) {
+        case .none:
+            break
+
+        case .notify(let listeners):
+            for listener in listeners {
+                listener.notificationReceived(notification)
+            }
+        }
+    }
+
 }
 
 extension PostgresChannelHandler: PSQLRowsDataSource {
@@ -576,18 +744,5 @@ extension ConnectionStateMachine.TLSConfiguration {
         case (true, false):
             self = .prefer
         }
-    }
-}
-
-extension PostgresChannelHandler {
-    convenience init(
-        configuration: PostgresConnection.InternalConfiguration,
-        configureSSLCallback: ((Channel) throws -> Void)?)
-    {
-        self.init(
-            configuration: configuration,
-            logger: .psqlNoOpLogger,
-            configureSSLCallback: configureSSLCallback
-        )
     }
 }

@@ -125,17 +125,90 @@ extension PostgresFrontendMessage {
     static func decode(from buffer: inout ByteBuffer, for messageID: ID) throws -> PostgresFrontendMessage {
         switch messageID {
         case .bind:
-            preconditionFailure("TODO: Unimplemented")
+            guard let portalName = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            guard let preparedStatementName = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            guard let parameterFormatCount = buffer.readInteger(as: UInt16.self) else {
+                preconditionFailure("TODO: Unimplemented")
+            }
+
+            let parameterFormats = (0..<parameterFormatCount).map({ _ in PostgresFormat(rawValue: buffer.readInteger(as: Int16.self)!)! })
+
+            guard let parameterCount = buffer.readInteger(as: UInt16.self) else {
+                preconditionFailure("TODO: Unimplemented")
+            }
+
+            let parameters = (0..<parameterCount).map { _ -> ByteBuffer? in
+                let length = buffer.readInteger(as: UInt16.self)
+                switch length {
+                case .some(..<0):
+                    return nil
+                case .some(0...):
+                    return buffer.readSlice(length: Int(length!))
+                default:
+                    preconditionFailure("TODO: Unimplemented")
+                }
+            }
+
+            guard let resultColumnFormatCount = buffer.readInteger(as: UInt16.self) else {
+                preconditionFailure("TODO: Unimplemented")
+            }
+
+            let resultColumnFormats = (0..<resultColumnFormatCount).map({ _ in PostgresFormat(rawValue: buffer.readInteger(as: Int16.self)!)! })
+
+            return .bind(
+                Bind(
+                    portalName: portalName,
+                    preparedStatementName: preparedStatementName,
+                    parameterFormats: parameterFormats,
+                    parameters: parameters,
+                    resultColumnFormats: resultColumnFormats
+                )
+            )
+
         case .close:
             preconditionFailure("TODO: Unimplemented")
+
         case .describe:
-            preconditionFailure("TODO: Unimplemented")
+            switch buffer.readInteger(as: UInt8.self) {
+            case UInt8(ascii: "S"):
+                return .describe(.preparedStatement(buffer.readNullTerminatedString()!))
+            case UInt8(ascii: "P"):
+                return .describe(.portal(buffer.readNullTerminatedString()!))
+            default:
+                preconditionFailure("TODO: Unimplemented")
+            }
+
         case .execute:
-            preconditionFailure("TODO: Unimplemented")
+            guard let portalName = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+
+            guard let maxNumberOfRows = buffer.readInteger(as: Int32.self) else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: Int.self)
+            }
+
+            return .execute(.init(portalName: portalName, maxNumberOfRows: maxNumberOfRows))
+
         case .flush:
             return .flush
+
         case .parse:
-            preconditionFailure("TODO: Unimplemented")
+            guard let preparedStatementName = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            guard let query = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            guard let parameterCount = buffer.readInteger(as: UInt16.self) else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            let parameters = (0..<parameterCount).map({ _ in PostgresDataType(buffer.readInteger(as: UInt32.self)!) })
+            return .parse(.init(preparedStatementName: preparedStatementName, query: query, parameters: parameters))
+
         case .password:
             guard let password = buffer.readNullTerminatedString() else {
                 throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
