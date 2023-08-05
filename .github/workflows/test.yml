@@ -193,7 +193,7 @@ jobs:
           - ubuntu-latest
           - macos-13
     runs-on: ${{ matrix.runner-os }}
-    #permissions: { security-events: write }
+    permissions: { security-events: write }
     steps:
       - name: Select appropriate Xcode version
         if: ${{ startsWith(matrix.runner-os, 'macos') }}
