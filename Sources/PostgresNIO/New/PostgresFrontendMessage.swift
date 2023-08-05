@@ -14,7 +14,12 @@ enum PostgresFrontendMessage: Equatable {
         var preparedStatementName: String
 
         /// The number of parameter values that follow (possibly zero). This must match the number of parameters needed by the query.
-        var bind: PostgresBindings
+        var parameterFormats: [PostgresFormat]
+
+        /// The number of parameter values that follow (possibly zero). This must match the number of parameters needed by the query.
+        var parameters: [ByteBuffer?]
+
+        var resultColumnFormats: [PostgresFormat]
     }
 
     struct Cancel: Equatable {

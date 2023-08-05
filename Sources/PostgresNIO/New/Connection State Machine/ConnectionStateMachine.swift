@@ -1091,11 +1091,12 @@ extension ConnectionStateMachine {
              .tooManyParameters,
              .invalidCommandTag,
              .connectionError,
-             .uncleanShutdown:
+             .uncleanShutdown,
+             .unlistenFailed:
             return true
         case .queryCancelled:
             return false
-        case .server:
+        case .server, .listenFailed:
             guard let sqlState = error.serverInfo?[.sqlState] else {
                 // any error message that doesn't have a sql state field, is unexpected by default.
                 return true
