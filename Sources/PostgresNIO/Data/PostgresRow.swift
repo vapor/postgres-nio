@@ -22,6 +22,10 @@ public struct PostgresRow: Sendable {
     }
 }
 
+public protocol PostgresTypedRow {
+    init(from row: PostgresRow) throws
+}
+
 extension PostgresRow: Equatable {
     public static func ==(lhs: Self, rhs: Self) -> Bool {
         // we don't need to compare the lookup table here, as the looup table is only derived

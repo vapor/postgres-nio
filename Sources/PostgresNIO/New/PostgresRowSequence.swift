@@ -43,7 +43,7 @@ extension PostgresRowSequence {
             self.columns = columns
         }
 
-        public mutating func next() async throws -> PostgresRow? {
+        public func next() async throws -> PostgresRow? {
             if let dataRow = try await self.backing.next() {
                 return PostgresRow(
                     data: dataRow,
@@ -52,6 +52,33 @@ extension PostgresRowSequence {
                 )
             }
             return nil
+        }
+    }
+}
+
+public struct PostgresTypedSequence<T: PostgresTypedRow>: AsyncSequence {
+    public typealias Element = T
+
+    let rowSequence: PostgresRowSequence
+
+    init(rowSequence: PostgresRowSequence) {
+        self.rowSequence = rowSequence
+    }
+
+    public func makeAsyncIterator() -> AsyncIterator {
+        AsyncIterator(rowSequence: rowSequence.makeAsyncIterator())
+    }
+}
+
+extension PostgresTypedSequence {
+    public struct AsyncIterator: AsyncIteratorProtocol {
+        let rowSequence: PostgresRowSequence.AsyncIterator
+
+        public func next() async throws -> T? {
+            guard let row = try await self.rowSequence.next() else {
+                return nil
+            }
+            return try T.init(from: row)
         }
     }
 }
