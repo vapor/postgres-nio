@@ -240,10 +240,10 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             }
 
             let first = try await iterator.next()
-            XCTAssertEqual(first, "bar")
+            XCTAssertEqual(first?.payload, "bar")
 
             let second = try await iterator.next()
-            XCTAssertEqual(second, "foo")
+            XCTAssertEqual(second?.payload, "foo")
         }
     }
 

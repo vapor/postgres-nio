@@ -45,7 +45,7 @@ class PostgresConnectionTests: XCTestCase {
             taskGroup.addTask {
                 let events = try await connection.listen("foo")
                 for try await event in events {
-                    XCTAssertEqual(event, "wooohooo")
+                    XCTAssertEqual(event.payload, "wooohooo")
                     break
                 }
             }
@@ -88,7 +88,7 @@ class PostgresConnectionTests: XCTestCase {
             taskGroup.addTask {
                 let events = try await connection.listen("foo")
                 for try await event in events {
-                    XCTAssertEqual(event, "wooohooo")
+                    XCTAssertEqual(event.payload, "wooohooo")
                     break
                 }
             }
@@ -100,9 +100,9 @@ class PostgresConnectionTests: XCTestCase {
                     defer { counter += 1 }
                     switch counter {
                     case 0:
-                        XCTAssertEqual(event, "wooohooo")
+                        XCTAssertEqual(event.payload, "wooohooo")
                     case 1:
-                        XCTAssertEqual(event, "wooohooo2")
+                        XCTAssertEqual(event.payload, "wooohooo2")
                         break loop
                     default:
                         XCTFail("Unexpected message: \(event)")
@@ -150,7 +150,7 @@ class PostgresConnectionTests: XCTestCase {
                 let events = try await connection.listen("foo")
                 var iterator = events.makeAsyncIterator()
                 let first = try await iterator.next()
-                XCTAssertEqual(first, "wooohooo")
+                XCTAssertEqual(first?.payload, "wooohooo")
                 do {
                     _ = try await iterator.next()
                     XCTFail("Did not expect to not throw")
@@ -171,7 +171,7 @@ class PostgresConnectionTests: XCTestCase {
 
             try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
             struct MyWeirdError: Error {}
-            _ = try await channel.pipeline.fireErrorCaught(MyWeirdError())
+            channel.pipeline.fireErrorCaught(MyWeirdError())
 
             switch await taskGroup.nextResult()! {
             case .success:

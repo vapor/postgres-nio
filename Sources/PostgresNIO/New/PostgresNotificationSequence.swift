@@ -1,15 +1,19 @@
 
-public struct PostgresNotificationSequence: AsyncSequence {
-    public typealias Element = String
+public struct PostgresNotification: Sendable {
+    public let payload: String
+}
 
-    let base: AsyncThrowingStream<String, Error>
+public struct PostgresNotificationSequence: AsyncSequence, Sendable {
+    public typealias Element = PostgresNotification
+
+    let base: AsyncThrowingStream<PostgresNotification, Error>
 
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(base: self.base.makeAsyncIterator())
     }
 
     public struct AsyncIterator: AsyncIteratorProtocol {
-        var base: AsyncThrowingStream<String, Error>.AsyncIterator
+        var base: AsyncThrowingStream<PostgresNotification, Error>.AsyncIterator
 
         public mutating func next() async throws -> Element? {
             try await self.base.next()

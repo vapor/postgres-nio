@@ -11,7 +11,7 @@ final class NotificationListener: @unchecked Sendable {
 
     enum State {
         case streamInitialized(CheckedContinuation<PostgresNotificationSequence, Error>)
-        case streamListening(AsyncThrowingStream<String, Error>.Continuation)
+        case streamListening(AsyncThrowingStream<PostgresNotification, Error>.Continuation)
 
         case closure(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)
         case done
@@ -47,7 +47,7 @@ final class NotificationListener: @unchecked Sendable {
 
         switch self.state {
         case .streamInitialized(let checkedContinuation):
-            let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self)
+            let (stream, continuation) = AsyncThrowingStream.makeStream(of: PostgresNotification.self)
             let eventLoop = self.eventLoop
             let channel = self.channel
             let listenerID = self.id
@@ -85,7 +85,7 @@ final class NotificationListener: @unchecked Sendable {
         case .streamInitialized, .done:
             fatalError("Invalid state: \(self.state)")
         case .streamListening(let continuation):
-            continuation.yield(backendMessage.payload)
+            continuation.yield(.init(payload: backendMessage.payload))
 
         case .closure(let postgresListenContext, let closure):
             let message = PostgresMessage.NotificationResponse(
