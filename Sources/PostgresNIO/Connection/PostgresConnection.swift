@@ -589,7 +589,7 @@ internal enum PostgresCommands: PostgresRequest {
 // MARK: Notifications
 
 /// Context for receiving NotificationResponse messages on a connection, used for PostgreSQL's `LISTEN`/`NOTIFY` support.
-public final class PostgresListenContext {
+public final class PostgresListenContext: Sendable {
     private let promise: EventLoopPromise<Void>
 
     var future: EventLoopFuture<Void> {
@@ -613,9 +613,10 @@ public final class PostgresListenContext {
 extension PostgresConnection {
     /// Add a handler for NotificationResponse messages on a certain channel. This is used in conjunction with PostgreSQL's `LISTEN`/`NOTIFY` support: to listen on a channel, you add a listener using this method to handle the NotificationResponse messages, then issue a `LISTEN` query to instruct PostgreSQL to begin sending NotificationResponse messages.
     @discardableResult
+    @preconcurrency
     public func addListener(
         channel: String,
-        handler notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
+        handler notificationHandler: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
     ) -> PostgresListenContext {
         let listenContext = PostgresListenContext(promise: self.eventLoop.makePromise(of: Void.self))
         let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)

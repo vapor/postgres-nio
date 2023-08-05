@@ -1,6 +1,7 @@
 import NIOCore
 
-final class NotificationListener {
+// This object is @unchecked Sendable, since we syncronize state on the EL
+final class NotificationListener: @unchecked Sendable {
     let eventLoop: EventLoop
 
     let channel: String
@@ -33,7 +34,7 @@ final class NotificationListener {
         id: Int,
         eventLoop: EventLoop,
         context: PostgresListenContext,
-        closure: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
+        closure: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
     ) {
         self.channel = channel
         self.id = id
