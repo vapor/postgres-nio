@@ -142,7 +142,7 @@ final class NotificationListener: @unchecked Sendable {
 
 
 #if swift(<5.9)
-// Async stream API backfil
+// Async stream API backfill
 extension AsyncThrowingStream {
     static func makeStream(
          of elementType: Element.Type = Element.self,
