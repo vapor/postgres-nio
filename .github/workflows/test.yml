@@ -166,7 +166,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v3
       - name: Run unit tests for coverage data
-        run: swift test --enable-code-coverage
+        run: swift test --filter=^PostgresNIOTests --enable-code-coverage
       - name: Upload coverage data
         uses: vapor/swift-codecov-action@v0.2
     
