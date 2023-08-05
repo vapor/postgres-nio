@@ -10,8 +10,8 @@ class PostgresChannelHandlerTests: XCTestCase {
     var eventLoop: EmbeddedEventLoop!
 
     override func setUp() {
-        self.eventLoop = EmbeddedEventLoop()
         super.setUp()
+        self.eventLoop = EmbeddedEventLoop()
     }
 
     // MARK: Startup
