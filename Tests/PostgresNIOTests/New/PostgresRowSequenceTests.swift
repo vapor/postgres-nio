@@ -183,7 +183,7 @@ final class PostgresRowSequenceTests: XCTestCase {
             logger: self.logger
         )
 
-        stream.receive(completion: .failure(PSQLError.connectionClosed))
+        stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
 
         let rowSequence = stream.asyncSequence()
 
@@ -194,7 +194,7 @@ final class PostgresRowSequenceTests: XCTestCase {
             }
             XCTFail("Expected that an error was thrown before.")
         } catch {
-            XCTAssertEqual(error as? PSQLError, .connectionClosed)
+            XCTAssertEqual(error as? PSQLError, .serverClosedConnection(underlying: nil))
         }
     }
 
@@ -255,14 +255,14 @@ final class PostgresRowSequenceTests: XCTestCase {
         XCTAssertEqual(try row1?.decode(Int.self, context: .default), 0)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
-            stream.receive(completion: .failure(PSQLError.connectionClosed))
+            stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
         }
 
         do {
             _ = try await rowIterator.next()
             XCTFail("Expected that an error was thrown before.")
         } catch {
-            XCTAssertEqual(error as? PSQLError, .connectionClosed)
+            XCTAssertEqual(error as? PSQLError, .serverClosedConnection(underlying: nil))
         }
     }
 

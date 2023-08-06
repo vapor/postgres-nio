@@ -137,14 +137,14 @@ class ConnectionStateMachineTests: XCTestCase {
     
     func testErrorIsIgnoredWhenClosingConnection() {
         // test ignore unclean shutdown when closing connection
-        var stateIgnoreChannelError = ConnectionStateMachine(.closing)
-        
+        var stateIgnoreChannelError = ConnectionStateMachine(.closing(nil))
+
         XCTAssertEqual(stateIgnoreChannelError.errorHappened(.connectionError(underlying: NIOSSLError.uncleanShutdown)), .wait)
         XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
         
         // test ignore any other error when closing connection
         
-        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing)
+        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing(nil))
         XCTAssertEqual(stateIgnoreErrorMessage.errorReceived(.init(fields: [:])), .wait)
         XCTAssertEqual(stateIgnoreErrorMessage.closed(), .fireChannelInactive)
     }
