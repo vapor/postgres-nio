@@ -193,24 +193,8 @@ struct ConnectionStateMachine {
         }
     }
 
-    mutating func close(_ promise: EventLoopPromise<Void>?) -> ConnectionAction {
-
-        switch self.state {
-        case .authenticated:
-            return self.closeConnectionAndCleanup(.clientClosedConnection(underlying: nil))
-
-        case .extendedQuery:
-            return self.closeConnectionAndCleanup(.clientClosedConnection(underlying: nil))
-
-        case .prepareStatement:
-            return self.closeConnectionAndCleanup(.clientClosedConnection(underlying: nil))
-
-        case .closeCommand:
-            return self.closeConnectionAndCleanup(.clientClosedConnection(underlying: nil))
-
-        default:
-            return self.closeConnectionAndCleanup(.clientClosedConnection(underlying: nil))
-        }
+    mutating func close(promise: EventLoopPromise<Void>?) -> ConnectionAction {
+        return self.closeConnectionAndCleanup(.clientClosedConnection(underlying: nil), closePromise: promise)
     }
 
     mutating func closed() -> ConnectionAction {
@@ -837,7 +821,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    private mutating func closeConnectionAndCleanup(_ error: PSQLError) -> ConnectionAction {
+    private mutating func closeConnectionAndCleanup(_ error: PSQLError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction {
         switch self.state {
         case .initialized,
              .sslRequestSent,
@@ -846,12 +830,12 @@ struct ConnectionStateMachine {
              .waitingToStartAuthentication,
              .authenticated,
              .readyForQuery:
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
+            let cleanupContext = self.setErrorAndCreateCleanupContext(error, closePromise: closePromise)
             return .closeConnectionAndCleanup(cleanupContext)
 
         case .authenticating(var authState):
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            
+            let cleanupContext = self.setErrorAndCreateCleanupContext(error, closePromise: closePromise)
+
             if authState.isComplete {
                 // in case the auth state machine is complete all necessary actions have already
                 // been forwarded to the consumer. We can close and cleanup without caring about the
@@ -866,8 +850,8 @@ struct ConnectionStateMachine {
             return .closeConnectionAndCleanup(cleanupContext)
 
         case .extendedQuery(var queryStateMachine, _):
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            
+            let cleanupContext = self.setErrorAndCreateCleanupContext(error, closePromise: closePromise)
+
             if queryStateMachine.isComplete {
                 // in case the query state machine is complete all necessary actions have already
                 // been forwarded to the consumer. We can close and cleanup without caring about the
@@ -901,8 +885,8 @@ struct ConnectionStateMachine {
             }
 
         case .closeCommand(var closeStateMachine, _):
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            
+            let cleanupContext = self.setErrorAndCreateCleanupContext(error, closePromise: closePromise)
+
             if closeStateMachine.isComplete {
                 // in case the close state machine is complete all necessary actions have already
                 // been forwarded to the consumer. We can close and cleanup without caring about the
@@ -1062,15 +1046,20 @@ extension ConnectionStateMachine {
         return self.setErrorAndCreateCleanupContext(error)
     }
     
-    mutating func setErrorAndCreateCleanupContext(_ error: PSQLError) -> ConnectionAction.CleanUpContext {
+    mutating func setErrorAndCreateCleanupContext(_ error: PSQLError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction.CleanUpContext {
         let tasks = Array(self.taskQueue)
         self.taskQueue.removeAll()
         
-        var closePromise: EventLoopPromise<Void>? = nil
-        if case .quiescing(let promise) = self.quiescingState {
-            closePromise = promise
+        var forwardedPromise: EventLoopPromise<Void>? = nil
+        if case .quiescing(.some(let quiescePromise)) = self.quiescingState, let closePromise = closePromise {
+            quiescePromise.futureResult.cascade(to: closePromise)
+            forwardedPromise = quiescePromise
+        } else if case .quiescing(.some(let quiescePromise)) = self.quiescingState {
+            forwardedPromise = quiescePromise
+        } else {
+            forwardedPromise = closePromise
         }
-        
+
         self.state = .closing(error)
 
         var action = ConnectionAction.CleanUpContext.Action.close
@@ -1078,7 +1067,7 @@ extension ConnectionStateMachine {
             action = .fireChannelInactive
         }
         
-        return .init(action: action, tasks: tasks, error: error, closePromise: closePromise)
+        return .init(action: action, tasks: tasks, error: error, closePromise: forwardedPromise)
     }
 }
 

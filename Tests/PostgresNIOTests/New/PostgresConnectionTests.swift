@@ -186,27 +186,26 @@ class PostgresConnectionTests: XCTestCase {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
-                let rows = try await connection.query("SELECT 1;", logger: self.logger)
-                var iterator = rows.decode(Int.self).makeAsyncIterator()
-                let first = try await iterator.next()
-                XCTAssertEqual(first, 1)
-                let second = try await iterator.next()
-                XCTAssertNil(second)
-            }
-
-            taskGroup.addTask {
-                let rows = try await connection.query("SELECT 1;", logger: self.logger)
-                var iterator = rows.decode(Int.self).makeAsyncIterator()
-                let first = try await iterator.next()
-                XCTAssertEqual(first, 1)
-                let second = try await iterator.next()
-                XCTAssertNil(second)
-            }
-
             for _ in 1...2 {
+                taskGroup.addTask {
+                    let rows = try await connection.query("SELECT 1;", logger: self.logger)
+                    var iterator = rows.decode(Int.self).makeAsyncIterator()
+                    let first = try await iterator.next()
+                    XCTAssertEqual(first, 1)
+                    let second = try await iterator.next()
+                    XCTAssertNil(second)
+                }
+            }
+
+            for i in 0...1 {
                 let listenMessage = try await channel.waitForUnpreparedRequest()
                 XCTAssertEqual(listenMessage.parse.query, "SELECT 1;")
+
+                if i == 0 {
+                    taskGroup.addTask {
+                        try await connection.close()
+                    }
+                }
 
                 try await channel.writeInbound(PostgresBackendMessage.parseComplete)
                 try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
@@ -227,15 +226,57 @@ class PostgresConnectionTests: XCTestCase {
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
             }
 
-            switch await taskGroup.nextResult()! {
-            case .success:
-                break
-            case .failure(let failure):
-                XCTFail("Unexpected error: \(failure)")
+            let terminate = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+            XCTAssertEqual(terminate, .terminate)
+            try await channel.closeFuture.get()
+            XCTAssertEqual(channel.isActive, false)
+
+            while let taskResult = await taskGroup.nextResult() {
+                switch taskResult {
+                case .success:
+                    break
+                case .failure(let failure):
+                    XCTFail("Unexpected error: \(failure)")
+                }
             }
         }
     }
 
+    func testCloseClosesImmediatly() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            for _ in 1...2 {
+                taskGroup.addTask {
+                    try await connection.query("SELECT 1;", logger: self.logger)
+                }
+            }
+
+            let listenMessage = try await channel.waitForUnpreparedRequest()
+            XCTAssertEqual(listenMessage.parse.query, "SELECT 1;")
+
+            async let close: () = connection.close()
+            print("close scheduled")
+
+//            let terminate = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+            print("terminate received")
+//            XCTAssertEqual(terminate, .terminate)
+            try await channel.closeFuture.get()
+            XCTAssertEqual(channel.isActive, false)
+            print("foo")
+
+            try await close
+
+            while let taskResult = await taskGroup.nextResult() {
+                switch taskResult {
+                case .success:
+                    XCTFail("Expected queries to fail")
+                case .failure(let failure):
+                    print("\(failure)")
+                }
+            }
+        }
+    }
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()

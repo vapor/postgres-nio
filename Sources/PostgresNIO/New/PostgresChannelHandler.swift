@@ -247,7 +247,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             return
         }
 
-        let action = self.state.gracefulClose(promise)
+        let action = self.state.close(promise: promise)
         self.run(action, with: context)
     }
     
