@@ -107,8 +107,8 @@ struct PostgresMessageDecodingError: Error {
     static func withPartialError(
         _ partialError: PSQLPartialDecodingError,
         messageID: UInt8,
-        messageBytes: ByteBuffer) -> Self
-    {
+        messageBytes: ByteBuffer
+    ) -> Self {
         var byteBuffer = messageBytes
         let data = byteBuffer.readData(length: byteBuffer.readableBytes)!
         
@@ -124,8 +124,8 @@ struct PostgresMessageDecodingError: Error {
         messageID: UInt8,
         messageBytes: ByteBuffer,
         file: String = #fileID,
-        line: Int = #line) -> Self
-    {
+        line: Int = #line
+    ) -> Self {
         var byteBuffer = messageBytes
         let data = byteBuffer.readData(length: byteBuffer.readableBytes)!
         
@@ -153,8 +153,8 @@ struct PSQLPartialDecodingError: Error {
         value: Target.RawValue,
         asType: Target.Type,
         file: String = #fileID,
-        line: Int = #line) -> Self
-    {
+        line: Int = #line
+    ) -> Self {
         return PSQLPartialDecodingError(
             description: "Can not represent '\(value)' with type '\(asType)'.",
             file: file, line: line)
