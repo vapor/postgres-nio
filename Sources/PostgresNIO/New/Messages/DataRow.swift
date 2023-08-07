@@ -9,7 +9,7 @@ import NIOCore
 ///         Not putting `DataRow` in ``PSQLBackendMessage`` is our way to trick
 ///         the Swift compiler
 @usableFromInline
-struct DataRow: Sendable, PostgresBackendMessage.PayloadDecodable, Equatable {
+struct DataRow: Sendable, PostgresBackendMessage.PayloadDecodable, Hashable {
     @usableFromInline
     var columnCount: Int16
     @usableFromInline

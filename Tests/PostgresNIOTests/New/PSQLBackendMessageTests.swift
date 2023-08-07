@@ -256,11 +256,12 @@ class PSQLBackendMessageTests: XCTestCase {
     }
     
     func testDebugDescription() {
+        let salt: UInt32 = 0x00_01_02_03
         XCTAssertEqual("\(PostgresBackendMessage.authentication(.ok))", ".authentication(.ok)")
         XCTAssertEqual("\(PostgresBackendMessage.authentication(.kerberosV5))",
                        ".authentication(.kerberosV5)")
-        XCTAssertEqual("\(PostgresBackendMessage.authentication(.md5(salt: (0, 1, 2, 3))))",
-                       ".authentication(.md5(salt: (0, 1, 2, 3)))")
+        XCTAssertEqual("\(PostgresBackendMessage.authentication(.md5(salt: salt)))",
+                       ".authentication(.md5(salt: \(salt)))")
         XCTAssertEqual("\(PostgresBackendMessage.authentication(.plaintext))",
                        ".authentication(.plaintext)")
         XCTAssertEqual("\(PostgresBackendMessage.authentication(.scmCredential))",

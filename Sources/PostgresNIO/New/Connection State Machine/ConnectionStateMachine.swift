@@ -1258,18 +1258,7 @@ struct AuthContext: Equatable, CustomDebugStringConvertible {
 
 enum PasswordAuthencationMode: Equatable {
     case cleartext
-    case md5(salt: (UInt8, UInt8, UInt8, UInt8))
-    
-    static func ==(lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.cleartext, .cleartext):
-            return true
-        case (.md5(let lhs), .md5(let rhs)):
-            return lhs == rhs
-        default:
-            return false
-        }
-    }
+    case md5(salt: UInt32)
 }
 
 extension ConnectionStateMachine.State: CustomDebugStringConvertible {

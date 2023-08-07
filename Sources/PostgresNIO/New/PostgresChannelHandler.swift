@@ -437,10 +437,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             var hash2 = [UInt8]()
             hash2.reserveCapacity(pwdhash.count + 4)
             hash2.append(contentsOf: pwdhash)
-            hash2.append(salt.0)
-            hash2.append(salt.1)
-            hash2.append(salt.2)
-            hash2.append(salt.3)
+            var saltNetworkOrder = salt.bigEndian
+            withUnsafeBytes(of: &saltNetworkOrder) { ptr in
+                hash2.append(contentsOf: ptr)
+            }
             let hash = Insecure.MD5.hash(data: hash2).md5PrefixHexdigest()
             
             self.encoder.password(hash.utf8)

@@ -152,19 +152,19 @@ class PostgresChannelHandlerTests: XCTestCase {
         let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop, state: state, configureSSLCallback: nil)
         let embedded = EmbeddedChannel(handlers: [
             ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
             handler
         ], loop: self.eventLoop)
 
         embedded.triggerUserOutboundEvent(PSQLOutgoingEvent.authenticate(authContext), promise: nil)
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
+        let salt: UInt32 = 0x00_01_02_03
+
+        let encoder = PSQLBackendMessageEncoder()
+        var byteBuffer = ByteBuffer()
+        encoder.encode(data: .authentication(.md5(salt: salt)), out: &byteBuffer)
+        XCTAssertNoThrow(try embedded.writeInbound(byteBuffer))
         
-        XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.md5(salt: (0,1,2,3)))))
-        
-        var message: PostgresFrontendMessage?
-        XCTAssertNoThrow(message = try embedded.readOutbound(as: PostgresFrontendMessage.self))
-        
-        XCTAssertEqual(message, .password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a")))
+        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a")))
     }
     
     func testRunAuthenticateCleartext() {
@@ -187,11 +187,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
         
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.plaintext)))
-        
-        var message: PostgresFrontendMessage?
-        XCTAssertNoThrow(message = try embedded.readOutbound(as: PostgresFrontendMessage.self))
-        
-        XCTAssertEqual(message, .password(.init(value: password)))
+        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .password(.init(value: password)))
     }
 
     func testHandlerThatSendsMultipleWrongMessages() {
