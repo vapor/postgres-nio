@@ -2,7 +2,7 @@ import NIOCore
 
 extension PostgresBackendMessage {
     
-    struct ParameterStatus: PayloadDecodable, Equatable {
+    struct ParameterStatus: PayloadDecodable, Hashable {
         /// The name of the run-time parameter being reported.
         var parameter: String
         

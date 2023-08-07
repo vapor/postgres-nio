@@ -2,10 +2,10 @@ import NIOCore
 
 extension PostgresBackendMessage {
     
-    enum Authentication: PayloadDecodable {
+    enum Authentication: PayloadDecodable, Hashable {
         case ok
         case kerberosV5
-        case md5(salt: (UInt8, UInt8, UInt8, UInt8))
+        case md5(salt: UInt32)
         case plaintext
         case scmCredential
         case gss
@@ -26,7 +26,7 @@ extension PostgresBackendMessage {
             case 3:
                 return .plaintext
             case 5:
-                guard let salt = buffer.readMultipleIntegers(endianness: .big, as: (UInt8, UInt8, UInt8, UInt8).self) else {
+                guard let salt = buffer.readInteger(as: UInt32.self) else {
                     throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(4, actual: buffer.readableBytes)
                 }
                 return .md5(salt: salt)
@@ -58,37 +58,6 @@ extension PostgresBackendMessage {
             }
         }
         
-    }
-}
-
-extension PostgresBackendMessage.Authentication: Equatable {
-    static func ==(lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.ok, .ok):
-            return true
-        case (.kerberosV5, .kerberosV5):
-            return true
-        case (.md5(let lhs), .md5(let rhs)):
-            return lhs == rhs
-        case (.plaintext, .plaintext):
-            return true
-        case (.scmCredential, .scmCredential):
-            return true
-        case (.gss, .gss):
-            return true
-        case (.sspi, .sspi):
-            return true
-        case (.gssContinue(let lhs), .gssContinue(let rhs)):
-            return lhs == rhs
-        case (.sasl(let lhs), .sasl(let rhs)):
-            return lhs == rhs
-        case (.saslContinue(let lhs), .saslContinue(let rhs)):
-            return lhs == rhs
-        case (.saslFinal(let lhs), .saslFinal(let rhs)):
-            return lhs == rhs
-        default:
-            return false
-        }
     }
 }
 

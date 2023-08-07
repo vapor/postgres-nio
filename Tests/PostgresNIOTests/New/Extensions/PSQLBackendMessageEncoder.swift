@@ -9,7 +9,7 @@ struct PSQLBackendMessageEncoder: MessageToByteEncoder {
     /// - parameters:
     ///     - data: The data to encode into a `ByteBuffer`.
     ///     - out: The `ByteBuffer` into which we want to encode.
-    func encode(data message: PostgresBackendMessage, out buffer: inout ByteBuffer) throws {
+    func encode(data message: PostgresBackendMessage, out buffer: inout ByteBuffer) {
         switch message {
         case .authentication(let authentication):
             self.encode(messageID: message.id, payload: authentication, into: &buffer)
@@ -144,11 +144,7 @@ extension PostgresBackendMessage.Authentication: PSQLMessagePayloadEncodable {
             buffer.writeInteger(Int32(3))
             
         case .md5(salt: let salt):
-            buffer.writeInteger(Int32(5))
-            buffer.writeInteger(salt.0)
-            buffer.writeInteger(salt.1)
-            buffer.writeInteger(salt.2)
-            buffer.writeInteger(salt.3)
+            buffer.writeMultipleIntegers(Int32(5), salt)
             
         case .scmCredential:
             buffer.writeInteger(Int32(6))

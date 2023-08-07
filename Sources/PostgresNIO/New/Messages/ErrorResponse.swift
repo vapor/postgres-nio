@@ -80,7 +80,7 @@ extension PostgresBackendMessage {
         case routine = 0x52 /// R
     }
         
-    struct ErrorResponse: PSQLMessageNotice, PayloadDecodable, Equatable {
+    struct ErrorResponse: PSQLMessageNotice, PayloadDecodable, Hashable {
         let fields: [PostgresBackendMessage.Field: String]
         
         init(fields: [PostgresBackendMessage.Field: String]) {
@@ -88,7 +88,7 @@ extension PostgresBackendMessage {
         }
     }
     
-    struct NoticeResponse: PSQLMessageNotice, PayloadDecodable, Equatable {
+    struct NoticeResponse: PSQLMessageNotice, PayloadDecodable, Hashable {
         let fields: [PostgresBackendMessage.Field: String]
         
         init(fields: [PostgresBackendMessage.Field: String]) {

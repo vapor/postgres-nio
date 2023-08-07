@@ -2,7 +2,7 @@ import NIOCore
 
 extension PostgresBackendMessage {
     
-    struct ParameterDescription: PayloadDecodable, Equatable {
+    struct ParameterDescription: PayloadDecodable, Hashable {
         /// Specifies the object ID of the parameter data type.
         var dataTypes: [PostgresDataType]
         
