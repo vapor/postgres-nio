@@ -5,11 +5,11 @@ import NIOCore
 class PasswordTests: XCTestCase {
     
     func testEncodePassword() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         // md522d085ed8dc3377968dc1c1a40519a2a = "abc123" with salt 1, 2, 3, 4
-        let message = PostgresFrontendMessage.password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a"))
-        encoder.encode(data: message, out: &byteBuffer)
+        let password = "md522d085ed8dc3377968dc1c1a40519a2a"
+        encoder.password(password.utf8)
+        var byteBuffer = encoder.flushBuffer()
         
         let expectedLength = 41 // 1 (id) + 4 (length) + 35 (string) + 1 (null termination)
         

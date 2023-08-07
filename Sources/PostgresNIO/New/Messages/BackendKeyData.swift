@@ -2,7 +2,7 @@ import NIOCore
 
 extension PostgresBackendMessage {
     
-    struct BackendKeyData: PayloadDecodable, Equatable {
+    struct BackendKeyData: PayloadDecodable, Hashable {
         let processID: Int32
         let secretKey: Int32
         

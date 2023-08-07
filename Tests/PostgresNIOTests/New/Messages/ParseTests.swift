@@ -3,18 +3,19 @@ import NIOCore
 @testable import PostgresNIO
 
 class ParseTests: XCTestCase {
-
     func testEncode() {
-        let encoder = PSQLFrontendMessageEncoder()
-        var byteBuffer = ByteBuffer()
-        let parse = PostgresFrontendMessage.Parse(
-            preparedStatementName: "test",
-            query: "SELECT version()",
-            parameters: [.bool, .int8, .bytea, .varchar, .text, .uuid, .json, .jsonbArray])
-        let message = PostgresFrontendMessage.parse(parse)
-        encoder.encode(data: message, out: &byteBuffer)
+        let preparedStatementName = "test"
+        let query = "SELECT version()"
+        let parameters: [PostgresDataType] = [.bool, .int8, .bytea, .varchar, .text, .uuid, .json, .jsonbArray]
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+        encoder.parse(
+            preparedStatementName: preparedStatementName,
+            query: query,
+            parameters: parameters
+        )
+        var byteBuffer = encoder.flushBuffer()
         
-        let length: Int = 1 + 4 + (parse.preparedStatementName.count + 1) + (parse.query.count + 1) + 2 + parse.parameters.count * 4
+        let length: Int = 1 + 4 + (preparedStatementName.count + 1) + (query.count + 1) + 2 + parameters.count * 4
 
         //   1 id
         // + 4 length
@@ -24,17 +25,11 @@ class ParseTests: XCTestCase {
         XCTAssertEqual(byteBuffer.readableBytes, length)
         XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.parse.rawValue)
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.preparedStatementName)
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), parse.query)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt16.self), UInt16(parse.parameters.count))
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.bool.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.int8.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.bytea.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.varchar.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.text.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.uuid.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.json.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), PostgresDataType.jsonbArray.rawValue)
+        XCTAssertEqual(byteBuffer.readNullTerminatedString(), preparedStatementName)
+        XCTAssertEqual(byteBuffer.readNullTerminatedString(), query)
+        XCTAssertEqual(byteBuffer.readInteger(as: UInt16.self), UInt16(parameters.count))
+        for dataType in parameters {
+            XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), dataType.rawValue)
+        }
     }
-
 }

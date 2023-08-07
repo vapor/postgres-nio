@@ -1,4 +1,4 @@
-#if compiler(>=5.8)
+#if swift(>=5.8)
 
 @_documentation(visibility: internal) @_exported import NIO
 @_documentation(visibility: internal) @_exported import NIOSSL

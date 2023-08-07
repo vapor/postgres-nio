@@ -22,6 +22,9 @@ public struct PSQLError: Error {
             case connectionClosed
             case connectionError
             case uncleanShutdown
+
+            case listenFailed
+            case unlistenFailed
         }
 
         internal var base: Base
@@ -46,6 +49,8 @@ public struct PSQLError: Error {
         public static let connectionClosed = Self(.connectionClosed)
         public static let connectionError = Self(.connectionError)
         public static let uncleanShutdown = Self.init(.uncleanShutdown)
+        public static let listenFailed = Self.init(.listenFailed)
+        public static let unlistenFailed = Self.init(.unlistenFailed)
 
         public var description: String {
             switch self.base {
@@ -81,13 +86,17 @@ public struct PSQLError: Error {
                 return "connectionError"
             case .uncleanShutdown:
                 return "uncleanShutdown"
+            case .listenFailed:
+                return "listenFailed"
+            case .unlistenFailed:
+                return "unlistenFailed"
             }
         }
     }
 
     private var backing: Backing
 
-    private mutating func copyBackingStoriageIfNecessary() {
+    private mutating func copyBackingStorageIfNecessary() {
         if !isKnownUniquelyReferenced(&self.backing) {
             self.backing = self.backing.copy()
         }
@@ -97,7 +106,7 @@ public struct PSQLError: Error {
     public internal(set) var code: Code {
         get { self.backing.code }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.code = newValue
         }
     }
@@ -106,7 +115,7 @@ public struct PSQLError: Error {
     public internal(set) var serverInfo: ServerInfo? {
         get { self.backing.serverInfo }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.serverInfo = newValue
         }
     }
@@ -115,7 +124,7 @@ public struct PSQLError: Error {
     public internal(set) var underlying: Error? {
         get { self.backing.underlying }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.underlying = newValue
         }
     }
@@ -124,7 +133,7 @@ public struct PSQLError: Error {
     public internal(set) var file: String? {
         get { self.backing.file }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.file = newValue
         }
     }
@@ -133,7 +142,7 @@ public struct PSQLError: Error {
     public internal(set) var line: Int? {
         get { self.backing.line }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.line = newValue
         }
     }
@@ -142,7 +151,7 @@ public struct PSQLError: Error {
     public internal(set) var query: PostgresQuery? {
         get { self.backing.query }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.query = newValue
         }
     }
@@ -152,7 +161,7 @@ public struct PSQLError: Error {
     var backendMessage: PostgresBackendMessage? {
         get { self.backing.backendMessage }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.backendMessage = newValue
         }
     }
@@ -162,7 +171,7 @@ public struct PSQLError: Error {
     var unsupportedAuthScheme: UnsupportedAuthScheme? {
         get { self.backing.unsupportedAuthScheme }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.unsupportedAuthScheme = newValue
         }
     }
@@ -172,7 +181,7 @@ public struct PSQLError: Error {
     var invalidCommandTag: String? {
         get { self.backing.invalidCommandTag }
         set {
-            self.copyBackingStoriageIfNecessary()
+            self.copyBackingStorageIfNecessary()
             self.backing.invalidCommandTag = newValue
         }
     }
@@ -415,6 +424,12 @@ public struct PSQLError: Error {
     static func invalidCommandTag(_ value: String) -> PSQLError {
         var error = PSQLError(code: .invalidCommandTag)
         error.invalidCommandTag = value
+        return error
+    }
+
+    static func unlistenError(underlying: Error) -> PSQLError {
+        var error = PSQLError(code: .unlistenFailed)
+        error.underlying = underlying
         return error
     }
 

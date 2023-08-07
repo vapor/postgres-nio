@@ -23,7 +23,7 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.sslHandlerAdded(), .wait)
         XCTAssertEqual(state.sslEstablished(), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
-        let salt: (UInt8, UInt8, UInt8, UInt8) = (0,1,2,3)
+        let salt: UInt32 = 0x00_01_02_03
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
     }
 
@@ -154,7 +154,7 @@ class ConnectionStateMachineTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
 
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
+        let salt: UInt32 = 0x00_01_02_03
 
         let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRowStream.self)
 

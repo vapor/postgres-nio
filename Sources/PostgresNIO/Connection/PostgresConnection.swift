@@ -38,15 +38,7 @@ public final class PostgresConnection: @unchecked Sendable {
         }
     }
 
-    /// A dictionary to store notification callbacks in
-    ///
-    /// Those are used when `PostgresConnection.addListener` is invoked. This only lives here since properties
-    /// can not be added in extensions. All relevant code lives in `PostgresConnection+Notifications`
-    var notificationListeners: [String: [(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)]] = [:] {
-        willSet {
-            self.channel.eventLoop.preconditionInEventLoop()
-        }
-    }
+    private let internalListenID = ManagedAtomic(0)
 
     public var isClosed: Bool {
         return !self.channel.isActive
@@ -87,10 +79,10 @@ public final class PostgresConnection: @unchecked Sendable {
 
         let channelHandler = PostgresChannelHandler(
             configuration: configuration,
+            eventLoop: channel.eventLoop,
             logger: logger,
             configureSSLCallback: configureSSLCallback
         )
-        channelHandler.notificationDelegate = self
 
         let eventHandler = PSQLEventsHandler(logger: logger)
 
@@ -164,14 +156,16 @@ public final class PostgresConnection: @unchecked Sendable {
         // thread and the EventLoop.
         return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
             let connectFuture: EventLoopFuture<Channel>
-            let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
 
             switch configuration.connection {
             case .resolved(let address):
+                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
                 connectFuture = bootstrap.connect(to: address)
             case .unresolvedTCP(let host, let port):
+                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
                 connectFuture = bootstrap.connect(host: host, port: port)
             case .unresolvedUDS(let path):
+                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
                 connectFuture = bootstrap.connect(unixDomainSocketPath: path)
             case .bootstrapped(let channel):
                 guard channel.isActive else {
@@ -224,9 +218,10 @@ public final class PostgresConnection: @unchecked Sendable {
         let context = ExtendedQueryContext(
             query: query,
             logger: logger,
-            promise: promise)
+            promise: promise
+        )
 
-        self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
 
         return promise.futureResult
     }
@@ -241,7 +236,7 @@ public final class PostgresConnection: @unchecked Sendable {
             logger: logger,
             promise: promise)
 
-        self.channel.write(PSQLTask.preparedStatement(context), promise: nil)
+        self.channel.write(HandlerTask.preparedStatement(context), promise: nil)
         return promise.futureResult.map { rowDescription in
             PSQLPreparedStatement(name: name, query: query, connection: self, rowDescription: rowDescription)
         }
@@ -257,7 +252,7 @@ public final class PostgresConnection: @unchecked Sendable {
             logger: logger,
             promise: promise)
 
-        self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
         return promise.futureResult
     }
 
@@ -265,7 +260,7 @@ public final class PostgresConnection: @unchecked Sendable {
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let context = CloseCommandContext(target: target, logger: logger, promise: promise)
 
-        self.channel.write(PSQLTask.closeCommand(context), promise: nil)
+        self.channel.write(HandlerTask.closeCommand(context), promise: nil)
         return promise.futureResult
     }
 
@@ -417,7 +412,7 @@ extension PostgresConnection {
             promise: promise
         )
 
-        self.channel.write(PSQLTask.extendedQuery(context), promise: nil)
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()
@@ -426,6 +421,31 @@ extension PostgresConnection {
             error.line = line
             error.query = query
             throw error // rethrow with more metadata
+        }
+    }
+
+    /// Start listening for a channel
+    public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
+        let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
+
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+
+            return try await withCheckedThrowingContinuation { continuation in
+                let listener = NotificationListener(
+                    channel: channel,
+                    id: id,
+                    eventLoop: self.eventLoop,
+                    checkedContinuation: continuation
+                )
+
+                let task = HandlerTask.startListening(listener)
+
+                self.channel.write(task, promise: nil)
+            }
+        } onCancel: {
+            let task = HandlerTask.cancelListening(channel, id)
+            self.channel.write(task, promise: nil)
         }
     }
 }
@@ -569,70 +589,55 @@ internal enum PostgresCommands: PostgresRequest {
 // MARK: Notifications
 
 /// Context for receiving NotificationResponse messages on a connection, used for PostgreSQL's `LISTEN`/`NOTIFY` support.
-public final class PostgresListenContext {
-    var stopper: (() -> Void)?
+public final class PostgresListenContext: Sendable {
+    private let promise: EventLoopPromise<Void>
+
+    var future: EventLoopFuture<Void> {
+        self.promise.futureResult
+    }
+
+    init(promise: EventLoopPromise<Void>) {
+        self.promise = promise
+    }
+
+    func cancel() {
+        self.promise.succeed()
+    }
 
     /// Detach this listener so it no longer receives notifications. Other listeners, including those for the same channel, are unaffected. `UNLISTEN` is not sent; you are responsible for issuing an `UNLISTEN` query yourself if it is appropriate for your application.
     public func stop() {
-        stopper?()
-        stopper = nil
+        self.promise.succeed()
     }
 }
 
 extension PostgresConnection {
     /// Add a handler for NotificationResponse messages on a certain channel. This is used in conjunction with PostgreSQL's `LISTEN`/`NOTIFY` support: to listen on a channel, you add a listener using this method to handle the NotificationResponse messages, then issue a `LISTEN` query to instruct PostgreSQL to begin sending NotificationResponse messages.
     @discardableResult
-    public func addListener(channel: String, handler notificationHandler: @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void) -> PostgresListenContext {
+    @preconcurrency
+    public func addListener(
+        channel: String,
+        handler notificationHandler: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
+    ) -> PostgresListenContext {
+        let listenContext = PostgresListenContext(promise: self.eventLoop.makePromise(of: Void.self))
+        let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
 
-        let listenContext = PostgresListenContext()
+        let listener = NotificationListener(
+            channel: channel,
+            id: id,
+            eventLoop: self.eventLoop,
+            context: listenContext,
+            closure: notificationHandler
+        )
 
-        self.channel.pipeline.handler(type: PostgresChannelHandler.self).whenSuccess { handler in
-            if self.notificationListeners[channel] != nil {
-                self.notificationListeners[channel]!.append((listenContext, notificationHandler))
-            }
-            else {
-                self.notificationListeners[channel] = [(listenContext, notificationHandler)]
-            }
-        }
+        let task = HandlerTask.startListening(listener)
+        self.channel.write(task, promise: nil)
 
-        listenContext.stopper = { [weak self, weak listenContext] in
-            // self is weak, since the connection can long be gone, when the listeners stop is
-            // triggered. listenContext must be weak to prevent a retain cycle
-
-            self?.channel.eventLoop.execute {
-                guard
-                    let self = self, // the connection is already gone
-                    var listeners = self.notificationListeners[channel] // we don't have the listeners for this topic ¯\_(ツ)_/¯
-                else {
-                    return
-                }
-
-                assert(listeners.filter { $0.0 === listenContext }.count <= 1, "Listeners can not appear twice in a channel!")
-                listeners.removeAll(where: { $0.0 === listenContext }) // just in case a listener shows up more than once in a release build, remove all, not just first
-                self.notificationListeners[channel] = listeners.isEmpty ? nil : listeners
-            }
+        listenContext.future.whenComplete { _ in
+            let task = HandlerTask.cancelListening(channel, id)
+            self.channel.write(task, promise: nil)
         }
 
         return listenContext
-    }
-}
-
-extension PostgresConnection: PSQLChannelHandlerNotificationDelegate {
-    func notificationReceived(_ notification: PostgresBackendMessage.NotificationResponse) {
-        self.eventLoop.assertInEventLoop()
-
-        guard let listeners = self.notificationListeners[notification.channel] else {
-            return
-        }
-
-        let postgresNotification = PostgresMessage.NotificationResponse(
-            backendPID: notification.backendPID,
-            channel: notification.channel,
-            payload: notification.payload)
-
-        listeners.forEach { (listenContext, handler) in
-            handler(listenContext, postgresNotification)
-        }
     }
 }
 

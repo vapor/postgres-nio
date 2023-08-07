@@ -11,35 +11,37 @@ class AuthenticationTests: XCTestCase {
         let encoder = PSQLBackendMessageEncoder()
         
         // add ok
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.ok), out: &buffer))
+        encoder.encode(data: .authentication(.ok), out: &buffer)
         expected.append(.authentication(.ok))
         
         // add kerberos
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.kerberosV5), out: &buffer))
+        encoder.encode(data: .authentication(.kerberosV5), out: &buffer)
         expected.append(.authentication(.kerberosV5))
         
         // add plaintext
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.plaintext), out: &buffer))
+        encoder.encode(data: .authentication(.plaintext), out: &buffer)
         expected.append(.authentication(.plaintext))
         
         // add md5
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.md5(salt: (1, 2, 3, 4))), out: &buffer))
-        expected.append(.authentication(.md5(salt: (1, 2, 3, 4))))
-        
+        let salt: UInt32 = 0x01_02_03_04
+        encoder.encode(data: .authentication(.md5(salt: salt)), out: &buffer)
+        expected.append(.authentication(.md5(salt: salt)))
+
         // add scm credential
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.scmCredential), out: &buffer))
+        encoder.encode(data: .authentication(.scmCredential), out: &buffer)
         expected.append(.authentication(.scmCredential))
         
         // add gss
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.gss), out: &buffer))
+        encoder.encode(data: .authentication(.gss), out: &buffer)
         expected.append(.authentication(.gss))
         
         // add sspi
-        XCTAssertNoThrow(try encoder.encode(data: .authentication(.sspi), out: &buffer))
+        encoder.encode(data: .authentication(.sspi), out: &buffer)
         expected.append(.authentication(.sspi))
         
         XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
             inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
+        ))
     }
 }

@@ -928,7 +928,7 @@ struct ConnectionStateMachine {
                  .forwardStreamComplete,
                  .wait,
                  .read:
-                preconditionFailure("Expecting only failure actions if an error happened")
+                preconditionFailure("Invalid state: \(self.state)")
             case .evaluateErrorAtConnectionLevel:
                 return .closeConnectionAndCleanup(cleanupContext)
             case .failQuery(let queryContext, with: let error):
@@ -951,7 +951,7 @@ struct ConnectionStateMachine {
                  .succeedPreparedStatementCreation,
                  .read,
                  .wait:
-                preconditionFailure("Expecting only failure actions if an error happened")
+                preconditionFailure("Invalid state: \(self.state)")
             case .failPreparedStatementCreation(let preparedStatementContext, with: let error):
                 return .failPreparedStatementCreation(preparedStatementContext, with: error, cleanupContext: cleanupContext)
             }
@@ -970,22 +970,20 @@ struct ConnectionStateMachine {
                  .succeedClose,
                  .read,
                  .wait:
-                preconditionFailure("Expecting only failure actions if an error happened")
+                preconditionFailure("Invalid state: \(self.state)")
             case .failClose(let closeCommandContext, with: let error):
                 return .failClose(closeCommandContext, with: error, cleanupContext: cleanupContext)
             }
-        case .error:
-            // TBD: this is an interesting case. why would this case happen?
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            return .closeConnectionAndCleanup(cleanupContext)
-            
-        case .closing:
-            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
-            return .closeConnectionAndCleanup(cleanupContext)
-        case .closed:
-            preconditionFailure("How can an error occur if the connection is already closed?")
+        case .error, .closing, .closed:
+            // We might run into this case because of reentrancy. For example: After we received an
+            // backend unexpected message, that we read of the wire, we bring this connection into
+            // the error state and will try to close the connection. However the server might have
+            // send further follow up messages. In those cases we will run into this method again
+            // and again. We should just ignore those events.
+            return .wait
+
         case .modifying:
-            preconditionFailure("Invalid state")
+            preconditionFailure("Invalid state: \(self.state)")
         }
     }
     
@@ -1093,11 +1091,12 @@ extension ConnectionStateMachine {
              .tooManyParameters,
              .invalidCommandTag,
              .connectionError,
-             .uncleanShutdown:
+             .uncleanShutdown,
+             .unlistenFailed:
             return true
         case .queryCancelled:
             return false
-        case .server:
+        case .server, .listenFailed:
             guard let sqlState = error.serverInfo?[.sqlState] else {
                 // any error message that doesn't have a sql state field, is unexpected by default.
                 return true
@@ -1259,18 +1258,7 @@ struct AuthContext: Equatable, CustomDebugStringConvertible {
 
 enum PasswordAuthencationMode: Equatable {
     case cleartext
-    case md5(salt: (UInt8, UInt8, UInt8, UInt8))
-    
-    static func ==(lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.cleartext, .cleartext):
-            return true
-        case (.md5(let lhs), .md5(let rhs)):
-            return lhs == rhs
-        default:
-            return false
-        }
-    }
+    case md5(salt: UInt32)
 }
 
 extension ConnectionStateMachine.State: CustomDebugStringConvertible {
