@@ -1,0 +1,46 @@
+{
+    "theme": {
+        "aside": {
+            "border-radius": "6px",
+            "border-style": "double",
+            "border-width": "3px"
+        },
+        "border-radius": "0",
+        "button": {
+            "border-radius": "16px",
+            "border-width": "1px",
+            "border-style": "solid"
+        },
+        "code": {
+            "border-radius": "16px",
+            "border-width": "1px",
+            "border-style": "solid"
+        },
+        "color": {
+            "fill": {
+                "dark": "rgb(20, 20, 22)",
+                "light": "rgb(255, 255, 255)"
+            },
+            "psql-blue": "#336791",
+            "documentation-intro-fill": "radial-gradient(circle at top, var(--color-documentation-intro-accent) 30%, #1f1d1f 100%)",
+            "documentation-intro-accent": "var(--color-psql-blue)",
+            "documentation-intro-accent-outer": {
+                "dark": "rgb(255, 255, 255)",
+                "light": "rgb(51, 51, 51)"
+            },
+            "documentation-intro-accent-inner": {
+                "dark": "rgb(51, 51, 51)",
+                "light": "rgb(255, 255, 255)"
+            }
+        },
+        "icons": {
+            "technology": "/images/vapor-postgres-logo.svg",
+            "article": "/images/article.svg"
+        }
+    },
+    "features": {
+        "quickNavigation": {
+            "enable": true
+        }
+    }
+}
