@@ -67,7 +67,7 @@ let config = PostgresConnection.Configuration(
 )
 ```
 
-A [`Logger`] is also required.
+To create a connection we need a [`Logger`], that is used to log connection background events.
 
 ```swift
 import Logging
