@@ -380,7 +380,7 @@ extension PostgresConnection {
 
     /// Creates a new connection to a Postgres server.
     ///
-    /// This methos uses `MultiThreadedEventLoopGroup.singleton` eventLoop provided by SwiftNIO
+    /// This method uses an `EventLoop` from `MultiThreadedEventLoopGroup.singleton`, which is provided by SwiftNIO
     ///
     /// - Parameters:
     ///   - configuration: A ``Configuration`` that shall be used for the connection
