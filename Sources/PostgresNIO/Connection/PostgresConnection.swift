@@ -378,6 +378,28 @@ extension PostgresConnection {
         ).get()
     }
 
+    /// Creates a new connection to a Postgres server.
+    ///
+    /// This methos uses `MultiThreadedEventLoopGroup.singleton` eventLoop provided by SwiftNIO
+    ///
+    /// - Parameters:
+    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - connectionID: An `Int` id, used for metadata logging
+    ///   - logger: A logger to log background events into
+    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
+    public static func connect(
+        configuration: PostgresConnection.Configuration,
+        id connectionID: PostgresConnection.ID,
+        logger: Logger
+    ) async throws -> PostgresConnection {
+        try await Self.connect(
+            on: MultiThreadedEventLoopGroup.singleton.any(),
+            configuration: configuration,
+            id: connectionID,
+            logger: logger
+        )
+    }
+
     /// Closes the connection to the server.
     public func close() async throws {
         try await self.close().get()
