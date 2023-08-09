@@ -69,24 +69,6 @@ final class ExtendedQueryContext {
     }
 }
 
-final class PrepareStatementContext {
-    let name: String
-    let query: String
-    let logger: Logger
-    let promise: EventLoopPromise<RowDescription?>
-    
-    init(name: String,
-         query: String,
-         logger: Logger,
-         promise: EventLoopPromise<RowDescription?>)
-    {
-        self.name = name
-        self.query = query
-        self.logger = logger
-        self.promise = promise
-    }
-}
-
 final class CloseCommandContext {
     let target: CloseTarget
     let logger: Logger
@@ -94,8 +76,8 @@ final class CloseCommandContext {
     
     init(target: CloseTarget,
          logger: Logger,
-         promise: EventLoopPromise<Void>)
-    {
+         promise: EventLoopPromise<Void>
+    ) {
         self.target = target
         self.logger = logger
         self.promise = promise
