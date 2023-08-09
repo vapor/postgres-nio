@@ -180,9 +180,9 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.errorReceived(.init(fields: fields)),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [.extendedQuery(extendedQueryContext)], error: .server(.init(fields: fields)), closePromise: nil)))
         
-        XCTAssertNil(extendedQueryContext.promise.futureResult._value)
-        
+        XCTAssertNil(queryPromise.futureResult._value)
+
         // make sure we don't crash
-        extendedQueryContext.promise.fail(PSQLError.server(.init(fields: fields)))
+        queryPromise.fail(PSQLError.server(.init(fields: fields)))
     }
 }
