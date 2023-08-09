@@ -182,9 +182,8 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testGracefulShutdownClosesWhenInternalQueueIsEmpty() async throws {
+    func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
-
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             for _ in 1...2 {
                 taskGroup.addTask {
@@ -203,7 +202,7 @@ class PostgresConnectionTests: XCTestCase {
 
                 if i == 0 {
                     taskGroup.addTask {
-                        try await connection.close()
+                        try await connection.closeGracefully()
                     }
                 }
 
@@ -256,14 +255,9 @@ class PostgresConnectionTests: XCTestCase {
             XCTAssertEqual(listenMessage.parse.query, "SELECT 1;")
 
             async let close: () = connection.close()
-            print("close scheduled")
 
-//            let terminate = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-            print("terminate received")
-//            XCTAssertEqual(terminate, .terminate)
             try await channel.closeFuture.get()
             XCTAssertEqual(channel.isActive, false)
-            print("foo")
 
             try await close
 
@@ -272,7 +266,10 @@ class PostgresConnectionTests: XCTestCase {
                 case .success:
                     XCTFail("Expected queries to fail")
                 case .failure(let failure):
-                    print("\(failure)")
+                    guard let error = failure as? PSQLError else {
+                        return XCTFail("Unexpected error type: \(failure)")
+                    }
+                    XCTAssertEqual(error.code, .clientClosedConnection)
                 }
             }
         }
