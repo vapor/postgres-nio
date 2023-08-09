@@ -359,7 +359,7 @@ extension PostgresConnection {
     /// Creates a new connection to a Postgres server.
     ///
     /// - Parameters:
-    ///   - eventLoop: The `EventLoop` the request shall be created on.
+    ///   - eventLoop: The `EventLoop` the connection shall be created on.
     ///   - configuration: A ``Configuration`` that shall be used for the connection
     ///   - connectionID: An `Int` id, used for metadata logging
     ///   - logger: A logger to log background events into
