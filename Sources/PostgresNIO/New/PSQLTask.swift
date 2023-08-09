@@ -3,7 +3,6 @@ import NIOCore
 
 enum HandlerTask {
     case extendedQuery(ExtendedQueryContext)
-    case preparedStatement(PrepareStatementContext)
     case closeCommand(CloseCommandContext)
     case startListening(NotificationListener)
     case cancelListening(String, Int)
@@ -11,16 +10,19 @@ enum HandlerTask {
 
 enum PSQLTask {
     case extendedQuery(ExtendedQueryContext)
-    case preparedStatement(PrepareStatementContext)
     case closeCommand(CloseCommandContext)
 
     func failWithError(_ error: PSQLError) {
         switch self {
         case .extendedQuery(let extendedQueryContext):
-            extendedQueryContext.promise.fail(error)
-
-        case .preparedStatement(let createPreparedStatementContext):
-            createPreparedStatementContext.promise.fail(error)
+            switch extendedQueryContext.query {
+            case .unnamed(_, let eventLoopPromise):
+                eventLoopPromise.fail(error)
+            case .executeStatement(_, let eventLoopPromise):
+                eventLoopPromise.fail(error)
+            case .prepareStatement(_, _, let eventLoopPromise):
+                eventLoopPromise.fail(error)
+            }
 
         case .closeCommand(let closeCommandContext):
             closeCommandContext.promise.fail(error)
@@ -30,31 +32,40 @@ enum PSQLTask {
 
 final class ExtendedQueryContext {
     enum Query {
-        case unnamed(PostgresQuery)
-        case preparedStatement(PSQLExecuteStatement)
+        case unnamed(PostgresQuery, EventLoopPromise<PSQLRowStream>)
+        case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
+        case prepareStatement(name: String, query: String, EventLoopPromise<RowDescription?>)
     }
     
     let query: Query
     let logger: Logger
-
-    let promise: EventLoopPromise<PSQLRowStream>
     
-    init(query: PostgresQuery,
-         logger: Logger,
-         promise: EventLoopPromise<PSQLRowStream>)
-    {
-        self.query = .unnamed(query)
+    init(
+        query: PostgresQuery,
+        logger: Logger,
+        promise: EventLoopPromise<PSQLRowStream>
+    ) {
+        self.query = .unnamed(query, promise)
         self.logger = logger
-        self.promise = promise
     }
     
-    init(executeStatement: PSQLExecuteStatement,
-         logger: Logger,
-         promise: EventLoopPromise<PSQLRowStream>)
-    {
-        self.query = .preparedStatement(executeStatement)
+    init(
+        executeStatement: PSQLExecuteStatement,
+        logger: Logger,
+        promise: EventLoopPromise<PSQLRowStream>
+    ) {
+        self.query = .executeStatement(executeStatement, promise)
         self.logger = logger
-        self.promise = promise
+    }
+
+    init(
+        name: String,
+        query: String,
+        logger: Logger,
+        promise: EventLoopPromise<RowDescription?>
+    ) {
+        self.query = .prepareStatement(name: name, query: query, promise)
+        self.logger = logger
     }
 }
 

@@ -5,44 +5,27 @@ import XCTest
 import NIOCore
 import NIOEmbedded
 
-class PSQLRowStreamTests: XCTestCase {
+final class PSQLRowStreamTests: XCTestCase {
+    let logger = Logger(label: "PSQLRowStreamTests")
+    let eventLoop = EmbeddedEventLoop()
+
     func testEmptyStream() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "INSERT INTO foo bar;", logger: logger, promise: promise
-        )
-        
         let stream = PSQLRowStream(
-            rowDescription: [],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .noRows(.success("INSERT 0 1"))
+            source: .noRows(.success("INSERT 0 1")),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         
         XCTAssertEqual(try stream.all().wait(), [])
         XCTAssertEqual(stream.commandTag, "INSERT 0 1")
     }
     
     func testFailedStream() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", logger: logger, promise: promise
-        )
-        
         let stream = PSQLRowStream(
-            rowDescription: [],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .noRows(.failure(PSQLError.connectionClosed))
+            source: .noRows(.failure(PSQLError.connectionClosed)),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         
         XCTAssertThrowsError(try stream.all().wait()) {
             XCTAssertEqual($0 as? PSQLError, .connectionClosed)
@@ -50,24 +33,15 @@ class PSQLRowStreamTests: XCTestCase {
     }
     
     func testGetArrayAfterStreamHasFinished() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", logger: logger, promise: promise
-        )
-        
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)
-            ],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
         
@@ -89,22 +63,15 @@ class PSQLRowStreamTests: XCTestCase {
     }
 
     func testGetArrayBeforeStreamHasFinished() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", logger: logger, promise: promise)
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)
-            ],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
         
@@ -139,24 +106,15 @@ class PSQLRowStreamTests: XCTestCase {
     }
     
     func testOnRowAfterStreamHasFinished() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", logger: logger, promise: promise
-        )
-        
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)
-            ],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
         
@@ -183,24 +141,15 @@ class PSQLRowStreamTests: XCTestCase {
     }
 
     func testOnRowThrowsErrorOnInitialBatch() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", logger: logger, promise: promise
-        )
-        
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)
-            ],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
         
@@ -232,24 +181,15 @@ class PSQLRowStreamTests: XCTestCase {
 
     
     func testOnRowBeforeStreamHasFinished() {
-        let logger = Logger(label: "test")
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        
-        let queryContext = ExtendedQueryContext(
-            query: "SELECT * FROM test;", logger: logger, promise: promise
-        )
-        
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)
-            ],
-            queryContext: queryContext,
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [self.makeColumnDescription(name: "foo", dataType: .text, format: .binary)],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
         
