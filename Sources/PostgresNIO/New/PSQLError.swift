@@ -54,6 +54,12 @@ public struct PSQLError: Error {
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
 
+        @available(*, deprecated, renamed: "clientClosesConnection")
+        public static let connectionQuiescing = Self.clientClosesConnection
+
+        @available(*, deprecated, message: "Use the more specific `serverClosedConnection` or `clientClosedConnection` instead")
+        public static let connectionClosed = Self.serverClosedConnection
+
         public var description: String {
             switch self.base {
             case .sslUnsupported:
