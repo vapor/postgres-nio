@@ -23,6 +23,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private let configureSSLCallback: ((Channel) throws -> Void)?
 
     private var listenState: ListenStateMachine
+    private var preparedStatementState: PreparedStatementStateMachine
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
@@ -33,6 +34,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
         self.eventLoop = eventLoop
         self.listenState = ListenStateMachine()
+        self.preparedStatementState = PreparedStatementStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -51,6 +53,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.state = state
         self.eventLoop = eventLoop
         self.listenState = ListenStateMachine()
+        self.preparedStatementState = PreparedStatementStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -231,6 +234,56 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
             case .cancelListener(let listener):
                 listener.failed(CancellationError())
+                return
+            }
+        case .executePreparedStatement(let preparedStatement):
+            switch self.preparedStatementState.lookup(
+                name: preparedStatement.name,
+                context: preparedStatement
+            ) {
+            case .prepareStatement:
+                let promise = self.eventLoop.makePromise(of: RowDescription?.self)
+                promise.futureResult.whenSuccess { rowDescription in
+                    self.prepareStatementComplete(
+                        name: preparedStatement.name,
+                        rowDescription: rowDescription,
+                        context: context
+                    )
+                }
+                promise.futureResult.whenFailure { error in
+                    self.prepareStatementFailed(
+                        name: preparedStatement.name,
+                        error: error as! PSQLError,
+                        context: context
+                    )
+                }
+                psqlTask = .extendedQuery(.init(
+                    name: preparedStatement.name,
+                    query: preparedStatement.sql,
+                    logger: preparedStatement.logger,
+                    promise: promise
+                ))
+            case .waitForAlreadyInFlightPreparation:
+                // The state machine already keeps track of this
+                // and will execute the statement as soon as it's prepared
+                return
+            case .executePendingStatements(let pendingStatements, let rowDescription):
+                for statement in pendingStatements {
+                    let action = self.state.enqueue(task: .extendedQuery(.init(
+                        executeStatement: .init(
+                            name: statement.name,
+                            binds: statement.bindings,
+                            rowDescription: rowDescription),
+                        logger: statement.logger,
+                        promise: statement.promise
+                    )))
+                    self.run(action, with: context)
+                }
+                return
+            case .returnError(let pendingStatements, let error):
+                for statement in pendingStatements {
+                    statement.promise.fail(error)
+                }
                 return
             }
         }
@@ -664,6 +717,49 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         }
     }
 
+    private func prepareStatementComplete(
+        name: String,
+        rowDescription: RowDescription?,
+        context: ChannelHandlerContext
+    ) {
+        let action = self.preparedStatementState.preparationComplete(
+            name: name,
+            rowDescription: rowDescription
+        )
+        guard case .executePendingStatements(let statements, let rowDescription) = action else {
+            preconditionFailure("Expected to have pending statements to execute")
+        }
+        for preparedStatement in statements {
+            let action = self.state.enqueue(task: .extendedQuery(.init(
+                executeStatement: .init(
+                    name: preparedStatement.name,
+                    binds: preparedStatement.bindings,
+                    rowDescription: rowDescription
+                ),
+                logger: preparedStatement.logger,
+                promise: preparedStatement.promise
+            ))
+            )
+            self.run(action, with: context)
+        }
+    }
+
+    private func prepareStatementFailed(
+        name: String,
+        error: PSQLError,
+        context: ChannelHandlerContext
+    ) {
+        let action = self.preparedStatementState.errorHappened(
+            name: name,
+            error: error
+        )
+        guard case .returnError(let statements, let error) = action else {
+            preconditionFailure("Expected to have pending statements to execute")
+        }
+        for statement in statements {
+            statement.promise.fail(error)
+        }
+    }
 }
 
 extension PostgresChannelHandler: PSQLRowsDataSource {

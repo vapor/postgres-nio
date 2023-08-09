@@ -460,6 +460,27 @@ extension PostgresConnection {
             self.channel.write(task, promise: nil)
         }
     }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary
+    public func execute<P: PreparedStatement>(
+        _ preparedStatement: P,
+        logger: Logger
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, P.Row>
+    {
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let task = HandlerTask.executePreparedStatement(.init(
+            name: String(reflecting: P.self),
+            sql: P.sql,
+            bindings: preparedStatement.makeBindings(),
+            logger: logger,
+            promise: promise
+        ))
+        self.channel.write(task, promise: nil)
+        return try await promise.futureResult
+            .map { $0.asyncSequence() }
+            .get()
+            .map { try preparedStatement.decodeRow($0) }
+    }
 }
 
 // MARK: EventLoopFuture interface
