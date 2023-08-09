@@ -1,5 +1,9 @@
 # ``PostgresNIO``
 
+@Metadata {
+    @TitleHeading(Package)
+}
+
 🐘 Non-blocking, event-driven Swift client for PostgreSQL built on SwiftNIO.
 
 ## Overview
