@@ -184,7 +184,7 @@ class PostgresConnectionTests: XCTestCase {
 
     func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             for _ in 1...2 {
                 taskGroup.addTask {
                     let rows = try await connection.query("SELECT 1;", logger: self.logger)
@@ -244,7 +244,7 @@ class PostgresConnectionTests: XCTestCase {
     func testCloseClosesImmediatly() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             for _ in 1...2 {
                 taskGroup.addTask {
                     try await connection.query("SELECT 1;", logger: self.logger)
