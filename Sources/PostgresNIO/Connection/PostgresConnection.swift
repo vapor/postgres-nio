@@ -359,13 +359,13 @@ extension PostgresConnection {
     /// Creates a new connection to a Postgres server.
     ///
     /// - Parameters:
-    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - eventLoop: The `EventLoop` the request shall be created on.
     ///   - configuration: A ``Configuration`` that shall be used for the connection
     ///   - connectionID: An `Int` id, used for metadata logging
     ///   - logger: A logger to log background events into
     /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
     public static func connect(
-        on eventLoop: EventLoop,
+        on eventLoop: EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
@@ -376,28 +376,6 @@ extension PostgresConnection {
             logger: logger,
             on: eventLoop
         ).get()
-    }
-
-    /// Creates a new connection to a Postgres server.
-    ///
-    /// This method uses an `EventLoop` from `MultiThreadedEventLoopGroup.singleton`, which is provided by SwiftNIO
-    ///
-    /// - Parameters:
-    ///   - configuration: A ``Configuration`` that shall be used for the connection
-    ///   - connectionID: An `Int` id, used for metadata logging
-    ///   - logger: A logger to log background events into
-    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
-    public static func connect(
-        configuration: PostgresConnection.Configuration,
-        id connectionID: PostgresConnection.ID,
-        logger: Logger
-    ) async throws -> PostgresConnection {
-        try await Self.connect(
-            on: MultiThreadedEventLoopGroup.singleton.any(),
-            configuration: configuration,
-            id: connectionID,
-            logger: logger
-        )
     }
 
     /// Closes the connection to the server.
@@ -680,5 +658,22 @@ extension EventLoopFuture {
                 throw error
             }
         }
+    }
+}
+
+extension PostgresConnection {
+    /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
+    ///
+    /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
+    public static var defaultEventLoopGroup: EventLoopGroup {
+#if canImport(Network)
+        if #available(OSX 10.14, iOS 12.0, tvOS 12.0, watchOS 6.0, *) {
+            return NIOTSEventLoopGroup.singleton
+        } else {
+            return MultiThreadedEventLoopGroup.singleton
+        }
+#else
+        return MultiThreadedEventLoopGroup.singleton
+#endif
     }
 }
