@@ -360,13 +360,13 @@ extension PostgresConnection {
     /// Creates a new connection to a Postgres server.
     ///
     /// - Parameters:
-    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - eventLoop: The `EventLoop` the connection shall be created on.
     ///   - configuration: A ``Configuration`` that shall be used for the connection
     ///   - connectionID: An `Int` id, used for metadata logging
     ///   - logger: A logger to log background events into
     /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
     public static func connect(
-        on eventLoop: EventLoop,
+        on eventLoop: EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
@@ -659,5 +659,22 @@ extension EventLoopFuture {
                 throw error
             }
         }
+    }
+}
+
+extension PostgresConnection {
+    /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
+    ///
+    /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
+    public static var defaultEventLoopGroup: EventLoopGroup {
+#if canImport(Network)
+        if #available(OSX 10.14, iOS 12.0, tvOS 12.0, watchOS 6.0, *) {
+            return NIOTSEventLoopGroup.singleton
+        } else {
+            return MultiThreadedEventLoopGroup.singleton
+        }
+#else
+        return MultiThreadedEventLoopGroup.singleton
+#endif
     }
 }
