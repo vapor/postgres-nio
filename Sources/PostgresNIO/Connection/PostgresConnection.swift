@@ -230,13 +230,14 @@ public final class PostgresConnection: @unchecked Sendable {
 
     func prepareStatement(_ query: String, with name: String, logger: Logger) -> EventLoopFuture<PSQLPreparedStatement> {
         let promise = self.channel.eventLoop.makePromise(of: RowDescription?.self)
-        let context = PrepareStatementContext(
+        let context = ExtendedQueryContext(
             name: name,
             query: query,
             logger: logger,
-            promise: promise)
+            promise: promise
+        )
 
-        self.channel.write(HandlerTask.preparedStatement(context), promise: nil)
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
         return promise.futureResult.map { rowDescription in
             PSQLPreparedStatement(name: name, query: query, connection: self, rowDescription: rowDescription)
         }

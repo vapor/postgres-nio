@@ -25,13 +25,10 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lquery == rquery
         case (.fireEventReadyForQuery, .fireEventReadyForQuery):
             return true
-        
-        case (.succeedQueryNoRowsComming(let lhsContext, let lhsCommandTag), .succeedQueryNoRowsComming(let rhsContext, let rhsCommandTag)):
-            return lhsContext === rhsContext && lhsCommandTag == rhsCommandTag
-        case (.succeedQuery(let lhsContext, let lhsRowDescription), .succeedQuery(let rhsContext, let rhsRowDescription)):
-            return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
-        case (.failQuery(let lhsContext, let lhsError, let lhsCleanupContext), .failQuery(let rhsContext, let rhsError, let rhsCleanupContext)):
-            return lhsContext === rhsContext && lhsError == rhsError && lhsCleanupContext == rhsCleanupContext
+        case (.succeedQuery(let lhsPromise, let lhsResult), .succeedQuery(let rhsPromise, let rhsResult)):
+            return lhsPromise.futureResult === rhsPromise.futureResult && lhsResult.value == rhsResult.value
+        case (.failQuery(let lhsPromise, let lhsError, let lhsCleanupContext), .failQuery(let rhsPromise, let rhsError, let rhsCleanupContext)):
+            return lhsPromise.futureResult === rhsPromise.futureResult && lhsError == rhsError && lhsCleanupContext == rhsCleanupContext
         case (.forwardRows(let lhsRows), .forwardRows(let rhsRows)):
             return lhsRows == rhsRows
         case (.forwardStreamComplete(let lhsBuffer, let lhsCommandTag), .forwardStreamComplete(let rhsBuffer, let rhsCommandTag)):
@@ -40,8 +37,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsError == rhsError && lhsRead == rhsRead && lhsCleanupContext == rhsCleanupContext
         case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
             return lhsName == rhsName && lhsQuery == rhsQuery
-        case (.succeedPreparedStatementCreation(let lhsContext, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsContext, let rhsRowDescription)):
-            return lhsContext === rhsContext && lhsRowDescription == rhsRowDescription
+        case (.succeedPreparedStatementCreation(let lhsPromise, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsPromise, let rhsRowDescription)):
+            return lhsPromise.futureResult === rhsPromise.futureResult && lhsRowDescription == rhsRowDescription
         case (.fireChannelInactive, .fireChannelInactive):
             return true
         default:
@@ -109,8 +106,6 @@ extension PSQLTask: Equatable {
     public static func == (lhs: PSQLTask, rhs: PSQLTask) -> Bool {
         switch (lhs, rhs) {
         case (.extendedQuery(let lhs), .extendedQuery(let rhs)):
-            return lhs === rhs
-        case (.preparedStatement(let lhs), .preparedStatement(let rhs)):
             return lhs === rhs
         case (.closeCommand(let lhs), .closeCommand(let rhs)):
             return lhs === rhs
