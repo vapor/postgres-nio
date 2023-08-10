@@ -3,7 +3,6 @@ import NIOEmbedded
 @testable import PostgresNIO
 
 class PrepareStatementStateMachineTests: XCTestCase {
-    
     func testCreatePreparedStatementReturningRowDescription() {
         var state = ConnectionStateMachine.readyForQuery()
         
@@ -12,10 +11,11 @@ class PrepareStatementStateMachineTests: XCTestCase {
         
         let name = "haha"
         let query = #"SELECT id FROM users WHERE id = $1 "#
-        let prepareStatementContext = PrepareStatementContext(
-            name: name, query: query, logger: .psqlTest, promise: promise)
-        
-        XCTAssertEqual(state.enqueue(task: .preparedStatement(prepareStatementContext)),
+        let prepareStatementContext = ExtendedQueryContext(
+            name: name, query: query, logger: .psqlTest, promise: promise
+        )
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
                        .sendParseDescribeSync(name: name, query: query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
@@ -25,7 +25,7 @@ class PrepareStatementStateMachineTests: XCTestCase {
         ]
         
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: columns)),
-                       .succeedPreparedStatementCreation(prepareStatementContext, with: .init(columns: columns)))
+                       .succeedPreparedStatementCreation(promise, with: .init(columns: columns)))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
@@ -37,25 +37,42 @@ class PrepareStatementStateMachineTests: XCTestCase {
         
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
-        let prepareStatementContext = PrepareStatementContext(
-            name: name, query: query, logger: .psqlTest, promise: promise)
-        
-        XCTAssertEqual(state.enqueue(task: .preparedStatement(prepareStatementContext)),
+        let prepareStatementContext = ExtendedQueryContext(
+            name: name, query: query, logger: .psqlTest, promise: promise
+        )
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
                        .sendParseDescribeSync(name: name, query: query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
         XCTAssertEqual(state.noDataReceived(),
-                       .succeedPreparedStatementCreation(prepareStatementContext, with: nil))
+                       .succeedPreparedStatementCreation(promise, with: nil))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
     func testErrorReceivedAfter() {
-        let connectionContext = ConnectionStateMachine.createConnectionContext()
-        var state = ConnectionStateMachine(.prepareStatement(.init(.noDataMessageReceived), connectionContext))
-        
+        var state = ConnectionStateMachine.readyForQuery()
+
+        let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+
+        let name = "haha"
+        let query = #"DELETE FROM users WHERE id = $1 "#
+        let prepareStatementContext = ExtendedQueryContext(
+            name: name, query: query, logger: .psqlTest, promise: promise
+        )
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
+                       .sendParseDescribeSync(name: name, query: query))
+        XCTAssertEqual(state.parseCompleteReceived(), .wait)
+        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+
+        XCTAssertEqual(state.noDataReceived(),
+                       .succeedPreparedStatementCreation(promise, with: nil))
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+
         XCTAssertEqual(state.authenticationMessageReceived(.ok),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(.ok)), closePromise: nil)))
     }
-
 }

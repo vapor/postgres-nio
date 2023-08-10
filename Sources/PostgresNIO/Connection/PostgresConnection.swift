@@ -230,13 +230,14 @@ public final class PostgresConnection: @unchecked Sendable {
 
     func prepareStatement(_ query: String, with name: String, logger: Logger) -> EventLoopFuture<PSQLPreparedStatement> {
         let promise = self.channel.eventLoop.makePromise(of: RowDescription?.self)
-        let context = PrepareStatementContext(
+        let context = ExtendedQueryContext(
             name: name,
             query: query,
             logger: logger,
-            promise: promise)
+            promise: promise
+        )
 
-        self.channel.write(HandlerTask.preparedStatement(context), promise: nil)
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
         return promise.futureResult.map { rowDescription in
             PSQLPreparedStatement(name: name, query: query, connection: self, rowDescription: rowDescription)
         }
@@ -359,13 +360,13 @@ extension PostgresConnection {
     /// Creates a new connection to a Postgres server.
     ///
     /// - Parameters:
-    ///   - eventLoop: The `EventLoop` the request shall be created on
+    ///   - eventLoop: The `EventLoop` the connection shall be created on.
     ///   - configuration: A ``Configuration`` that shall be used for the connection
     ///   - connectionID: An `Int` id, used for metadata logging
     ///   - logger: A logger to log background events into
     /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
     public static func connect(
-        on eventLoop: EventLoop,
+        on eventLoop: EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
@@ -381,6 +382,17 @@ extension PostgresConnection {
     /// Closes the connection to the server.
     public func close() async throws {
         try await self.close().get()
+    }
+
+    /// Closes the connection to the server, _after all queries_ that have been created on this connection have been run.
+    public func closeGracefully() async throws {
+        try await withTaskCancellationHandler { () async throws -> () in
+            let promise = self.eventLoop.makePromise(of: Void.self)
+            self.channel.triggerUserOutboundEvent(PSQLOutgoingEvent.gracefulShutdown, promise: promise)
+            return try await promise.futureResult.get()
+        } onCancel: {
+            _ = self.close()
+        }
     }
 
     /// Run a query on the Postgres server the connection is connected to.
@@ -658,5 +670,22 @@ extension EventLoopFuture {
                 throw error
             }
         }
+    }
+}
+
+extension PostgresConnection {
+    /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
+    ///
+    /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
+    public static var defaultEventLoopGroup: EventLoopGroup {
+#if canImport(Network)
+        if #available(OSX 10.14, iOS 12.0, tvOS 12.0, watchOS 6.0, *) {
+            return NIOTSEventLoopGroup.singleton
+        } else {
+            return MultiThreadedEventLoopGroup.singleton
+        }
+#else
+        return MultiThreadedEventLoopGroup.singleton
+#endif
     }
 }

@@ -20,7 +20,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .wait)
-        XCTAssertEqual(state.commandCompletedReceived("DELETE 1"), .succeedQueryNoRowsComming(queryContext, commandTag: "DELETE 1"))
+        XCTAssertEqual(state.commandCompletedReceived("DELETE 1"), .succeedQuery(promise, with: .init(value: .noRows("DELETE 1"), logger: logger)))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
@@ -49,7 +49,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         }
         
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
-        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
+        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(promise, with: .init(value: .rowDescription(expected), logger: logger)))
         let row1: DataRow = [ByteBuffer(string: "test1")]
         XCTAssertEqual(state.dataRowReceived(row1), .wait)
         XCTAssertEqual(state.channelReadComplete(), .forwardRows([row1]))
@@ -93,7 +93,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         let psqlError = PSQLError.unexpectedBackendMessage(.authentication(.ok))
         XCTAssertEqual(state.authenticationMessageReceived(.ok),
-                       .failQuery(queryContext, with: psqlError, cleanupContext: .init(action: .close, tasks: [], error: psqlError, closePromise: nil)))
+                       .failQuery(promise, with: psqlError, cleanupContext: .init(action: .close, tasks: [], error: psqlError, closePromise: nil)))
     }
 
     func testExtendedQueryIsCancelledImmediatly() {
@@ -121,7 +121,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         }
 
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
-        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
+        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(promise, with: .init(value: .rowDescription(expected), logger: logger)))
         XCTAssertEqual(state.cancelQueryStream(), .forwardStreamError(.queryCancelled, read: false, cleanupContext: nil))
         XCTAssertEqual(state.dataRowReceived([ByteBuffer(string: "test1")]), .wait)
         XCTAssertEqual(state.channelReadComplete(), .wait)
@@ -165,7 +165,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         }
 
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
-        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
+        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(promise, with: .init(value: .rowDescription(expected), logger: logger)))
         let row1: DataRow = [ByteBuffer(string: "test1")]
         XCTAssertEqual(state.dataRowReceived(row1), .wait)
         XCTAssertEqual(state.channelReadComplete(), .forwardRows([row1]))
@@ -207,7 +207,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         }
 
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
-        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(queryContext, columns: expected))
+        XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(promise, with: .init(value: .rowDescription(expected), logger: logger)))
         let dataRows1: [DataRow] = [
             [ByteBuffer(string: "test1")],
             [ByteBuffer(string: "test2")],
@@ -251,7 +251,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "Error", .sqlState: "123"])
         XCTAssertEqual(
-            state.errorReceived(serverError), .failQuery(queryContext, with: .server(serverError), cleanupContext: .none)
+            state.errorReceived(serverError), .failQuery(promise, with: .server(serverError), cleanupContext: .none)
         )
 
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
@@ -269,7 +269,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
-        XCTAssertEqual(state.cancelQueryStream(), .failQuery(queryContext, with: .queryCancelled, cleanupContext: .none))
+        XCTAssertEqual(state.cancelQueryStream(), .failQuery(promise, with: .queryCancelled, cleanupContext: .none))
 
         let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "Error", .sqlState: "123"])
         XCTAssertEqual(state.errorReceived(serverError), .wait)

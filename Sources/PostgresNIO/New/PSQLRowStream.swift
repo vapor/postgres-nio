@@ -1,12 +1,23 @@
 import NIOCore
 import Logging
 
+struct QueryResult {
+    enum Value: Equatable {
+        case noRows(String)
+        case rowDescription([RowDescription.Column])
+    }
+
+    var value: Value
+
+    var logger: Logger
+}
+
 // Thread safety is guaranteed in the RowStream through dispatching onto the NIO EventLoop.
 final class PSQLRowStream: @unchecked Sendable {
     private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
 
-    enum RowSource {
-        case stream(PSQLRowsDataSource)
+    enum Source {
+        case stream([RowDescription.Column], PSQLRowsDataSource)
         case noRows(Result<String, Error>)
     }
     
@@ -31,27 +42,28 @@ final class PSQLRowStream: @unchecked Sendable {
     private let lookupTable: [String: Int]
     private var downstreamState: DownstreamState
     
-    init(rowDescription: [RowDescription.Column],
-         queryContext: ExtendedQueryContext,
-         eventLoop: EventLoop,
-         rowSource: RowSource)
-    {
+    init(
+        source: Source,
+        eventLoop: EventLoop,
+        logger: Logger
+    ) {
         let bufferState: BufferState
-        switch rowSource {
-        case .stream(let dataSource):
+        switch source {
+        case .stream(let rowDescription, let dataSource):
+            self.rowDescription = rowDescription
             bufferState = .streaming(buffer: .init(), dataSource: dataSource)
         case .noRows(.success(let commandTag)):
+            self.rowDescription = []
             bufferState = .finished(buffer: .init(), commandTag: commandTag)
         case .noRows(.failure(let error)):
+            self.rowDescription = []
             bufferState = .failure(error)
         }
         
         self.downstreamState = .waitingForConsumer(bufferState)
         
         self.eventLoop = eventLoop
-        self.logger = queryContext.logger
-        
-        self.rowDescription = rowDescription
+        self.logger = logger
 
         var lookup = [String: Int]()
         lookup.reserveCapacity(rowDescription.count)

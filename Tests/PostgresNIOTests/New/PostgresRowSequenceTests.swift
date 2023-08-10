@@ -7,21 +7,21 @@ import NIOCore
 import Logging
 
 final class PostgresRowSequenceTests: XCTestCase {
+    let logger = Logger(label: "PSQLRowStreamTests")
+    let eventLoop = EmbeddedEventLoop()
 
     func testBackpressureWorks() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ], 
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let rowSequence = stream.asyncSequence()
         XCTAssertEqual(dataSource.requestCount, 0)
@@ -38,20 +38,19 @@ final class PostgresRowSequenceTests: XCTestCase {
         XCTAssertNil(empty)
     }
 
+
     func testCancellationWorksWhileIterating() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let rowSequence = stream.asyncSequence()
         XCTAssertEqual(dataSource.requestCount, 0)
@@ -72,19 +71,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testCancellationWorksBeforeIterating() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let rowSequence = stream.asyncSequence()
         XCTAssertEqual(dataSource.requestCount, 0)
@@ -99,19 +96,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testDroppingTheSequenceCancelsTheSource() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         var rowSequence: PostgresRowSequence? = stream.asyncSequence()
         rowSequence = nil
@@ -121,19 +116,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testStreamBasedOnCompletedQuery() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let rowSequence = stream.asyncSequence()
         let dataRows: [DataRow] = (0..<128).map { [ByteBuffer(integer: Int64($0))] }
@@ -150,19 +143,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testStreamIfInitializedWithAllData() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let dataRows: [DataRow] = (0..<128).map { [ByteBuffer(integer: Int64($0))] }
         stream.receive(dataRows)
@@ -180,21 +171,19 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testStreamIfInitializedWithError() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
-        stream.receive(completion: .failure(PSQLError.connectionClosed))
+        stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
 
         let rowSequence = stream.asyncSequence()
 
@@ -205,24 +194,22 @@ final class PostgresRowSequenceTests: XCTestCase {
             }
             XCTFail("Expected that an error was thrown before.")
         } catch {
-            XCTAssertEqual(error as? PSQLError, .connectionClosed)
+            XCTAssertEqual(error as? PSQLError, .serverClosedConnection(underlying: nil))
         }
     }
 
     func testSucceedingRowContinuationsWorks() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let rowSequence = stream.asyncSequence()
         var rowIterator = rowSequence.makeAsyncIterator()
@@ -244,19 +231,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testFailingRowContinuationsWorks() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let rowSequence = stream.asyncSequence()
         var rowIterator = rowSequence.makeAsyncIterator()
@@ -270,31 +255,29 @@ final class PostgresRowSequenceTests: XCTestCase {
         XCTAssertEqual(try row1?.decode(Int.self), 0)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
-            stream.receive(completion: .failure(PSQLError.connectionClosed))
+            stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
         }
 
         do {
             _ = try await rowIterator.next()
             XCTFail("Expected that an error was thrown before.")
         } catch {
-            XCTAssertEqual(error as? PSQLError, .connectionClosed)
+            XCTAssertEqual(error as? PSQLError, .serverClosedConnection(underlying: nil))
         }
     }
 
     func testAdaptiveRowBufferShrinksAndGrows() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let initialDataRows: [DataRow] = (0..<AdaptiveRowBuffer.defaultBufferTarget + 1).map { [ByteBuffer(integer: Int64($0))] }
         stream.receive(initialDataRows)
@@ -348,19 +331,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testAdaptiveRowShrinksToMin() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         var currentTarget = AdaptiveRowBuffer.defaultBufferTarget
 
@@ -404,19 +385,17 @@ final class PostgresRowSequenceTests: XCTestCase {
     }
 
     func testStreamBufferAcceptsNewRowsEventhoughItDidntAskForIt() async throws {
-        let eventLoop = EmbeddedEventLoop()
-        let promise = eventLoop.makePromise(of: PSQLRowStream.self)
-        let logger = Logger(label: "test")
         let dataSource = MockRowDataSource()
         let stream = PSQLRowStream(
-            rowDescription: [
-                .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-            ],
-            queryContext: .init(query: "SELECT * FROM foo", logger: logger, promise: promise),
-            eventLoop: eventLoop,
-            rowSource: .stream(dataSource)
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: self.eventLoop,
+            logger: self.logger
         )
-        promise.succeed(stream)
 
         let messagePerChunk = AdaptiveRowBuffer.defaultBufferTarget * 4
         let initialDataRows: [DataRow] = (0..<messagePerChunk).map { [ByteBuffer(integer: Int64($0))] }
@@ -443,7 +422,6 @@ final class PostgresRowSequenceTests: XCTestCase {
         let emptyRow = try await rowIterator.next()
         XCTAssertNil(emptyRow)
     }
-
 }
 
 final class MockRowDataSource: PSQLRowsDataSource {

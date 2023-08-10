@@ -206,8 +206,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             psqlTask = .closeCommand(command)
         case .extendedQuery(let query):
             psqlTask = .extendedQuery(query)
-        case .preparedStatement(let statement):
-            psqlTask = .preparedStatement(statement)
 
         case .startListening(let listener):
             switch self.listenState.startListening(listener) {
@@ -249,7 +247,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             return
         }
 
-        let action = self.state.close(promise)
+        let action = self.state.close(promise: promise)
         self.run(action, with: context)
     }
     
@@ -260,6 +258,11 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case PSQLOutgoingEvent.authenticate(let authContext):
             let action = self.state.provideAuthenticationContext(authContext)
             self.run(action, with: context)
+
+        case PSQLOutgoingEvent.gracefulShutdown:
+            let action = self.state.gracefulClose(promise)
+            self.run(action, with: context)
+
         default:
             context.triggerUserOutboundEvent(event, promise: promise)
         }
@@ -326,12 +329,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             self.sendBindExecuteAndSyncMessage(executeStatement: executeStatement, context: context)
         case .sendParseDescribeBindExecuteSync(let query):
             self.sendParseDescribeBindExecuteAndSyncMessage(query: query, context: context)
-        case .succeedQuery(let queryContext, columns: let columns):
-            self.succeedQueryWithRowStream(queryContext, columns: columns, context: context)
-        case .succeedQueryNoRowsComming(let queryContext, let commandTag):
-            self.succeedQueryWithoutRowStream(queryContext, commandTag: commandTag, context: context)
-        case .failQuery(let queryContext, with: let error, let cleanupContext):
-            queryContext.promise.fail(error)
+        case .succeedQuery(let promise, with: let result):
+            self.succeedQuery(promise, result: result, context: context)
+        case .failQuery(let promise, with: let error, let cleanupContext):
+            promise.fail(error)
             if let cleanupContext = cleanupContext {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
@@ -383,10 +384,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
             }
             context.close(mode: .all, promise: promise)
-        case .succeedPreparedStatementCreation(let preparedContext, with: let rowDescription):
-            preparedContext.promise.succeed(rowDescription)
-        case .failPreparedStatementCreation(let preparedContext, with: let error, let cleanupContext):
-            preparedContext.promise.fail(error)
+        case .succeedPreparedStatementCreation(let promise, with: let rowDescription):
+            promise.succeed(rowDescription)
+        case .failPreparedStatementCreation(let promise, with: let error, let cleanupContext):
+            promise.fail(error)
             if let cleanupContext = cleanupContext {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
@@ -510,33 +511,30 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
     }
     
-    private func succeedQueryWithRowStream(
-        _ queryContext: ExtendedQueryContext,
-        columns: [RowDescription.Column],
+    private func succeedQuery(
+        _ promise: EventLoopPromise<PSQLRowStream>,
+        result: QueryResult,
         context: ChannelHandlerContext
     ) {
-        let rows = PSQLRowStream(
-            rowDescription: columns,
-            queryContext: queryContext,
-            eventLoop: context.channel.eventLoop,
-            rowSource: .stream(self))
-        
-        self.rowStream = rows
-        queryContext.promise.succeed(rows)
-    }
-    
-    private func succeedQueryWithoutRowStream(
-        _ queryContext: ExtendedQueryContext,
-        commandTag: String,
-        context: ChannelHandlerContext
-    ) {
-        let rows = PSQLRowStream(
-            rowDescription: [],
-            queryContext: queryContext,
-            eventLoop: context.channel.eventLoop,
-            rowSource: .noRows(.success(commandTag))
-        )
-        queryContext.promise.succeed(rows)
+        let rows: PSQLRowStream
+        switch result.value {
+        case .rowDescription(let columns):
+            rows = PSQLRowStream(
+                source: .stream(columns, self),
+                eventLoop: context.channel.eventLoop,
+                logger: result.logger
+            )
+            self.rowStream = rows
+
+        case .noRows(let commandTag):
+            rows = PSQLRowStream(
+                source: .noRows(.success(commandTag)),
+                eventLoop: context.channel.eventLoop,
+                logger: result.logger
+            )
+        }
+
+        promise.succeed(rows)
     }
     
     private func closeConnectionAndCleanup(

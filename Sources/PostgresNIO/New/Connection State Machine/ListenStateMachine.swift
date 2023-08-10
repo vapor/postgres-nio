@@ -36,7 +36,14 @@ struct ListenStateMachine {
     }
 
     mutating func stopListeningSucceeded(channel: String) -> StopListeningSuccessAction {
-        return self.channels[channel, default: .init()].stopListeningSucceeded()
+        switch self.channels[channel]!.stopListeningSucceeded() {
+        case .none:
+            self.channels.removeValue(forKey: channel)
+            return .none
+
+        case .startListening:
+            return .startListening
+        }
     }
 
     enum CancelAction {
@@ -46,7 +53,7 @@ struct ListenStateMachine {
     }
 
     mutating func cancelNotificationListener(channel: String, id: Int) -> CancelAction {
-        return self.channels[channel, default: .init()].cancelListening(id: id)
+        return self.channels[channel]?.cancelListening(id: id) ?? .none
     }
 
     mutating func fail(_ error: Error) -> [NotificationListener] {

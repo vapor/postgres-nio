@@ -3,7 +3,7 @@ public struct PostgresNotification: Sendable {
     public let payload: String
 }
 
-public struct PostgresNotificationSequence: AsyncSequence, Sendable {
+public struct PostgresNotificationSequence: AsyncSequence {
     public typealias Element = PostgresNotification
 
     let base: AsyncThrowingStream<PostgresNotification, Error>
@@ -20,3 +20,8 @@ public struct PostgresNotificationSequence: AsyncSequence, Sendable {
         }
     }
 }
+
+#if swift(>=5.7)
+// AsyncThrowingStream is marked as Sendable in Swift 5.6
+extension PostgresNotificationSequence: Sendable {}
+#endif

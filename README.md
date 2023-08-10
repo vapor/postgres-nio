@@ -67,19 +67,7 @@ let config = PostgresConnection.Configuration(
 )
 ```
 
-A connection must be created on a SwiftNIO `EventLoop`. In most server use cases, an 
-`EventLoopGroup` is created at app startup and closed during app shutdown.
-
-```swift
-import NIOPosix
-
-let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-
-// Much later
-try await eventLoopGroup.shutdownGracefully()
-```
-
-A [`Logger`] is also required.
+To create a connection we need a [`Logger`], that is used to log connection background events.
 
 ```swift
 import Logging
@@ -91,10 +79,8 @@ Now we can put it together:
 
 ```swift
 import PostgresNIO
-import NIOPosix
 import Logging
 
-let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 let logger = Logger(label: "postgres-logger")
 
 let config = PostgresConnection.Configuration(
@@ -107,7 +93,6 @@ let config = PostgresConnection.Configuration(
 )
 
 let connection = try await PostgresConnection.connect(
-  on: eventLoopGroup.next(),
   configuration: config,
   id: 1,
   logger: logger
@@ -115,9 +100,6 @@ let connection = try await PostgresConnection.connect(
 
 // Close your connection once done
 try await connection.close()
-
-// Shutdown the EventLoopGroup, once all connections are closed.
-try await eventLoopGroup.shutdownGracefully()
 ```
 
 #### Querying

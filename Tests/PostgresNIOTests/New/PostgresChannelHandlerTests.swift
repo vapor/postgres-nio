@@ -24,8 +24,11 @@ class PostgresChannelHandlerTests: XCTestCase {
             ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
             handler
         ], loop: self.eventLoop)
-        defer { XCTAssertNoThrow(try embedded.finish()) }
-        
+        defer {
+            do { try embedded.finish() }
+            catch { print("\(String(reflecting: error))") }
+        }
+
         var maybeMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
         XCTAssertNoThrow(maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))

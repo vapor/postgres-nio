@@ -137,14 +137,14 @@ class ConnectionStateMachineTests: XCTestCase {
     
     func testErrorIsIgnoredWhenClosingConnection() {
         // test ignore unclean shutdown when closing connection
-        var stateIgnoreChannelError = ConnectionStateMachine(.closing)
-        
+        var stateIgnoreChannelError = ConnectionStateMachine(.closing(nil))
+
         XCTAssertEqual(stateIgnoreChannelError.errorHappened(.connectionError(underlying: NIOSSLError.uncleanShutdown)), .wait)
         XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
         
         // test ignore any other error when closing connection
         
-        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing)
+        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing(nil))
         XCTAssertEqual(stateIgnoreErrorMessage.errorReceived(.init(fields: [:])), .wait)
         XCTAssertEqual(stateIgnoreErrorMessage.closed(), .fireChannelInactive)
     }
@@ -180,9 +180,9 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.errorReceived(.init(fields: fields)),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [.extendedQuery(extendedQueryContext)], error: .server(.init(fields: fields)), closePromise: nil)))
         
-        XCTAssertNil(extendedQueryContext.promise.futureResult._value)
-        
+        XCTAssertNil(queryPromise.futureResult._value)
+
         // make sure we don't crash
-        extendedQueryContext.promise.fail(PSQLError.server(.init(fields: fields)))
+        queryPromise.fail(PSQLError.server(.init(fields: fields)))
     }
 }
