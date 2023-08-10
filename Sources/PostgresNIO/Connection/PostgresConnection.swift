@@ -384,6 +384,17 @@ extension PostgresConnection {
         try await self.close().get()
     }
 
+    /// Closes the connection to the server, _after all queries_ that have been created on this connection have been run.
+    public func closeGracefully() async throws {
+        try await withTaskCancellationHandler { () async throws -> () in
+            let promise = self.eventLoop.makePromise(of: Void.self)
+            self.channel.triggerUserOutboundEvent(PSQLOutgoingEvent.gracefulShutdown, promise: promise)
+            return try await promise.futureResult.get()
+        } onCancel: {
+            _ = self.close()
+        }
+    }
+
     /// Run a query on the Postgres server the connection is connected to.
     ///
     /// - Parameters:

@@ -247,7 +247,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             return
         }
 
-        let action = self.state.close(promise)
+        let action = self.state.close(promise: promise)
         self.run(action, with: context)
     }
     
@@ -258,6 +258,11 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case PSQLOutgoingEvent.authenticate(let authContext):
             let action = self.state.provideAuthenticationContext(authContext)
             self.run(action, with: context)
+
+        case PSQLOutgoingEvent.gracefulShutdown:
+            let action = self.state.gracefulClose(promise)
+            self.run(action, with: context)
+
         default:
             context.triggerUserOutboundEvent(event, promise: promise)
         }

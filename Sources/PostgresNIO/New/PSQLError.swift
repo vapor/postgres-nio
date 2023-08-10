@@ -18,8 +18,9 @@ public struct PSQLError: Error {
 
             case queryCancelled
             case tooManyParameters
-            case connectionQuiescing
-            case connectionClosed
+            case clientClosesConnection
+            case clientClosedConnection
+            case serverClosedConnection
             case connectionError
             case uncleanShutdown
 
@@ -45,12 +46,19 @@ public struct PSQLError: Error {
         public static let invalidCommandTag = Self(.invalidCommandTag)
         public static let queryCancelled = Self(.queryCancelled)
         public static let tooManyParameters = Self(.tooManyParameters)
-        public static let connectionQuiescing = Self(.connectionQuiescing)
-        public static let connectionClosed = Self(.connectionClosed)
+        public static let clientClosesConnection = Self(.clientClosesConnection)
+        public static let clientClosedConnection = Self(.clientClosedConnection)
+        public static let serverClosedConnection = Self(.serverClosedConnection)
         public static let connectionError = Self(.connectionError)
         public static let uncleanShutdown = Self.init(.uncleanShutdown)
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
+
+        @available(*, deprecated, renamed: "clientClosesConnection")
+        public static let connectionQuiescing = Self.clientClosesConnection
+
+        @available(*, deprecated, message: "Use the more specific `serverClosedConnection` or `clientClosedConnection` instead")
+        public static let connectionClosed = Self.serverClosedConnection
 
         public var description: String {
             switch self.base {
@@ -78,10 +86,12 @@ public struct PSQLError: Error {
                 return "queryCancelled"
             case .tooManyParameters:
                 return "tooManyParameters"
-            case .connectionQuiescing:
-                return "connectionQuiescing"
-            case .connectionClosed:
-                return "connectionClosed"
+            case .clientClosesConnection:
+                return "clientClosesConnection"
+            case .clientClosedConnection:
+                return "clientClosedConnection"
+            case .serverClosedConnection:
+                return "serverClosedConnection"
             case .connectionError:
                 return "connectionError"
             case .uncleanShutdown:
@@ -377,19 +387,33 @@ public struct PSQLError: Error {
         return new
     }
 
-    static var connectionQuiescing: PSQLError { PSQLError(code: .connectionQuiescing) }
+    static func clientClosesConnection(underlying: Error?) -> PSQLError {
+        var error = PSQLError(code: .clientClosesConnection)
+        error.underlying = underlying
+        return error
+    }
 
-    static var connectionClosed: PSQLError { PSQLError(code: .connectionClosed) }
+    static func clientClosedConnection(underlying: Error?) -> PSQLError {
+        var error = PSQLError(code: .clientClosedConnection)
+        error.underlying = underlying
+        return error
+    }
 
-    static var authMechanismRequiresPassword: PSQLError { PSQLError(code: .authMechanismRequiresPassword) }
+    static func serverClosedConnection(underlying: Error?) -> PSQLError {
+        var error = PSQLError(code: .serverClosedConnection)
+        error.underlying = underlying
+        return error
+    }
 
-    static var sslUnsupported: PSQLError { PSQLError(code: .sslUnsupported) }
+    static let authMechanismRequiresPassword = PSQLError(code: .authMechanismRequiresPassword)
 
-    static var queryCancelled: PSQLError { PSQLError(code: .queryCancelled) }
+    static let sslUnsupported = PSQLError(code: .sslUnsupported)
 
-    static var uncleanShutdown: PSQLError { PSQLError(code: .uncleanShutdown) }
+    static let queryCancelled = PSQLError(code: .queryCancelled)
 
-    static var receivedUnencryptedDataAfterSSLRequest: PSQLError { PSQLError(code: .receivedUnencryptedDataAfterSSLRequest) }
+    static let uncleanShutdown = PSQLError(code: .uncleanShutdown)
+
+    static let receivedUnencryptedDataAfterSSLRequest = PSQLError(code: .receivedUnencryptedDataAfterSSLRequest)
 
     static func server(_ response: PostgresBackendMessage.ErrorResponse) -> PSQLError {
         var error = PSQLError(code: .server)
