@@ -1145,15 +1145,9 @@ extension AuthContext: Equatable {
             return false
         }
 
-        var lhsIterator = lhs.additionalParameters.makeIterator()
-        var rhsIterator = rhs.additionalParameters.makeIterator()
-
-        while let lhsNext = lhsIterator.next(), let rhsNext = rhsIterator.next() {
-            guard lhsNext.0 == rhsNext.0 && lhsNext.1 == rhsNext.1 else {
-                return false
-            }
+        return lhs.additionalParameters.elementsEqual(rhs.additionalParameters) { lhs, rhs in
+            lhs.0 == rhs.0 && lhs.1 == rhs.1
         }
-        return true
     }
 }
 
