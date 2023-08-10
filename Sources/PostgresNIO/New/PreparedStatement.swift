@@ -5,7 +5,7 @@
 ///
 /// As an example, consider this struct:
 /// ```swift
-/// struct Example: PreparedStatement {
+/// struct Example: PostgresPreparedStatement {
 ///     static var sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
 ///     typealias Row = (Int, String)
 ///
@@ -25,7 +25,7 @@
 ///
 /// Structs conforming to this protocol can then be used with `PostgresConnection.execute(_ preparedStatement:, logger:)`,
 /// which will take care of preparing the statement on the server side and executing it.
-public protocol PreparedStatement {
+public protocol PostgresPreparedStatement: Sendable {
     /// The type rows returned by the statement will be decoded into
     associatedtype Row
 

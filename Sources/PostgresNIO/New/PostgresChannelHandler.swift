@@ -237,10 +237,11 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 return
             }
         case .executePreparedStatement(let preparedStatement):
-            switch self.preparedStatementState.lookup(
+            let action = self.preparedStatementState.lookup(
                 name: preparedStatement.name,
                 context: preparedStatement
-            ) {
+            )
+            switch action {
             case .prepareStatement:
                 let promise = self.eventLoop.makePromise(of: RowDescription?.self)
                 promise.futureResult.whenSuccess { rowDescription in
@@ -267,6 +268,15 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 // The state machine already keeps track of this
                 // and will execute the statement as soon as it's prepared
                 return
+            case .executeStatement(let rowDescription):
+                psqlTask = .extendedQuery(.init(
+                    executeStatement: .init(
+                        name: preparedStatement.name,
+                        binds: preparedStatement.bindings,
+                        rowDescription: rowDescription),
+                    logger: preparedStatement.logger,
+                    promise: preparedStatement.promise
+                ))
             case .executePendingStatements(let pendingStatements, let rowDescription):
                 for statement in pendingStatements {
                     let action = self.state.enqueue(task: .extendedQuery(.init(

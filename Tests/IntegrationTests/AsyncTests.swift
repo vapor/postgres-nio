@@ -321,7 +321,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        struct TestPreparedStatement: PreparedStatement {
+        struct TestPreparedStatement: PostgresPreparedStatement {
             static var sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
             typealias Row = (Int, String)
 

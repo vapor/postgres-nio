@@ -462,15 +462,15 @@ extension PostgresConnection {
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
-    public func execute<P: PreparedStatement>(
-        _ preparedStatement: P,
+    public func execute<Statement: PostgresPreparedStatement>(
+        _ preparedStatement: Statement,
         logger: Logger
-    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, P.Row>
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Statement.Row>
     {
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
-            name: String(reflecting: P.self),
-            sql: P.sql,
+            name: String(reflecting: Statement.self),
+            sql: Statement.sql,
             bindings: preparedStatement.makeBindings(),
             logger: logger,
             promise: promise
@@ -480,6 +480,27 @@ extension PostgresConnection {
             .map { $0.asyncSequence() }
             .get()
             .map { try preparedStatement.decodeRow($0) }
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary
+    public func execute<Statement: PostgresPreparedStatement>(
+        _ preparedStatement: Statement,
+        logger: Logger
+    ) async throws -> String
+    where Statement.Row == ()
+    {
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let task = HandlerTask.executePreparedStatement(.init(
+            name: String(reflecting: Statement.self),
+            sql: Statement.sql,
+            bindings: preparedStatement.makeBindings(),
+            logger: logger,
+            promise: promise
+        ))
+        self.channel.write(task, promise: nil)
+        return try await promise.futureResult
+            .map { $0.commandTag }
+            .get()
     }
 }
 
