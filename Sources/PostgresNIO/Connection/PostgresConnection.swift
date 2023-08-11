@@ -464,9 +464,10 @@ extension PostgresConnection {
     /// Execute a prepared statement, taking care of the preparation when necessary
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
-        logger: Logger
-    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Statement.Row>
-    {
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Statement.Row> {
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
             name: String(reflecting: Statement.self),
@@ -485,10 +486,10 @@ extension PostgresConnection {
     /// Execute a prepared statement, taking care of the preparation when necessary
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
-        logger: Logger
-    ) async throws -> String
-    where Statement.Row == ()
-    {
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> String where Statement.Row == () {
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
             name: String(reflecting: Statement.self),
