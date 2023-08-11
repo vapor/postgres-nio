@@ -275,6 +275,97 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    struct TestPrepareStatement: PostgresPreparedStatement {
+        static var sql = "SELECT datname FROM pg_stat_activity WHERE state = $1"
+        typealias Row = String
+
+        var state: String
+
+        func makeBindings() -> PostgresBindings {
+            var bindings = PostgresBindings()
+            bindings.append(.init(string: self.state))
+            return bindings
+        }
+
+        func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+            try row.decode(Row.self)
+        }
+    }
+
+    func testPreparedStatement() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "active")
+                let result = try await connection.execute(preparedStatement, logger: .psqlTest)
+                var rows = 0
+                for try await database in result {
+                    rows += 1
+                    XCTAssertEqual("test_database", database)
+                }
+                XCTAssertEqual(rows, 1)
+            }
+            // Wait for the PREPARE request from the client
+            guard case .parse(let parse) = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+                fatalError("Unexpected message")
+            }
+            XCTAssertEqual(parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
+            XCTAssertEqual(parse.parameters.count, 0)
+            guard case .describe(.preparedStatement(let name)) = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+                fatalError("Unexpected message")
+            }
+            XCTAssertEqual(name, String(reflecting: TestPrepareStatement.self))
+            guard case .sync = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+                fatalError("Unexpected message")
+            }
+
+            // Respond to the PREPARE request
+            try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [
+                PostgresDataType.text
+            ])))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            let rowDescription = RowDescription(columns: [
+                .init(
+                    name: "datname",
+                    tableOID: 12222,
+                    columnAttributeNumber: 2,
+                    dataType: .name,
+                    dataTypeSize: 64,
+                    dataTypeModifier: -1,
+                    format: .text
+                )
+            ])
+            try await channel.writeInbound(PostgresBackendMessage.rowDescription(rowDescription))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+
+            // Wait for the EXECUTE request
+            guard case .bind = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+                fatalError("Unexpected message")
+            }
+            guard case .execute = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+                fatalError("Unexpected message")
+            }
+            guard case .sync = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+                fatalError("Unexpected message")
+            }
+            // Respond to the EXECUTE request
+            try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            let dataRow = DataRow(arrayLiteral: "test_database")
+            try await channel.writeInbound(PostgresBackendMessage.dataRow(dataRow))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete(TestPrepareStatement.sql))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+        }
+    }
+
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = await NIOAsyncTestingChannel(handlers: [
