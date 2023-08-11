@@ -37,6 +37,8 @@ struct PostgresFrontendMessageEncoder {
                 buffer.writeNullTerminatedString(database)
             }
 
+            // we don't send replication parameters, as the default is false and this is what we
+            // need for a client
             for (key, value) in options {
                 buffer.writeNullTerminatedString(key)
                 buffer.writeNullTerminatedString(value)

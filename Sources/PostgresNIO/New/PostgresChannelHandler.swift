@@ -328,11 +328,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case .wait:
             break
         case .sendStartupMessage(let authContext):
-            self.encoder.startup(
-                user: authContext.username,
-                database: authContext.database,
-                options: authContext.additionalParameters
-            )
+            self.encoder.startup(user: authContext.username, database: authContext.database, options: authContext.additionalParameters)
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .sendSSLRequest:
             self.encoder.ssl()
