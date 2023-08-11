@@ -7,40 +7,36 @@ struct PreparedStatementStateMachine {
         case error(PSQLError)
     }
 
-    var preparedStatements: [String: State]
+    var preparedStatements: [String: State] = [:]
     
-    init() {
-        self.preparedStatements = [:]
-    }
-
     enum LookupAction {
         case prepareStatement
         case waitForAlreadyInFlightPreparation
         case executeStatement(RowDescription?)
-        case executePendingStatements([PreparedStatementContext], RowDescription?)
-        case returnError([PreparedStatementContext], PSQLError)
+        case returnError(PSQLError)
     }
 
-    mutating func lookup(name: String, context: PreparedStatementContext) -> LookupAction {
-        if let state = self.preparedStatements[name] {
+    mutating func lookup(preparedStatement: PreparedStatementContext) -> LookupAction {
+        if let state = self.preparedStatements[preparedStatement.name] {
             switch state {
             case .preparing(var statements):
-                statements.append(context)
-                self.preparedStatements[name] = .preparing(statements)
+                statements.append(preparedStatement)
+                self.preparedStatements[preparedStatement.name] = .preparing(statements)
                 return .waitForAlreadyInFlightPreparation
             case .prepared(let rowDescription):
                 return .executeStatement(rowDescription)
             case .error(let error):
-                return .returnError([context], error)
+                return .returnError(error)
             }
         } else {
-            self.preparedStatements[name] = .preparing([context])
+            self.preparedStatements[preparedStatement.name] = .preparing([preparedStatement])
             return .prepareStatement
         }
     }
 
-    enum PreparationCompleteAction {
-        case executePendingStatements([PreparedStatementContext], RowDescription?)
+    struct PreparationCompleteAction {
+        var statements: [PreparedStatementContext]
+        var rowDescription: RowDescription?
     }
 
     mutating func preparationComplete(
@@ -56,15 +52,22 @@ struct PreparedStatementStateMachine {
                 rowDescription.columns[i].format = .binary
             }
             self.preparedStatements[name] = .prepared(rowDescription)
-            return .executePendingStatements(statements, rowDescription)
+            return PreparationCompleteAction(
+                statements: statements,
+                rowDescription: rowDescription
+            )
         } else {
             self.preparedStatements[name] = .prepared(nil)
-            return .executePendingStatements(statements, nil)
+            return PreparationCompleteAction(
+                statements: statements,
+                rowDescription: nil
+            )
         }
     }
 
-    enum ErrorHappenedAction {
-        case returnError([PreparedStatementContext], PSQLError)
+    struct ErrorHappenedAction {
+        var statements: [PreparedStatementContext]
+        var error: PSQLError
     }
     
     mutating func errorHappened(name: String, error: PSQLError) -> ErrorHappenedAction {
@@ -72,6 +75,9 @@ struct PreparedStatementStateMachine {
             preconditionFailure("Preparation completed for an unexpected statement")
         }
         self.preparedStatements[name] = .error(error)
-        return .returnError(statements, error)
+        return ErrorHappenedAction(
+            statements: statements,
+            error: error
+        )
     }
 }
