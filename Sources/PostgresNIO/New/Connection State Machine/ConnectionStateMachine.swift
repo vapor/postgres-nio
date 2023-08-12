@@ -978,11 +978,7 @@ extension ConnectionStateMachine {
     /// remains in this bad state.
     ///
     /// A key note here is that all callers must ensure that they return to a good state before they exit.
-    ///
-    /// Sadly, because it's generic and has a closure, we need to force it to be inlined at all call sites, which is
-    /// not ideal.
-    @inline(__always)
-    private mutating func avoidingStateMachineCoW<ReturnType>(_ body: (inout ConnectionStateMachine) -> ReturnType) -> ReturnType {
+    private mutating func avoidingStateMachineCoW(_ body: (inout ConnectionStateMachine) -> ConnectionAction) -> ConnectionAction {
         self.state = .modifying
         defer {
             assert(!self.isModifying)
