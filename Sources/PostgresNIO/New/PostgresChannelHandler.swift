@@ -306,7 +306,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case .wait:
             break
         case .sendStartupMessage(let authContext):
-            self.encoder.startup(authContext.toStartupParameters())
+            self.encoder.startup(user: authContext.username, database: authContext.database)
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .sendSSLRequest:
             self.encoder.ssl()
@@ -681,17 +681,6 @@ extension PostgresChannelHandler: PSQLRowsDataSource {
         }
         let action = self.state.cancelQueryStream()
         self.run(action, with: handlerContext)
-    }
-}
-
-extension AuthContext {
-    func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
-        PostgresFrontendMessage.Startup.Parameters(
-            user: self.username,
-            database: self.database,
-            options: nil,
-            replication: .false
-        )
     }
 }
 
