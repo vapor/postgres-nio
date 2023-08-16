@@ -13,7 +13,7 @@
 ///
 ///     func makeBindings() -> PostgresBindings {
 ///         var bindings = PostgresBindings()
-///         bindings.append(.init(string: self.state))
+///         bindings.append(self.state)
 ///         return bindings
 ///     }
 ///
@@ -33,7 +33,7 @@ public protocol PostgresPreparedStatement: Sendable {
     static var sql: String { get }
 
     /// Make the bindings to provided concrete values to use when executing the prepared SQL statement
-    func makeBindings() -> PostgresBindings
+    func makeBindings() throws -> PostgresBindings
     
     /// Decode a row returned by the database into an instance of `Row`
     func decodeRow(_ row: PostgresRow) throws -> Row

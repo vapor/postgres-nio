@@ -468,7 +468,7 @@ extension PostgresConnection {
         file: String = #fileID,
         line: Int = #line
     ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Statement.Row> {
-        let bindings = preparedStatement.makeBindings()
+        let bindings = try preparedStatement.makeBindings()
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
             name: String(reflecting: Statement.self),
@@ -502,7 +502,7 @@ extension PostgresConnection {
         file: String = #fileID,
         line: Int = #line
     ) async throws -> String where Statement.Row == () {
-        let bindings = preparedStatement.makeBindings()
+        let bindings = try preparedStatement.makeBindings()
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
             name: String(reflecting: Statement.self),

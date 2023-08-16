@@ -168,12 +168,22 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
+    public mutating func append<Value: PostgresEncodable>(_ value: Value) throws {
+        try self.append(value, context: .default)
+    }
+
+    @inlinable
     public mutating func append<Value: PostgresEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         try value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value, protected: true))
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresNonThrowingEncodable>(_ value: Value) {
+        self.append(value, context: .default)
     }
 
     @inlinable
