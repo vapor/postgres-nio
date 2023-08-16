@@ -344,9 +344,12 @@ class PostgresConnectionTests: XCTestCase {
             try await channel.testingEventLoop.executeInContext { channel.read() }
 
             // Wait for the EXECUTE request
-            guard case .bind = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
+            guard case .bind(let bind) = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
                 fatalError("Unexpected message")
             }
+            XCTAssertEqual(bind.preparedStatementName, String(reflecting: TestPrepareStatement.self))
+            XCTAssertEqual(bind.parameters.count, 1)
+            XCTAssertEqual(bind.resultColumnFormats, [.binary])
             guard case .execute = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self) else {
                 fatalError("Unexpected message")
             }
