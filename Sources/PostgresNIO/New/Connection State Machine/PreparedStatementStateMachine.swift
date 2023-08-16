@@ -43,25 +43,30 @@ struct PreparedStatementStateMachine {
         name: String,
         rowDescription: RowDescription?
     ) -> PreparationCompleteAction {
-        guard case .preparing(let statements) = self.preparedStatements[name] else {
-            preconditionFailure("Preparation completed for an unexpected statement")
+        guard let state = self.preparedStatements[name] else {
+            fatalError("Unknown prepared statement \(name)")
         }
-        // When sending the bindings we are going to ask for binary data.
-        if var rowDescription {
-            for i in 0..<rowDescription.columns.count {
-                rowDescription.columns[i].format = .binary
+        switch state {
+        case .preparing(let statements):
+            // When sending the bindings we are going to ask for binary data.
+            if var rowDescription {
+                for i in 0..<rowDescription.columns.count {
+                    rowDescription.columns[i].format = .binary
+                }
+                self.preparedStatements[name] = .prepared(rowDescription)
+                return PreparationCompleteAction(
+                    statements: statements,
+                    rowDescription: rowDescription
+                )
+            } else {
+                self.preparedStatements[name] = .prepared(nil)
+                return PreparationCompleteAction(
+                    statements: statements,
+                    rowDescription: nil
+                )
             }
-            self.preparedStatements[name] = .prepared(rowDescription)
-            return PreparationCompleteAction(
-                statements: statements,
-                rowDescription: rowDescription
-            )
-        } else {
-            self.preparedStatements[name] = .prepared(nil)
-            return PreparationCompleteAction(
-                statements: statements,
-                rowDescription: nil
-            )
+        case .prepared, .error:
+            preconditionFailure("Preparation completed happened in an unexpected state \(state)")
         }
     }
 
@@ -71,13 +76,18 @@ struct PreparedStatementStateMachine {
     }
     
     mutating func errorHappened(name: String, error: PSQLError) -> ErrorHappenedAction {
-        guard case .preparing(let statements) = self.preparedStatements[name] else {
-            preconditionFailure("Preparation completed for an unexpected statement")
+        guard let state = self.preparedStatements[name] else {
+            fatalError("Unknown prepared statement \(name)")
         }
-        self.preparedStatements[name] = .error(error)
-        return ErrorHappenedAction(
-            statements: statements,
-            error: error
-        )
+        switch state {
+        case .preparing(let statements):
+            self.preparedStatements[name] = .error(error)
+            return ErrorHappenedAction(
+                statements: statements,
+                error: error
+            )
+        case .prepared, .error:
+            preconditionFailure("Error happened in an unexpected state \(state)")
+        }
     }
 }
