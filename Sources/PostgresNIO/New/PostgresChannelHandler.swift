@@ -247,7 +247,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 // and will execute the statement as soon as it's prepared
                 return
             case .executeStatement(let rowDescription):
-                psqlTask = self. makeExecutePreparedStatementTask(
+                psqlTask = self.makeExecutePreparedStatementTask(
                     preparedStatement: preparedStatement,
                     rowDescription: rowDescription
                 )

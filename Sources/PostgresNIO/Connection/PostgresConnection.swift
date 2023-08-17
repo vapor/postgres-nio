@@ -462,7 +462,6 @@ extension PostgresConnection {
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
-    @inlinable
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
         logger: Logger,
@@ -497,7 +496,6 @@ extension PostgresConnection {
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
-    @inlinable
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
         logger: Logger,
