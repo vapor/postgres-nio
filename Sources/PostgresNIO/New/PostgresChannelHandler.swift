@@ -50,8 +50,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     ) {
         self.state = state
         self.eventLoop = eventLoop
-        self.listenState = ListenStateMachine()
-        self.preparedStatementState = PreparedStatementStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -240,7 +238,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             )
             switch action {
             case .prepareStatement:
-                psqlTask = self.makePrepareStatementAction(
+                psqlTask = self.makePrepareStatementTask(
                     preparedStatement: preparedStatement,
                     context: context
                 )
@@ -249,7 +247,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 // and will execute the statement as soon as it's prepared
                 return
             case .executeStatement(let rowDescription):
-                psqlTask = self.makeExecutPreparedStatementAction(
+                psqlTask = self. makeExecutePreparedStatementTask(
                     preparedStatement: preparedStatement,
                     rowDescription: rowDescription
                 )
@@ -688,7 +686,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         }
     }
 
-    private func makePrepareStatementAction(
+    private func makePrepareStatementTask(
         preparedStatement: PreparedStatementContext,
         context: ChannelHandlerContext
     ) -> PSQLTask {
@@ -723,7 +721,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         ))
     }
 
-    private func makeExecutPreparedStatementAction(
+    private func makeExecutePreparedStatementTask(
         preparedStatement: PreparedStatementContext,
         rowDescription: RowDescription?
     ) -> PSQLTask {
@@ -731,7 +729,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             executeStatement: .init(
                 name: preparedStatement.name,
                 binds: preparedStatement.bindings,
-                rowDescription: rowDescription),
+                rowDescription: rowDescription
+            ),
             logger: preparedStatement.logger,
             promise: preparedStatement.promise
         ))

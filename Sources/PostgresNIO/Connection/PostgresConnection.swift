@@ -462,12 +462,13 @@ extension PostgresConnection {
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
-    public func execute<Statement: PostgresPreparedStatement>(
+    @inlinable
+    public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
         logger: Logger,
         file: String = #fileID,
         line: Int = #line
-    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Statement.Row> {
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Row> where Row == Statement.Row {
         let bindings = try preparedStatement.makeBindings()
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
@@ -496,6 +497,7 @@ extension PostgresConnection {
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
+    @inlinable
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
         logger: Logger,
@@ -525,7 +527,6 @@ extension PostgresConnection {
             )
             throw error // rethrow with more metadata
         }
-
     }
 }
 
