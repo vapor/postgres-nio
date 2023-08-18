@@ -339,7 +339,7 @@ class PostgresConnectionTests: XCTestCase {
 
             try await channel.sendPreparedResponse(
                 dataRows: [
-                    DataRow(arrayLiteral: "test_database")
+                    ["test_database"]
                 ],
                 commandTag: TestPrepareStatement.sql
             )
@@ -394,7 +394,7 @@ class PostgresConnectionTests: XCTestCase {
             XCTAssertEqual(parameter1, "active")
             try await channel.sendPreparedResponse(
                 dataRows: [
-                    DataRow(arrayLiteral: "test_database")
+                    ["test_database"]
                 ],
                 commandTag: TestPrepareStatement.sql
             )
@@ -418,7 +418,7 @@ class PostgresConnectionTests: XCTestCase {
             XCTAssertEqual(parameter2, "idle")
             try await channel.sendPreparedResponse(
                 dataRows: [
-                    DataRow(arrayLiteral: "test_database")
+                    ["test_database"]
                 ],
                 commandTag: TestPrepareStatement.sql
             )
@@ -489,7 +489,7 @@ class PostgresConnectionTests: XCTestCase {
             let parameter1 = buffer.readString(length: buffer.readableBytes)!
             try await channel.sendPreparedResponse(
                 dataRows: [
-                    DataRow(arrayLiteral: "test_database_\(parameter1)")
+                    ["test_database_\(parameter1)"]
                 ],
                 commandTag: TestPrepareStatement.sql
             )
@@ -498,7 +498,7 @@ class PostgresConnectionTests: XCTestCase {
             let parameter2 = buffer.readString(length: buffer.readableBytes)!
             try await channel.sendPreparedResponse(
                 dataRows: [
-                    DataRow(arrayLiteral: "test_database_\(parameter2)")
+                    ["test_database_\(parameter2)"]
                 ],
                 commandTag: TestPrepareStatement.sql
             )
