@@ -142,7 +142,7 @@ extension PostgresFrontendMessage {
             }
 
             let parameters = (0..<parameterCount).map { _ -> ByteBuffer? in
-                let length = buffer.readInteger(as: UInt16.self)
+                let length = buffer.readInteger(as: UInt32.self)
                 switch length {
                 case .some(..<0):
                     return nil

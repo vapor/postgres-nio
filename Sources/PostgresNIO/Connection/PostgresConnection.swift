@@ -460,6 +460,72 @@ extension PostgresConnection {
             self.channel.write(task, promise: nil)
         }
     }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary
+    public func execute<Statement: PostgresPreparedStatement, Row>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Row> where Row == Statement.Row {
+        let bindings = try preparedStatement.makeBindings()
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let task = HandlerTask.executePreparedStatement(.init(
+            name: String(reflecting: Statement.self),
+            sql: Statement.sql,
+            bindings: bindings,
+            logger: logger,
+            promise: promise
+        ))
+        self.channel.write(task, promise: nil)
+        do {
+            return try await promise.futureResult
+                .map { $0.asyncSequence() }
+                .get()
+                .map { try preparedStatement.decodeRow($0) }
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = .init(
+                unsafeSQL: Statement.sql,
+                binds: bindings
+            )
+            throw error // rethrow with more metadata
+        }
+
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary
+    public func execute<Statement: PostgresPreparedStatement>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> String where Statement.Row == () {
+        let bindings = try preparedStatement.makeBindings()
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let task = HandlerTask.executePreparedStatement(.init(
+            name: String(reflecting: Statement.self),
+            sql: Statement.sql,
+            bindings: bindings,
+            logger: logger,
+            promise: promise
+        ))
+        self.channel.write(task, promise: nil)
+        do {
+            return try await promise.futureResult
+                .map { $0.commandTag }
+                .get()
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = .init(
+                unsafeSQL: Statement.sql,
+                binds: bindings
+            )
+            throw error // rethrow with more metadata
+        }
+    }
 }
 
 // MARK: EventLoopFuture interface
