@@ -6,6 +6,7 @@ enum HandlerTask {
     case closeCommand(CloseCommandContext)
     case startListening(NotificationListener)
     case cancelListening(String, Int)
+    case executePreparedStatement(PreparedStatementContext)
 }
 
 enum PSQLTask {
@@ -66,6 +67,28 @@ final class ExtendedQueryContext {
     ) {
         self.query = .prepareStatement(name: name, query: query, promise)
         self.logger = logger
+    }
+}
+
+final class PreparedStatementContext{
+    let name: String
+    let sql: String
+    let bindings: PostgresBindings
+    let logger: Logger
+    let promise: EventLoopPromise<PSQLRowStream>
+
+    init(
+        name: String,
+        sql: String,
+        bindings: PostgresBindings,
+        logger: Logger,
+        promise: EventLoopPromise<PSQLRowStream>
+    ) {
+        self.name = name
+        self.sql = sql
+        self.bindings = bindings
+        self.logger = logger
+        self.promise = promise
     }
 }
 
