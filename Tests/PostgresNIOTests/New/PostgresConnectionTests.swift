@@ -275,6 +275,34 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testIfServerJustClosesTheErrorReflectsThat() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        async let response = try await connection.query("SELECT 1;", logger: self.logger)
+
+        let listenMessage = try await channel.waitForUnpreparedRequest()
+        XCTAssertEqual(listenMessage.parse.query, "SELECT 1;")
+
+        try await channel.testingEventLoop.executeInContext { channel.pipeline.fireChannelInactive() }
+        try await channel.testingEventLoop.executeInContext { channel.pipeline.fireChannelUnregistered() }
+
+        do {
+            _ = try await response
+            XCTFail("Expected to throw")
+        } catch {
+            XCTAssertEqual((error as? PSQLError)?.code, .serverClosedConnection)
+        }
+
+        // retry on same connection
+
+        do {
+            _ = try await connection.query("SELECT 1;", logger: self.logger)
+            XCTFail("Expected to throw")
+        } catch {
+            XCTAssertEqual((error as? PSQLError)?.code, .serverClosedConnection)
+        }
+    }
+
     struct TestPrepareStatement: PostgresPreparedStatement {
         static var sql = "SELECT datname FROM pg_stat_activity WHERE state = $1"
         typealias Row = String
