@@ -858,8 +858,9 @@ struct ConnectionStateMachine {
                 // substate machine.
                 return .closeConnectionAndCleanup(cleanupContext)
             }
-            
-            switch queryStateMachine.errorHappened(error) {
+
+            let action = queryStateMachine.errorHappened(error)
+            switch action {
             case .sendParseDescribeBindExecuteSync,
                  .sendParseDescribeSync,
                  .sendBindExecuteSync,
@@ -869,7 +870,7 @@ struct ConnectionStateMachine {
                  .forwardStreamComplete,
                  .wait,
                  .read:
-                preconditionFailure("Invalid state: \(self.state)")
+                preconditionFailure("Invalid query state machine action in state: \(self.state), action: \(action)")
 
             case .evaluateErrorAtConnectionLevel:
                 return .closeConnectionAndCleanup(cleanupContext)
@@ -894,12 +895,13 @@ struct ConnectionStateMachine {
                 return .closeConnectionAndCleanup(cleanupContext)
             }
             
-            switch closeStateMachine.errorHappened(error) {
+            let action = closeStateMachine.errorHappened(error)
+            switch action {
             case .sendCloseSync,
                  .succeedClose,
                  .read,
                  .wait:
-                preconditionFailure("Invalid state: \(self.state)")
+                preconditionFailure("Invalid close state machine action in state: \(self.state), action: \(action)")
             case .failClose(let closeCommandContext, with: let error):
                 return .failClose(closeCommandContext, with: error, cleanupContext: cleanupContext)
             }
@@ -1032,7 +1034,7 @@ extension ConnectionStateMachine {
             
             return false
         case .clientClosesConnection, .clientClosedConnection:
-            preconditionFailure("Pure client error, that is thrown directly in PostgresConnection")
+            preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
         case .serverClosedConnection:
             return true
         }
