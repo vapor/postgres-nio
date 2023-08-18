@@ -277,3 +277,14 @@ class TestEventHandler: ChannelInboundHandler {
         self.events.append(psqlEvent)
     }
 }
+
+extension AuthContext {
+    func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
+        PostgresFrontendMessage.Startup.Parameters(
+            user: self.username,
+            database: self.database,
+            options: nil,
+            replication: .false
+        )
+    }
+}

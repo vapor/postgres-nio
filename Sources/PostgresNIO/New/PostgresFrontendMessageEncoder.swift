@@ -13,32 +13,16 @@ struct PostgresFrontendMessageEncoder {
         self.buffer = buffer
     }
 
-    mutating func startup(_ parameters: PostgresFrontendMessage.Startup.Parameters) {
+    mutating func startup(user: String, database: String?) {
         self.clearIfNeeded()
         self.encodeLengthPrefixed { buffer in
             buffer.writeInteger(PostgresFrontendMessage.Startup.versionThree)
             buffer.writeNullTerminatedString("user")
-            buffer.writeNullTerminatedString(parameters.user)
+            buffer.writeNullTerminatedString(user)
 
-            if let database = parameters.database {
+            if let database = database {
                 buffer.writeNullTerminatedString("database")
                 buffer.writeNullTerminatedString(database)
-            }
-
-            if let options = parameters.options {
-                buffer.writeNullTerminatedString("options")
-                buffer.writeNullTerminatedString(options)
-            }
-
-            switch parameters.replication {
-            case .database:
-                buffer.writeNullTerminatedString("replication")
-                buffer.writeNullTerminatedString("replication")
-            case .true:
-                buffer.writeNullTerminatedString("replication")
-                buffer.writeNullTerminatedString("true")
-            case .false:
-                break
             }
 
             buffer.writeInteger(UInt8(0))

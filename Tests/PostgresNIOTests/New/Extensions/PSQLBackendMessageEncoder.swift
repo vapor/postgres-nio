@@ -257,3 +257,7 @@ extension RowDescription: PSQLMessagePayloadEncodable {
         }
     }
 }
+
+protocol PSQLMessagePayloadEncodable {
+    func encode(into buffer: inout ByteBuffer)
+}
