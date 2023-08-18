@@ -22,7 +22,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private let configuration: PostgresConnection.InternalConfiguration
     private let configureSSLCallback: ((Channel) throws -> Void)?
 
-    private var listenState: ListenStateMachine
+    private var listenState = ListenStateMachine()
+    private var preparedStatementState = PreparedStatementStateMachine()
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
@@ -32,7 +33,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     ) {
         self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
         self.eventLoop = eventLoop
-        self.listenState = ListenStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -50,7 +50,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     ) {
         self.state = state
         self.eventLoop = eventLoop
-        self.listenState = ListenStateMachine()
         self.configuration = configuration
         self.configureSSLCallback = configureSSLCallback
         self.logger = logger
@@ -233,6 +232,29 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 listener.failed(CancellationError())
                 return
             }
+        case .executePreparedStatement(let preparedStatement):
+            let action = self.preparedStatementState.lookup(
+                preparedStatement: preparedStatement
+            )
+            switch action {
+            case .prepareStatement:
+                psqlTask = self.makePrepareStatementTask(
+                    preparedStatement: preparedStatement,
+                    context: context
+                )
+            case .waitForAlreadyInFlightPreparation:
+                // The state machine already keeps track of this
+                // and will execute the statement as soon as it's prepared
+                return
+            case .executeStatement(let rowDescription):
+                psqlTask = self.makeExecutePreparedStatementTask(
+                    preparedStatement: preparedStatement,
+                    rowDescription: rowDescription
+                )
+            case .returnError(let error):
+                preparedStatement.promise.fail(error)
+                return
+            }
         }
 
         let action = self.state.enqueue(task: psqlTask)
@@ -306,7 +328,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case .wait:
             break
         case .sendStartupMessage(let authContext):
-            self.encoder.startup(authContext.toStartupParameters())
+            self.encoder.startup(user: authContext.username, database: authContext.database)
             context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .sendSSLRequest:
             self.encoder.ssl()
@@ -664,6 +686,93 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         }
     }
 
+    private func makePrepareStatementTask(
+        preparedStatement: PreparedStatementContext,
+        context: ChannelHandlerContext
+    ) -> PSQLTask {
+        let promise = self.eventLoop.makePromise(of: RowDescription?.self)
+        promise.futureResult.whenComplete { result in
+            switch result {
+            case .success(let rowDescription):
+                self.prepareStatementComplete(
+                    name: preparedStatement.name,
+                    rowDescription: rowDescription,
+                    context: context
+                )
+            case .failure(let error):
+                let psqlError: PSQLError
+                if let error = error as? PSQLError {
+                    psqlError = error
+                } else {
+                    psqlError = .connectionError(underlying: error)
+                }
+                self.prepareStatementFailed(
+                    name: preparedStatement.name,
+                    error: psqlError,
+                    context: context
+                )
+            }
+        }
+        return .extendedQuery(.init(
+            name: preparedStatement.name,
+            query: preparedStatement.sql,
+            logger: preparedStatement.logger,
+            promise: promise
+        ))
+    }
+
+    private func makeExecutePreparedStatementTask(
+        preparedStatement: PreparedStatementContext,
+        rowDescription: RowDescription?
+    ) -> PSQLTask {
+        return .extendedQuery(.init(
+            executeStatement: .init(
+                name: preparedStatement.name,
+                binds: preparedStatement.bindings,
+                rowDescription: rowDescription
+            ),
+            logger: preparedStatement.logger,
+            promise: preparedStatement.promise
+        ))
+    }
+
+    private func prepareStatementComplete(
+        name: String,
+        rowDescription: RowDescription?,
+        context: ChannelHandlerContext
+    ) {
+        let action = self.preparedStatementState.preparationComplete(
+            name: name,
+            rowDescription: rowDescription
+        )
+        for preparedStatement in action.statements {
+            let action = self.state.enqueue(task: .extendedQuery(.init(
+                executeStatement: .init(
+                    name: preparedStatement.name,
+                    binds: preparedStatement.bindings,
+                    rowDescription: action.rowDescription
+                ),
+                logger: preparedStatement.logger,
+                promise: preparedStatement.promise
+            ))
+            )
+            self.run(action, with: context)
+        }
+    }
+
+    private func prepareStatementFailed(
+        name: String,
+        error: PSQLError,
+        context: ChannelHandlerContext
+    ) {
+        let action = self.preparedStatementState.errorHappened(
+            name: name,
+            error: error
+        )
+        for statement in action.statements {
+            statement.promise.fail(action.error)
+        }
+    }
 }
 
 extension PostgresChannelHandler: PSQLRowsDataSource {
@@ -681,17 +790,6 @@ extension PostgresChannelHandler: PSQLRowsDataSource {
         }
         let action = self.state.cancelQueryStream()
         self.run(action, with: handlerContext)
-    }
-}
-
-extension AuthContext {
-    func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
-        PostgresFrontendMessage.Startup.Parameters(
-            user: self.username,
-            database: self.database,
-            options: nil,
-            replication: .false
-        )
     }
 }
 
