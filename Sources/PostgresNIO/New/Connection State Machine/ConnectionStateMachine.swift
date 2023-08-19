@@ -550,7 +550,7 @@ struct ConnectionStateMachine {
         // check if we are quiescing. if so fail task immidiatly
         switch self.quiescingState {
         case .quiescing:
-            psqlErrror = PSQLError.clientClosesConnection(underlying: nil)
+            psqlErrror = PSQLError.clientClosedConnection(underlying: nil)
 
         case .notQuiescing:
             switch self.state {
@@ -570,7 +570,7 @@ struct ConnectionStateMachine {
                 return self.executeTask(task)
 
             case .closing(let error):
-                psqlErrror = PSQLError.clientClosesConnection(underlying: error)
+                psqlErrror = PSQLError.clientClosedConnection(underlying: error)
 
             case .closed(clientInitiated: true, error: let error):
                 psqlErrror = PSQLError.clientClosedConnection(underlying: error)
@@ -1033,7 +1033,7 @@ extension ConnectionStateMachine {
             }
             
             return false
-        case .clientClosesConnection, .clientClosedConnection:
+        case .clientClosedConnection:
             preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
         case .serverClosedConnection:
             return true
