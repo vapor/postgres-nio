@@ -2,7 +2,10 @@ import NIOCore
 @testable import PostgresNIO
 
 extension ByteBuffer {
-    
+    mutating func psqlWriteBackendMessageID(_ messageID: PostgresBackendMessage.ID) {
+        self.writeInteger(messageID.rawValue)
+    }
+
     static func backendMessage(id: PostgresBackendMessage.ID, _ payload: (inout ByteBuffer) throws -> ()) rethrows -> ByteBuffer {
         var byteBuffer = ByteBuffer()
         try byteBuffer.writeBackendMessage(id: id, payload)
