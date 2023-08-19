@@ -2,14 +2,6 @@ import NIOCore
 
 internal extension ByteBuffer {
     
-    mutating func psqlWriteBackendMessageID(_ messageID: PostgresBackendMessage.ID) {
-        self.writeInteger(messageID.rawValue)
-    }
-    
-    mutating func psqlWriteFrontendMessageID(_ messageID: PostgresFrontendMessage.ID) {
-        self.writeInteger(messageID.rawValue)
-    }
-
     @usableFromInline
     mutating func psqlReadFloat() -> Float? {
         return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }
