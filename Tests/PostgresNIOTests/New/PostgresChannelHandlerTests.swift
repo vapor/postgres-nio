@@ -25,8 +25,7 @@ class PostgresChannelHandlerTests: XCTestCase {
             handler
         ], loop: self.eventLoop)
         defer {
-            do { try embedded.finish() }
-            catch { print("\(String(reflecting: error))") }
+            XCTAssertNoThrow({ try embedded.finish() })
         }
 
         var maybeMessage: PostgresFrontendMessage?

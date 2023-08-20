@@ -18,7 +18,6 @@ public struct PSQLError: Error {
 
             case queryCancelled
             case tooManyParameters
-            case clientClosesConnection
             case clientClosedConnection
             case serverClosedConnection
             case connectionError
@@ -46,7 +45,6 @@ public struct PSQLError: Error {
         public static let invalidCommandTag = Self(.invalidCommandTag)
         public static let queryCancelled = Self(.queryCancelled)
         public static let tooManyParameters = Self(.tooManyParameters)
-        public static let clientClosesConnection = Self(.clientClosesConnection)
         public static let clientClosedConnection = Self(.clientClosedConnection)
         public static let serverClosedConnection = Self(.serverClosedConnection)
         public static let connectionError = Self(.connectionError)
@@ -54,8 +52,8 @@ public struct PSQLError: Error {
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
 
-        @available(*, deprecated, renamed: "clientClosesConnection")
-        public static let connectionQuiescing = Self.clientClosesConnection
+        @available(*, deprecated, renamed: "clientClosedConnection")
+        public static let connectionQuiescing = Self.clientClosedConnection
 
         @available(*, deprecated, message: "Use the more specific `serverClosedConnection` or `clientClosedConnection` instead")
         public static let connectionClosed = Self.serverClosedConnection
@@ -86,8 +84,6 @@ public struct PSQLError: Error {
                 return "queryCancelled"
             case .tooManyParameters:
                 return "tooManyParameters"
-            case .clientClosesConnection:
-                return "clientClosesConnection"
             case .clientClosedConnection:
                 return "clientClosedConnection"
             case .serverClosedConnection:
@@ -385,12 +381,6 @@ public struct PSQLError: Error {
         var new = Self(code: .messageDecodingFailure)
         new.underlying = error
         return new
-    }
-
-    static func clientClosesConnection(underlying: Error?) -> PSQLError {
-        var error = PSQLError(code: .clientClosesConnection)
-        error.underlying = underlying
-        return error
     }
 
     static func clientClosedConnection(underlying: Error?) -> PSQLError {

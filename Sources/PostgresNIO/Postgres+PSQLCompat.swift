@@ -37,8 +37,7 @@ extension PSQLError {
             return self.underlying ?? self
         case .tooManyParameters, .invalidCommandTag:
             return self
-        case .clientClosesConnection, 
-             .clientClosedConnection,
+        case .clientClosedConnection,
              .serverClosedConnection:
             return PostgresError.connectionClosed
         case .connectionError:
