@@ -8,7 +8,6 @@ import NIOPosix
 import NIOCore
 
 final class AsyncPostgresConnectionTests: XCTestCase {
-
     func test1kRoundTrips() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -37,7 +36,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         try await withTestConnection(on: eventLoop) { connection in
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
             var counter = 0
-            for try await element in rows.decode(Int.self, context: .default) {
+            for try await row in rows {
+                let element = try row.decode(Int.self)
                 XCTAssertEqual(element, counter + 1)
                 counter += 1
             }
@@ -259,7 +259,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         try await withTestConnection(on: eventLoop) { connection in
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
             var counter = 1
-            for try await element in rows.decode(Int.self, context: .default) {
+            for try await row in rows {
+                let element = try row.decode(Int.self, context: .default)
                 XCTAssertEqual(element, counter)
                 counter += 1
             }

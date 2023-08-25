@@ -59,7 +59,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
         var counter = 0
         for try await row in rowSequence {
-            XCTAssertEqual(try row.decode(Int.self, context: .default), counter)
+            XCTAssertEqual(try row.decode(Int.self), counter)
             counter += 1
 
             if counter == 64 {
@@ -135,7 +135,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
         var counter = 0
         for try await row in rowSequence {
-            XCTAssertEqual(try row.decode(Int.self, context: .default), counter)
+            XCTAssertEqual(try row.decode(Int.self), counter)
             counter += 1
         }
 
@@ -163,7 +163,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
         var counter = 0
         for try await row in rowSequence {
-            XCTAssertEqual(try row.decode(Int.self, context: .default), counter)
+            XCTAssertEqual(try row.decode(Int.self), counter)
             counter += 1
         }
 
@@ -220,7 +220,7 @@ final class PostgresRowSequenceTests: XCTestCase {
         }
 
         let row1 = try await rowIterator.next()
-        XCTAssertEqual(try row1?.decode(Int.self, context: .default), 0)
+        XCTAssertEqual(try row1?.decode(Int.self), 0)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
             stream.receive(completion: .success("SELECT 1"))
@@ -252,7 +252,7 @@ final class PostgresRowSequenceTests: XCTestCase {
         }
 
         let row1 = try await rowIterator.next()
-        XCTAssertEqual(try row1?.decode(Int.self, context: .default), 0)
+        XCTAssertEqual(try row1?.decode(Int.self), 0)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
             stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
@@ -415,7 +415,7 @@ final class PostgresRowSequenceTests: XCTestCase {
         var counter = 1
         for _ in 0..<(2 * messagePerChunk - 1) {
             let row = try await rowIterator.next()
-            XCTAssertEqual(try row?.decode(Int.self, context: .default), counter)
+            XCTAssertEqual(try row?.decode(Int.self), counter)
             counter += 1
         }
 
