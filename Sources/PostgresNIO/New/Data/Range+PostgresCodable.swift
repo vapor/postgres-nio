@@ -191,6 +191,11 @@ extension PostgresRange: PostgresEncodable & PostgresNonThrowingEncodable where 
     }
 }
 
+// explicitly conforming to PostgresDynamicTypeEncodable and PostgresThrowingDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension PostgresRange: PostgresThrowingDynamicTypeEncodable & PostgresDynamicTypeEncodable
+    where Bound: PostgresRangeEncodable {}
+
 extension PostgresRange where Bound: Comparable {
     @inlinable
     init(range: Range<Bound>) {
@@ -227,6 +232,11 @@ extension Range: PostgresEncodable where Bound: PostgresRangeEncodable {
 
 extension Range: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
 
+// explicitly conforming to PostgresDynamicTypeEncodable and PostgresThrowingDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension Range: PostgresDynamicTypeEncodable & PostgresThrowingDynamicTypeEncodable
+    where Bound: PostgresRangeEncodable {}
+
 extension Range: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
     public init<JSONDecoder: PostgresJSONDecoder>(
@@ -249,7 +259,7 @@ extension Range: PostgresDecodable where Bound: PostgresRangeDecodable {
         else {
             throw PostgresDecodingError.Code.failure
         }
-        
+
         self = lowerBound..<upperBound
     }
 }
@@ -270,7 +280,15 @@ extension ClosedRange: PostgresEncodable where Bound: PostgresRangeEncodable {
     }
 }
 
+// explicitly conforming to PostgresThrowingDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension ClosedRange: PostgresThrowingDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
+
 extension ClosedRange: PostgresNonThrowingEncodable where Bound: PostgresRangeEncodable {}
+
+// explicitly conforming to PostgresDynamicTypeEncodable because of:
+// https://github.com/apple/swift/issues/54132
+extension ClosedRange: PostgresDynamicTypeEncodable where Bound: PostgresRangeEncodable {}
 
 extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
@@ -301,7 +319,7 @@ extension ClosedRange: PostgresDecodable where Bound: PostgresRangeDecodable {
         if lowerBound > upperBound {
             throw PostgresDecodingError.Code.failure
         }
-        
+
         self = lowerBound...upperBound
     }
 }

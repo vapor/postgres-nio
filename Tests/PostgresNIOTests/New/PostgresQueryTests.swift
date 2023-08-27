@@ -31,6 +31,27 @@ final class PostgresQueryTests: XCTestCase {
         XCTAssertEqual(query.binds.bytes, expected)
     }
 
+    func testStringInterpolationWithDynamicType() {
+        let type = PostgresDataType(16435)
+        let format = PostgresFormat.binary
+        let dynamicString = DynamicString(value: "Hello world", psqlType: type, psqlFormat: format)
+
+        let query: PostgresQuery = """
+        INSERT INTO foo (dynamicType) SET (\(dynamicString));
+        """
+
+        XCTAssertEqual(query.sql, "INSERT INTO foo (dynamicType) SET ($1);")
+
+        var expectedBindsBytes = ByteBuffer()
+        expectedBindsBytes.writeInteger(Int32(dynamicString.value.utf8.count))
+        expectedBindsBytes.writeString(dynamicString.value)
+
+        let expectedMetadata: [PostgresBindings.Metadata] = [.init(dataType: type, format: format, protected: true)]
+
+        XCTAssertEqual(query.binds.bytes, expectedBindsBytes)
+        XCTAssertEqual(query.binds.metadata, expectedMetadata)
+    }
+
     func testStringInterpolationWithCustomJSONEncoder() {
         struct Foo: Codable, PostgresCodable {
             var helloWorld: String
@@ -87,5 +108,21 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(value)
 
         XCTAssertEqual(query.binds.bytes, expected)
+    }
+}
+
+extension PostgresQueryTests {
+    struct DynamicString: PostgresDynamicTypeEncodable {
+        let value: String
+
+        var psqlType: PostgresDataType
+        var psqlFormat: PostgresFormat
+
+        func encode<JSONEncoder>(
+            into byteBuffer: inout ByteBuffer,
+            context: PostgresNIO.PostgresEncodingContext<JSONEncoder>
+        ) where JSONEncoder: PostgresJSONEncoder {
+            byteBuffer.writeString(value)
+        }
     }
 }
