@@ -275,6 +275,316 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testIfServerJustClosesTheErrorReflectsThat() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        async let response = try await connection.query("SELECT 1;", logger: self.logger)
+
+        let listenMessage = try await channel.waitForUnpreparedRequest()
+        XCTAssertEqual(listenMessage.parse.query, "SELECT 1;")
+
+        try await channel.testingEventLoop.executeInContext { channel.pipeline.fireChannelInactive() }
+        try await channel.testingEventLoop.executeInContext { channel.pipeline.fireChannelUnregistered() }
+
+        do {
+            _ = try await response
+            XCTFail("Expected to throw")
+        } catch {
+            XCTAssertEqual((error as? PSQLError)?.code, .serverClosedConnection)
+        }
+
+        // retry on same connection
+
+        do {
+            _ = try await connection.query("SELECT 1;", logger: self.logger)
+            XCTFail("Expected to throw")
+        } catch {
+            XCTAssertEqual((error as? PSQLError)?.code, .serverClosedConnection)
+        }
+    }
+
+    struct TestPrepareStatement: PostgresPreparedStatement {
+        static var sql = "SELECT datname FROM pg_stat_activity WHERE state = $1"
+        typealias Row = String
+
+        var state: String
+
+        func makeBindings() -> PostgresBindings {
+            var bindings = PostgresBindings()
+            bindings.append(.init(string: self.state))
+            return bindings
+        }
+
+        func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+            try row.decode(Row.self)
+        }
+    }
+
+    func testPreparedStatement() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "active")
+                let result = try await connection.execute(preparedStatement, logger: .psqlTest)
+                var rows = 0
+                for try await database in result {
+                    rows += 1
+                    XCTAssertEqual("test_database", database)
+                }
+                XCTAssertEqual(rows, 1)
+            }
+
+            let prepareRequest = try await channel.waitForPrepareRequest()
+            XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
+            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            guard case .preparedStatement(let name) = prepareRequest.describe else {
+                fatalError("Describe should contain a prepared statement")
+            }
+            XCTAssertEqual(name, String(reflecting: TestPrepareStatement.self))
+
+            try await channel.sendPrepareResponse(
+                parameterDescription: .init(dataTypes: [
+                    PostgresDataType.text
+                ]),
+                rowDescription: .init(columns: [
+                    .init(
+                        name: "datname",
+                        tableOID: 12222,
+                        columnAttributeNumber: 2,
+                        dataType: .name,
+                        dataTypeSize: 64,
+                        dataTypeModifier: -1,
+                        format: .text
+                    )
+                ])
+            )
+
+            let preparedRequest = try await channel.waitForPreparedRequest()
+            XCTAssertEqual(preparedRequest.bind.preparedStatementName, String(reflecting: TestPrepareStatement.self))
+            XCTAssertEqual(preparedRequest.bind.parameters.count, 1)
+            XCTAssertEqual(preparedRequest.bind.resultColumnFormats, [.binary])
+
+            try await channel.sendPreparedResponse(
+                dataRows: [
+                    ["test_database"]
+                ],
+                commandTag: TestPrepareStatement.sql
+            )
+        }
+    }
+
+    func testSerialExecutionOfSamePreparedStatement() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            // Send the same prepared statement twice, but with different parameters.
+            // Send one first and wait to send the other request until preparation is complete
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "active")
+                let result = try await connection.execute(preparedStatement, logger: .psqlTest)
+                var rows = 0
+                for try await database in result {
+                    rows += 1
+                    XCTAssertEqual("test_database", database)
+                }
+                XCTAssertEqual(rows, 1)
+            }
+
+            let prepareRequest = try await channel.waitForPrepareRequest()
+            XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
+            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            guard case .preparedStatement(let name) = prepareRequest.describe else {
+                fatalError("Describe should contain a prepared statement")
+            }
+            XCTAssertEqual(name, String(reflecting: TestPrepareStatement.self))
+
+            try await channel.sendPrepareResponse(
+                parameterDescription: .init(dataTypes: [
+                    PostgresDataType.text
+                ]),
+                rowDescription: .init(columns: [
+                    .init(
+                        name: "datname",
+                        tableOID: 12222,
+                        columnAttributeNumber: 2,
+                        dataType: .name,
+                        dataTypeSize: 64,
+                        dataTypeModifier: -1,
+                        format: .text
+                    )
+                ])
+            )
+
+            let preparedRequest1 = try await channel.waitForPreparedRequest()
+            var buffer = preparedRequest1.bind.parameters[0]!
+            let parameter1 = buffer.readString(length: buffer.readableBytes)!
+            XCTAssertEqual(parameter1, "active")
+            try await channel.sendPreparedResponse(
+                dataRows: [
+                    ["test_database"]
+                ],
+                commandTag: TestPrepareStatement.sql
+            )
+
+            // Now that the statement has been prepared and executed, send another request that will only get executed
+            // without preparation
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "idle")
+                let result = try await connection.execute(preparedStatement, logger: .psqlTest)
+                var rows = 0
+                for try await database in result {
+                    rows += 1
+                    XCTAssertEqual("test_database", database)
+                }
+                XCTAssertEqual(rows, 1)
+            }
+
+            let preparedRequest2 = try await channel.waitForPreparedRequest()
+            buffer = preparedRequest2.bind.parameters[0]!
+            let parameter2 = buffer.readString(length: buffer.readableBytes)!
+            XCTAssertEqual(parameter2, "idle")
+            try await channel.sendPreparedResponse(
+                dataRows: [
+                    ["test_database"]
+                ],
+                commandTag: TestPrepareStatement.sql
+            )
+            // Ensure we received and responded to both the requests
+            let parameters = [parameter1, parameter2]
+            XCTAssert(parameters.contains("active"))
+            XCTAssert(parameters.contains("idle"))
+        }
+    }
+
+    func testStatementPreparationOnlyHappensOnceWithConcurrentRequests() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            // Send the same prepared statement twice, but with different parameters.
+            // Let them race to tests that requests and responses aren't mixed up
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "active")
+                let result = try await connection.execute(preparedStatement, logger: .psqlTest)
+                var rows = 0
+                for try await database in result {
+                    rows += 1
+                    XCTAssertEqual("test_database_active", database)
+                }
+                XCTAssertEqual(rows, 1)
+            }
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "idle")
+                let result = try await connection.execute(preparedStatement, logger: .psqlTest)
+                var rows = 0
+                for try await database in result {
+                    rows += 1
+                    XCTAssertEqual("test_database_idle", database)
+                }
+                XCTAssertEqual(rows, 1)
+            }
+
+            // The channel deduplicates prepare requests, we're going to see only one of them
+            let prepareRequest = try await channel.waitForPrepareRequest()
+            XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
+            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            guard case .preparedStatement(let name) = prepareRequest.describe else {
+                fatalError("Describe should contain a prepared statement")
+            }
+            XCTAssertEqual(name, String(reflecting: TestPrepareStatement.self))
+
+            try await channel.sendPrepareResponse(
+                parameterDescription: .init(dataTypes: [
+                    PostgresDataType.text
+                ]),
+                rowDescription: .init(columns: [
+                    .init(
+                        name: "datname",
+                        tableOID: 12222,
+                        columnAttributeNumber: 2,
+                        dataType: .name,
+                        dataTypeSize: 64,
+                        dataTypeModifier: -1,
+                        format: .text
+                    )
+                ])
+            )
+
+            // Now both the tasks have their statements prepared.
+            // We should see both of their execute requests coming in, the order is nondeterministic
+            let preparedRequest1 = try await channel.waitForPreparedRequest()
+            var buffer = preparedRequest1.bind.parameters[0]!
+            let parameter1 = buffer.readString(length: buffer.readableBytes)!
+            try await channel.sendPreparedResponse(
+                dataRows: [
+                    ["test_database_\(parameter1)"]
+                ],
+                commandTag: TestPrepareStatement.sql
+            )
+            let preparedRequest2 = try await channel.waitForPreparedRequest()
+            buffer = preparedRequest2.bind.parameters[0]!
+            let parameter2 = buffer.readString(length: buffer.readableBytes)!
+            try await channel.sendPreparedResponse(
+                dataRows: [
+                    ["test_database_\(parameter2)"]
+                ],
+                commandTag: TestPrepareStatement.sql
+            )
+            // Ensure we received and responded to both the requests
+            let parameters = [parameter1, parameter2]
+            XCTAssert(parameters.contains("active"))
+            XCTAssert(parameters.contains("idle"))
+        }
+    }
+
+    func testStatementPreparationFailure() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            // Send the same prepared statement twice, but with different parameters.
+            // Send one first and wait to send the other request until preparation is complete
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "active")
+                do {
+                    _ = try await connection.execute(preparedStatement, logger: .psqlTest)
+                    XCTFail("Was supposed to fail")
+                } catch {
+                    XCTAssert(error is PSQLError)
+                }
+            }
+
+            let prepareRequest = try await channel.waitForPrepareRequest()
+            XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
+            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            guard case .preparedStatement(let name) = prepareRequest.describe else {
+                fatalError("Describe should contain a prepared statement")
+            }
+            XCTAssertEqual(name, String(reflecting: TestPrepareStatement.self))
+            
+            // Respond with an error taking care to return a SQLSTATE that isn't
+            // going to get the connection closed.
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .sqlState : "26000" // invalid_sql_statement_name
+            ])))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            try await channel.testingEventLoop.executeInContext { channel.read() }
+
+
+            // Send another requests with the same prepared statement, which should fail straight
+            // away without any interaction with the server
+            taskGroup.addTask {
+                let preparedStatement = TestPrepareStatement(state: "idle")
+                do {
+                    _ = try await connection.execute(preparedStatement, logger: .psqlTest)
+                    XCTFail("Was supposed to fail")
+                } catch {
+                    XCTAssert(error is PSQLError)
+                }
+            }
+        }
+    }
+
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = await NIOAsyncTestingChannel(handlers: [
@@ -327,11 +637,81 @@ extension NIOAsyncTestingChannel {
 
         return UnpreparedRequest(parse: parse, describe: describe, bind: bind, execute: execute)
     }
+
+    func waitForPrepareRequest() async throws -> PrepareRequest {
+        let parse = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        let describe = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        let sync = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+
+        guard case .parse(let parse) = parse,
+              case .describe(let describe) = describe,
+              case .sync = sync
+        else {
+            fatalError("Unexpected message")
+        }
+
+        return PrepareRequest(parse: parse, describe: describe)
+    }
+
+    func sendPrepareResponse(
+        parameterDescription: PostgresBackendMessage.ParameterDescription,
+        rowDescription: RowDescription
+    ) async throws {
+        try await self.writeInbound(PostgresBackendMessage.parseComplete)
+        try await self.testingEventLoop.executeInContext { self.read() }
+        try await self.writeInbound(PostgresBackendMessage.parameterDescription(parameterDescription))
+        try await self.testingEventLoop.executeInContext { self.read() }
+        try await self.writeInbound(PostgresBackendMessage.rowDescription(rowDescription))
+        try await self.testingEventLoop.executeInContext { self.read() }
+        try await self.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+        try await self.testingEventLoop.executeInContext { self.read() }
+    }
+
+    func waitForPreparedRequest() async throws -> PreparedRequest {
+        let bind = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        let execute = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        let sync = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+
+        guard case .bind(let bind) = bind,
+              case .execute(let execute) = execute,
+              case .sync = sync
+        else {
+            fatalError()
+        }
+
+        return PreparedRequest(bind: bind, execute: execute)
+    }
+
+    func sendPreparedResponse(
+        dataRows: [DataRow],
+        commandTag: String
+    ) async throws {
+        try await self.writeInbound(PostgresBackendMessage.bindComplete)
+        try await self.testingEventLoop.executeInContext { self.read() }
+        for dataRow in dataRows {
+            try await self.writeInbound(PostgresBackendMessage.dataRow(dataRow))
+        }
+        try await self.testingEventLoop.executeInContext { self.read() }
+        try await self.writeInbound(PostgresBackendMessage.commandComplete(commandTag))
+        try await self.testingEventLoop.executeInContext { self.read() }
+        try await self.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+        try await self.testingEventLoop.executeInContext { self.read() }
+    }
 }
 
 struct UnpreparedRequest {
     var parse: PostgresFrontendMessage.Parse
     var describe: PostgresFrontendMessage.Describe
+    var bind: PostgresFrontendMessage.Bind
+    var execute: PostgresFrontendMessage.Execute
+}
+
+struct PrepareRequest {
+    var parse: PostgresFrontendMessage.Parse
+    var describe: PostgresFrontendMessage.Describe
+}
+
+struct PreparedRequest {
     var bind: PostgresFrontendMessage.Bind
     var execute: PostgresFrontendMessage.Execute
 }

@@ -1246,10 +1246,10 @@ final class PostgresNIOTests: XCTestCase {
             return EventLoopFuture.whenAllSucceed([a, b, c], on: self.eventLoop)
         }).wait())
         XCTAssertEqual(queries?.count, 3)
-        var resutIterator = queries?.makeIterator()
-        XCTAssertEqual(try resutIterator?.next()?.first?.decode(String.self, context: .default), "a")
-        XCTAssertEqual(try resutIterator?.next()?.first?.decode(String.self, context: .default), "b")
-        XCTAssertEqual(try resutIterator?.next()?.first?.decode(String.self, context: .default), "c")
+        var resultIterator = queries?.makeIterator()
+        XCTAssertEqual(try resultIterator?.next()?.first?.decode(String.self, context: .default), "a")
+        XCTAssertEqual(try resultIterator?.next()?.first?.decode(String.self, context: .default), "b")
+        XCTAssertEqual(try resultIterator?.next()?.first?.decode(String.self, context: .default), "c")
     }
 
     // https://github.com/vapor/postgres-nio/issues/122

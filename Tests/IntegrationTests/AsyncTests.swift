@@ -8,7 +8,6 @@ import NIOPosix
 import NIOCore
 
 final class AsyncPostgresConnectionTests: XCTestCase {
-
     func test1kRoundTrips() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -37,7 +36,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         try await withTestConnection(on: eventLoop) { connection in
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
             var counter = 0
-            for try await element in rows.decode(Int.self, context: .default) {
+            for try await row in rows {
+                let element = try row.decode(Int.self)
                 XCTAssertEqual(element, counter + 1)
                 counter += 1
             }
@@ -259,7 +259,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         try await withTestConnection(on: eventLoop) { connection in
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
             var counter = 1
-            for try await element in rows.decode(Int.self, context: .default) {
+            for try await row in rows {
+                let element = try row.decode(Int.self, context: .default)
                 XCTAssertEqual(element, counter)
                 counter += 1
             }
@@ -313,6 +314,48 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             }
 
             try await connection.query("SELECT 1;", logger: .psqlTest)
+        }
+    }
+
+    func testPreparedStatement() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        struct TestPreparedStatement: PostgresPreparedStatement {
+            static var sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
+            typealias Row = (Int, String)
+
+            var state: String
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.state)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                try row.decode(Row.self)
+            }
+        }
+        let preparedStatement = TestPreparedStatement(state: "active")
+        try await withTestConnection(on: eventLoop) { connection in
+            var results = try await connection.execute(preparedStatement, logger: .psqlTest)
+            var counter = 0
+
+            for try await element in results {
+                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
+                counter += 1
+            }
+
+            XCTAssertGreaterThanOrEqual(counter, 1)
+
+            // Second execution, which reuses the existing prepared statement
+            results = try await connection.execute(preparedStatement, logger: .psqlTest)
+            for try await element in results {
+                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
+                counter += 1
+            }
         }
     }
 }

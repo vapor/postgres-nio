@@ -25,8 +25,7 @@ class PostgresChannelHandlerTests: XCTestCase {
             handler
         ], loop: self.eventLoop)
         defer {
-            do { try embedded.finish() }
-            catch { print("\(String(reflecting: error))") }
+            XCTAssertNoThrow({ try embedded.finish() })
         }
 
         var maybeMessage: PostgresFrontendMessage?
@@ -275,5 +274,16 @@ class TestEventHandler: ChannelInboundHandler {
             return XCTFail("Unexpected event type received: \(event)")
         }
         self.events.append(psqlEvent)
+    }
+}
+
+extension AuthContext {
+    func toStartupParameters() -> PostgresFrontendMessage.Startup.Parameters {
+        PostgresFrontendMessage.Startup.Parameters(
+            user: self.username,
+            database: self.database,
+            options: nil,
+            replication: .false
+        )
     }
 }

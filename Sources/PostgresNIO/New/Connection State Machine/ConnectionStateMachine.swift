@@ -203,7 +203,7 @@ struct ConnectionStateMachine {
             preconditionFailure("How can a connection be closed, if it was never connected.")
         
         case .closed:
-            preconditionFailure("How can a connection be closed, if it is already closed.")
+            return .wait
         
         case .authenticated,
              .sslRequestSent,
@@ -214,8 +214,8 @@ struct ConnectionStateMachine {
              .readyForQuery,
              .extendedQuery,
              .closeCommand:
-            return self.errorHappened(.uncleanShutdown)
-            
+            return self.errorHappened(.serverClosedConnection(underlying: nil))
+
         case .closing(let error):
             self.state = .closed(clientInitiated: true, error: error)
             self.quiescingState = .notQuiescing
@@ -550,7 +550,7 @@ struct ConnectionStateMachine {
         // check if we are quiescing. if so fail task immidiatly
         switch self.quiescingState {
         case .quiescing:
-            psqlErrror = PSQLError.clientClosesConnection(underlying: nil)
+            psqlErrror = PSQLError.clientClosedConnection(underlying: nil)
 
         case .notQuiescing:
             switch self.state {
@@ -570,7 +570,7 @@ struct ConnectionStateMachine {
                 return self.executeTask(task)
 
             case .closing(let error):
-                psqlErrror = PSQLError.clientClosesConnection(underlying: error)
+                psqlErrror = PSQLError.clientClosedConnection(underlying: error)
 
             case .closed(clientInitiated: true, error: let error):
                 psqlErrror = PSQLError.clientClosedConnection(underlying: error)
@@ -858,8 +858,9 @@ struct ConnectionStateMachine {
                 // substate machine.
                 return .closeConnectionAndCleanup(cleanupContext)
             }
-            
-            switch queryStateMachine.errorHappened(error) {
+
+            let action = queryStateMachine.errorHappened(error)
+            switch action {
             case .sendParseDescribeBindExecuteSync,
                  .sendParseDescribeSync,
                  .sendBindExecuteSync,
@@ -869,7 +870,7 @@ struct ConnectionStateMachine {
                  .forwardStreamComplete,
                  .wait,
                  .read:
-                preconditionFailure("Invalid state: \(self.state)")
+                preconditionFailure("Invalid query state machine action in state: \(self.state), action: \(action)")
 
             case .evaluateErrorAtConnectionLevel:
                 return .closeConnectionAndCleanup(cleanupContext)
@@ -894,12 +895,13 @@ struct ConnectionStateMachine {
                 return .closeConnectionAndCleanup(cleanupContext)
             }
             
-            switch closeStateMachine.errorHappened(error) {
+            let action = closeStateMachine.errorHappened(error)
+            switch action {
             case .sendCloseSync,
                  .succeedClose,
                  .read,
                  .wait:
-                preconditionFailure("Invalid state: \(self.state)")
+                preconditionFailure("Invalid close state machine action in state: \(self.state), action: \(action)")
             case .failClose(let closeCommandContext, with: let error):
                 return .failClose(closeCommandContext, with: error, cleanupContext: cleanupContext)
             }
@@ -910,7 +912,7 @@ struct ConnectionStateMachine {
             // the error state and will try to close the connection. However the server might have
             // send further follow up messages. In those cases we will run into this method again
             // and again. We should just ignore those events.
-            return .wait
+            return .closeConnection(closePromise)
 
         case .modifying:
             preconditionFailure("Invalid state: \(self.state)")
@@ -1031,19 +1033,19 @@ extension ConnectionStateMachine {
             }
             
             return false
-        case .clientClosesConnection, .clientClosedConnection:
-            preconditionFailure("Pure client error, that is thrown directly in PostgresConnection")
+        case .clientClosedConnection:
+            preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
         case .serverClosedConnection:
-            preconditionFailure("Pure client error, that is thrown directly and should never ")
+            return true
         }
     }
 
     mutating func setErrorAndCreateCleanupContextIfNeeded(_ error: PSQLError) -> ConnectionAction.CleanUpContext? {
-        guard self.shouldCloseConnection(reason: error) else {
-            return nil
+        if self.shouldCloseConnection(reason: error) {
+            return self.setErrorAndCreateCleanupContext(error)
         }
         
-        return self.setErrorAndCreateCleanupContext(error)
+        return nil
     }
     
     mutating func setErrorAndCreateCleanupContext(_ error: PSQLError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction.CleanUpContext {
@@ -1060,13 +1062,15 @@ extension ConnectionStateMachine {
             forwardedPromise = closePromise
         }
 
-        self.state = .closing(error)
-
-        var action = ConnectionAction.CleanUpContext.Action.close
-        if case .uncleanShutdown = error.code.base {
+        let action: ConnectionAction.CleanUpContext.Action
+        if case .serverClosedConnection = error.code.base {
+            self.state = .closed(clientInitiated: false, error: error)
             action = .fireChannelInactive
+        } else {
+            self.state = .closing(error)
+            action = .close
         }
-        
+
         return .init(action: action, tasks: tasks, error: error, closePromise: forwardedPromise)
     }
 }
