@@ -17,49 +17,52 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        container:
+        swift-image:
           - swift:5.6-focal
           - swift:5.7-jammy
           - swift:5.8-jammy
           - swiftlang/swift:nightly-5.9-jammy
           - swiftlang/swift:nightly-main-jammy
-    container: ${{ matrix.container }}
+        include:
+          - swift-image: swift:5.8-jammy
+            code-coverage: true
+    container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
     steps:
       - name: Display OS and Swift versions
         shell: bash
         run: |
-          if [[ '${{ contains(matrix.container, 'nightly') }}' == 'true' ]]; then
-            SWIFT_PLATFORM="$(source /etc/os-release && echo "${ID}${VERSION_ID}")" SWIFT_VERSION="$(cat /.swift_tag)"
-            printf 'SWIFT_PLATFORM=%s\nSWIFT_VERSION=%s\n' "${SWIFT_PLATFORM}" "${SWIFT_VERSION}" >>"${GITHUB_ENV}"
-          fi
-          printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
+          [[ -z "${SWIFT_PLATFORM}" ]] && SWIFT_PLATFORM="$(. /etc/os-release && echo "${ID}${VERSION_ID}")"
+          [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
+          printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}"
+          swift --version
       - name: Check out package
         uses: actions/checkout@v3
-      - name: Run unit tests with code coverage and Thread Sanitizer
-        run: swift test --filter=^PostgresNIOTests --sanitize=thread --enable-code-coverage
-      - name: Submit coverage report to Codecov.io
-        uses: vapor/swift-codecov-action@v0.2
-        with:
-          cc_env_vars: 'SWIFT_VERSION,SWIFT_PLATFORM,RUNNER_OS,RUNNER_ARCH'
-          cc_fail_ci_if_error: false
+      - name: Run unit tests with Thread Sanitizer
+        env:
+          CODE_COVERAGE: ${{ matrix.code-coverage && '--enable-code-coverage' || '' }}
+        run: |
+          swift test --filter=^PostgresNIOTests --sanitize=thread ${CODE_COVERAGE}
+      - name: Submit code coverage
+        if: ${{ matrix.code-coverage }}
+        uses: vapor/swift-codecov-action@v0.2        
 
   linux-integration-and-dependencies:
     if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
-        dbimage:
+        postgres-image:
           - postgres:15
           - postgres:13
           - postgres:11
         include:
-          - dbimage: postgres:15
-            dbauth: scram-sha-256
-          - dbimage: postgres:13
-            dbauth: md5
-          - dbimage: postgres:11
-            dbauth: trust
+          - postgres-image: postgres:15
+            postgres-auth: scram-sha-256
+          - postgres-image: postgres:13
+            postgres-auth: md5
+          - postgres-image: postgres:11
+            postgres-auth: trust
     container:
       image: swift:5.8-jammy
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
@@ -79,29 +82,31 @@ jobs:
       POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
       POSTGRES_SOCKET: '/var/run/postgresql/.s.PGSQL.5432'
-      POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+      POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
     services:
       psql-a:
-        image: ${{ matrix.dbimage }}
+        image: ${{ matrix.postgres-image }}
         volumes: [ 'pgrunshare:/var/run/postgresql' ]
         env:
           POSTGRES_USER: 'test_username'
           POSTGRES_DB: 'test_database'
           POSTGRES_PASSWORD: 'test_password'
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
-          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
+          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.postgres-auth }}
       psql-b:
-        image: ${{ matrix.dbimage }}
+        image: ${{ matrix.postgres-image }}
         volumes: [ 'pgrunshare:/var/run/postgresql' ]
         env:
           POSTGRES_USER: 'test_username'
           POSTGRES_DB: 'test_database'
           POSTGRES_PASSWORD: 'test_password'
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
-          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.dbauth }}
+          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
+          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.postgres-auth }}
     steps:
       - name: Display OS and Swift versions
         run: |
+          [[ -z "${SWIFT_PLATFORM}" ]] && SWIFT_PLATFORM="$(. /etc/os-release && echo "${ID}${VERSION_ID}")"
+          [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
         uses: actions/checkout@v3
@@ -128,32 +133,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dbimage:
+        postgres-formula:
           # Only test one version on macOS, let Linux do the rest
           - postgresql@14
-        dbauth:
+        postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
-        xcode:
-          - latest-stable
+        xcode-version:
+          - '~14.3'
+          - '15.0-beta'
     runs-on: macos-13
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
       POSTGRES_USER: 'test_username'
       POSTGRES_PASSWORD: 'test_password'
       POSTGRES_DB: 'postgres'
-      POSTGRES_HOST_AUTH_METHOD: ${{ matrix.dbauth }}
+      POSTGRES_AUTH_METHOD: ${{ matrix.postgres-auth }}
       POSTGRES_SOCKET: '/tmp/.s.PGSQL.5432'
+      POSTGRES_FORMULA: ${{ matrix.postgres-formula }}
     steps:
       - name: Select latest available Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: ${{ matrix.xcode }}
+          xcode-version: ${{ matrix.xcode-version }}
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
-          export PATH="$(brew --prefix)/opt/${{ matrix.dbimage }}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          (brew unlink postgresql || true) && brew install '${{ matrix.dbimage }}' && brew link --force '${{ matrix.dbimage }}'
-          initdb --locale=C --auth-host '${{ matrix.dbauth }}' -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
+          export PATH="$(brew --prefix)/opt/${POSTGRES_FORMULA}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
+          (brew unlink postgresql || true) && brew install "${POSTGRES_FORMULA}" && brew link --force "${POSTGRES_FORMULA}"
+          initdb --locale=C --auth-host "${POSTGRES_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
         timeout-minutes: 2
       - name: Checkout code
@@ -164,7 +171,7 @@ jobs:
   api-breakage:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container: swift:5.8-jammy
+    container: swift:jammy
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -175,3 +182,18 @@ jobs:
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: API breaking changes
         run: swift package diagnose-api-breaking-changes origin/main
+
+  gh-codeql:
+    runs-on: ubuntu-latest
+    permissions: { security-events: write }
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: swift
+      - name: Perform build
+        run: swift build
+      - name: Run CodeQL analyze
+        uses: github/codeql-action/analyze@v2

@@ -1,12 +1,16 @@
 # ``PostgresNIO``
 
-🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO].
+@Metadata {
+    @TitleHeading(Package)
+}
+
+🐘 Non-blocking, event-driven Swift client for PostgreSQL built on SwiftNIO.
 
 ## Overview
 
 Features:
 
-- A ``PostgresConnection`` which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
+- A ``PostgresConnection`` which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server using [SwiftNIO].
 - An async/await interface that supports backpressure 
 - Automatic conversions between Swift primitive types and the Postgres wire format
 - Integrated with the Swift server ecosystem, including use of [SwiftLog].

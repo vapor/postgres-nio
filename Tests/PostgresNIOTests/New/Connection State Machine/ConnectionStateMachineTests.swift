@@ -23,7 +23,7 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.sslHandlerAdded(), .wait)
         XCTAssertEqual(state.sslEstablished(), .provideAuthenticationContext)
         XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
-        let salt: (UInt8, UInt8, UInt8, UInt8) = (0,1,2,3)
+        let salt: UInt32 = 0x00_01_02_03
         XCTAssertEqual(state.authenticationMessageReceived(.md5(salt: salt)), .sendPasswordMessage(.md5(salt: salt), authContext))
     }
 
@@ -137,14 +137,14 @@ class ConnectionStateMachineTests: XCTestCase {
     
     func testErrorIsIgnoredWhenClosingConnection() {
         // test ignore unclean shutdown when closing connection
-        var stateIgnoreChannelError = ConnectionStateMachine(.closing)
-        
+        var stateIgnoreChannelError = ConnectionStateMachine(.closing(nil))
+
         XCTAssertEqual(stateIgnoreChannelError.errorHappened(.connectionError(underlying: NIOSSLError.uncleanShutdown)), .wait)
         XCTAssertEqual(stateIgnoreChannelError.closed(), .fireChannelInactive)
         
         // test ignore any other error when closing connection
         
-        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing)
+        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing(nil))
         XCTAssertEqual(stateIgnoreErrorMessage.errorReceived(.init(fields: [:])), .wait)
         XCTAssertEqual(stateIgnoreErrorMessage.closed(), .fireChannelInactive)
     }
@@ -154,7 +154,7 @@ class ConnectionStateMachineTests: XCTestCase {
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
 
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
-        let salt: (UInt8, UInt8, UInt8, UInt8) = (0, 1, 2, 3)
+        let salt: UInt32 = 0x00_01_02_03
 
         let queryPromise = eventLoopGroup.next().makePromise(of: PSQLRowStream.self)
 
@@ -180,9 +180,9 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.errorReceived(.init(fields: fields)),
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [.extendedQuery(extendedQueryContext)], error: .server(.init(fields: fields)), closePromise: nil)))
         
-        XCTAssertNil(extendedQueryContext.promise.futureResult._value)
-        
+        XCTAssertNil(queryPromise.futureResult._value)
+
         // make sure we don't crash
-        extendedQueryContext.promise.fail(PSQLError.server(.init(fields: fields)))
+        queryPromise.fail(PSQLError.server(.init(fields: fields)))
     }
 }

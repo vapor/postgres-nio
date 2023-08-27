@@ -5,7 +5,7 @@ extension PSQLError {
         switch self.code.base {
         case .queryCancelled:
             return self
-        case .server:
+        case .server, .listenFailed:
             guard let serverInfo = self.serverInfo else {
                 return self
             }
@@ -37,11 +37,13 @@ extension PSQLError {
             return self.underlying ?? self
         case .tooManyParameters, .invalidCommandTag:
             return self
-        case .connectionQuiescing:
-            return PostgresError.connectionClosed
-        case .connectionClosed:
+        case .clientClosesConnection, 
+             .clientClosedConnection,
+             .serverClosedConnection:
             return PostgresError.connectionClosed
         case .connectionError:
+            return self.underlying ?? self
+        case .unlistenFailed:
             return self.underlying ?? self
         case .uncleanShutdown:
             return PostgresError.protocol("Unexpected connection close")

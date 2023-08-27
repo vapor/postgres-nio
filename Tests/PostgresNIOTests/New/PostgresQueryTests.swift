@@ -46,7 +46,7 @@ final class PostgresQueryTests: XCTestCase {
         expectedBindsBytes.writeInteger(Int32(dynamicString.value.utf8.count))
         expectedBindsBytes.writeString(dynamicString.value)
 
-        let expectedMetadata: [PostgresBindings.Metadata] = [.init(dataType: type, format: format)]
+        let expectedMetadata: [PostgresBindings.Metadata] = [.init(dataType: type, format: format, protected: true)]
 
         XCTAssertEqual(query.binds.bytes, expectedBindsBytes)
         XCTAssertEqual(query.binds.metadata, expectedMetadata)

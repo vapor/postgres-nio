@@ -2,7 +2,7 @@ import NIOCore
 
 extension PostgresBackendMessage {
     
-    struct NotificationResponse: PayloadDecodable, Equatable {
+    struct NotificationResponse: PayloadDecodable, Hashable {
         let backendPID: Int32
         let channel: String
         let payload: String

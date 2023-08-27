@@ -11,4 +11,4 @@ jobs:
      with:
        package_name: postgres-nio
        modules: PostgresNIO
-       pathsToInvalidate: /postgresnio
+       pathsToInvalidate: /postgresnio/*

@@ -72,7 +72,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             var counter = 0
 
             for try await element in rows.decode((Int, String, String, String, String?, Int, Date, Date, String, String).self) {
-                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "localhost")
+                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
                 XCTAssertEqual(element.2, env("POSTGRES_USER") ?? "test_username")
 
                 XCTAssertEqual(element.8, query.sql)
@@ -105,8 +105,6 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 XCTFail("Expected to get cancelled while reading the query")
             } catch {
                 guard let error = error as? PSQLError else { return XCTFail("Unexpected error type") }
-
-                print(error)
 
                 XCTAssertEqual(error.code, .server)
                 XCTAssertEqual(error.serverInfo?[.severity], "ERROR")
@@ -223,6 +221,29 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 
             let dropQuery = PostgresQuery(unsafeSQL: "DROP TABLE table1")
             try await connection.query(dropQuery, logger: .psqlTest)
+        }
+    }
+
+    func testListenAndNotify() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            let stream = try await connection.listen("foo")
+            var iterator = stream.makeAsyncIterator()
+
+            try await self.withTestConnection(on: eventLoop) { other in
+                try await other.query(#"NOTIFY foo, 'bar';"#, logger: .psqlTest)
+
+                try await other.query(#"NOTIFY foo, 'foo';"#, logger: .psqlTest)
+            }
+
+            let first = try await iterator.next()
+            XCTAssertEqual(first?.payload, "bar")
+
+            let second = try await iterator.next()
+            XCTAssertEqual(second?.payload, "foo")
         }
     }
 

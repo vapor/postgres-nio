@@ -5,15 +5,15 @@ import NIOCore
 class BindTests: XCTestCase {
     
     func testEncodeBind() {
-        let encoder = PSQLFrontendMessageEncoder()
         var bindings = PostgresBindings()
         bindings.append("Hello", context: .default)
         bindings.append("World", context: .default)
-        var byteBuffer = ByteBuffer()
-        let bind = PostgresFrontendMessage.Bind(portalName: "", preparedStatementName: "", bind: bindings)
-        let message = PostgresFrontendMessage.bind(bind)
-        encoder.encode(data: message, out: &byteBuffer)
-        
+
+        var encoder = PostgresFrontendMessageEncoder(buffer: .init())
+
+        encoder.bind(portalName: "", preparedStatementName: "", bind: bindings)
+        var byteBuffer = encoder.flushBuffer()
+
         XCTAssertEqual(byteBuffer.readableBytes, 37)
         XCTAssertEqual(PostgresFrontendMessage.ID.bind.rawValue, byteBuffer.readInteger(as: UInt8.self))
         XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 36)

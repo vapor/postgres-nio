@@ -20,7 +20,7 @@ protocol PSQLMessagePayloadDecodable {
 ///
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)
-enum PostgresBackendMessage {
+enum PostgresBackendMessage: Hashable {
     
     typealias PayloadDecodable = PSQLMessagePayloadDecodable
     
@@ -46,141 +46,31 @@ enum PostgresBackendMessage {
 }
     
 extension PostgresBackendMessage {
-    enum ID: RawRepresentable, Equatable {
-        typealias RawValue = UInt8
-        
-        case authentication
-        case backendKeyData
-        case bindComplete
-        case closeComplete
-        case commandComplete
-        case copyData
-        case copyDone
-        case copyInResponse
-        case copyOutResponse
-        case copyBothResponse
-        case dataRow
-        case emptyQueryResponse
-        case error
-        case functionCallResponse
-        case negotiateProtocolVersion
-        case noData
-        case noticeResponse
-        case notificationResponse
-        case parameterDescription
-        case parameterStatus
-        case parseComplete
-        case portalSuspended
-        case readyForQuery
-        case rowDescription
-        
-        init?(rawValue: UInt8) {
-            switch rawValue {
-            case UInt8(ascii: "R"):
-                self = .authentication
-            case UInt8(ascii: "K"):
-                self = .backendKeyData
-            case UInt8(ascii: "2"):
-                self = .bindComplete
-            case UInt8(ascii: "3"):
-                self = .closeComplete
-            case UInt8(ascii: "C"):
-                self = .commandComplete
-            case UInt8(ascii: "d"):
-                self = .copyData
-            case UInt8(ascii: "c"):
-                self = .copyDone
-            case UInt8(ascii: "G"):
-                self = .copyInResponse
-            case UInt8(ascii: "H"):
-                self = .copyOutResponse
-            case UInt8(ascii: "W"):
-                self = .copyBothResponse
-            case UInt8(ascii: "D"):
-                self = .dataRow
-            case UInt8(ascii: "I"):
-                self = .emptyQueryResponse
-            case UInt8(ascii: "E"):
-                self = .error
-            case UInt8(ascii: "V"):
-                self = .functionCallResponse
-            case UInt8(ascii: "v"):
-                self = .negotiateProtocolVersion
-            case UInt8(ascii: "n"):
-                self = .noData
-            case UInt8(ascii: "N"):
-                self = .noticeResponse
-            case UInt8(ascii: "A"):
-                self = .notificationResponse
-            case UInt8(ascii: "t"):
-                self = .parameterDescription
-            case UInt8(ascii: "S"):
-                self = .parameterStatus
-            case UInt8(ascii: "1"):
-                self = .parseComplete
-            case UInt8(ascii: "s"):
-                self = .portalSuspended
-            case UInt8(ascii: "Z"):
-                self = .readyForQuery
-            case UInt8(ascii: "T"):
-                self = .rowDescription
-            default:
-                return nil
-            }
-        }
-        
-        var rawValue: UInt8 {
-            switch self {
-            case .authentication:
-                return UInt8(ascii: "R")
-            case .backendKeyData:
-                return UInt8(ascii: "K")
-            case .bindComplete:
-                return UInt8(ascii: "2")
-            case .closeComplete:
-                return UInt8(ascii: "3")
-            case .commandComplete:
-                return UInt8(ascii: "C")
-            case .copyData:
-                return UInt8(ascii: "d")
-            case .copyDone:
-                return UInt8(ascii: "c")
-            case .copyInResponse:
-                return UInt8(ascii: "G")
-            case .copyOutResponse:
-                return UInt8(ascii: "H")
-            case .copyBothResponse:
-                return UInt8(ascii: "W")
-            case .dataRow:
-                return UInt8(ascii: "D")
-            case .emptyQueryResponse:
-                return UInt8(ascii: "I")
-            case .error:
-                return UInt8(ascii: "E")
-            case .functionCallResponse:
-                return UInt8(ascii: "V")
-            case .negotiateProtocolVersion:
-                return UInt8(ascii: "v")
-            case .noData:
-                return UInt8(ascii: "n")
-            case .noticeResponse:
-                return UInt8(ascii: "N")
-            case .notificationResponse:
-                return UInt8(ascii: "A")
-            case .parameterDescription:
-                return UInt8(ascii: "t")
-            case .parameterStatus:
-                return UInt8(ascii: "S")
-            case .parseComplete:
-                return UInt8(ascii: "1")
-            case .portalSuspended:
-                return UInt8(ascii: "s")
-            case .readyForQuery:
-                return UInt8(ascii: "Z")
-            case .rowDescription:
-                return UInt8(ascii: "T")
-            }
-        }
+    enum ID: UInt8, Hashable {
+        case authentication = 82            // ascii: R
+        case backendKeyData = 75            // ascii: K
+        case bindComplete = 50              // ascii: 2
+        case closeComplete = 51             // ascii: 3
+        case commandComplete = 67           // ascii: C
+        case copyData = 100                 // ascii: d
+        case copyDone = 99                  // ascii: c
+        case copyInResponse = 71            // ascii: G
+        case copyOutResponse = 72           // ascii: H
+        case copyBothResponse = 87          // ascii: W
+        case dataRow = 68                   // ascii: D
+        case emptyQueryResponse = 73        // ascii: I
+        case error = 69                     // ascii: E
+        case functionCallResponse = 86      // ascii: V
+        case negotiateProtocolVersion = 118 // ascii: v
+        case noData = 110                   // ascii: n
+        case noticeResponse = 78            // ascii: N
+        case notificationResponse = 65      // ascii: A
+        case parameterDescription = 116     // ascii: t
+        case parameterStatus = 83           // ascii: S
+        case parseComplete = 49             // ascii: 1
+        case portalSuspended = 115          // ascii: s
+        case readyForQuery = 90             // ascii: Z
+        case rowDescription = 84            // ascii: T
     }
 }
 
