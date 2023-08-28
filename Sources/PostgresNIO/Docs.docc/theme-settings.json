@@ -34,8 +34,8 @@
             }
         },
         "icons": {
-            "technology": "/images/vapor-postgres-logo.svg",
-            "article": "/images/article.svg"
+            "technology": "/postgresnio/images/vapor-postgres-logo.svg",
+            "article": "/postgresnio/images/article.svg"
         }
     },
     "features": {
