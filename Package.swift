@@ -20,6 +20,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", "1.0.0" ..< "3.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.2"),
+        .package(url: "https://github.com/swift-server/swift-backtrace.git", from: "1.3.3"),
     ],
     targets: [
         .target(
@@ -53,5 +54,15 @@ let package = Package(
                 .product(name: "NIOTestUtils", package: "swift-nio"),
             ]
         ),
+        .executableTarget(
+            name: "Repro",
+            dependencies: [
+                .target(name: "PostgresNIO"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "Backtrace", package: "swift-backtrace"),
+            ]
+        )
     ]
 )
