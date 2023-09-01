@@ -1,15 +1,15 @@
 import NIOCore
+import NIOConcurrencyHelpers
 import Logging
 
 extension PostgresDatabase {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
-        let rowsBoxed = NIOLoopBoundBox([PostgresRow](), eventLoop: self.eventLoop)
-        return self.simpleQuery(string) {
-            var rows = rowsBoxed.value
-            rowsBoxed.value = [] // prevent CoW
-            rows.append($0)
-            rowsBoxed.value = rows
-        }.map { rowsBoxed.value }
+        let rowsBoxed = NIOLockedValueBox([PostgresRow]())
+        return self.simpleQuery(string) { row in
+            rowsBoxed.withLockedValue {
+                $0.append(row)
+            }
+        }.map { rowsBoxed.withLockedValue { $0 } }
     }
     
     @preconcurrency

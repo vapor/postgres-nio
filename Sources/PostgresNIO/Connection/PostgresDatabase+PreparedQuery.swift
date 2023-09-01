@@ -38,13 +38,12 @@ public struct PreparedQuery: Sendable {
     }
 
     public func execute(_ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
-        let rowsBoxed = NIOLoopBoundBox([PostgresRow](), eventLoop: self.database.eventLoop)
-        return self.execute(binds) {
-            var rows = rowsBoxed.value
-            rowsBoxed.value = [] // prevent CoW
-            rows.append($0)
-            rowsBoxed.value = rows
-        }.map { rowsBoxed.value }
+        let rowsBoxed = NIOLockedValueBox([PostgresRow]())
+        return self.execute(binds) { row in
+            rowsBoxed.withLockedValue {
+                $0.append(row)
+            }
+        }.map { rowsBoxed.withLockedValue { $0 } }
     }
 
     @preconcurrency

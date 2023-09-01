@@ -1,23 +1,26 @@
 import NIOCore
 import Logging
+import NIOConcurrencyHelpers
 
 extension PostgresDatabase {
     public func query(
         _ string: String,
         _ binds: [PostgresData] = []
     ) -> EventLoopFuture<PostgresQueryResult> {
-        let metadataBox = NIOLoopBoundBox(PostgresQueryMetadata?.none, eventLoop: self.eventLoop)
-        let rowsBoxed = NIOLoopBoundBox([PostgresRow](), eventLoop: self.eventLoop)
+        let box = NIOLockedValueBox((metadata: PostgresQueryMetadata?.none, rows: [PostgresRow]()))
 
-        return self.query(string, binds, onMetadata: {
-            metadataBox.value = $0
-        }) {
-            var rows = rowsBoxed.value
-            rowsBoxed.value = [] // prevent CoW
-            rows.append($0)
-            rowsBoxed.value = rows
+        return self.query(string, binds, onMetadata: { metadata in
+            box.withLockedValue {
+                $0.metadata = metadata
+            }
+        }) { row in
+            box.withLockedValue {
+                $0.rows.append(row)
+            }
         }.map {
-            .init(metadata: metadataBox.value!, rows: rowsBoxed.value)
+            box.withLockedValue {
+                PostgresQueryResult(metadata: $0.metadata!, rows: $0.rows)
+            }
         }
     }
 
