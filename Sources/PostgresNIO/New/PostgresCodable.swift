@@ -188,7 +188,7 @@ extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
 
 /// A context that is passed to Swift objects that are decoded from the Postgres wire format. Used
 /// to pass further information to the decoding method.
-public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder> {
+public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder>: Sendable {
     /// A ``PostgresJSONDecoder`` used to decode the object from json.
     public var jsonDecoder: JSONDecoder
 

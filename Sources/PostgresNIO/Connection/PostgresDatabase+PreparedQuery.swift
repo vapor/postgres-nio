@@ -1,4 +1,5 @@
 import NIOCore
+import NIOConcurrencyHelpers
 import struct Foundation.UUID
 
 extension PostgresDatabase {
@@ -14,7 +15,8 @@ extension PostgresDatabase {
         }
     }
 
-    public func prepare(query: String, handler: @escaping (PreparedQuery) -> EventLoopFuture<[[PostgresRow]]>) -> EventLoopFuture<[[PostgresRow]]> {
+    @preconcurrency
+    public func prepare(query: String, handler: @Sendable @escaping (PreparedQuery) -> EventLoopFuture<[[PostgresRow]]>) -> EventLoopFuture<[[PostgresRow]]> {
         prepare(query: query)
         .flatMap { preparedQuery in
             handler(preparedQuery)
@@ -26,7 +28,7 @@ extension PostgresDatabase {
 }
 
 
-public struct PreparedQuery {
+public struct PreparedQuery: Sendable {
     let underlying: PSQLPreparedStatement
     let database: PostgresDatabase
 
@@ -36,11 +38,17 @@ public struct PreparedQuery {
     }
 
     public func execute(_ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
-        var rows: [PostgresRow] = []
-        return self.execute(binds) { rows.append($0) }.map { rows }
+        let rowsBoxed = NIOLoopBoundBox([PostgresRow](), eventLoop: self.database.eventLoop)
+        return self.execute(binds) {
+            var rows = rowsBoxed.value
+            rowsBoxed.value = [] // prevent CoW
+            rows.append($0)
+            rowsBoxed.value = rows
+        }.map { rowsBoxed.value }
     }
 
-    public func execute(_ binds: [PostgresData] = [], _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    @preconcurrency
+    public func execute(_ binds: [PostgresData] = [], _ onRow: @Sendable @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         let command = PostgresCommands.executePreparedStatement(query: self, binds: binds, onRow: onRow)
         return self.database.send(command, logger: self.database.logger)
     }
@@ -50,15 +58,23 @@ public struct PreparedQuery {
     }
 }
 
-final class PrepareQueryRequest {
+final class PrepareQueryRequest: Sendable {
     let query: String
     let name: String
-    var prepared: PreparedQuery? = nil
-    
-    
+    var prepared: PreparedQuery? {
+        get {
+            self._prepared.withLockedValue { $0 }
+        }
+        set {
+            self._prepared.withLockedValue {
+                $0 = newValue
+            }
+        }
+    }
+    let _prepared: NIOLockedValueBox<PreparedQuery?> = .init(nil)
+
     init(_ query: String, as name: String) {
         self.query = query
         self.name = name
     }
-
 }

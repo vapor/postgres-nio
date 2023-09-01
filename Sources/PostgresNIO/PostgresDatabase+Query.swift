@@ -6,22 +6,27 @@ extension PostgresDatabase {
         _ string: String,
         _ binds: [PostgresData] = []
     ) -> EventLoopFuture<PostgresQueryResult> {
-        var rows: [PostgresRow] = []
-        var metadata: PostgresQueryMetadata?
+        let metadataBox = NIOLoopBoundBox(PostgresQueryMetadata?.none, eventLoop: self.eventLoop)
+        let rowsBoxed = NIOLoopBoundBox([PostgresRow](), eventLoop: self.eventLoop)
+
         return self.query(string, binds, onMetadata: {
-            metadata = $0
+            metadataBox.value = $0
         }) {
+            var rows = rowsBoxed.value
+            rowsBoxed.value = [] // prevent CoW
             rows.append($0)
+            rowsBoxed.value = rows
         }.map {
-            .init(metadata: metadata!, rows: rows)
+            .init(metadata: metadataBox.value!, rows: rowsBoxed.value)
         }
     }
 
+    @preconcurrency
     public func query(
         _ string: String,
         _ binds: [PostgresData] = [],
-        onMetadata: @escaping (PostgresQueryMetadata) -> () = { _ in },
-        onRow: @escaping (PostgresRow) throws -> ()
+        onMetadata: @Sendable @escaping (PostgresQueryMetadata) -> () = { _ in },
+        onRow: @Sendable @escaping (PostgresRow) throws -> ()
     ) -> EventLoopFuture<Void> {
         var bindings = PostgresBindings(capacity: binds.count)
         binds.forEach { bindings.append($0) }
@@ -58,7 +63,7 @@ extension PostgresQueryResult: Collection {
     }
 }
 
-public struct PostgresQueryMetadata {
+public struct PostgresQueryMetadata: Sendable {
     public let command: String
     public var oid: Int?
     public var rows: Int?

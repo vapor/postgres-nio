@@ -3,11 +3,17 @@ import Logging
 
 extension PostgresDatabase {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
-        var rows: [PostgresRow] = []
-        return simpleQuery(string) { rows.append($0) }.map { rows }
+        let rowsBoxed = NIOLoopBoundBox([PostgresRow](), eventLoop: self.eventLoop)
+        return self.simpleQuery(string) {
+            var rows = rowsBoxed.value
+            rowsBoxed.value = [] // prevent CoW
+            rows.append($0)
+            rowsBoxed.value = rows
+        }.map { rowsBoxed.value }
     }
     
-    public func simpleQuery(_ string: String, _ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    @preconcurrency
+    public func simpleQuery(_ string: String, _ onRow: @Sendable @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         self.query(string, onRow: onRow)
     }
 }

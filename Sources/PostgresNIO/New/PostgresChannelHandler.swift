@@ -597,8 +597,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             logger: self.logger,
             promise: promise
         )
+        let selfLoopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
+        let contextBound = NIOLoopBound(context, eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
-            self.startListenCompleted(result, for: channel, context: context)
+            selfLoopBound.value.startListenCompleted(result, for: channel, context: contextBound.value)
         }
 
         return .extendedQuery(query)
@@ -643,8 +645,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             logger: self.logger,
             promise: promise
         )
+        let selfLoopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
+        let contextBound = NIOLoopBound(context, eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
-            self.stopListenCompleted(result, for: channel, context: context)
+            selfLoopBound.value.stopListenCompleted(result, for: channel, context: contextBound.value)
         }
 
         return .extendedQuery(query)
@@ -693,13 +697,15 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext
     ) -> PSQLTask {
         let promise = self.eventLoop.makePromise(of: RowDescription?.self)
+        let selfLoopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
+        let contextLoopBound = NIOLoopBound(context, eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
             switch result {
             case .success(let rowDescription):
-                self.prepareStatementComplete(
+                selfLoopBound.value.prepareStatementComplete(
                     name: preparedStatement.name,
                     rowDescription: rowDescription,
-                    context: context
+                    context: contextLoopBound.value
                 )
             case .failure(let error):
                 let psqlError: PSQLError
@@ -708,10 +714,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 } else {
                     psqlError = .connectionError(underlying: error)
                 }
-                self.prepareStatementFailed(
+                selfLoopBound.value.prepareStatementFailed(
                     name: preparedStatement.name,
                     error: psqlError,
-                    context: context
+                    context: contextLoopBound.value
                 )
             }
         }
