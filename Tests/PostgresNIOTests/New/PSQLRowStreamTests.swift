@@ -1,3 +1,4 @@
+import Atomics
 import NIOCore
 import Logging
 import XCTest
@@ -128,12 +129,12 @@ final class PSQLRowStreamTests: XCTestCase {
         XCTAssertEqual(dataSource.hitDemand, 0)
         
         // attach consumer
-        var counter = 0
+        let counter = ManagedAtomic(0)
         let future = stream.onRow { row in
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(counter)")
-            counter += 1
+            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
         }
-        XCTAssertEqual(counter, 2)
+        XCTAssertEqual(counter.load(ordering: .relaxed), 2)
         XCTAssertEqual(dataSource.hitDemand, 0)
         
         XCTAssertNoThrow(try future.wait())
@@ -155,7 +156,9 @@ final class PSQLRowStreamTests: XCTestCase {
         
         stream.receive([
             [ByteBuffer(string: "0")],
-            [ByteBuffer(string: "1")]
+            [ByteBuffer(string: "1")],
+            [ByteBuffer(string: "2")],
+            [ByteBuffer(string: "3")],
         ])
         
         stream.receive(completion: .success("SELECT 2"))
@@ -163,15 +166,15 @@ final class PSQLRowStreamTests: XCTestCase {
         XCTAssertEqual(dataSource.hitDemand, 0)
         
         // attach consumer
-        var counter = 0
+        let counter = ManagedAtomic(0)
         let future = stream.onRow { row in
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(counter)")
-            if counter == 1 {
-                throw OnRowError(row: counter)
+            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
+            if expected == 1 {
+                throw OnRowError(row: expected)
             }
-            counter += 1
         }
-        XCTAssertEqual(counter, 1)
+        XCTAssertEqual(counter.load(ordering: .relaxed), 2) // one more than where we excited, because we already incremented
         XCTAssertEqual(dataSource.hitDemand, 0)
         
         XCTAssertThrowsError(try future.wait()) {
@@ -179,7 +182,6 @@ final class PSQLRowStreamTests: XCTestCase {
         }
     }
 
-    
     func testOnRowBeforeStreamHasFinished() {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -201,26 +203,26 @@ final class PSQLRowStreamTests: XCTestCase {
         XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
         
         // attach consumer
-        var counter = 0
+        let counter = ManagedAtomic(0)
         let future = stream.onRow { row in
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(counter)")
-            counter += 1
+            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
         }
-        XCTAssertEqual(counter, 2)
+        XCTAssertEqual(counter.load(ordering: .relaxed), 2)
         XCTAssertEqual(dataSource.hitDemand, 1)
         
         stream.receive([
             [ByteBuffer(string: "2")],
             [ByteBuffer(string: "3")]
         ])
-        XCTAssertEqual(counter, 4)
+        XCTAssertEqual(counter.load(ordering: .relaxed), 4)
         XCTAssertEqual(dataSource.hitDemand, 2)
         
         stream.receive([
             [ByteBuffer(string: "4")],
             [ByteBuffer(string: "5")]
         ])
-        XCTAssertEqual(counter, 6)
+        XCTAssertEqual(counter.load(ordering: .relaxed), 6)
         XCTAssertEqual(dataSource.hitDemand, 3)
         
         stream.receive(completion: .success("SELECT 6"))

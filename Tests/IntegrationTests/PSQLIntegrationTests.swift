@@ -1,3 +1,4 @@
+import Atomics
 import XCTest
 import Logging
 @testable import PostgresNIO
@@ -73,19 +74,17 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var metadata: PostgresQueryMetadata?
-        var received: Int64 = 0
+        let received = ManagedAtomic<Int64>(0)
         XCTAssertNoThrow(metadata = try conn?.query("SELECT generate_series(1, 10000);", logger: .psqlTest) { row in
             func workaround() {
-                var number: Int64?
-                XCTAssertNoThrow(number = try row.decode(Int64.self, context: .default))
-                received += 1
-                XCTAssertEqual(number, received)
+                let expected = received.wrappingIncrementThenLoad(ordering: .relaxed)
+                XCTAssertEqual(expected, try row.decode(Int64.self, context: .default))
             }
 
             workaround()
         }.wait())
 
-        XCTAssertEqual(received, 10000)
+        XCTAssertEqual(received.load(ordering: .relaxed), 10000)
         XCTAssertEqual(metadata?.command, "SELECT")
         XCTAssertEqual(metadata?.rows, 10000)
     }
