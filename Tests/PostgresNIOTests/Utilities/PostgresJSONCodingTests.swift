@@ -1,3 +1,4 @@
+import Atomics
 import NIOCore
 import XCTest
 import PostgresNIO
@@ -10,9 +11,9 @@ class PostgresJSONCodingTests: XCTestCase {
             PostgresNIO._defaultJSONEncoder = previousDefaultJSONEncoder
         }
         final class CustomJSONEncoder: PostgresJSONEncoder {
-            var didEncode = false
+            let counter = ManagedAtomic(0)
             func encode<T>(_ value: T) throws -> Data where T : Encodable {
-                self.didEncode = true
+                self.counter.wrappingIncrement(ordering: .relaxed)
                 return try JSONEncoder().encode(value)
             }
         }
@@ -21,14 +22,16 @@ class PostgresJSONCodingTests: XCTestCase {
             var bar: Int
         }
         let customJSONEncoder = CustomJSONEncoder()
+        XCTAssertEqual(customJSONEncoder.counter.load(ordering: .relaxed), 0)
         PostgresNIO._defaultJSONEncoder = customJSONEncoder
         XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)))
-        XCTAssert(customJSONEncoder.didEncode)
+        XCTAssertEqual(customJSONEncoder.counter.load(ordering: .relaxed), 1)
 
         let customJSONBEncoder = CustomJSONEncoder()
+        XCTAssertEqual(customJSONBEncoder.counter.load(ordering: .relaxed), 0)
         PostgresNIO._defaultJSONEncoder = customJSONBEncoder
         XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)))
-        XCTAssert(customJSONBEncoder.didEncode)
+        XCTAssertEqual(customJSONBEncoder.counter.load(ordering: .relaxed), 1)
     }
 
     // https://github.com/vapor/postgres-nio/issues/126
@@ -38,9 +41,9 @@ class PostgresJSONCodingTests: XCTestCase {
             PostgresNIO._defaultJSONDecoder = previousDefaultJSONDecoder
         }
         final class CustomJSONDecoder: PostgresJSONDecoder {
-            var didDecode = false
+            let counter = ManagedAtomic(0)
             func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable {
-                self.didDecode = true
+                self.counter.wrappingIncrement(ordering: .relaxed)
                 return try JSONDecoder().decode(type, from: data)
             }
         }
@@ -49,13 +52,15 @@ class PostgresJSONCodingTests: XCTestCase {
             var bar: Int
         }
         let customJSONDecoder = CustomJSONDecoder()
+        XCTAssertEqual(customJSONDecoder.counter.load(ordering: .relaxed), 0)
         PostgresNIO._defaultJSONDecoder = customJSONDecoder
         XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
-        XCTAssert(customJSONDecoder.didDecode)
+        XCTAssertEqual(customJSONDecoder.counter.load(ordering: .relaxed), 1)
 
         let customJSONBDecoder = CustomJSONDecoder()
+        XCTAssertEqual(customJSONBDecoder.counter.load(ordering: .relaxed), 0)
         PostgresNIO._defaultJSONDecoder = customJSONBDecoder
         XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
-        XCTAssert(customJSONBDecoder.didDecode)
+        XCTAssertEqual(customJSONBDecoder.counter.load(ordering: .relaxed), 1)
     }
 }

@@ -304,7 +304,7 @@ class PostgresConnectionTests: XCTestCase {
     }
 
     struct TestPrepareStatement: PostgresPreparedStatement {
-        static var sql = "SELECT datname FROM pg_stat_activity WHERE state = $1"
+        static let sql = "SELECT datname FROM pg_stat_activity WHERE state = $1"
         typealias Row = String
 
         var state: String
