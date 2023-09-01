@@ -640,6 +640,7 @@ extension PostgresConnection: PostgresDatabase {
         }
     }
 
+    @preconcurrency
     public func withConnection<T>(_ closure: (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
         closure(self)
     }

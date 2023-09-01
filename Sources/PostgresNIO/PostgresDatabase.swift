@@ -8,9 +8,8 @@ public protocol PostgresDatabase: _PostgresPreconcurrencySendable {
         _ request: PostgresRequest,
         logger: Logger
     ) -> EventLoopFuture<Void>
-    
-    @preconcurrency
-    func withConnection<T>(_ closure: @Sendable @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T>
+
+    func withConnection<T>(_ closure: @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T>
 }
 
 extension PostgresDatabase {
@@ -33,8 +32,7 @@ extension _PostgresDatabaseCustomLogger: PostgresDatabase {
         self.database.send(request, logger: logger)
     }
     
-    @preconcurrency
-    func withConnection<T>(_ closure: @Sendable @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
+    func withConnection<T>(_ closure: @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
         self.database.withConnection(closure)
     }
 }
