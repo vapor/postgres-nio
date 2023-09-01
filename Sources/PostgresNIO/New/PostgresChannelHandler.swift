@@ -597,10 +597,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             logger: self.logger,
             promise: promise
         )
-        let selfLoopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
-        let contextBound = NIOLoopBound(context, eventLoop: self.eventLoop)
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
-            selfLoopBound.value.startListenCompleted(result, for: channel, context: contextBound.value)
+            let (selfTransferred, context) = loopBound.value
+            selfTransferred.startListenCompleted(result, for: channel, context: context)
         }
 
         return .extendedQuery(query)
@@ -645,10 +645,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             logger: self.logger,
             promise: promise
         )
-        let selfLoopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
-        let contextBound = NIOLoopBound(context, eventLoop: self.eventLoop)
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
-            selfLoopBound.value.stopListenCompleted(result, for: channel, context: contextBound.value)
+            let (selfTransferred, context) = loopBound.value
+            selfTransferred.stopListenCompleted(result, for: channel, context: context)
         }
 
         return .extendedQuery(query)
@@ -697,15 +697,15 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext
     ) -> PSQLTask {
         let promise = self.eventLoop.makePromise(of: RowDescription?.self)
-        let selfLoopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
-        let contextLoopBound = NIOLoopBound(context, eventLoop: self.eventLoop)
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
+            let (selfTransferred, context) = loopBound.value
             switch result {
             case .success(let rowDescription):
-                selfLoopBound.value.prepareStatementComplete(
+                selfTransferred.prepareStatementComplete(
                     name: preparedStatement.name,
                     rowDescription: rowDescription,
-                    context: contextLoopBound.value
+                    context: context
                 )
             case .failure(let error):
                 let psqlError: PSQLError
@@ -714,10 +714,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 } else {
                     psqlError = .connectionError(underlying: error)
                 }
-                selfLoopBound.value.prepareStatementFailed(
+                selfTransferred.prepareStatementFailed(
                     name: preparedStatement.name,
                     error: psqlError,
-                    context: contextLoopBound.value
+                    context: context
                 )
             }
         }
