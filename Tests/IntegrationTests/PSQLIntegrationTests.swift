@@ -212,7 +212,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
     }
 
-    func testDoubleArraySerializationWithCollectionInterpolation() {
+    func testDoubleArraySerializationQueryWithCollectionInterpolation() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
@@ -223,9 +223,18 @@ final class IntegrationTests: XCTestCase {
 
         var result: PostgresQueryResult?
         let doubles: [Double] = [3.14, 42]
-        XCTAssertNoThrow(result = try conn?.query("SELECT \(collection: doubles) as doubles", logger: .psqlTest).wait())
-        XCTAssertEqual(result?.rows.count, 1)
-        XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
+        XCTAssertNoThrow(result = try conn?.query("CREATE TABLE foo (accuracy double precision)", logger: .psqlTest).wait())
+        XCTAssertNoThrow(result = try conn?.query("INSERT INTO foo VALUES (\(doubles[0]))", logger: .psqlTest).wait())
+        XCTAssertNoThrow(result = try conn?.query("INSERT INTO foo VALUES (\(doubles[1]))", logger: .psqlTest).wait())
+        XCTAssertNoThrow(result = try conn?.query("SELECT * FROM foo WHERE accuracy IN \(collection: doubles)", logger: .psqlTest).wait())
+
+        guard result?.count == doubles.count else {
+            XCTFail("Expected '\(doubles.count)' rows, but got '\(result?.count ?? 0)'. Result: \(String(describing: result))")
+            return
+        }
+        for (idx, double) in doubles.enumerated() {
+            XCTAssertEqual(try result?.rows[idx].decode(Double.self, context: .default), double)
+        }
     }
 
     func testDecodeDates() {
