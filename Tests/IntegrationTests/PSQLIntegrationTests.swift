@@ -212,7 +212,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
     }
 
-    func testDoubleArraySerializationQueryWithCollectionInterpolation() {
+    func testDoubleArraySerializationWithCollectionInterpolation() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
