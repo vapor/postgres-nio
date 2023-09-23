@@ -92,7 +92,7 @@ extension PostgresQuery {
 
 
         @usableFromInline
-        struct PostgresEncodableSequenceCannotBeEmpty: Error {
+        struct InterpolatedCollectionCannotBeEmpty: Error {
             @usableFromInline init() { }
         }
 
@@ -101,7 +101,7 @@ extension PostgresQuery {
             _ values: C
         ) throws where C.Element: PostgresArrayEncodable {
             guard !values.isEmpty else {
-                throw PostgresEncodableSequenceCannotBeEmpty()
+                throw InterpolatedCollectionCannotBeEmpty()
             }
             let bindsSQL = try values.map { value in
                 try self.binds.append(value, context: .default)
