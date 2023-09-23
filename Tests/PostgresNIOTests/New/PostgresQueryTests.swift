@@ -97,6 +97,23 @@ final class PostgresQueryTests: XCTestCase {
         XCTAssertEqual(query.binds.bytes, expected)
     }
 
+    func testStringInterpolationWithSequence() throws {
+        let titles = ["bar", "baz"]
+        let query: PostgresQuery = try """
+        SELECT * FROM foo WHERE title in \(titles)
+        """
+
+        XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE title in ($1, $2)")
+
+        var expected = ByteBuffer()
+        for title in titles {
+            expected.writeInteger(UInt32(3))
+            expected.writeString(title)
+        }
+
+        XCTAssertEqual(query.binds.bytes, expected)
+    }
+
     func testUnescapedSQL() {
         let tableName = UUID().uuidString.uppercased()
         let value = 1

@@ -43,6 +43,7 @@ extension PostgresQuery {
             self.sql.append(contentsOf: literal)
         }
 
+        @_disfavoredOverload
         @inlinable
         public mutating func appendInterpolation<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
@@ -61,6 +62,7 @@ extension PostgresQuery {
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
+        @_disfavoredOverload
         @inlinable
         public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value) {
             self.binds.append(value, context: .default)
@@ -86,6 +88,26 @@ extension PostgresQuery {
         ) throws {
             try self.binds.append(value, context: context)
             self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+
+        @usableFromInline
+        struct PostgresEncodableSequenceCannotBeEmpty: Error {
+            @usableFromInline init() { }
+        }
+
+        @inlinable
+        public mutating func appendInterpolation<C: Collection>(
+            _ values: C
+        ) throws where C.Element: PostgresThrowingDynamicTypeEncodable {
+            guard !values.isEmpty else {
+                throw PostgresEncodableSequenceCannotBeEmpty()
+            }
+            let bindsSQL = try values.map { value in
+                try self.binds.append(value, context: .default)
+                return "$\(self.binds.count)"
+            }.joined(separator: ", ")
+            self.sql.append(contentsOf: "(\(bindsSQL))")
         }
 
         @inlinable
