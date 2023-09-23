@@ -99,7 +99,7 @@ extension PostgresQuery {
         @inlinable
         public mutating func appendInterpolation<C: Collection>(
             _ values: C
-        ) throws where C.Element: PostgresThrowingDynamicTypeEncodable {
+        ) throws where C.Element: PostgresArrayEncodable {
             guard !values.isEmpty else {
                 throw PostgresEncodableSequenceCannotBeEmpty()
             }
