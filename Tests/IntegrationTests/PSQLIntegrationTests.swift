@@ -223,10 +223,10 @@ final class IntegrationTests: XCTestCase {
 
         var result: PostgresQueryResult?
         let doubles: [Double] = [3.14, 42]
-        XCTAssertNoThrow(try conn?.query("CREATE TABLE foo (accuracy double precision)", logger: .psqlTest).wait())
-        XCTAssertNoThrow(try conn?.query("INSERT INTO foo VALUES (\(doubles[0]))", logger: .psqlTest).wait())
-        XCTAssertNoThrow(try conn?.query("INSERT INTO foo VALUES (\(doubles[1]))", logger: .psqlTest).wait())
-        XCTAssertNoThrow(result = try conn?.query("SELECT * FROM foo WHERE accuracy IN \(collection: doubles)", logger: .psqlTest).wait())
+        XCTAssertNoThrow(try conn?.query("CREATE TABLE array_table (accuracy double precision)", logger: .psqlTest).wait())
+        XCTAssertNoThrow(try conn?.query("INSERT INTO array_table VALUES (\(doubles[0]))", logger: .psqlTest).wait())
+        XCTAssertNoThrow(try conn?.query("INSERT INTO array_table VALUES (\(doubles[1]))", logger: .psqlTest).wait())
+        XCTAssertNoThrow(result = try conn?.query("SELECT * FROM array_table WHERE accuracy IN \(collection: doubles)", logger: .psqlTest).wait())
 
         guard result?.count == doubles.count else {
             XCTFail("Expected '\(doubles.count)' rows, but got '\(result?.count ?? 0)'. Result: \(String(describing: result))")
