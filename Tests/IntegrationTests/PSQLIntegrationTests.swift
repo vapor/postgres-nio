@@ -223,7 +223,7 @@ final class IntegrationTests: XCTestCase {
 
         var result: PostgresQueryResult?
         let doubles: [Double] = [3.14, 42]
-        XCTAssertNoThrow(result = try conn?.query("SELECT \(collection: doubles)::double precision[] as doubles", logger: .psqlTest).wait())
+        XCTAssertNoThrow(result = try conn?.query("SELECT \(collection: doubles) as doubles", logger: .psqlTest).wait())
         XCTAssertEqual(result?.rows.count, 1)
         XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
     }
