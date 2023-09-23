@@ -43,7 +43,6 @@ extension PostgresQuery {
             self.sql.append(contentsOf: literal)
         }
 
-        @_disfavoredOverload
         @inlinable
         public mutating func appendInterpolation<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
@@ -62,7 +61,6 @@ extension PostgresQuery {
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        @_disfavoredOverload
         @inlinable
         public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value) {
             self.binds.append(value, context: .default)
@@ -98,7 +96,7 @@ extension PostgresQuery {
 
         @inlinable
         public mutating func appendInterpolation<C: Collection>(
-            _ values: C
+            collection values: C
         ) throws where C.Element: PostgresArrayEncodable {
             guard !values.isEmpty else {
                 throw InterpolatedCollectionCannotBeEmpty()

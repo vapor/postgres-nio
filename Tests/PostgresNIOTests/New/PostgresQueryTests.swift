@@ -100,7 +100,7 @@ final class PostgresQueryTests: XCTestCase {
     func testStringInterpolationWithSequence() throws {
         let titles = ["bar", "baz"]
         let query: PostgresQuery = try """
-        SELECT * FROM foo WHERE title in \(titles)
+        SELECT * FROM foo WHERE title in \(collection: titles)
         """
 
         XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE title in ($1, $2)")

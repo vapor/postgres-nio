@@ -212,6 +212,22 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
     }
 
+    func testDoubleArraySerializationWithCollectionInterpolation() {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
+        var result: PostgresQueryResult?
+        let doubles: [Double] = [3.14, 42]
+        XCTAssertNoThrow(result = try conn?.query("SELECT \(collection: doubles) as doubles", logger: .psqlTest).wait())
+        XCTAssertEqual(result?.rows.count, 1)
+        XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
+    }
+
     func testDecodeDates() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
