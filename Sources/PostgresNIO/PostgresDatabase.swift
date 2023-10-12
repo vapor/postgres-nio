@@ -1,7 +1,8 @@
 import NIOCore
 import Logging
 
-public protocol PostgresDatabase: _PostgresPreconcurrencySendable {
+@preconcurrency
+public protocol PostgresDatabase: Sendable {
     var logger: Logger { get }
     var eventLoop: EventLoop { get }
     func send(

@@ -6,7 +6,8 @@ import NIOConcurrencyHelpers
 /// A protocol that mimicks the Foundation `JSONEncoder.encode(_:)` function.
 /// Conform a non-Foundation JSON encoder to this protocol if you want PostgresNIO to be
 /// able to use it when encoding JSON & JSONB values (see `PostgresNIO._defaultJSONEncoder`)
-public protocol PostgresJSONEncoder: _PostgresPreconcurrencySendable {
+@preconcurrency
+public protocol PostgresJSONEncoder: Sendable {
     func encode<T>(_ value: T) throws -> Data where T : Encodable
 
     func encode<T: Encodable>(_ value: T, into buffer: inout ByteBuffer) throws
@@ -36,5 +37,3 @@ public var _defaultJSONEncoder: PostgresJSONEncoder {
     }
 }
 
-@preconcurrency
-public protocol _PostgresPreconcurrencySendable: Sendable {}
