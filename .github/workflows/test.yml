@@ -42,13 +42,12 @@ jobs:
         env:
           CODE_COVERAGE: ${{ matrix.code-coverage && '--enable-code-coverage' || '' }}
         run: |
-          swift test --filter=^PostgresNIOTests --sanitize=thread ${CODE_COVERAGE}
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread ${CODE_COVERAGE}
       - name: Submit code coverage
         if: ${{ matrix.code-coverage }}
         uses: vapor/swift-codecov-action@v0.2        
 
   linux-integration-and-dependencies:
-    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -129,7 +128,6 @@ jobs:
         run: swift test --package-path fluent-postgres-driver
 
   macos-all:
-    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
