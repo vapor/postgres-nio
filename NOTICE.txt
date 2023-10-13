@@ -2,7 +2,7 @@
 //
 // This source file is part of the Vapor open source project
 //
-// Copyright (c) 2017-2021 Vapor project authors
+// Copyright (c) 2017-2023 Vapor project authors
 // Licensed under MIT
 //
 // See LICENSE for license information
@@ -11,3 +11,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+This product contains a derivation of the NIOLock implementation
+from Swift NIO.
+
+  * LICENSE (Apache License 2.0):
+    * https://www.apache.org/licenses/LICENSE-2.0
+  * HOMEPAGE:
+    * https://github.com/apple/swift-nio
