@@ -56,3 +56,61 @@ public protocol ConnectionKeepAliveBehavior: Sendable {
     /// run.
     func runKeepAlive(for connection: Connection) async throws
 }
+
+/// A request to get a connection from the `ConnectionPool`
+public protocol ConnectionRequestProtocol: Sendable {
+    /// A connection lease request ID type.
+    associatedtype ID: Hashable & Sendable
+    /// The leased connection type
+    associatedtype Connection: PooledConnection
+
+    /// A connection lease request ID. This ID must be generated
+    /// by users of the `ConnectionPool` outside the
+    /// `ConnectionPool`. It is not generated inside the pool like
+    /// the `ConnectionID`s. The lease request ID must be unique
+    /// and must not change, if your implementing type is a
+    /// reference type.
+    var id: ID { get }
+
+    /// A function that is called with a connection or a
+    /// `PoolError`.
+    func complete(with: Result<Connection, ConnectionPoolError>)
+}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+public struct ConnectionPoolConfiguration {
+    /// The minimum number of connections to preserve in the pool.
+    ///
+    /// If the pool is mostly idle and the remote servers closes
+    /// idle connections,
+    /// the `ConnectionPool` will initiate new outbound
+    /// connections proactively to avoid the number of available
+    /// connections dropping below this number.
+    public var minimumConnectionCount: Int
+
+    /// Between the `minimumConnectionCount` and
+    /// `maximumConnectionSoftLimit` the connection pool creates
+    /// _preserved_ connections. Preserved connections are closed
+    /// if they have been idle for ``idleTimeout``.
+    public var maximumConnectionSoftLimit: Int
+
+    /// The maximum number of connections for this pool, that can
+    /// exist at any point in time. The pool can create _overflow_
+    /// connections, if all connections are leased, and the
+    /// `maximumConnectionHardLimit` > `maximumConnectionSoftLimit `
+    /// Overflow connections are closed immediately as soon as they
+    /// become idle.
+    public var maximumConnectionHardLimit: Int
+
+    /// The time that a _preserved_ idle connection stays in the
+    /// pool before it is closed.
+    public var idleTimeout: Duration
+
+    /// initializer
+    public init() {
+        self.minimumConnectionCount = 0
+        self.maximumConnectionSoftLimit = 16
+        self.maximumConnectionHardLimit = 16
+        self.idleTimeout = .seconds(60)
+    }
+}
