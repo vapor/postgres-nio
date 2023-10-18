@@ -19,7 +19,7 @@ extension PostgresEncodable where Self: RawRepresentable, RawValue: PostgresEnco
 }
 
 extension PostgresDecodable where Self: RawRepresentable, RawValue: PostgresDecodable, RawValue._DecodableType == RawValue {
-    init<JSONDecoder: PostgresJSONDecoder>(
+    public init<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,

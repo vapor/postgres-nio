@@ -1,6 +1,6 @@
 import XCTest
 import Logging
-@testable import PostgresNIO
+import PostgresNIO
 import NIOCore
 import NIOPosix
 import NIOTestUtils
@@ -252,7 +252,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(result = try conn?.query("""
             SELECT
                 \(Decimal(string: "123456.789123")!)::numeric     as numeric,
-                \(Decimal(string: "-123456.789123")!)::numeric     as numeric_negative
+                \(Decimal(string: "-123456.789123")!)::numeric    as numeric_negative
             """, logger: .psqlTest).wait())
         XCTAssertEqual(result?.rows.count, 1)
 
@@ -261,6 +261,41 @@ final class IntegrationTests: XCTestCase {
 
         XCTAssertEqual(cells?.0, Decimal(string: "123456.789123"))
         XCTAssertEqual(cells?.1, Decimal(string: "-123456.789123"))
+    }
+
+    func testDecodeRawRepresentable() {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
+        enum StringRR: String, PostgresDecodable {
+            case a
+        }
+
+        enum IntRR: Int, PostgresDecodable {
+            case b
+        }
+
+        let stringValue = StringRR.a
+        let intValue = IntRR.b
+
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("""
+            SELECT
+                \(stringValue.rawValue)::varchar     as string,
+                \(intValue.rawValue)::int8           as int
+            """, logger: .psqlTest).wait())
+        XCTAssertEqual(result?.rows.count, 1)
+
+        var cells: (StringRR, IntRR)?
+        XCTAssertNoThrow(cells = try result?.rows.first?.decode((StringRR, IntRR).self, context: .default))
+
+        XCTAssertEqual(cells?.0, stringValue)
+        XCTAssertEqual(cells?.1, intValue)
     }
 
     func testRoundTripUUID() {
