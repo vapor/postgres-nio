@@ -90,6 +90,16 @@ struct Max2Sequence<Element>: Sequence {
     }
 }
 
+extension Max2Sequence: ExpressibleByArrayLiteral {
+    @inlinable
+    init(arrayLiteral elements: Element...) {
+        precondition(elements.count <= 2)
+        var iterator = elements.makeIterator()
+        self.first = iterator.next()
+        self.second = iterator.next()
+    }
+}
+
 extension Max2Sequence: Equatable where Element: Equatable {}
 extension Max2Sequence: Hashable where Element: Hashable {}
 extension Max2Sequence: Sendable where Element: Sendable {}

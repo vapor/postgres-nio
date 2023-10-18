@@ -39,36 +39,55 @@ struct PoolStateMachine<
     RequestID,
     TimerCancellationToken
 > where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID {
+    
+    @usableFromInline
+    struct ConnectionRequest: Equatable {
+        @usableFromInline var connectionID: ConnectionID
+
+        @inlinable
+        init(connectionID: ConnectionID) {
+            self.connectionID = connectionID
+        }
+    }
+
+    @usableFromInline
+    enum ConnectionAction {
+        @usableFromInline
+        struct Shutdown {
+            @usableFromInline
+            var connections: [Connection]
+            @usableFromInline
+            var timersToCancel: [TimerCancellationToken]
+
+            @inlinable
+            init() {
+                self.connections = []
+                self.timersToCancel = []
+            }
+        }
+
+        case scheduleTimers(Max2Sequence<Timer>)
+        case makeConnection(ConnectionRequest, TimerCancellationToken?)
+        case runKeepAlive(Connection, TimerCancellationToken?)
+        case cancelTimers(Max2Sequence<TimerCancellationToken>)
+        case closeConnection(Connection)
+        case shutdown(Shutdown)
+
+        case none
+    }
 
     @usableFromInline
     struct Timer: Hashable, Sendable {
         @usableFromInline
-        enum Usecase: Sendable {
-            case backoff
-            case idleTimeout
-            case keepAlive
-        }
-
-        @usableFromInline
-        var connectionID: ConnectionID
-
-        @usableFromInline
-        var timerID: Int
+        var underlying: ConnectionTimer
 
         @usableFromInline
         var duration: Duration
 
-        @usableFromInline
-        var usecase: Usecase
-
         @inlinable
-        init(connectionID: ConnectionID, timerID: Int, duration: Duration, usecase: Usecase) {
-            self.connectionID = connectionID
-            self.timerID = timerID
+        init(_ connectionTimer: ConnectionTimer, duration: Duration) {
+            self.underlying = connectionTimer
             self.duration = duration
-            self.usecase = usecase
         }
     }
-
-
 }
