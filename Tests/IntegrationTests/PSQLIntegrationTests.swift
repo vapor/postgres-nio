@@ -263,7 +263,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(cells?.1, Decimal(string: "-123456.789123"))
     }
 
-    func testDecodeRawRepresentable() {
+    func testDecodeRawRepresentables() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
