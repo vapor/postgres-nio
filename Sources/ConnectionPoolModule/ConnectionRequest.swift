@@ -4,11 +4,13 @@ public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequest
 
     public var id: ID
 
-    private var continuation: CheckedContinuation<Connection, ConnectionPoolError>
+    @usableFromInline
+    private(set) var continuation: CheckedContinuation<Connection, any Error>
 
+    @inlinable
     init(
         id: Int,
-        continuation: CheckedContinuation<Connection, ConnectionPoolError>
+        continuation: CheckedContinuation<Connection, any Error>
     ) {
         self.id = id
         self.continuation = continuation

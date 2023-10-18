@@ -17,7 +17,7 @@ struct OneElementFastSequence<Element>: Sequence {
     }
 
     @inlinable
-    init(_ element: Element) {
+    init(element: Element) {
         self.base = .one(element, reserveCapacity: 1)
     }
 
