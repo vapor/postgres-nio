@@ -35,7 +35,7 @@ final class OneElementFastSequenceTests: XCTestCase {
         }
         XCTAssertEqual(array.capacity, 8)
 
-        var oneElemSequence = OneElementFastSequence<Int>(1)
+        var oneElemSequence = OneElementFastSequence<Int>(element: 1)
         oneElemSequence.reserveCapacity(8)
         oneElemSequence.append(2)
         guard case .n(let array) = oneElemSequence.base else {
