@@ -10,19 +10,19 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         XCTAssertEqual(state.id, connectionID)
-        XCTAssertEqual(state.isIdleOrRunningKeepAlive, false)
+        XCTAssertEqual(state.isIdle, false)
         XCTAssertEqual(state.isAvailable, false)
         XCTAssertEqual(state.isConnected, false)
         XCTAssertEqual(state.isLeased, false)
         let connection = MockConnection(id: connectionID)
         XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(state.isIdleOrRunningKeepAlive, true)
+        XCTAssertEqual(state.isIdle, true)
         XCTAssertEqual(state.isAvailable, true)
         XCTAssertEqual(state.isConnected, true)
         XCTAssertEqual(state.isLeased, false)
         XCTAssertEqual(state.lease(streams: 1), .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        XCTAssertEqual(state.isIdleOrRunningKeepAlive, false)
+        XCTAssertEqual(state.isIdle, false)
         XCTAssertEqual(state.isAvailable, false)
         XCTAssertEqual(state.isConnected, true)
         XCTAssertEqual(state.isLeased, true)
@@ -257,7 +257,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         XCTAssertNil(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
         XCTAssertNil(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken))
 
-        XCTAssertEqual(state.closeIfIdle(), .init(connection: connection, cancelTimers: [keepAliveTimerCancellationToken, idleTimerCancellationToken], maxStreams: 1))
+        XCTAssertEqual(state.closeIfIdle(), .init(connection: connection, cancelTimers: [keepAliveTimerCancellationToken, idleTimerCancellationToken], usedStreams: 0, maxStreams: 1))
         XCTAssertEqual(state.runKeepAliveIfIdle(reducesAvailableStreams: true), .none)
 
     }
