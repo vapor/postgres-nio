@@ -33,7 +33,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertNil(connections.createNewDemandConnectionIfPossible())
         XCTAssertNil(connections.createNewOverflowConnectionIfPossible())
         XCTAssertEqual(connections.stats, .init(connecting: 4))
-        XCTAssertEqual(connections.soonAvailable, 4)
+        XCTAssertEqual(connections.soonAvailableConnections, 4)
 
         let requests2 = connections.refillConnections()
         XCTAssertTrue(requests2.isEmpty)
@@ -46,7 +46,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
             XCTAssertEqual(context.use, .persisted)
             connected += 1
             XCTAssertEqual(connections.stats, .init(connecting: 4 - connected, idle: connected, availableStreams: connected))
-            XCTAssertEqual(connections.soonAvailable, 4 - connected)
+            XCTAssertEqual(connections.soonAvailableConnections, 4 - connected)
         }
 
         let requests3 = connections.refillConnections()
@@ -72,7 +72,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         }
         XCTAssertEqual(request, .init(connectionID: 0))
         XCTAssertFalse(connections.isEmpty)
-        XCTAssertEqual(connections.soonAvailable, 1)
+        XCTAssertEqual(connections.soonAvailableConnections, 1)
         XCTAssertEqual(connections.stats, .init(connecting: 1))
 
         let newConnection = MockConnection(id: request.connectionID)
@@ -80,7 +80,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(establishedContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedContext.use, .demand)
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
-        XCTAssertEqual(connections.soonAvailable, 0)
+        XCTAssertEqual(connections.soonAvailableConnections, 0)
 
         guard case .leasedConnection(let leaseResult) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
             return XCTFail("Expected to lease a connection")
@@ -137,7 +137,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
 
         let requests = connections.refillConnections()
         XCTAssertEqual(connections.stats, .init(connecting: 1))
-        XCTAssertEqual(connections.soonAvailable, 1)
+        XCTAssertEqual(connections.soonAvailableConnections, 1)
         XCTAssertFalse(connections.isEmpty)
         XCTAssertEqual(requests.count, 1)
 
@@ -167,7 +167,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
 
         let requests = connections.refillConnections()
         XCTAssertEqual(connections.stats, .init(connecting: 2))
-        XCTAssertEqual(connections.soonAvailable, 2)
+        XCTAssertEqual(connections.soonAvailableConnections, 2)
         XCTAssertFalse(connections.isEmpty)
         XCTAssertEqual(requests.count, 2)
 
@@ -186,14 +186,14 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(establishedSecondConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedSecondConnectionContext.use, .persisted)
         XCTAssertEqual(connections.stats, .init(connecting: 2, idle: 1, availableStreams: 1))
-        XCTAssertEqual(connections.soonAvailable, 2)
+        XCTAssertEqual(connections.soonAvailableConnections, 2)
 
         let newThirdConnection = MockConnection(id: thirdRequest.connectionID)
         let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, maxStreams: 1)
         XCTAssertEqual(establishedThirdConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedThirdConnectionContext.use, .demand)
         XCTAssertEqual(connections.stats, .init(connecting: 1, idle: 2, availableStreams: 2))
-        XCTAssertEqual(connections.soonAvailable, 1)
+        XCTAssertEqual(connections.soonAvailableConnections, 1)
         let thirdConnKeepTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: thirdRequest.connectionID, usecase: .keepAlive)
         let thirdConnIdleTimer = TestPoolStateMachine.ConnectionTimer(timerID: 1, connectionID: thirdRequest.connectionID, usecase: .idleTimeout)
         let thirdConnIdleTimerCancellationToken = MockTimerCancellationToken(thirdConnIdleTimer)
@@ -240,7 +240,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(establishedFirstConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedFirstConnectionContext.use, .demand)
         XCTAssertEqual(connections.stats, .init(connecting: 1, idle: 1, availableStreams: 1))
-        XCTAssertEqual(connections.soonAvailable, 1)
+        XCTAssertEqual(connections.soonAvailableConnections, 1)
 
         let backoffTimer = connections.backoffNextConnectionAttempt(secondRequest.connectionID)
         let backoffTimerCancellationToken = MockTimerCancellationToken(backoffTimer)

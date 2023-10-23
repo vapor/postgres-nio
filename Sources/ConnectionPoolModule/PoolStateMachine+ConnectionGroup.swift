@@ -108,7 +108,7 @@ extension PoolStateMachine {
         }
 
         @usableFromInline
-        var soonAvailable: UInt16 {
+        var soonAvailableConnections: UInt16 {
             self.stats.soonAvailable
         }
 
