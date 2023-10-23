@@ -95,8 +95,7 @@ extension Max2Sequence: ExpressibleByArrayLiteral {
     init(arrayLiteral elements: Element...) {
         precondition(elements.count <= 2)
         var iterator = elements.makeIterator()
-        self.first = iterator.next()
-        self.second = iterator.next()
+        self.init(iterator.next(), iterator.next())
     }
 }
 
