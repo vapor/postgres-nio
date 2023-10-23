@@ -135,9 +135,16 @@ extension PoolStateMachine {
         }
 
         /// Information around the failed/closed connection.
+        @usableFromInline
         struct FailedConnectionContext {
             /// Connections that are currently starting
+            @usableFromInline
             var connectionsStarting: Int
+
+            @inlinable
+            init(connectionsStarting: Int) {
+                self.connectionsStarting = connectionsStarting
+            }
         }
 
         mutating func refillConnections() -> [ConnectionRequest] {
@@ -429,30 +436,9 @@ extension PoolStateMachine {
 
         /// Closes the connection at the given index.
         @inlinable
-        mutating func closeConnection(at index: Int) -> Connection {
-            self.stats.idle -= 1
-            self.stats.closing += 1
-            fatalError()
-//            return self.connections[index].close()
-        }
-
-        @inlinable
-        mutating func closeConnectionIfIdle(_ connectionID: Connection.ID) -> CloseAction? {
-            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
-                // because of a race this connection (connection close runs against trigger of timeout)
-                // was already removed from the state machine.
-                return nil
-            }
-
-            if index < self.minimumConcurrentConnections {
-                // because of a race a connection might receive a idle timeout after it was moved into
-                // the persisted connections. If a connection is now persisted, we now need to ignore
-                // the trigger
-                return nil
-            }
-
+        mutating func closeConnectionIfIdle(at index: Int) -> CloseAction {
             guard let closeAction = self.connections[index].closeIfIdle() else {
-                return nil
+                preconditionFailure("Invalid state: \(self)")
             }
 
             self.stats.idle -= 1
@@ -473,7 +459,23 @@ extension PoolStateMachine {
             )
         }
 
-        // MARK: Connection failure
+        @inlinable
+        mutating func closeConnectionIfIdle(_ connectionID: Connection.ID) -> CloseAction? {
+            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
+                // because of a race this connection (connection close runs against trigger of timeout)
+                // was already removed from the state machine.
+                return nil
+            }
+
+            if index < self.minimumConcurrentConnections {
+                // because of a race a connection might receive a idle timeout after it was moved into
+                // the persisted connections. If a connection is now persisted, we now need to ignore
+                // the trigger
+                return nil
+            }
+
+            return self.closeConnectionIfIdle(at: index)
+        }
 
         /// Connection closed. Call this method, if a connection is closed.
         ///
@@ -484,6 +486,7 @@ extension PoolStateMachine {
         ///            You must call ``removeConnection(at:)`` or ``replaceConnection(at:)`` with the
         ///            supplied index after this. If nil is returned the connection was closed by the state machine and was
         ///            therefore already removed.
+        @inlinable
         mutating func connectionClosed(_ connectionID: Connection.ID) -> FailedConnectionContext? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 return nil
@@ -508,7 +511,7 @@ extension PoolStateMachine {
                 self.stats.closing -= 1
             }
 
-            let lastIndex = self.connections.endIndex - 1
+            let lastIndex = self.connections.index(before: self.connections.endIndex)
 
             if index == lastIndex {
                 self.connections.remove(at: index)
@@ -549,7 +552,7 @@ extension PoolStateMachine {
             case self.maximumConcurrentConnectionSoftLimit...:
                 return .overflow
             default:
-                preconditionFailure()
+                preconditionFailure("We do not allow negative connection indexes but got: \(index)")
             }
         }
 
@@ -567,14 +570,15 @@ extension PoolStateMachine {
 
         @inlinable
         /*private*/ mutating func swapForDeletion(index indexToDelete: Int) -> TimerCancellationToken? {
-            let lastConnectedIndex = self.connections.lastIndex(where: { $0.isConnected })
+            let maybeLastConnectedIndex = self.connections.lastIndex(where: { $0.isConnected })
 
-            if lastConnectedIndex == nil || lastConnectedIndex! < indexToDelete {
+            if maybeLastConnectedIndex == nil || maybeLastConnectedIndex! < indexToDelete {
                 self.removeO1(indexToDelete)
                 return nil
             }
 
-            guard let lastConnectedIndex = lastConnectedIndex else { preconditionFailure() }
+            // if maybeLastConnectedIndex == nil, we return early in the above if case.
+            let lastConnectedIndex = maybeLastConnectedIndex!
 
             switch indexToDelete {
             case 0..<self.minimumConcurrentConnections:
@@ -620,7 +624,7 @@ extension PoolStateMachine {
 
         @inlinable
         /*private*/ mutating func removeO1(_ indexToDelete: Int) {
-            let lastIndex = self.connections.endIndex - 1
+            let lastIndex = self.connections.index(before: self.connections.endIndex)
 
             if indexToDelete == lastIndex {
                 self.connections.remove(at: indexToDelete)

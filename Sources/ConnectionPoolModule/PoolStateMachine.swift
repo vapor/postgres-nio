@@ -37,7 +37,7 @@ struct PoolStateMachine<
     ConnectionID: Hashable & Sendable,
     Request: ConnectionRequestProtocol,
     RequestID,
-    TimerCancellationToken
+    TimerCancellationToken: Sendable
 > where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID {
     
     @usableFromInline

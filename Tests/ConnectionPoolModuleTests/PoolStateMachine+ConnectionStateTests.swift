@@ -257,7 +257,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         XCTAssertNil(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
         XCTAssertNil(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken))
 
-        XCTAssertEqual(state.closeIfIdle(), .init(connection: connection, cancelTimers: [keepAliveTimerCancellationToken, idleTimerCancellationToken], usedStreams: 0, maxStreams: 1))
+        XCTAssertEqual(state.closeIfIdle(), .init(connection: connection, previousConnectionState: .idle, cancelTimers: [keepAliveTimerCancellationToken, idleTimerCancellationToken], usedStreams: 0, maxStreams: 1))
         XCTAssertEqual(state.runKeepAliveIfIdle(reducesAvailableStreams: true), .none)
 
     }

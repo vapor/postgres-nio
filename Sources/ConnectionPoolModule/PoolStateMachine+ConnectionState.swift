@@ -623,6 +623,7 @@ extension PoolStateMachine {
             }
         }
 
+        @inlinable
         mutating func closed() -> ClosedAction {
             switch self.state {
             case .starting, .backingOff, .closed:
