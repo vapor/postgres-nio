@@ -468,7 +468,7 @@ extension PoolStateMachine {
             self.stats.availableStreams -= closeAction.maxStreams
 
             return CloseAction(
-                connection: closeAction.connection,
+                connection: closeAction.connection!,
                 timersToCancel: closeAction.cancelTimers
             )
         }
@@ -522,17 +522,19 @@ extension PoolStateMachine {
 
         // MARK: Shutdown
 
-        mutating func triggerShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
-            fatalError("TODO: Unimplemented")
-//            for var connectionState in self.connections {
-//                let connectionCleanup = connectionState.shutdown()
-//                if let connection = connectionCleanup.connection {
-//                    cleanup.connections.append(connection)
-//                }
-//                cleanup.timersToCancel.append(contentsOf: connectionCleanup.timersToCancel)
-//            }
-//
-//            self.connections = []
+        mutating func triggerForceShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
+            for var connectionState in self.connections {
+                guard let closeAction = connectionState.close() else {
+                    continue
+                }
+
+                if let connection = closeAction.connection {
+                    cleanup.connections.append(connection)
+                }
+                cleanup.timersToCancel.append(contentsOf: closeAction.cancelTimers)
+            }
+
+            self.connections = []
         }
 
         // MARK: - Private functions -

@@ -463,31 +463,6 @@ extension PoolStateMachine {
             }
         }
 
-        @usableFromInline
-        struct CloseAction {
-            @usableFromInline
-            var connection: Connection
-            @usableFromInline
-            var cancelTimers: Max2Sequence<TimerCancellationToken>
-            @usableFromInline
-            var usedStreams: UInt16
-            @usableFromInline
-            var maxStreams: UInt16
-
-            @inlinable
-            init(
-                connection: Connection,
-                cancelTimers: Max2Sequence<TimerCancellationToken>,
-                usedStreams: UInt16,
-                maxStreams: UInt16
-            ) {
-                self.connection = connection
-                self.cancelTimers = cancelTimers
-                self.usedStreams = usedStreams
-                self.maxStreams = maxStreams
-            }
-        }
-
         @inlinable
         mutating func cancelIdleTimer() -> TimerCancellationToken? {
             switch self.state {
@@ -500,6 +475,44 @@ extension PoolStateMachine {
             }
         }
 
+        @usableFromInline
+        struct CloseAction {
+
+            @usableFromInline
+            enum PreviousConnectionState {
+                case idle
+                case leased
+                case closing
+                case backingOff
+            }
+
+            @usableFromInline
+            var connection: Connection?
+            @usableFromInline
+            var previousConnectionState: PreviousConnectionState
+            @usableFromInline
+            var cancelTimers: Max2Sequence<TimerCancellationToken>
+            @usableFromInline
+            var usedStreams: UInt16
+            @usableFromInline
+            var maxStreams: UInt16
+
+            @inlinable
+            init(
+                connection: Connection?,
+                previousConnectionState: PreviousConnectionState,
+                cancelTimers: Max2Sequence<TimerCancellationToken>,
+                usedStreams: UInt16,
+                maxStreams: UInt16
+            ) {
+                self.connection = connection
+                self.previousConnectionState = previousConnectionState
+                self.cancelTimers = cancelTimers
+                self.usedStreams = usedStreams
+                self.maxStreams = maxStreams
+            }
+        }
+
         @inlinable
         mutating func closeIfIdle() -> CloseAction? {
             switch self.state {
@@ -507,6 +520,7 @@ extension PoolStateMachine {
                 self.state = .closing(connection)
                 return CloseAction(
                     connection: connection,
+                    previousConnectionState: .idle,
                     cancelTimers: Max2Sequence(
                         keepAlive.cancelTimerIfScheduled(),
                         idleTimerState?.cancellationContinuation
@@ -539,6 +553,7 @@ extension PoolStateMachine {
                 self.state = .closing(connection)
                 return CloseAction(
                     connection: connection,
+                    previousConnectionState: .idle,
                     cancelTimers: Max2Sequence(
                         keepAlive.cancelTimerIfScheduled(),
                         idleTimerState?.cancellationContinuation
@@ -551,6 +566,7 @@ extension PoolStateMachine {
                 self.state = .closing(connection)
                 return CloseAction(
                     connection: connection,
+                    previousConnectionState: .leased,
                     cancelTimers: Max2Sequence(
                         keepAlive.cancelTimerIfScheduled()
                     ),
@@ -558,8 +574,15 @@ extension PoolStateMachine {
                     maxStreams: maxStreams
                 )
 
-            case .backingOff:
-                preconditionFailure("Invalid state: \(self.state)")
+            case .backingOff(let timer):
+                self.state = .closed
+                return CloseAction(
+                    connection: nil,
+                    previousConnectionState: .backingOff,
+                    cancelTimers: Max2Sequence(timer.cancellationContinuation),
+                    usedStreams: 0,
+                    maxStreams: 0
+                )
             }
         }
 
