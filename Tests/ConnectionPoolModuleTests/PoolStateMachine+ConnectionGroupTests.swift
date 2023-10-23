@@ -120,7 +120,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(connections.stats, .init(closing: 1, availableStreams: 0))
 
         let closeContext = connections.connectionClosed(newConnection.id)
-        XCTAssertEqual(closeContext?.connectionsStarting, 0)
+        XCTAssertEqual(closeContext.connectionsStarting, 0)
         XCTAssertTrue(connections.isEmpty)
         XCTAssertEqual(connections.stats, .init())
     }

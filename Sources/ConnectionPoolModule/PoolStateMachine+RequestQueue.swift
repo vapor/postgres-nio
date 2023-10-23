@@ -10,7 +10,7 @@ extension PoolStateMachine {
     /// request from the dictionary and keep it inside the queue. Whenever we pop a request from the deque, we validate
     /// that it hasn't been cancelled in the meantime by checking if the popped request is still in the `requests` dictionary.
     @usableFromInline
-    struct RequestQueue {
+    struct RequestQueue: Sendable {
         @usableFromInline
         private(set) var queue: Deque<RequestID>
 
@@ -40,8 +40,8 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func pop(max: UInt16) -> OneElementFastSequence<Request> {
-            var result = OneElementFastSequence<Request>()
+        mutating func pop(max: UInt16) -> TinyFastSequence<Request> {
+            var result = TinyFastSequence<Request>()
             result.reserveCapacity(Int(max))
             var popped = 0
             while let requestID = self.queue.popFirst(), popped < max {
@@ -61,8 +61,8 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func removeAll() -> OneElementFastSequence<Request> {
-            let result = OneElementFastSequence(self.requests.values)
+        mutating func removeAll() -> TinyFastSequence<Request> {
+            let result = TinyFastSequence(self.requests.values)
             self.requests.removeAll()
             self.queue.removeAll()
             return result

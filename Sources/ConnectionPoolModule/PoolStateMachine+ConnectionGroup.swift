@@ -134,19 +134,6 @@ extension PoolStateMachine {
             var info: ConnectionAvailableInfo
         }
 
-        /// Information around the failed/closed connection.
-        @usableFromInline
-        struct FailedConnectionContext {
-            /// Connections that are currently starting
-            @usableFromInline
-            var connectionsStarting: Int
-
-            @inlinable
-            init(connectionsStarting: Int) {
-                self.connectionsStarting = connectionsStarting
-            }
-        }
-
         mutating func refillConnections() -> [ConnectionRequest] {
             let existingConnections = self.stats.active
             let missingConnection = self.minimumConcurrentConnections - Int(existingConnections)
@@ -477,6 +464,31 @@ extension PoolStateMachine {
             return self.closeConnectionIfIdle(at: index)
         }
 
+        /// Information around the failed/closed connection.
+        @usableFromInline
+        struct ClosedAction {
+            /// Connections that are currently starting
+            @usableFromInline
+            var connectionsStarting: Int
+
+            @usableFromInline
+            var timersToCancel: TinyFastSequence<TimerCancellationToken>
+
+            @usableFromInline
+            var newConnectionRequest: ConnectionRequest?
+
+            @inlinable
+            init(
+                connectionsStarting: Int,
+                timersToCancel: TinyFastSequence<TimerCancellationToken>,
+                newConnectionRequest: ConnectionRequest? = nil
+            ) {
+                self.connectionsStarting = connectionsStarting
+                self.timersToCancel = timersToCancel
+                self.newConnectionRequest = newConnectionRequest
+            }
+        }
+
         /// Connection closed. Call this method, if a connection is closed.
         ///
         /// This will put the position into the closed state.
@@ -487,12 +499,13 @@ extension PoolStateMachine {
         ///            supplied index after this. If nil is returned the connection was closed by the state machine and was
         ///            therefore already removed.
         @inlinable
-        mutating func connectionClosed(_ connectionID: Connection.ID) -> FailedConnectionContext? {
+        mutating func connectionClosed(_ connectionID: Connection.ID) -> ClosedAction {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
-                return nil
+                preconditionFailure("All connections that have been created, should say goodbye exactly once!")
             }
 
             let closedAction = self.connections[index].closed()
+            var timersToCancel = TinyFastSequence(closedAction.cancelTimers)
 
             if closedAction.wasRunningKeepAlive {
                 self.stats.runningKeepAlive -= 1
@@ -511,16 +524,22 @@ extension PoolStateMachine {
                 self.stats.closing -= 1
             }
 
-            let lastIndex = self.connections.index(before: self.connections.endIndex)
-
-            if index == lastIndex {
-                self.connections.remove(at: index)
-            } else {
-                self.connections.swapAt(index, lastIndex)
-                self.connections.remove(at: lastIndex)
+            if let cancellationTimer = self.swapForDeletion(index: index) {
+                timersToCancel.append(cancellationTimer)
             }
 
-            return FailedConnectionContext(connectionsStarting: 0)
+            let newConnectionRequest: ConnectionRequest?
+            if self.connections.count < self.minimumConcurrentConnections {
+                newConnectionRequest = .init(connectionID: self.generator.next())
+            } else {
+                newConnectionRequest = .none
+            }
+
+            return ClosedAction(
+                connectionsStarting: 0,
+                timersToCancel: timersToCancel,
+                newConnectionRequest: newConnectionRequest
+            )
         }
 
         // MARK: Shutdown
