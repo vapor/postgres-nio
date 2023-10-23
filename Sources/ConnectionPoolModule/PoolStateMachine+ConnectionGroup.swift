@@ -29,9 +29,9 @@ extension PoolStateMachine {
     }
 
     @usableFromInline
-    struct ConnectionGroup {
+    struct ConnectionGroup: Sendable {
         @usableFromInline
-        struct Stats: Hashable {
+        struct Stats: Hashable, Sendable {
             @usableFromInline var connecting: UInt16 = 0
             @usableFromInline var backingOff: UInt16 = 0
             @usableFromInline var idle: UInt16 = 0

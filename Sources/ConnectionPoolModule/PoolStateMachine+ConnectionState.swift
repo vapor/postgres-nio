@@ -45,11 +45,11 @@ extension PoolStateMachine {
 
     @usableFromInline
     /// An connection state machine about the pool's view on the connection.
-    struct ConnectionState {
+    struct ConnectionState: Sendable {
         @usableFromInline
-        enum State {
+        enum State: Sendable {
             @usableFromInline
-            enum KeepAlive {
+            enum KeepAlive: Sendable {
                 case notScheduled
                 case scheduled(Timer)
                 case running(_ consumingStream: Bool)
@@ -87,7 +87,7 @@ extension PoolStateMachine {
             }
 
             @usableFromInline
-            struct Timer {
+            struct Timer: Sendable {
                 @usableFromInline
                 let timerID: Int
 
