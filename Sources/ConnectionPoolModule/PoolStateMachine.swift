@@ -212,28 +212,24 @@ struct PoolStateMachine<
                 request: requestAction,
                 connection: .none
             )
-        }
-
-        // Can we create a demand connection
-        if let request = self.connections.createNewDemandConnectionIfPossible() {
+        } else if let request = self.connections.createNewDemandConnectionIfPossible() {
+            // Can we create a demand connection
             return .init(
                 request: requestAction,
                 connection: .makeConnection(request, .init())
             )
-        }
-
-        // Can we create an overflow connection
-        if let request = self.connections.createNewOverflowConnectionIfPossible() {
+        } else if let request = self.connections.createNewOverflowConnectionIfPossible() {
+            // Can we create an overflow connection
             return .init(
                 request: requestAction,
                 connection: .makeConnection(request, .init())
             )
+        } else {
+            self.cacheNoMoreConnectionsAllowed = true
+
+            // no new connections allowed:
+            return .init(request: requestAction, connection: .none)
         }
-
-        self.cacheNoMoreConnectionsAllowed = true
-
-        // no new connections allowed:
-        return .init(request: requestAction, connection: .none)
     }
 
     @inlinable
@@ -366,7 +362,7 @@ struct PoolStateMachine<
     }
 
     mutating func triggerGracefulShutdown() -> Action {
-        fatalError()
+        fatalError("Unimplemented")
     }
 
     mutating func triggerForceShutdown() -> Action {
@@ -456,7 +452,7 @@ struct PoolStateMachine<
 extension PoolStateMachine {
     /// Calculates the delay for the next connection attempt after the given number of failed `attempts`.
     ///
-    /// Our backoff formula is: 100ms * 1.25^(attempts - 1) that is capped of at 1 minute.
+    /// Our backoff formula is: 100ms * 1.25^(attempts - 1) with 3% jitter that is capped of at 1 minute.
     /// This means for:
     ///   -  1 failed attempt :  100ms
     ///   -  5 failed attempts: ~300ms
