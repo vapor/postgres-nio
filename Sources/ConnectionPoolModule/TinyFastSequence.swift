@@ -1,10 +1,11 @@
 /// A `Sequence` that does not heap allocate, if it only carries a single element
 @usableFromInline
-struct OneElementFastSequence<Element>: Sequence {
+struct TinyFastSequence<Element>: Sequence {
     @usableFromInline
     enum Base {
         case none(reserveCapacity: Int)
         case one(Element, reserveCapacity: Int)
+        case two(Element, Element, reserveCapacity: Int)
         case n([Element])
     }
 
@@ -37,6 +38,20 @@ struct OneElementFastSequence<Element>: Sequence {
         }
     }
 
+    @inlinable
+    init(_ max2Sequence: Max2Sequence<Element>) {
+        switch max2Sequence.count {
+        case 0:
+            self.base = .none(reserveCapacity: 0)
+        case 1:
+            self.base = .one(max2Sequence.first!, reserveCapacity: 0)
+        case 2:
+            self.base = .n(Array(max2Sequence))
+        default:
+            fatalError()
+        }
+    }
+
     @usableFromInline
     var count: Int {
         switch self.base {
@@ -44,6 +59,8 @@ struct OneElementFastSequence<Element>: Sequence {
             return 0
         case .one:
             return 1
+        case .two:
+            return 2
         case .n(let array):
             return array.count
         }
@@ -56,6 +73,8 @@ struct OneElementFastSequence<Element>: Sequence {
             return nil
         case .one(let element, _):
             return element
+        case .two(let first, _, _):
+            return first
         case .n(let array):
             return array.first
         }
@@ -66,7 +85,7 @@ struct OneElementFastSequence<Element>: Sequence {
         switch self.base {
         case .none:
             return true
-        case .one, .n:
+        case .one, .two, .n:
             return false
         }
     }
@@ -78,6 +97,8 @@ struct OneElementFastSequence<Element>: Sequence {
             self.base = .none(reserveCapacity: Swift.max(reservedCapacity, minimumCapacity))
         case .one(let element, let reservedCapacity):
             self.base = .one(element, reserveCapacity: Swift.max(reservedCapacity, minimumCapacity))
+        case .two(let first, let second, let reservedCapacity):
+            self.base = .two(first, second, reserveCapacity: Swift.max(reservedCapacity, minimumCapacity))
         case .n(var array):
             self.base = .none(reserveCapacity: 0) // prevent CoW
             array.reserveCapacity(minimumCapacity)
@@ -90,12 +111,17 @@ struct OneElementFastSequence<Element>: Sequence {
         switch self.base {
         case .none(let reserveCapacity):
             self.base = .one(element, reserveCapacity: reserveCapacity)
-        case .one(let existing, let reserveCapacity):
+        case .one(let first, let reserveCapacity):
+            self.base = .two(first, element, reserveCapacity: reserveCapacity)
+
+        case .two(let first, let second, let reserveCapacity):
             var new = [Element]()
-            new.reserveCapacity(reserveCapacity)
-            new.append(existing)
+            new.reserveCapacity(Swift.max(4, reserveCapacity))
+            new.append(first)
+            new.append(second)
             new.append(element)
             self.base = .n(new)
+
         case .n(var existing):
             self.base = .none(reserveCapacity: 0) // prevent CoW
             existing.append(element)
@@ -111,10 +137,10 @@ struct OneElementFastSequence<Element>: Sequence {
     @usableFromInline
     struct Iterator: IteratorProtocol {
         @usableFromInline private(set) var index: Int = 0
-        @usableFromInline private(set) var backing: OneElementFastSequence<Element>
+        @usableFromInline private(set) var backing: TinyFastSequence<Element>
 
         @inlinable
-        init(_ backing: OneElementFastSequence<Element>) {
+        init(_ backing: TinyFastSequence<Element>) {
             self.backing = backing
         }
 
@@ -130,6 +156,17 @@ struct OneElementFastSequence<Element>: Sequence {
                 }
                 return nil
 
+            case .two(let first, let second, _):
+                defer { self.index += 1 }
+                switch self.index {
+                case 0:
+                    return first
+                case 1:
+                    return second
+                default:
+                    return nil
+                }
+
             case .n(let array):
                 if self.index < array.endIndex {
                     defer { self.index += 1}
@@ -141,11 +178,28 @@ struct OneElementFastSequence<Element>: Sequence {
     }
 }
 
-extension OneElementFastSequence: Equatable where Element: Equatable {}
-extension OneElementFastSequence.Base: Equatable where Element: Equatable {}
+extension TinyFastSequence: Equatable where Element: Equatable {}
+extension TinyFastSequence.Base: Equatable where Element: Equatable {}
 
-extension OneElementFastSequence: Hashable where Element: Hashable {}
-extension OneElementFastSequence.Base: Hashable where Element: Hashable {}
+extension TinyFastSequence: Hashable where Element: Hashable {}
+extension TinyFastSequence.Base: Hashable where Element: Hashable {}
 
-extension OneElementFastSequence: Sendable where Element: Sendable {}
-extension OneElementFastSequence.Base: Sendable where Element: Sendable {}
+extension TinyFastSequence: Sendable where Element: Sendable {}
+extension TinyFastSequence.Base: Sendable where Element: Sendable {}
+
+extension TinyFastSequence: ExpressibleByArrayLiteral {
+    @inlinable
+    init(arrayLiteral elements: Element...) {
+        var iterator = elements.makeIterator()
+        switch elements.count {
+        case 0:
+            self.base = .none(reserveCapacity: 0)
+        case 1:
+            self.base = .one(iterator.next()!, reserveCapacity: 0)
+        case 2:
+            self.base = .two(iterator.next()!, iterator.next()!, reserveCapacity: 0)
+        default:
+            self.base = .n(elements)
+        }
+    }
+}
