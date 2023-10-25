@@ -290,7 +290,7 @@ struct PoolStateMachine<
         switch self.connections.backoffDone(connectionID, retry: retry) {
         case .createConnection(let request, let continuation):
             let timers: TinyFastSequence<TimerCancellationToken>
-            if let continuation = continuation {
+            if let continuation {
                 timers = .init(element: continuation)
             } else {
                 timers = .init()

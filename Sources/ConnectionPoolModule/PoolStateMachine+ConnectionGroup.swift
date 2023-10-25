@@ -501,7 +501,7 @@ extension PoolStateMachine {
         @inlinable
         mutating func connectionClosed(_ connectionID: Connection.ID) -> ClosedAction {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
-                preconditionFailure("All connections that have been created, should say goodbye exactly once!")
+                preconditionFailure("All connections that have been created should say goodbye exactly once!")
             }
 
             let closedAction = self.connections[index].closed()
