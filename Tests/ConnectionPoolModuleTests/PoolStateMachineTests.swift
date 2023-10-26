@@ -224,4 +224,46 @@ final class PoolStateMachineTests: XCTestCase {
         // connection 1 is dropped
         XCTAssertEqual(stateMachine.connectionClosed(connection1), .init(request: .none, connection: .cancelTimers([connection2IdleTimerCancellationToken])))
     }
+
+    func testReleaseLoosesRaceAgainstClosed() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = nil
+        configuration.idleTimeoutDuration = .seconds(3)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // don't refill pool
+        let requests = stateMachine.refillConnections()
+        XCTAssertEqual(requests.count, 0)
+
+        // request connection while none exists
+        let request1 = MockRequest()
+        let leaseRequest1 = stateMachine.leaseConnection(request1)
+        XCTAssertEqual(leaseRequest1.connection, .makeConnection(.init(connectionID: 0), []))
+        XCTAssertEqual(leaseRequest1.request, .none)
+
+        // make connection 1 and lease immediately
+        let connection1 = MockConnection(id: 0)
+        let createdAction1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        XCTAssertEqual(createdAction1.request, .leaseConnection(.init(element: request1), connection1))
+        XCTAssertEqual(createdAction1.connection, .none)
+
+        // connection got closed
+        let closedAction = stateMachine.connectionClosed(connection1)
+        XCTAssertEqual(closedAction.connection, .none)
+        XCTAssertEqual(closedAction.request, .none)
+
+        // release connection 1 should be leased again immediately
+        let releaseRequest1 = stateMachine.releaseConnection(connection1, streams: 1)
+        XCTAssertEqual(releaseRequest1.request, .none)
+        XCTAssertEqual(releaseRequest1.connection, .none)
+    }
+
 }

@@ -234,7 +234,9 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func releaseConnection(_ connection: Connection, streams: UInt16) -> Action {
-        let (index, context) = self.connections.releaseConnection(connection.id, streams: streams)
+        guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
+            return .none()
+        }
         return self.handleAvailableConnection(index: index, availableContext: context)
     }
 

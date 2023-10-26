@@ -184,8 +184,6 @@ final class ConnectionPoolTests: XCTestCase {
             taskGroup.cancelAll()
         }
     }
-
-
 }
 
 
