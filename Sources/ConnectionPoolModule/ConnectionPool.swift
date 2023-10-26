@@ -502,7 +502,7 @@ public final class ConnectionPool<
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
-                        #if swift(>=5.8)
+                        #if swift(>=5.8) && os(Linux) || swift(>=5.9)
                         try await self.clock.sleep(for: timer.duration)
                         #else
                         try await self.clock.sleep(until: self.clock.now.advanced(by: timer.duration), tolerance: nil)
