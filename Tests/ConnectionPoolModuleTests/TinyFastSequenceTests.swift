@@ -1,7 +1,7 @@
 @testable import _ConnectionPoolModule
 import XCTest
 
-final class OneElementFastSequenceTests: XCTestCase {
+final class TinyFastSequenceTests: XCTestCase {
     func testCountIsEmptyAndIterator() async {
         var sequence = TinyFastSequence<Int>()
         XCTAssertEqual(sequence.count, 0)

@@ -342,9 +342,9 @@ extension PoolStateMachine {
         ///            Call ``leaseConnection(at:)`` or ``closeConnection(at:)`` with the supplied index after
         ///            this. If you want to park the connection no further call is required.
         @inlinable
-        mutating func releaseConnection(_ connectionID: Connection.ID, streams: UInt16) -> (Int, AvailableConnectionContext) {
+        mutating func releaseConnection(_ connectionID: Connection.ID, streams: UInt16) -> (Int, AvailableConnectionContext)? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
-                preconditionFailure("A connection that we don't know was released? Something is very wrong...")
+                return nil
             }
 
             let connectionInfo = self.connections[index].release(streams: streams)
@@ -657,3 +657,6 @@ extension PoolStateMachine {
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PoolStateMachine.ConnectionGroup.BackoffDoneAction: Equatable where TimerCancellationToken: Equatable {}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension PoolStateMachine.ConnectionGroup.ClosedAction: Equatable where TimerCancellationToken: Equatable {}

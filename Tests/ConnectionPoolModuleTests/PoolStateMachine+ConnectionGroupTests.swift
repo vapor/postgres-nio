@@ -88,7 +88,9 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssert(newConnection === leaseResult.connection)
         XCTAssertEqual(connections.stats, .init(leased: 1, leasedStreams: 1))
 
-        let (index, releasedContext) = connections.releaseConnection(leaseResult.connection.id, streams: 1)
+        guard let (index, releasedContext) = connections.releaseConnection(leaseResult.connection.id, streams: 1) else {
+            return XCTFail("Expected that this connection is still active")
+        }
         XCTAssertEqual(releasedContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(releasedContext.use, .demand)
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))

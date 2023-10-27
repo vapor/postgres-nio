@@ -234,7 +234,9 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func releaseConnection(_ connection: Connection, streams: UInt16) -> Action {
-        let (index, context) = self.connections.releaseConnection(connection.id, streams: streams)
+        guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
+            return .none()
+        }
         return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
@@ -251,8 +253,13 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionEstablished(_ connection: Connection, maxStreams: UInt16) -> Action {
-        let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-        return self.handleAvailableConnection(index: index, availableContext: context)
+        switch self.poolState {
+        case .running, .shuttingDown(graceful: true):
+            let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
+            return self.handleAvailableConnection(index: index, availableContext: context)
+        case .shuttingDown(graceful: false), .shutDown:
+            return .init(request: .none, connection: .closeConnection(connection, []))
+        }
     }
 
     @inlinable
@@ -274,31 +281,43 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
-        self.failedConsecutiveConnectionAttempts += 1
+        switch self.poolState {
+        case .running, .shuttingDown(graceful: true):
+            self.failedConsecutiveConnectionAttempts += 1
 
-        let connectionTimer = self.connections.backoffNextConnectionAttempt(request.connectionID)
-        let backoff = Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
-        let timer = Timer(connectionTimer, duration: backoff)
-        return .init(request: .none, connection: .scheduleTimers(.init(timer)))
+            let connectionTimer = self.connections.backoffNextConnectionAttempt(request.connectionID)
+            let backoff = Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
+            let timer = Timer(connectionTimer, duration: backoff)
+            return .init(request: .none, connection: .scheduleTimers(.init(timer)))
+
+        case .shuttingDown(graceful: false), .shutDown:
+            return .none()
+        }
     }
 
     @inlinable
     mutating func connectionCreationBackoffDone(_ connectionID: ConnectionID) -> Action {
-        let soonAvailable = self.connections.soonAvailableConnections
-        let retry = (soonAvailable - 1) < self.requestQueue.count
+        switch self.poolState {
+        case .running, .shuttingDown(graceful: true):
+            let soonAvailable = self.connections.soonAvailableConnections
+            let retry = (soonAvailable - 1) < self.requestQueue.count
 
-        switch self.connections.backoffDone(connectionID, retry: retry) {
-        case .createConnection(let request, let continuation):
-            let timers: TinyFastSequence<TimerCancellationToken>
-            if let continuation {
-                timers = .init(element: continuation)
-            } else {
-                timers = .init()
+            switch self.connections.backoffDone(connectionID, retry: retry) {
+            case .createConnection(let request, let continuation):
+                let timers: TinyFastSequence<TimerCancellationToken>
+                if let continuation {
+                    timers = .init(element: continuation)
+                } else {
+                    timers = .init()
+                }
+                return .init(request: .none, connection: .makeConnection(request, timers))
+
+            case .cancelTimers(let timers):
+                return .init(request: .none, connection: .cancelTimers(.init(timers)))
             }
-            return .init(request: .none, connection: .makeConnection(request, timers))
 
-        case .cancelTimers(let timers):
-            return .init(request: .none, connection: .cancelTimers(.init(timers)))
+        case .shuttingDown(graceful: false), .shutDown:
+            return .none()
         }
     }
 
