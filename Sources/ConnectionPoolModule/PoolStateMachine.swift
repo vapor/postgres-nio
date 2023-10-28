@@ -355,18 +355,24 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionClosed(_ connection: Connection) -> Action {
-        self.cacheNoMoreConnectionsAllowed = false
+        switch self.poolState {
+        case .running, .shuttingDown(graceful: true):
+            self.cacheNoMoreConnectionsAllowed = false
 
-        let closedConnectionAction = self.connections.connectionClosed(connection.id)
+            let closedConnectionAction = self.connections.connectionClosed(connection.id)
 
-        let connectionAction: ConnectionAction
-        if let newRequest = closedConnectionAction.newConnectionRequest {
-            connectionAction = .makeConnection(newRequest, closedConnectionAction.timersToCancel)
-        } else {
-            connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
+            let connectionAction: ConnectionAction
+            if let newRequest = closedConnectionAction.newConnectionRequest {
+                connectionAction = .makeConnection(newRequest, closedConnectionAction.timersToCancel)
+            } else {
+                connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
+            }
+
+            return .init(request: .none, connection: connectionAction)
+
+        case .shuttingDown(graceful: false), .shutDown:
+            return .none()
         }
-
-        return .init(request: .none, connection: connectionAction)
     }
 
     struct CleanupAction {

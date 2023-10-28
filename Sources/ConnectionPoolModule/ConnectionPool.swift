@@ -306,7 +306,6 @@ public final class ConnectionPool<
     @usableFromInline
     enum NewPoolActions: Sendable {
         case makeConnection(StateMachine.ConnectionRequest)
-        case closeConnection(Connection)
         case runKeepAlive(Connection)
 
         case scheduleTimer(StateMachine.Timer)
@@ -341,9 +340,6 @@ public final class ConnectionPool<
 
         case .runKeepAlive(let connection):
             self.runKeepAlive(connection, in: &taskGroup)
-
-        case .closeConnection(let connection):
-            self.closeConnection(connection)
 
         case .scheduleTimer(let timer):
             self.runTimer(timer, in: &taskGroup)
@@ -427,8 +423,15 @@ public final class ConnectionPool<
             do {
                 let bundle = try await self.factory(request.connectionID, self)
                 self.connectionEstablished(bundle)
-                bundle.connection.onClose {
-                    self.connectionDidClose(bundle.connection, error: $0)
+
+                // after the connection has been established, we keep the task open. This ensures
+                // that the pools run method can not be exited before all connections have been
+                // closed.
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    bundle.connection.onClose {
+                        self.connectionDidClose(bundle.connection, error: $0)
+                        continuation.resume()
+                    }
                 }
             } catch {
                 self.connectionEstablishFailed(error, for: request)
