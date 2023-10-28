@@ -1,4 +1,5 @@
 @testable import _ConnectionPoolModule
+import Atomics
 import XCTest
 import NIOEmbedded
 
@@ -52,7 +53,14 @@ final class ConnectionPoolTests: XCTestCase {
             }
 
             taskGroup.cancelAll()
+
+            XCTAssertEqual(factory.pendingConnectionAttemptsCount, 0)
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
         }
+
+        XCTAssertEqual(factory.runningConnections.count, 0)
     }
 
     func testShutdownPoolWhileConnectionIsBeingCreated() async {
@@ -155,11 +163,16 @@ final class ConnectionPoolTests: XCTestCase {
             try await factory.makeConnection(id: $0, for: $1)
         }
 
+        let hasFinished = ManagedAtomic(false)
+        let createdConnections = ManagedAtomic(0)
+        let iterations = 10_000
+
         // the same connection is reused 1000 times
 
-        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        await withTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
                 await pool.run()
+                XCTAssertFalse(hasFinished.compareExchange(expected: false, desired: true, ordering: .relaxed).original)
             }
 
             taskGroup.addTask {
@@ -167,22 +180,45 @@ final class ConnectionPoolTests: XCTestCase {
                 for _ in 0..<config.maximumConnectionHardLimit {
                     await factory.nextConnectAttempt { connectionID in
                         XCTAssertTrue(usedConnectionIDs.insert(connectionID).inserted)
+                        createdConnections.wrappingIncrement(ordering: .relaxed)
                         return 1
                     }
                 }
 
+
                 XCTAssertEqual(factory.pendingConnectionAttemptsCount, 0)
             }
 
-            for _ in 0..<10_000 {
+            let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+
+            for _ in 0..<iterations {
                 taskGroup.addTask {
-                    let leasedConnection = try await pool.leaseConnection()
-                    pool.releaseConnection(leasedConnection)
+                    do {
+                        let leasedConnection = try await pool.leaseConnection()
+                        pool.releaseConnection(leasedConnection)
+                    } catch {
+                        XCTFail("Unexpected error: \(error)")
+                    }
+                    continuation.yield()
                 }
             }
 
+            var leaseReleaseIterator = stream.makeAsyncIterator()
+            for _ in 0..<iterations {
+                _ = await leaseReleaseIterator.next()
+            }
+
             taskGroup.cancelAll()
+
+            XCTAssertFalse(hasFinished.load(ordering: .relaxed))
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
         }
+
+        XCTAssertEqual(createdConnections.load(ordering: .relaxed), config.maximumConnectionHardLimit)
+        XCTAssert(hasFinished.load(ordering: .relaxed))
+        XCTAssertEqual(factory.runningConnections.count, 0)
     }
 }
 

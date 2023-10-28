@@ -88,10 +88,16 @@ final class MockConnectionFactory<Clock: _Concurrency.Clock> where Clock.Duratio
         var attempts = Deque<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>)>()
 
         var waiter = Deque<CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>>()
+
+        var runningConnections = [ConnectionID: Connection]()
     }
 
     var pendingConnectionAttemptsCount: Int {
         self.stateBox.withLockedValue { $0.attempts.count }
+    }
+
+    var runningConnections: [Connection] {
+        self.stateBox.withLockedValue { Array($0.runningConnections.values) }
     }
 
     func makeConnection(
@@ -137,6 +143,17 @@ final class MockConnectionFactory<Clock: _Concurrency.Clock> where Clock.Duratio
         do {
             let streamCount = try await closure(connectionID)
             let connection = MockConnection(id: connectionID)
+
+            connection.onClose { _ in
+                self.stateBox.withLockedValue { state in
+                    _ = state.runningConnections.removeValue(forKey: connectionID)
+                }
+            }
+
+            self.stateBox.withLockedValue { state in
+                _ = state.runningConnections[connectionID] = connection
+            }
+
             continuation.resume(returning: (connection, streamCount))
             return connection
         } catch {

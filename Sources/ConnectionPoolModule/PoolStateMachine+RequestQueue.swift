@@ -44,7 +44,7 @@ extension PoolStateMachine {
             var result = TinyFastSequence<Request>()
             result.reserveCapacity(Int(max))
             var popped = 0
-            while let requestID = self.queue.popFirst(), popped < max {
+            while popped < max, let requestID = self.queue.popFirst() {
                 if let requestIndex = self.requests.index(forKey: requestID) {
                     popped += 1
                     result.append(self.requests.remove(at: requestIndex).value)
