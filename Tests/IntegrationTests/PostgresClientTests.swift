@@ -35,6 +35,12 @@ final class PostgresClientTests: XCTestCase {
                     print("done: \(i)")
                 }
             }
+
+            for _ in 0..<10000 {
+                _ = await taskGroup.nextResult()!
+            }
+
+            taskGroup.cancelAll()
         }
     }
 }

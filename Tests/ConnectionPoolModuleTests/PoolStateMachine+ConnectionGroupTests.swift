@@ -95,7 +95,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(releasedContext.use, .demand)
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
 
-        let parkTimers = connections.parkConnection(at: index)
+        let parkTimers = connections.parkConnection(at: index, hasBecomeIdle: true)
         XCTAssertEqual(parkTimers, [
             .init(timerID: 0, connectionID: newConnection.id, usecase: .keepAlive),
             .init(timerID: 1, connectionID: newConnection.id, usecase: .idleTimeout),
@@ -199,7 +199,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         let thirdConnKeepTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: thirdRequest.connectionID, usecase: .keepAlive)
         let thirdConnIdleTimer = TestPoolStateMachine.ConnectionTimer(timerID: 1, connectionID: thirdRequest.connectionID, usecase: .idleTimeout)
         let thirdConnIdleTimerCancellationToken = MockTimerCancellationToken(thirdConnIdleTimer)
-        XCTAssertEqual(connections.parkConnection(at: thirdConnectionIndex), [thirdConnKeepTimer, thirdConnIdleTimer])
+        XCTAssertEqual(connections.parkConnection(at: thirdConnectionIndex, hasBecomeIdle: true), [thirdConnKeepTimer, thirdConnIdleTimer])
 
         XCTAssertNil(connections.timerScheduled(thirdConnKeepTimer, cancelContinuation: .init(thirdConnKeepTimer)))
         XCTAssertNil(connections.timerScheduled(thirdConnIdleTimer, cancelContinuation: thirdConnIdleTimerCancellationToken))
@@ -277,7 +277,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedConnectionContext.use, .persisted)
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
-        let timers = connections.parkConnection(at: connectionIndex)
+        let timers = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
         let keepAliveTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: firstRequest.connectionID, usecase: .keepAlive)
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         XCTAssertEqual(timers, [keepAliveTimer])
