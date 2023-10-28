@@ -985,7 +985,7 @@ extension ConnectionStateMachine {
             }
             
             return false
-        case .clientClosedConnection:
+        case .clientClosedConnection, .poolClosed:
             preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
         case .serverClosedConnection:
             return true
