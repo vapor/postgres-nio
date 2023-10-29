@@ -6,7 +6,6 @@ import _ConnectionPoolModule
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 @_spi(ConnectionPool)
 public final class PostgresClient: Sendable {
-
     public struct Configuration: Sendable {
         public struct TLS: Sendable {
             enum Base {
@@ -191,7 +190,11 @@ public final class PostgresClient: Sendable {
     let pool: Pool
     let factory: ConnectionFactory
 
-    public init(configuration: Configuration, eventLoopGroup: EventLoopGroup, backgroundLogger: Logger) {
+    public init(
+        configuration: Configuration,
+        eventLoopGroup: any EventLoopGroup = PostgresClient.defaultEventLoopGroup,
+        backgroundLogger: Logger
+    ) {
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
         self.factory = factory
 
@@ -232,6 +235,10 @@ public final class PostgresClient: Sendable {
 
     public func run() async {
         await self.pool.run()
+    }
+
+    public static var defaultEventLoopGroup: EventLoopGroup {
+        PostgresConnection.defaultEventLoopGroup
     }
 }
 
