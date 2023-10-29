@@ -1,6 +1,7 @@
 @_spi(ConnectionPool) import PostgresNIO
 import XCTest
 import NIOPosix
+import NIOSSL
 import Logging
 import Atomics
 
@@ -17,10 +18,7 @@ final class PostgresClientTests: XCTestCase {
         }
 
         let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
-
-        var maybeClient: PostgresClient?
-        XCTAssertNoThrow(maybeClient = try PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger))
-        guard let client = maybeClient else { return XCTFail("Expected to have a client here") }
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
 
         await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -29,7 +27,7 @@ final class PostgresClientTests: XCTestCase {
 
             for i in 0..<10000 {
                 taskGroup.addTask {
-                    try await client.withConnection(logger: logger) { connection in
+                    try await client.withConnection() { connection in
                         _ = try await connection.query("SELECT 1", logger: logger)
                     }
                     print("done: \(i)")
@@ -48,20 +46,20 @@ final class PostgresClientTests: XCTestCase {
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PostgresClient.Configuration {
     static func makeTestConfiguration() -> PostgresClient.Configuration {
-        var clientConfig = PostgresClient.Configuration()
-        clientConfig.pool.minimumConnectionCount = 0
-        clientConfig.pool.maximumConnectionSoftLimit = 8*4
-        clientConfig.pool.maximumConnectionHardLimit = 12*4
-        clientConfig.pool.keepAliveFrequency = .seconds(5)
-        clientConfig.pool.connectionIdleTimeout = .seconds(15)
-
-        clientConfig.server.host = env("POSTGRES_HOSTNAME") ?? "localhost"
-        clientConfig.server.port = env("POSTGRES_PORT").flatMap({ Int($0) }) ?? 5432
-        clientConfig.authentication.username = env("POSTGRES_USER") ?? "test_username"
-        clientConfig.authentication.database = env("POSTGRES_DB") ?? "test_database"
-        clientConfig.authentication.password = env("POSTGRES_PASSWORD") ?? "test_password"
-
-        clientConfig.tls = .disable
+        var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
+        tlsConfiguration.certificateVerification = .none
+        var clientConfig = PostgresClient.Configuration(
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: env("POSTGRES_PORT").flatMap({ Int($0) }) ?? 5432,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database",
+            tls: .prefer(tlsConfiguration)
+        )
+        clientConfig.options.minimumConnections = 0
+        clientConfig.options.maximumConnections = 12*4
+        clientConfig.options.keepAliveBehavior = .init(frequency: .seconds(5))
+        clientConfig.options.connectionIdleTimeout = .seconds(15)
 
         return clientConfig
     }
