@@ -1,8 +1,36 @@
 import NIOCore
 import NIOSSL
+import Atomics
 import Logging
 import _ConnectionPoolModule
 
+/// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
+/// behavior.
+///
+/// > Important:
+/// The client can only lease connections, if the user is running the client's ``run()`` method in a long running task:
+///
+/// ```swift
+/// let client = PostgresClient(configuration: configuration, logger: logger)
+/// await withTaskGroup(of: Void.self) {
+///   taskGroup.addTask {
+///     client.run() // !important
+///   }
+///
+///   taskGroup.addTask {
+///     client.withConnection { connection in
+///       do {
+///         let rows = try await connection.query("SELECT userID, name, age FROM users;")
+///         for try await (userID, name, age) in rows.decode((UUID, String, Int).self) {
+///           // do something with the values
+///         }
+///       } catch {
+///         // handle errors
+///       }
+///     }
+///   }
+/// }
+/// ```
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 @_spi(ConnectionPool)
 public final class PostgresClient: Sendable {
@@ -38,20 +66,30 @@ public final class PostgresClient: Sendable {
 
         // MARK: Client options
 
-        /// Describes options affecting how the underlying connection is made.
+        /// Describes general client behavior options. Those settings are considered advanced options.
         public struct Options: Sendable {
+            /// A keep-alive behavior for Postgres connections. The ``frequency`` defines after which time an idle
+            /// connection shall run a keep-alive ``query``.
             public struct KeepAliveBehavior: Sendable {
+                /// The amount of time that shall pass before an idle connection runs a keep-alive ``query``.
                 public var frequency: Duration
 
+                /// The ``query`` that is run on an idle connection after it has been idle for ``frequency``.
                 public var query: PostgresQuery
 
+                /// Create a new `KeepAliveBehavior`.
+                /// - Parameters:
+                ///   - frequency: The amount of time that shall pass before an idle connection runs a keep-alive `query`.
+                ///                Defaults to `30` seconds.
+                ///   - query: The `query` that is run on an idle connection after it has been idle for `frequency`.
+                ///            Defaults to `SELECT 1;`.
                 public init(frequency: Duration = .seconds(30), query: PostgresQuery = "SELECT 1;") {
                     self.frequency = frequency
                     self.query = query
                 }
             }
 
-            /// A timeout for creating a the underlying TCP/Unix domain socket connection. Defaults to `10` seconds.
+            /// A timeout for creating a TCP/Unix domain socket connection. Defaults to `10` seconds.
             public var connectTimeout: Duration = .seconds(10)
 
             /// The server name to use for certificate validation and SNI (Server Name Indication) when TLS is enabled.
@@ -70,12 +108,29 @@ public final class PostgresClient: Sendable {
             /// If you are not using Amazon RDS Proxy, you should leave this set to `true` (the default).
             public var requireBackendKeyData: Bool = true
 
+            /// The minimum number of connections that the client shall keep open at any time, even if there is no
+            /// demand. Default to `0`.
+            ///
+            /// If the open connection count becomes less than ``minimumConnections`` new connections
+            /// are created immidiatly. Must be greater or equal to zero and less than ``maximumConnections``.
+            ///
+            /// Idle connections are kept alive using the ``keepAliveBehavior``.
             public var minimumConnections: Int = 0
 
-            public var maximumConnections: Int = 0
+            /// The maximum number of connections that the client may open to the server at any time. Must be greater
+            /// than ``minimumConnections``. Defaults to `20` connections.
+            ///
+            /// Connections, that are created in response to demand are kept alive for the ``connectionIdleTimeout``
+            /// before they are dropped.
+            public var maximumConnections: Int = 20
 
+            /// The maximum amount time that a connection that is not part of the ``minimumConnections`` is kept
+            /// open without being leased. Defaults to `60` seconds.
             public var connectionIdleTimeout: Duration = .seconds(60)
 
+            /// The ``KeepAliveBehavior-swift.struct`` to ensure that the underlying tcp-connection is still active
+            /// for idle connections. `Nil` means that the client shall not run keep alive queries to the server. Defaults to a
+            /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
             /// Create an options structure with default values.
@@ -189,7 +244,15 @@ public final class PostgresClient: Sendable {
 
     let pool: Pool
     let factory: ConnectionFactory
-
+    let runningAtomic = ManagedAtomic(false)
+    let backgroundLogger: Logger
+    
+    /// Creates a new ``PostgresClient``. Don't forget to run ``run()`` the client in a long running task.
+    /// - Parameters:
+    ///   - configuration: The client's configuration. See ``Configuration`` for details.
+    ///   - eventLoopGroup: The underlying NIO `EventLoopGroup`. Defaults to ``defaultEventLoopGroup``.
+    ///   - backgroundLogger: A `swift-log` `Logger` to log background messages to. A copy of this logger is also
+    ///                       forwarded to the created connections as a background logger.
     public init(
         configuration: Configuration,
         eventLoopGroup: any EventLoopGroup = PostgresClient.defaultEventLoopGroup,
@@ -197,6 +260,7 @@ public final class PostgresClient: Sendable {
     ) {
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
         self.factory = factory
+        self.backgroundLogger = backgroundLogger
 
         self.pool = ConnectionPool(
             configuration: .init(configuration),
@@ -212,31 +276,36 @@ public final class PostgresClient: Sendable {
         }
     }
 
-//    public func query<Clock: _Concurrency.Clock>(
-//        _ query: PostgresQuery,
-//        deadline: Clock.Instant,
-//        clock: Clock,
-//        logger: Logger,
-//        file: String = #file,
-//        line: Int = #line
-//    ) async throws -> PostgresRowSequence {
-//        let connection = try await self.pool.leaseConnection()
-//
-//        return try await connection.query(query, logger: logger)
-//    }
-
     public func withConnection<Result>(_ closure: (PostgresConnection) async throws -> Result) async throws -> Result {
-        let connection = try await self.pool.leaseConnection()
+        let connection = try await self.leaseConnection()
 
         defer { self.pool.releaseConnection(connection) }
 
         return try await closure(connection)
     }
 
+    /// The client's run method. Users must call this function in order to start the client's background task processing
+    /// like creating and destroying connections and running timers. 
+    ///
+    /// Calls to ``withConnection(_:)`` will emit a `logger` warning, if ``run()`` hasn't been called previously.
     public func run() async {
+        let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
+        precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
         await self.pool.run()
     }
 
+    // MARK: - Private Methods -
+
+    private func leaseConnection() async throws -> PostgresConnection {
+        if !self.runningAtomic.load(ordering: .relaxed) {
+            self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
+        }
+        return try await self.pool.leaseConnection()
+    }
+
+    /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
+    ///
+    /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
     public static var defaultEventLoopGroup: EventLoopGroup {
         PostgresConnection.defaultEventLoopGroup
     }

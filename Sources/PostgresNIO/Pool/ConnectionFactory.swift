@@ -141,6 +141,7 @@ final class ConnectionFactory: Sendable {
                 break
 
             case .produce:
+                // TBD: we might want to consider moving this of the concurrent executor
                 self.reportProduceSSLContextResult(
                     Result(catching: {try NIOSSLContext(configuration: tlsConfiguration)}),
                     for: tlsConfiguration
