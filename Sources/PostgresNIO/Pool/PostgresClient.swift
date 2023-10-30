@@ -8,7 +8,7 @@ import _ConnectionPoolModule
 /// behavior.
 ///
 /// > Important:
-/// The client can only lease connections, if the user is running the client's ``run()`` method in a long running task:
+/// The client can only lease connections if the user is running the client's ``run()`` method in a long running task:
 ///
 /// ```swift
 /// let client = PostgresClient(configuration: configuration, logger: logger)
