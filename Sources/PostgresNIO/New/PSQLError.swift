@@ -1,7 +1,8 @@
 import NIOCore
 
 /// An error that is thrown from the PostgresClient.
-public struct PSQLError: Error {
+/// Sendability enforced through Copy on Write semantics
+public struct PSQLError: Error, @unchecked Sendable {
 
     public struct Code: Sendable, Hashable, CustomStringConvertible {
         enum Base: Sendable, Hashable {

@@ -4,12 +4,12 @@ import NIOSSL
 
 extension PostgresConnection {
     /// A configuration object for a connection
-    public struct Configuration {
-    
+    public struct Configuration: Sendable {
+
         // MARK: - TLS
         
         /// The possible modes of operation for TLS encapsulation of a connection.
-        public struct TLS {
+        public struct TLS: Sendable {
             // MARK: Initializers
             
             /// Do not try to create a TLS connection to the server.
@@ -63,7 +63,7 @@ extension PostgresConnection {
         // MARK: - Connection options
         
         /// Describes options affecting how the underlying connection is made.
-        public struct Options {
+        public struct Options: Sendable {
             /// A timeout for connection attempts. Defaults to ten seconds.
             ///
             /// Ignored when using a preexisting communcation channel. (See
@@ -219,7 +219,7 @@ extension PostgresConnection {
     /// the deprecated configuration.
     ///
     /// TODO: Drop with next major release
-    struct InternalConfiguration {
+    struct InternalConfiguration: Sendable {
         enum Connection {
             case unresolvedTCP(host: String, port: Int)
             case unresolvedUDS(path: String)

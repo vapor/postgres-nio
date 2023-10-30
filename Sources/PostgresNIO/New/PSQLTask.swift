@@ -70,7 +70,7 @@ final class ExtendedQueryContext {
     }
 }
 
-final class PreparedStatementContext{
+final class PreparedStatementContext: Sendable {
     let name: String
     let sql: String
     let bindings: PostgresBindings

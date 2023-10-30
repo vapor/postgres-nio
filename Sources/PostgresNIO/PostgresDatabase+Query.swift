@@ -1,27 +1,35 @@
 import NIOCore
 import Logging
+import NIOConcurrencyHelpers
 
 extension PostgresDatabase {
     public func query(
         _ string: String,
         _ binds: [PostgresData] = []
     ) -> EventLoopFuture<PostgresQueryResult> {
-        var rows: [PostgresRow] = []
-        var metadata: PostgresQueryMetadata?
-        return self.query(string, binds, onMetadata: {
-            metadata = $0
-        }) {
-            rows.append($0)
+        let box = NIOLockedValueBox((metadata: PostgresQueryMetadata?.none, rows: [PostgresRow]()))
+
+        return self.query(string, binds, onMetadata: { metadata in
+            box.withLockedValue {
+                $0.metadata = metadata
+            }
+        }) { row in
+            box.withLockedValue {
+                $0.rows.append(row)
+            }
         }.map {
-            .init(metadata: metadata!, rows: rows)
+            box.withLockedValue {
+                PostgresQueryResult(metadata: $0.metadata!, rows: $0.rows)
+            }
         }
     }
 
+    @preconcurrency
     public func query(
         _ string: String,
         _ binds: [PostgresData] = [],
-        onMetadata: @escaping (PostgresQueryMetadata) -> () = { _ in },
-        onRow: @escaping (PostgresRow) throws -> ()
+        onMetadata: @Sendable @escaping (PostgresQueryMetadata) -> () = { _ in },
+        onRow: @Sendable @escaping (PostgresRow) throws -> ()
     ) -> EventLoopFuture<Void> {
         var bindings = PostgresBindings(capacity: binds.count)
         binds.forEach { bindings.append($0) }
@@ -58,7 +66,7 @@ extension PostgresQueryResult: Collection {
     }
 }
 
-public struct PostgresQueryMetadata {
+public struct PostgresQueryMetadata: Sendable {
     public let command: String
     public var oid: Int?
     public var rows: Int?

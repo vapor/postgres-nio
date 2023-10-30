@@ -2,8 +2,8 @@ import NIOCore
 
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
-    public struct Error: CustomStringConvertible {
-        public enum Field: UInt8, Hashable {
+    public struct Error: CustomStringConvertible, Sendable {
+        public enum Field: UInt8, Hashable, Sendable {
             /// Severity: the field contents are ERROR, FATAL, or PANIC (in an error message),
             /// or WARNING, NOTICE, DEBUG, INFO, or LOG (in a notice message), or a
             //// localized translation of one of these. Always present.

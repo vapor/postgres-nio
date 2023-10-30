@@ -597,8 +597,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             logger: self.logger,
             promise: promise
         )
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
-            self.startListenCompleted(result, for: channel, context: context)
+            let (selfTransferred, context) = loopBound.value
+            selfTransferred.startListenCompleted(result, for: channel, context: context)
         }
 
         return .extendedQuery(query)
@@ -643,8 +645,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             logger: self.logger,
             promise: promise
         )
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
-            self.stopListenCompleted(result, for: channel, context: context)
+            let (selfTransferred, context) = loopBound.value
+            selfTransferred.stopListenCompleted(result, for: channel, context: context)
         }
 
         return .extendedQuery(query)
@@ -693,10 +697,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         context: ChannelHandlerContext
     ) -> PSQLTask {
         let promise = self.eventLoop.makePromise(of: RowDescription?.self)
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
         promise.futureResult.whenComplete { result in
+            let (selfTransferred, context) = loopBound.value
             switch result {
             case .success(let rowDescription):
-                self.prepareStatementComplete(
+                selfTransferred.prepareStatementComplete(
                     name: preparedStatement.name,
                     rowDescription: rowDescription,
                     context: context
@@ -708,7 +714,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 } else {
                     psqlError = .connectionError(underlying: error)
                 }
-                self.prepareStatementFailed(
+                selfTransferred.prepareStatementFailed(
                     name: preparedStatement.name,
                     error: psqlError,
                     context: context
