@@ -44,7 +44,7 @@ public final class PostgresConnection: @unchecked Sendable {
         return !self.channel.isActive
     }
 
-    let id: ID
+    public let id: ID
 
     private var _logger: Logger
 
@@ -392,7 +392,7 @@ extension PostgresConnection {
             self.channel.triggerUserOutboundEvent(PSQLOutgoingEvent.gracefulShutdown, promise: promise)
             return try await promise.futureResult.get()
         } onCancel: {
-            _ = self.close()
+            self.close()
         }
     }
 

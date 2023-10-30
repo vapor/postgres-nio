@@ -46,6 +46,8 @@ extension PSQLError {
             return self.underlying ?? self
         case .uncleanShutdown:
             return PostgresError.protocol("Unexpected connection close")
+        case .poolClosed:
+            return self
         }
     }
 }

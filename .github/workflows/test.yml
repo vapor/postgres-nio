@@ -18,13 +18,13 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:5.6-focal
           - swift:5.7-jammy
           - swift:5.8-jammy
-          - swiftlang/swift:nightly-5.9-jammy
+          - swift:5.9-jammy
+          - swiftlang/swift:nightly-5.10-jammy
           - swiftlang/swift:nightly-main-jammy
         include:
-          - swift-image: swift:5.8-jammy
+          - swift-image: swift:5.9-jammy
             code-coverage: true
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -37,34 +37,33 @@ jobs:
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}"
           swift --version
       - name: Check out package
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run unit tests with Thread Sanitizer
         env:
           CODE_COVERAGE: ${{ matrix.code-coverage && '--enable-code-coverage' || '' }}
         run: |
-          swift test --filter=^PostgresNIOTests --sanitize=thread ${CODE_COVERAGE}
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread ${CODE_COVERAGE}
       - name: Submit code coverage
         if: ${{ matrix.code-coverage }}
         uses: vapor/swift-codecov-action@v0.2        
 
   linux-integration-and-dependencies:
-    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
         postgres-image:
-          - postgres:15
-          - postgres:13
-          - postgres:11
+          - postgres:16
+          - postgres:14
+          - postgres:12
         include:
-          - postgres-image: postgres:15
+          - postgres-image: postgres:16
             postgres-auth: scram-sha-256
-          - postgres-image: postgres:13
+          - postgres-image: postgres:14
             postgres-auth: md5
-          - postgres-image: postgres:11
+          - postgres-image: postgres:12
             postgres-auth: trust
     container:
-      image: swift:5.8-jammy
+      image: swift:5.9-jammy
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
@@ -109,15 +108,15 @@ jobs:
           [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: { path: 'postgres-nio' }
       - name: Run integration tests
         run: swift test --package-path postgres-nio --filter=^IntegrationTests
       - name: Check out postgres-kit dependent
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
       - name: Check out fluent-postgres-driver dependent
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: { repository: 'vapor/fluent-postgres-driver', path: 'fluent-postgres-driver' }
       - name: Use local package in dependents
         run: |
@@ -129,19 +128,18 @@ jobs:
         run: swift test --package-path fluent-postgres-driver
 
   macos-all:
-    if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
       matrix:
         postgres-formula:
           # Only test one version on macOS, let Linux do the rest
-          - postgresql@14
+          - postgresql@15
         postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         xcode-version:
           - '~14.3'
-          - '15.0-beta'
+          - '~15.0'
     runs-on: macos-13
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
@@ -164,7 +162,7 @@ jobs:
           pg_ctl start --wait
         timeout-minutes: 2
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run all tests
         run: swift test
 
@@ -174,21 +172,24 @@ jobs:
     container: swift:jammy
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       # https://github.com/actions/checkout/issues/766
-      - name: Mark the workspace as safe
-        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: API breaking changes
-        run: swift package diagnose-api-breaking-changes origin/main
+        run: |
+          git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+          swift package diagnose-api-breaking-changes origin/main
 
   gh-codeql:
     runs-on: ubuntu-latest
-    permissions: { security-events: write }
+    container: swift:5.8-jammy # CodeQL currently broken with 5.9
+    permissions: { actions: write, contents: read, security-events: write }
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      - name: Mark repo safe in non-fake global config
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
