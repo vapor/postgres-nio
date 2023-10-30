@@ -276,6 +276,12 @@ public final class PostgresClient: Sendable {
         }
     }
 
+    
+    /// Lease a connection for the provided `closure`'s lifetime.
+    ///
+    /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
+    ///                      the provided `PostgresConnection`.
+    /// - Returns: The closure's return value.
     public func withConnection<Result>(_ closure: (PostgresConnection) async throws -> Result) async throws -> Result {
         let connection = try await self.leaseConnection()
 
