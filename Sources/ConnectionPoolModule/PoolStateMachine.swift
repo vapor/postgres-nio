@@ -435,8 +435,8 @@ struct PoolStateMachine<
             case .leased:
                 return .none()
 
-            case .idle:
-                let timers = self.connections.parkConnection(at: index).map(self.mapTimers)
+            case .idle(_, let newIdle):
+                let timers = self.connections.parkConnection(at: index, hasBecomeIdle: newIdle).map(self.mapTimers)
 
                 return .init(
                     request: .none,

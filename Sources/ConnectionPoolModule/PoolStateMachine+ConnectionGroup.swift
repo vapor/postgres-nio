@@ -308,7 +308,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func parkConnection(at index: Int) -> Max2Sequence<ConnectionTimer> {
+        mutating func parkConnection(at index: Int, hasBecomeIdle newIdle: Bool) -> Max2Sequence<ConnectionTimer> {
             let scheduleIdleTimeoutTimer: Bool
             switch index {
             case 0..<self.minimumConcurrentConnections:
@@ -318,7 +318,7 @@ extension PoolStateMachine {
 
             case self.minimumConcurrentConnections..<self.maximumConcurrentConnectionSoftLimit:
                 // if a connection is a demand connection, we want a timeout timer
-                scheduleIdleTimeoutTimer = true
+                scheduleIdleTimeoutTimer = newIdle
 
             case self.maximumConcurrentConnectionSoftLimit..<self.maximumConcurrentConnectionHardLimit:
                 preconditionFailure("Overflow connections should never be parked.")
@@ -626,8 +626,11 @@ extension PoolStateMachine {
 
             case self.minimumConcurrentConnections..<self.maximumConcurrentConnectionSoftLimit:
                 // the connection to be removed is a demand connection
+                self.connections.swapAt(indexToDelete, lastConnectedIndex)
+                self.removeO1(lastConnectedIndex)
+
                 switch lastConnectedIndex {
-                case self.minimumConcurrentConnections..<self.maximumConcurrentConnectionSoftLimit:
+                case self.maximumConcurrentConnectionSoftLimit..<self.maximumConcurrentConnectionHardLimit:
                     // an overflow connection was moved to a demand connection. It has to be currently leased
                     precondition(self.connections[indexToDelete].isLeased)
                     return nil
