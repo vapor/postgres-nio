@@ -176,20 +176,20 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 Please see [SECURITY.md] for details on the security process.
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
-[Documentation]: https://swiftpackageindex.com/vapor/postgres-nio/documentation
+[Documentation]: https://api.vapor.codes/postgresnio/documentation/postgresnio
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
 [Swift 5.7]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
-[`PostgresConnection`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/
-[`query(_:logger:)`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
-[`PostgresQuery`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresquery/
-[`PostgresRow`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrow/
-[`PostgresRowSequence`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrowsequence/
-[`PostgresDecodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresdecodable/
-[`PostgresEncodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresencodable/
+[`PostgresConnection`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection
+[`query(_:logger:)`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
+[`PostgresQuery`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresquery
+[`PostgresRow`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrow
+[`PostgresRowSequence`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrowsequence
+[`PostgresDecodable`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresdecodable
+[`PostgresEncodable`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresencodable
 
 [PostgresKit]: https://github.com/vapor/postgres-kit
 
