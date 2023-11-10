@@ -1,5 +1,6 @@
 @testable import _ConnectionPoolModule
 import Atomics
+import DequeModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 final class MockClock: Clock {
@@ -34,19 +35,19 @@ final class MockClock: Clock {
 
         var sleepersHeap: Array<Sleeper>
 
-        var waitersHeap: Array<Waiter>
+        var waiters: Deque<Waiter>
+        var nextDeadlines: Deque<Instant>
 
         init() {
             self.now = .init(.seconds(0))
             self.sleepersHeap = Array()
-            self.waitersHeap = Array()
+            self.waiters = Deque()
+            self.nextDeadlines = Deque()
         }
     }
 
     private struct Waiter {
-        var expectedSleepers: Int
-
-        var continuation: CheckedContinuation<Void, Never>
+        var continuation: CheckedContinuation<Instant, Never>
     }
 
     private struct Sleeper {
@@ -77,39 +78,34 @@ final class MockClock: Clock {
                     case cancel
                 }
 
-                let action = self.stateBox.withLockedValue { state -> (SleepAction, ArraySlice<Waiter>) in
-                    state.waitersHeap = state.waitersHeap.map { waiter in
-                        var waiter = waiter; waiter.expectedSleepers -= 1; return waiter
-                    }
-                    let slice: ArraySlice<Waiter>
-                    let lastRemainingIndex = state.waitersHeap.firstIndex(where: { $0.expectedSleepers > 0 })
-                    if let lastRemainingIndex {
-                        slice = state.waitersHeap[0..<lastRemainingIndex]
-                        state.waitersHeap.removeFirst(lastRemainingIndex)
-                    } else if !state.waitersHeap.isEmpty {
-                        slice = state.waitersHeap[...]
-                        state.waitersHeap.removeAll()
+                let action = self.stateBox.withLockedValue { state -> (SleepAction, Waiter?) in
+                    let waiter: Waiter?
+                    if let next = state.waiters.popFirst() {
+                        waiter = next
                     } else {
-                        slice = []
+                        state.nextDeadlines.append(deadline)
+                        waiter = nil
                     }
 
                     if Task.isCancelled {
-                        return (.cancel, slice)
+                        return (.cancel, waiter)
                     }
 
                     if state.now >= deadline {
-                        return (.resume, slice)
+                        return (.resume, waiter)
                     }
 
-                    let newWaiter = Sleeper(id: waiterID, deadline: deadline, continuation: continuation)
+                    let newSleeper = Sleeper(id: waiterID, deadline: deadline, continuation: continuation)
 
                     if let index = state.sleepersHeap.lastIndex(where: { $0.deadline < deadline }) {
-                        state.sleepersHeap.insert(newWaiter, at: index + 1)
+                        state.sleepersHeap.insert(newSleeper, at: index + 1)
+                    } else if let first = state.sleepersHeap.first, first.deadline > deadline {
+                        state.sleepersHeap.insert(newSleeper, at: 0)
                     } else {
-                        state.sleepersHeap.append(newWaiter)
+                        state.sleepersHeap.append(newSleeper)
                     }
 
-                    return (.none, slice)
+                    return (.none, waiter)
                 }
 
                 switch action.0 {
@@ -121,9 +117,7 @@ final class MockClock: Clock {
                     break
                 }
 
-                for waiter in action.1 {
-                    waiter.continuation.resume()
-                }
+                action.1?.continuation.resume(returning: deadline)
             }
         } onCancel: {
             let continuation = self.stateBox.withLockedValue { state -> CheckedContinuation<Void, any Error>? in
@@ -136,28 +130,21 @@ final class MockClock: Clock {
         }
     }
 
-    func timerScheduled(n: Int = 1) async {
-        precondition(n >= 1, "At least one new sleep must be awaited")
-        await withCheckedContinuation { (continuation: CheckedContinuation<(), Never>) in
-            let result = self.stateBox.withLockedValue { state -> Bool in
-                let n = n - state.sleepersHeap.count
-
-                if n <= 0 {
-                    return true
-                }
-
-                let waiter = Waiter(expectedSleepers: n, continuation: continuation)
-
-                if let index = state.waitersHeap.firstIndex(where: { $0.expectedSleepers > n }) {
-                    state.waitersHeap.insert(waiter, at: index)
+    @discardableResult
+    func nextTimerScheduled() async -> Instant {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Instant, Never>) in
+            let instant = self.stateBox.withLockedValue { state -> Instant? in
+                if let scheduled = state.nextDeadlines.popFirst() {
+                    return scheduled
                 } else {
-                    state.waitersHeap.append(waiter)
+                    let waiter = Waiter(continuation: continuation)
+                    state.waiters.append(waiter)
+                    return nil
                 }
-                return false
             }
 
-            if result {
-                continuation.resume()
+            if let instant {
+                continuation.resume(returning: instant)
             }
         }
     }
