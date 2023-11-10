@@ -385,7 +385,8 @@ extension PoolStateMachine {
         @inlinable
         mutating func keepAliveSucceeded(_ connectionID: Connection.ID) -> (Int, AvailableConnectionContext)? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
-                preconditionFailure("A connection that we don't know was released? Something is very wrong...")
+                // keepAliveSucceeded can race against, closeIfIdle, shutdowns or connection errors
+                return nil
             }
 
             guard let connectionInfo = self.connections[index].keepAliveSucceeded() else {
@@ -430,15 +431,8 @@ extension PoolStateMachine {
 
             self.stats.idle -= 1
             self.stats.closing += 1
-
-//            if idleState.runningKeepAlive {
-//                self.stats.runningKeepAlive -= 1
-//                if self.keepAliveReducesAvailableStreams {
-//                    self.stats.availableStreams += 1
-//                }
-//            }
-
-            self.stats.availableStreams -= closeAction.maxStreams
+            self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
+            self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
 
             return CloseAction(
                 connection: closeAction.connection!,

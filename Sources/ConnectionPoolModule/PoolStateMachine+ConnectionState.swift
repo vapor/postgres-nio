@@ -496,6 +496,9 @@ extension PoolStateMachine {
             var usedStreams: UInt16
             @usableFromInline
             var maxStreams: UInt16
+            @usableFromInline
+            var runningKeepAlive: Bool
+
 
             @inlinable
             init(
@@ -503,13 +506,15 @@ extension PoolStateMachine {
                 previousConnectionState: PreviousConnectionState,
                 cancelTimers: Max2Sequence<TimerCancellationToken>,
                 usedStreams: UInt16,
-                maxStreams: UInt16
+                maxStreams: UInt16,
+                runningKeepAlive: Bool
             ) {
                 self.connection = connection
                 self.previousConnectionState = previousConnectionState
                 self.cancelTimers = cancelTimers
                 self.usedStreams = usedStreams
                 self.maxStreams = maxStreams
+                self.runningKeepAlive = runningKeepAlive
             }
         }
 
@@ -526,7 +531,8 @@ extension PoolStateMachine {
                         idleTimerState?.cancellationContinuation
                     ),
                     usedStreams: keepAlive.usedStreams,
-                    maxStreams: maxStreams
+                    maxStreams: maxStreams,
+                    runningKeepAlive: keepAlive.isRunning
                 )
 
             case .leased, .closed:
@@ -559,7 +565,8 @@ extension PoolStateMachine {
                         idleTimerState?.cancellationContinuation
                     ),
                     usedStreams: keepAlive.usedStreams,
-                    maxStreams: maxStreams
+                    maxStreams: maxStreams,
+                    runningKeepAlive: keepAlive.isRunning
                 )
 
             case .leased(let connection, usedStreams: let usedStreams, maxStreams: let maxStreams, var keepAlive):
@@ -571,7 +578,8 @@ extension PoolStateMachine {
                         keepAlive.cancelTimerIfScheduled()
                     ),
                     usedStreams: keepAlive.usedStreams + usedStreams,
-                    maxStreams: maxStreams
+                    maxStreams: maxStreams,
+                    runningKeepAlive: keepAlive.isRunning
                 )
 
             case .backingOff(let timer):
@@ -581,7 +589,8 @@ extension PoolStateMachine {
                     previousConnectionState: .backingOff,
                     cancelTimers: Max2Sequence(timer.cancellationContinuation),
                     usedStreams: 0,
-                    maxStreams: 0
+                    maxStreams: 0,
+                    runningKeepAlive: false
                 )
             }
         }
