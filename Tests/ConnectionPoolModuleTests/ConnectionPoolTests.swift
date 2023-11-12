@@ -368,6 +368,65 @@ final class ConnectionPoolTests: XCTestCase {
         }
     }
 
-}
+    func testCancelConnectionRequestWorks() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
 
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 4
+        mutableConfig.maximumConnectionHardLimit = 4
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionRequest<MockConnection>.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            let leaseTask = Task {
+                do {
+                    _ = try await pool.leaseConnection()
+                    XCTFail("Did not expect call to succeed")
+                } catch {
+                    XCTAssertEqual((error as? ConnectionPoolError), .requestCancelled)
+                }
+            }
+
+            let connectionAttemptWaiter = Waiter(of: Void.self)
+
+            taskGroup.addTask {
+                try await factory.nextConnectAttempt { connectionID in
+                    connectionAttemptWaiter.yield(value: ())
+                    throw CancellationError()
+                }
+            }
+
+            try await connectionAttemptWaiter.result
+            leaseTask.cancel()
+
+            await leaseTask.result
+
+            taskGroup.cancelAll()
+            print("cancelled")
+
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
+}
 
