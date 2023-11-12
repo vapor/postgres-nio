@@ -398,12 +398,7 @@ final class ConnectionPoolTests: XCTestCase {
             }
 
             let leaseTask = Task {
-                do {
-                    _ = try await pool.leaseConnection()
-                    XCTFail("Did not expect call to succeed")
-                } catch {
-                    XCTAssertEqual((error as? ConnectionPoolError), .requestCancelled)
-                }
+                _ = try await pool.leaseConnection()
             }
 
             let connectionAttemptWaiter = Waiter(of: Void.self)
@@ -418,7 +413,13 @@ final class ConnectionPoolTests: XCTestCase {
             try await connectionAttemptWaiter.result
             leaseTask.cancel()
 
-            await leaseTask.result
+            let taskResult = await leaseTask.result
+            switch taskResult {
+            case .success:
+                XCTFail("Expected task failure")
+            case .failure(let failure):
+                XCTAssertEqual(failure as? ConnectionPoolError, .requestCancelled)
+            }
 
             taskGroup.cancelAll()
             print("cancelled")
