@@ -73,7 +73,9 @@ final class Waiter<Result: Sendable>: Sendable {
 
     func yield(value: Result) {
         let continuations = self.stateBox.withLockedValue { state in
-            guard state.result == nil else { return [].lazy.map(\.1) }
+            guard state.result == nil else {
+                return [(Int, CheckedContinuation<Result, any Error>)]().lazy.map(\.1)
+            }
             state.result = .success(value)
 
             let continuations = state.continuations
@@ -89,7 +91,9 @@ final class Waiter<Result: Sendable>: Sendable {
 
     func yield(error: any Error) {
         let continuations = self.stateBox.withLockedValue { state in
-            guard state.result == nil else { return [].lazy.map(\.1) }
+            guard state.result == nil else {
+                return [(Int, CheckedContinuation<Result, any Error>)]().lazy.map(\.1)
+            }
             state.result = .failure(error)
 
             let continuations = state.continuations
