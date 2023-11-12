@@ -422,8 +422,6 @@ final class ConnectionPoolTests: XCTestCase {
             }
 
             taskGroup.cancelAll()
-            print("cancelled")
-
             for connection in factory.runningConnections {
                 connection.closeIfClosing()
             }
