@@ -89,18 +89,4 @@ final class MockConnectionFactory<Clock: _Concurrency.Clock> where Clock.Duratio
             throw error
         }
     }
-
-    func closeClosingConnections() async throws {
-        try await withTaskGroup(of: Void.self) { taskGroup in
-            while !self.runningConnections.isEmpty {
-                for connection in self.runningConnections {
-                    taskGroup.addTask {
-                        connection.
-                    }
-                }
-
-                try await Task.yield()
-            }
-        }
-    }
 }

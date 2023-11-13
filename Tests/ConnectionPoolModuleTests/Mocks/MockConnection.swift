@@ -8,15 +8,37 @@ final class MockConnection: PooledConnection, Sendable {
     let id: ID
 
     private enum State {
-        case running([@Sendable ((any Error)?) -> ()])
+        case running([CheckedContinuation<Void, any Error>], [@Sendable ((any Error)?) -> ()])
         case closing([@Sendable ((any Error)?) -> ()])
         case closed
     }
 
-    private let lock: NIOLockedValueBox<State> = NIOLockedValueBox(.running([]))
+    private let lock: NIOLockedValueBox<State> = NIOLockedValueBox(.running([], []))
 
     init(id: Int) {
         self.id = id
+    }
+
+    var signalToClose: Void {
+        get async throws {
+            try await withCheckedThrowingContinuation { continuation in
+                let runRightAway = self.lock.withLockedValue { state -> Bool in
+                    switch state {
+                    case .running(var continuations, let callbacks):
+                        continuations.append(continuation)
+                        state = .running(continuations, callbacks)
+                        return false
+
+                    case .closing, .closed:
+                        return true
+                    }
+                }
+
+                if runRightAway {
+                    continuation.resume()
+                }
+            }
+        }
     }
 
     func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
@@ -25,9 +47,9 @@ final class MockConnection: PooledConnection, Sendable {
             case .closed:
                 return false
 
-            case .running(var callbacks):
+            case .running(let continuations, var callbacks):
                 callbacks.append(closure)
-                state = .running(callbacks)
+                state = .running(continuations, callbacks)
                 return true
 
             case .closing(var callbacks):
@@ -43,14 +65,19 @@ final class MockConnection: PooledConnection, Sendable {
     }
 
     func close() {
-        self.lock.withLockedValue { state in
+        let continuations = self.lock.withLockedValue { state -> [CheckedContinuation<Void, any Error>] in
             switch state {
-            case .running(let callbacks):
+            case .running(let continuations, let callbacks):
                 state = .closing(callbacks)
+                return continuations
 
             case .closing, .closed:
-                break
+                return []
             }
+        }
+
+        for continuation in continuations {
+            continuation.resume()
         }
     }
 

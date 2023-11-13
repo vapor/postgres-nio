@@ -516,7 +516,7 @@ final class ConnectionPoolTests: XCTestCase {
             try await factory.makeConnection(id: $0, for: $1)
         }
 
-        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
                 await pool.run()
             }
@@ -539,10 +539,9 @@ final class ConnectionPoolTests: XCTestCase {
                 XCTAssertEqual(error as? ConnectionPoolError, .poolShutdown)
             }
 
-            try? await Task.sleep(for: .nanoseconds(500))
-
             print("will close connections: \(factory.runningConnections)")
             for connection in factory.runningConnections {
+                try await connection.signalToClose
                 connection.closeIfClosing()
             }
         }
@@ -572,7 +571,7 @@ final class ConnectionPoolTests: XCTestCase {
             try await factory.makeConnection(id: $0, for: $1)
         }
 
-        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
                 await pool.run()
             }
@@ -603,6 +602,7 @@ final class ConnectionPoolTests: XCTestCase {
             }
 
             for connection in factory.runningConnections {
+                try await connection.signalToClose
                 connection.closeIfClosing()
             }
         }
