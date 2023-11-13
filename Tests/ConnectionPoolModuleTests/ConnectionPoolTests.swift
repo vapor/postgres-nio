@@ -401,7 +401,7 @@ final class ConnectionPoolTests: XCTestCase {
                 _ = try await pool.leaseConnection()
             }
 
-            let connectionAttemptWaiter = Waiter(of: Void.self)
+            let connectionAttemptWaiter = Future(of: Void.self)
 
             taskGroup.addTask {
                 try await factory.nextConnectAttempt { connectionID in
@@ -410,7 +410,7 @@ final class ConnectionPoolTests: XCTestCase {
                 }
             }
 
-            try await connectionAttemptWaiter.result
+            try await connectionAttemptWaiter.success
             leaseTask.cancel()
 
             let taskResult = await leaseTask.result
@@ -427,5 +427,87 @@ final class ConnectionPoolTests: XCTestCase {
             }
         }
     }
+
+    func testLeasingMultipleConnectionsAtOnceWorks() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 4
+        mutableConfig.maximumConnectionSoftLimit = 4
+        mutableConfig.maximumConnectionHardLimit = 4
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // create 4 persisted connections
+            for _ in 0..<4 {
+                await factory.nextConnectAttempt { connectionID in
+                    return 1
+                }
+            }
+
+            // create 4 connection requests
+            let requests = (0..<4).map { ConnectionFuture(id: $0) }
+
+            // lease 4 connections at once
+            pool.leaseConnections(requests)
+            var connections = [MockConnection]()
+
+            for request in requests {
+                let connection = try await request.future.success
+                connections.append(connection)
+            }
+
+            // Ensure that we got 4 distinct connections
+            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 4)
+
+            // release all 4 leased connections
+            for connection in connections {
+                pool.releaseConnection(connection)
+            }
+
+            // shutdown
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
 }
 
+struct ConnectionFuture: ConnectionRequestProtocol {
+    let id: Int
+    let future: Future<MockConnection>
+
+    init(id: Int) {
+        self.id = id
+        self.future = Future(of: MockConnection.self)
+    }
+
+    func complete(with result: Result<MockConnection, ConnectionPoolError>) {
+        switch result {
+        case .success(let success):
+            self.future.yield(value: success)
+        case .failure(let failure):
+            self.future.yield(error: failure)
+        }
+    }
+}

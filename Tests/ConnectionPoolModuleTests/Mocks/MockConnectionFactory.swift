@@ -30,7 +30,7 @@ final class MockConnectionFactory<Clock: _Concurrency.Clock> where Clock.Duratio
 
     func makeConnection(
         id: Int,
-        for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, ConnectionRequest<MockConnection>, Int, MockPingPongBehavior<MockConnection>, NoOpConnectionPoolMetrics<Int>, Clock>
+        for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>, NoOpConnectionPoolMetrics<Int>, Clock>
     ) async throws -> ConnectionAndMetadata<MockConnection> {
         // we currently don't support cancellation when creating a connection
         let result = try await withCheckedThrowingContinuation { (checkedContinuation: CheckedContinuation<(MockConnection, UInt16), any Error>) in
