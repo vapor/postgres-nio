@@ -476,6 +476,9 @@ final class ConnectionPoolTests: XCTestCase {
                 connections.append(connection)
             }
 
+            // Ensure that we got 4 distinct connections
+            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 4)
+
             // release all 4 leased connections
             for connection in connections {
                 pool.releaseConnection(connection)
