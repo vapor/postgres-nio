@@ -491,6 +491,122 @@ final class ConnectionPoolTests: XCTestCase {
             }
         }
     }
+
+    func testLeasingConnectionAfterShutdownIsInvokedFails() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 4
+        mutableConfig.maximumConnectionSoftLimit = 4
+        mutableConfig.maximumConnectionHardLimit = 4
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionRequest<MockConnection>.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // create 4 persisted connections
+            for _ in 0..<4 {
+                await factory.nextConnectAttempt { connectionID in
+                    return 1
+                }
+            }
+
+            // shutdown
+            taskGroup.cancelAll()
+
+            do {
+                _ = try await pool.leaseConnection()
+                XCTFail("Expected a failure")
+            } catch {
+                print("failed")
+                XCTAssertEqual(error as? ConnectionPoolError, .poolShutdown)
+            }
+
+            try? await Task.sleep(for: .nanoseconds(500))
+
+            print("will close connections: \(factory.runningConnections)")
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
+
+    func testLeasingConnectionsAfterShutdownIsInvokedFails() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 4
+        mutableConfig.maximumConnectionSoftLimit = 4
+        mutableConfig.maximumConnectionHardLimit = 4
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // create 4 persisted connections
+            for _ in 0..<4 {
+                await factory.nextConnectAttempt { connectionID in
+                    return 1
+                }
+            }
+
+            // shutdown
+            taskGroup.cancelAll()
+
+            // create 4 connection requests
+            let requests = (0..<4).map { ConnectionFuture(id: $0) }
+
+            // lease 4 connections at once
+            pool.leaseConnections(requests)
+
+            for request in requests {
+                do {
+                    _ = try await request.future.success
+                    XCTFail("Expected a failure")
+                } catch {
+                    XCTAssertEqual(error as? ConnectionPoolError, .poolShutdown)
+                }
+            }
+
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
 }
 
 struct ConnectionFuture: ConnectionRequestProtocol {
