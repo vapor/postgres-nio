@@ -1,31 +1,34 @@
 import Atomics
 @testable import _ConnectionPoolModule
 
-final class Waiter<Result: Sendable>: Sendable {
+/// This is a `Future` type that shall make writing tests a bit simpler. I'm well aware, that this is a pattern
+/// that should not be embraced with structured concurrency. However writing all tests in full structured
+/// concurrency is an effort, that isn't worth the endgoals in my view.
+final class Future<Success: Sendable>: Sendable {
     struct State: Sendable {
 
-        var result: Swift.Result<Result, any Error>? = nil
-        var continuations: [(Int, CheckedContinuation<Result, any Error>)] = []
+        var result: Swift.Result<Success, any Error>? = nil
+        var continuations: [(Int, CheckedContinuation<Success, any Error>)] = []
 
     }
 
     let waiterID = ManagedAtomic(0)
     let stateBox: NIOLockedValueBox<State> = NIOLockedValueBox(State())
 
-    init(of: Result.Type) {}
+    init(of: Success.Type) {}
 
     enum GetAction {
         case fail(any Error)
-        case succeed(Result)
+        case succeed(Success)
         case none
     }
 
-    var result: Result {
+    var success: Success {
         get async throws {
             let waiterID = self.waiterID.loadThenWrappingIncrement(ordering: .relaxed)
 
             return try await withTaskCancellationHandler {
-                return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Result, any Error>) in
+                return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Success, any Error>) in
                     let action = self.stateBox.withLockedValue { state -> GetAction in
                         if Task.isCancelled {
                             return .fail(CancellationError())
@@ -56,7 +59,7 @@ final class Waiter<Result: Sendable>: Sendable {
                     }
                 }
             } onCancel: {
-                let cont = self.stateBox.withLockedValue { state -> CheckedContinuation<Result, any Error>? in
+                let cont = self.stateBox.withLockedValue { state -> CheckedContinuation<Success, any Error>? in
                     guard state.result == nil else { return nil }
 
                     guard let contIndex = state.continuations.firstIndex(where: { $0.0 == waiterID }) else {
@@ -71,10 +74,10 @@ final class Waiter<Result: Sendable>: Sendable {
         }
     }
 
-    func yield(value: Result) {
+    func yield(value: Success) {
         let continuations = self.stateBox.withLockedValue { state in
             guard state.result == nil else {
-                return [(Int, CheckedContinuation<Result, any Error>)]().lazy.map(\.1)
+                return [(Int, CheckedContinuation<Success, any Error>)]().lazy.map(\.1)
             }
             state.result = .success(value)
 
@@ -92,7 +95,7 @@ final class Waiter<Result: Sendable>: Sendable {
     func yield(error: any Error) {
         let continuations = self.stateBox.withLockedValue { state in
             guard state.result == nil else {
-                return [(Int, CheckedContinuation<Result, any Error>)]().lazy.map(\.1)
+                return [(Int, CheckedContinuation<Success, any Error>)]().lazy.map(\.1)
             }
             state.result = .failure(error)
 
