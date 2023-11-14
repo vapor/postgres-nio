@@ -195,6 +195,53 @@ extension PoolStateMachine {
             }
         }
 
+        @usableFromInline
+        struct NewMaxStreamInfo {
+            @usableFromInline
+            var newMaxStreams: UInt16
+
+            @usableFromInline
+            var oldMaxStreams: UInt16
+
+            @usableFromInline
+            var usedStreams: UInt16
+
+            @inlinable
+            init(newMaxStreams: UInt16, oldMaxStreams: UInt16, usedStreams: UInt16) {
+                self.newMaxStreams = newMaxStreams
+                self.oldMaxStreams = oldMaxStreams
+                self.usedStreams = usedStreams
+            }
+        }
+
+        @inlinable
+        mutating func newMaxStreamSetting(_ newMaxStreams: UInt16) -> NewMaxStreamInfo? {
+            switch self.state {
+            case .starting, .backingOff:
+                preconditionFailure("Invalid state: \(self.state)")
+
+            case .idle(let connection, let oldMaxStreams, let keepAlive, idleTimer: let idleTimer):
+                self.state = .idle(connection, maxStreams: newMaxStreams, keepAlive: keepAlive, idleTimer: idleTimer)
+                return NewMaxStreamInfo(
+                    newMaxStreams: newMaxStreams,
+                    oldMaxStreams: oldMaxStreams,
+                    usedStreams: keepAlive.usedStreams
+                )
+
+            case .leased(let connection, let usedStreams, let oldMaxStreams, let keepAlive):
+                self.state = .leased(connection, usedStreams: usedStreams, maxStreams: newMaxStreams, keepAlive: keepAlive)
+                return NewMaxStreamInfo(
+                    newMaxStreams: newMaxStreams,
+                    oldMaxStreams: oldMaxStreams,
+                    usedStreams: usedStreams + keepAlive.usedStreams
+                )
+
+            case .closing, .closed:
+                return nil
+            }
+        }
+
+
         @inlinable
         mutating func parkConnection(scheduleKeepAliveTimer: Bool, scheduleIdleTimeoutTimer: Bool) -> Max2Sequence<ConnectionTimer> {
             var keepAliveTimer: ConnectionTimer?
