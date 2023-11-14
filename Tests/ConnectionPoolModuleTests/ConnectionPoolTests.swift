@@ -607,6 +607,148 @@ final class ConnectionPoolTests: XCTestCase {
             }
         }
     }
+
+    func testLeasingMultipleStreamsFromOneConnectionWorks() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 10
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // create 4 connection requests
+            let requests = (0..<10).map { ConnectionFuture(id: $0) }
+            pool.leaseConnections(requests)
+            var connections = [MockConnection]()
+
+            await factory.nextConnectAttempt { connectionID in
+                return 10
+            }
+
+            for request in requests {
+                let connection = try await request.future.success
+                connections.append(connection)
+            }
+
+            // Ensure that all requests got the same connection
+            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 1)
+
+            // release all 10 leased streams
+            for connection in connections {
+                pool.releaseConnection(connection)
+            }
+
+            for _ in 0..<9 {
+                _ = try? await factory.nextConnectAttempt { connectionID in
+                    throw CancellationError()
+                }
+            }
+
+            // shutdown
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
+
+    func testIncreasingAvailableStreamsWorks() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 1
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // create 4 connection requests
+            var requests = (0..<21).map { ConnectionFuture(id: $0) }
+            pool.leaseConnections(requests)
+            var connections = [MockConnection]()
+
+            await factory.nextConnectAttempt { connectionID in
+                return 1
+            }
+
+            let connection = try await requests.first!.future.success
+            connections.append(connection)
+            requests.removeFirst()
+
+            pool.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: 21)
+
+            for (index, request) in requests.enumerated() {
+                let connection = try await request.future.success
+                connections.append(connection)
+            }
+
+            // Ensure that all requests got the same connection
+            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 1)
+
+            requests = (22..<42).map { ConnectionFuture(id: $0) }
+            pool.leaseConnections(requests)
+
+            // release all 21 leased streams in a single call
+            pool.releaseConnection(connection, streams: 21)
+
+            // ensure all 20 new requests got fulfilled
+            for request in requests {
+                let connection = try await request.future.success
+                connections.append(connection)
+            }
+
+            // release all 20 leased streams one by one
+            for _ in requests {
+                pool.releaseConnection(connection, streams: 1)
+            }
+
+            // shutdown
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
 }
 
 struct ConnectionFuture: ConnectionRequestProtocol {

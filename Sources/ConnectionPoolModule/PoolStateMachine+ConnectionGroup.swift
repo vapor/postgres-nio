@@ -256,6 +256,50 @@ extension PoolStateMachine {
             return self.connections[index].timerScheduled(timer, cancelContinuation: cancelContinuation)
         }
 
+        // MARK: Changes at runtime
+
+        @usableFromInline
+        struct NewMaxStreamInfo {
+
+            @usableFromInline
+            var index: Int
+
+            @usableFromInline
+            var newMaxStreams: UInt16
+
+            @usableFromInline
+            var oldMaxStreams: UInt16
+
+            @usableFromInline
+            var usedStreams: UInt16
+
+            @inlinable
+            init(index: Int, info: ConnectionState.NewMaxStreamInfo) {
+                self.index = index
+                self.newMaxStreams = info.newMaxStreams
+                self.oldMaxStreams = info.oldMaxStreams
+                self.usedStreams = info.usedStreams
+            }
+        }
+
+        @inlinable
+        mutating func connectionReceivedNewMaxStreamSetting(
+            _ connectionID: ConnectionID,
+            newMaxStreamSetting maxStreams: UInt16
+        ) -> NewMaxStreamInfo? {
+            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
+                return nil
+            }
+
+            guard let info = self.connections[index].newMaxStreamSetting(maxStreams) else {
+                return nil
+            }
+
+            self.stats.availableStreams += maxStreams - info.oldMaxStreams
+
+            return NewMaxStreamInfo(index: index, info: info)
+        }
+
         // MARK: Leasing and releasing
 
         /// Lease a connection, if an idle connection is available.
@@ -424,9 +468,9 @@ extension PoolStateMachine {
 
         /// Closes the connection at the given index.
         @inlinable
-        mutating func closeConnectionIfIdle(at index: Int) -> CloseAction {
+        mutating func closeConnectionIfIdle(at index: Int) -> CloseAction? {
             guard let closeAction = self.connections[index].closeIfIdle() else {
-                preconditionFailure("Invalid state: \(self)")
+                return nil // apparently the connection isn't idle
             }
 
             self.stats.idle -= 1

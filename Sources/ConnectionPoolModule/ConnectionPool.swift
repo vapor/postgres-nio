@@ -265,8 +265,10 @@ public final class ConnectionPool<
 
     }
 
-    public func connection(_ connection: Connection, didReceiveNewMaxStreamSetting: UInt16) {
-
+    public func connectionReceivedNewMaxStreamSetting(_ connection: Connection, newMaxStreamSetting maxStreams: UInt16) {
+        self.modifyStateAndRunActions { state in
+            state.stateMachine.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: maxStreams)
+        }
     }
 
     public func run() async {

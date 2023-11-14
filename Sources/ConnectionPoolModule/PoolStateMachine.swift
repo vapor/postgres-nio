@@ -263,6 +263,39 @@ struct PoolStateMachine<
     }
 
     @inlinable
+    mutating func connectionReceivedNewMaxStreamSetting(
+        _ connection: ConnectionID,
+        newMaxStreamSetting maxStreams: UInt16
+    ) -> Action {
+        guard let info = self.connections.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: maxStreams) else {
+            return .none()
+        }
+
+        let waitingRequests = self.requestQueue.count
+
+        guard waitingRequests > 0 else {
+            return .none()
+        }
+
+        // the only thing we can do if we receive a new max stream setting is check if the new stream
+        // setting is higher and then dequeue some waiting requests
+
+        guard info.newMaxStreams > info.oldMaxStreams && info.newMaxStreams > info.usedStreams else {
+            return .none()
+        }
+
+        let leaseStreams = min(info.newMaxStreams - info.oldMaxStreams, info.newMaxStreams - info.usedStreams, UInt16(clamping: waitingRequests))
+        let requests = self.requestQueue.pop(max: leaseStreams)
+        precondition(Int(leaseStreams) == requests.count)
+        let leaseResult = self.connections.leaseConnection(at: info.index, streams: leaseStreams)
+
+        return .init(
+            request: .leaseConnection(requests, leaseResult.connection),
+            connection: .cancelTimers(.init(leaseResult.timersToCancel))
+        )
+    }
+
+    @inlinable
     mutating func timerScheduled(_ timer: Timer, cancelContinuation: TimerCancellationToken) -> TimerCancellationToken? {
         self.connections.timerScheduled(timer.underlying, cancelContinuation: cancelContinuation)
     }
@@ -445,11 +478,14 @@ struct PoolStateMachine<
             }
 
         case .overflow:
-            let closeAction = self.connections.closeConnectionIfIdle(at: index)
-            return .init(
-                request: .none,
-                connection: .closeConnection(closeAction.connection, closeAction.timersToCancel)
-            )
+            if let closeAction = self.connections.closeConnectionIfIdle(at: index) {
+                return .init(
+                    request: .none,
+                    connection: .closeConnection(closeAction.connection, closeAction.timersToCancel)
+                )
+            } else {
+                return .none()
+            }
         }
 
     }
