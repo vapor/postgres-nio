@@ -449,6 +449,21 @@ extension PoolStateMachine {
             return (index, context)
         }
 
+        /// Returns `true` if the connection should be explicitly closed, `false` if nothing needs to be done.
+        @inlinable
+        mutating func keepAliveFailed(_ connectionID: Connection.ID) -> Bool {
+            // We don't have to inform the ConnectionStates about any of this, because the connection will close
+            // immediately after this or is closed already
+            switch self.connections.first(where: { $0.id == connectionID })?.state {
+            case .closing, .closed, .none:
+                // There might've been a race between closing and keeping the connection alive.
+                // The connection has already been closed in that case.
+                return false
+            default:
+                return true
+            }
+        }
+
         // MARK: Connection close/removal
 
         @usableFromInline
@@ -547,8 +562,9 @@ extension PoolStateMachine {
 
             if closedAction.wasRunningKeepAlive {
                 self.stats.runningKeepAlive -= 1
+            } else {
+                self.stats.leasedStreams -= closedAction.usedStreams
             }
-            self.stats.leasedStreams -= closedAction.usedStreams
             self.stats.availableStreams -= closedAction.maxStreams - closedAction.usedStreams
 
             switch closedAction.previousConnectionState {

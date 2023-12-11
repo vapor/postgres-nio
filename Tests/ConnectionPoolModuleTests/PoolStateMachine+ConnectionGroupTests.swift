@@ -293,4 +293,35 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(afterPingIdleContext.use, .persisted)
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
     }
+
+    func testKeepAliveShouldNotIndicateCloseConnectionAfterClosed() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 2,
+            maximumConcurrentConnectionHardLimit: 2,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        guard let firstRequest = connections.createNewDemandConnectionIfPossible() else { return XCTFail("Expected to have a request here") }
+
+        let newConnection = MockConnection(id: firstRequest.connectionID)
+        let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
+        XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
+        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        let timers = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
+        let keepAliveTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: firstRequest.connectionID, usecase: .keepAlive)
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        XCTAssertNil(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
+        let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
+        XCTAssertEqual(keepAliveAction, .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
+        XCTAssertEqual(connections.stats, .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+
+        _ = connections.closeConnectionIfIdle(newConnection.id)
+        guard !connections.keepAliveFailed(newConnection.id) else {
+            return XCTFail("Expected keepAliveFailed to be false due to closing connection")
+        }
+        XCTAssertEqual(connections.stats, .init(closing: 1))
+    }
 }
