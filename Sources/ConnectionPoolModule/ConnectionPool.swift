@@ -481,7 +481,7 @@ public final class ConnectionPool<
                 self.observabilityDelegate.keepAliveFailed(id: connection.id, error: error)
 
                 self.modifyStateAndRunActions { state in
-                    state.stateMachine.connectionClosed(connection)
+                    state.stateMachine.connectionKeepAliveFailed(connection.id)
                 }
             }
         }
