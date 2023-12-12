@@ -449,19 +449,28 @@ extension PoolStateMachine {
             return (index, context)
         }
 
-        /// Returns `true` if the connection should be explicitly closed, `false` if nothing needs to be done.
         @inlinable
-        mutating func keepAliveFailed(_ connectionID: Connection.ID) -> Bool {
-            // We don't have to inform the ConnectionStates about any of this, because the connection will close
-            // immediately after this or is closed already
-            switch self.connections.first(where: { $0.id == connectionID })?.state {
-            case .closing, .closed, .none:
-                // There might've been a race between closing and keeping the connection alive.
-                // The connection has already been closed in that case.
-                return false
-            default:
-                return true
+        mutating func keepAliveFailed(_ connectionID: Connection.ID) -> CloseAction? {
+            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
+                // Connection has already been closed
+                return nil
             }
+
+            guard let closeAction = self.connections[index].keepAliveFailed() else {
+                return nil
+            }
+
+            self.stats.idle -= 1
+            self.stats.closing += 1
+            self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
+            self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
+
+            // force unwrapping the connection is fine, because a close action due to failed
+            // keepAlive cannot happen without a connection
+            return CloseAction(
+                connection: closeAction.connection!,
+                timersToCancel: closeAction.cancelTimers
+            )
         }
 
         // MARK: Connection close/removal
@@ -562,9 +571,8 @@ extension PoolStateMachine {
 
             if closedAction.wasRunningKeepAlive {
                 self.stats.runningKeepAlive -= 1
-            } else {
-                self.stats.leasedStreams -= closedAction.usedStreams
             }
+            self.stats.leasedStreams -= closedAction.usedStreams
             self.stats.availableStreams -= closedAction.maxStreams - closedAction.usedStreams
 
             switch closedAction.previousConnectionState {

@@ -97,17 +97,6 @@ final class MockConnection: PooledConnection, Sendable {
             callback(nil)
         }
     }
-
-    var isClosing: Bool {
-        self.lock.withLockedValue { state in
-            switch state {
-            case .closing:
-                return true
-            case .running, .closed:
-                return true
-            }
-        }
-    }
 }
 
 extension MockConnection: CustomStringConvertible {

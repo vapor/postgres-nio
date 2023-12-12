@@ -310,7 +310,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
-        let timers = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
+        _ = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
         let keepAliveTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: firstRequest.connectionID, usecase: .keepAlive)
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         XCTAssertNil(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
@@ -319,8 +319,8 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(connections.stats, .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
 
         _ = connections.closeConnectionIfIdle(newConnection.id)
-        guard !connections.keepAliveFailed(newConnection.id) else {
-            return XCTFail("Expected keepAliveFailed to be false due to closing connection")
+        guard connections.keepAliveFailed(newConnection.id) == nil else {
+            return XCTFail("Expected keepAliveFailed not to cause close again")
         }
         XCTAssertEqual(connections.stats, .init(closing: 1))
     }

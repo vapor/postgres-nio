@@ -375,8 +375,6 @@ final class ConnectionPoolTests: XCTestCase {
                 defer { print("failing keep alive has run") }
                 XCTAssertTrue(keepAliveConnection === lease1Connection)
                 keepAliveConnection.close()
-                keepAliveConnection.closeIfClosing()
-                XCTAssertTrue(keepAliveConnection.isClosing)
                 throw CancellationError() // any error 
             } // will fail and it's expected
 

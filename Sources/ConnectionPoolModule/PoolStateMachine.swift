@@ -376,10 +376,11 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionKeepAliveFailed(_ connection: Connection) -> Action {
-        if self.connections.keepAliveFailed(connection.id) {
-            return self.connectionClosed(connection)
+        guard let closeAction = self.connections.keepAliveFailed(connection.id) else {
+            return .none()
         }
-        return .none()
+
+        return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
     }
 
     @inlinable
