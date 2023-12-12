@@ -303,7 +303,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(keepAliveAction1.connection, .runKeepAlive(connection1, nil))
 
         // fail keep alive and cause closed
-        let keepAliveFailed1 = stateMachine.connectionKeepAliveFailed(connection1)
+        let keepAliveFailed1 = stateMachine.connectionKeepAliveFailed(connection1.id)
         XCTAssertEqual(keepAliveFailed1.connection, .closeConnection(connection1, []))
         connection1.closeIfClosing()
 
@@ -329,7 +329,7 @@ final class PoolStateMachineTests: XCTestCase {
         connection2.closeIfClosing()
 
         // fail keep alive and cause closed
-        let keepAliveFailed2 = stateMachine.connectionKeepAliveFailed(connection2)
+        let keepAliveFailed2 = stateMachine.connectionKeepAliveFailed(connection2.id)
         XCTAssertEqual(keepAliveFailed2.connection, .closeConnection(connection2, []))
     }
 
@@ -370,7 +370,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(keepAliveAction.connection, .runKeepAlive(connection, nil))
 
         // fail keep alive, cause closed and make new connection
-        let keepAliveFailed = stateMachine.connectionKeepAliveFailed(connection)
+        let keepAliveFailed = stateMachine.connectionKeepAliveFailed(connection.id)
         XCTAssertEqual(keepAliveFailed.connection, .closeConnection(connection, []))
         let connectionClosed = stateMachine.connectionClosed(connection)
         XCTAssertEqual(connectionClosed.connection, .makeConnection(.init(connectionID: 1), []))

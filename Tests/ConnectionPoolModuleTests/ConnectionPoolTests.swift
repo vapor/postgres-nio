@@ -354,29 +354,26 @@ final class ConnectionPoolTests: XCTestCase {
             // move clock forward to keep alive
             let newTime = clock.now.advanced(by: keepAliveDuration)
             clock.advance(to: newTime)
-            print("clock advanced to: \(newTime)")
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { print("keep alive 1 has run") }
                 XCTAssertTrue(keepAliveConnection === lease1Connection)
                 return true
             }
 
             // keep alive 2
-
             let deadline3 = await clock.nextTimerScheduled()
             XCTAssertEqual(deadline3, clock.now.advanced(by: keepAliveDuration))
-            print(deadline3)
-
             clock.advance(to: clock.now.advanced(by: keepAliveDuration))
 
+            let failingKeepAliveDidRun = ManagedAtomic(false)
             // the following keep alive should not cause a crash
             _ = try? await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { print("failing keep alive has run") }
+                defer { failingKeepAliveDidRun.store(true, ordering: .relaxed) }
                 XCTAssertTrue(keepAliveConnection === lease1Connection)
                 keepAliveConnection.close()
                 throw CancellationError() // any error 
             } // will fail and it's expected
+            XCTAssertTrue(failingKeepAliveDidRun.load(ordering: .relaxed))
 
             taskGroup.cancelAll()
 
