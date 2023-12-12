@@ -1,7 +1,8 @@
 import NIOCore
 
 /// An error that is thrown from the PostgresClient.
-public struct PSQLError: Error {
+/// Sendability enforced through Copy on Write semantics
+public struct PSQLError: Error, @unchecked Sendable {
 
     public struct Code: Sendable, Hashable, CustomStringConvertible {
         enum Base: Sendable, Hashable {
@@ -25,6 +26,7 @@ public struct PSQLError: Error {
 
             case listenFailed
             case unlistenFailed
+            case poolClosed
         }
 
         internal var base: Base
@@ -33,7 +35,7 @@ public struct PSQLError: Error {
             self.base = base
         }
 
-        public static let sslUnsupported = Self.init(.sslUnsupported)
+        public static let sslUnsupported = Self(.sslUnsupported)
         public static let failedToAddSSLHandler = Self(.failedToAddSSLHandler)
         public static let receivedUnencryptedDataAfterSSLRequest = Self(.receivedUnencryptedDataAfterSSLRequest)
         public static let server = Self(.server)
@@ -41,14 +43,17 @@ public struct PSQLError: Error {
         public static let unexpectedBackendMessage = Self(.unexpectedBackendMessage)
         public static let unsupportedAuthMechanism = Self(.unsupportedAuthMechanism)
         public static let authMechanismRequiresPassword = Self(.authMechanismRequiresPassword)
-        public static let saslError = Self.init(.saslError)
+        public static let saslError = Self(.saslError)
         public static let invalidCommandTag = Self(.invalidCommandTag)
         public static let queryCancelled = Self(.queryCancelled)
         public static let tooManyParameters = Self(.tooManyParameters)
         public static let clientClosedConnection = Self(.clientClosedConnection)
         public static let serverClosedConnection = Self(.serverClosedConnection)
         public static let connectionError = Self(.connectionError)
-        public static let uncleanShutdown = Self.init(.uncleanShutdown)
+
+        public static let uncleanShutdown = Self(.uncleanShutdown)
+        public static let poolClosed = Self(.poolClosed)
+
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
 
@@ -92,6 +97,8 @@ public struct PSQLError: Error {
                 return "connectionError"
             case .uncleanShutdown:
                 return "uncleanShutdown"
+            case .poolClosed:
+                return "poolClosed"
             case .listenFailed:
                 return "listenFailed"
             case .unlistenFailed:
@@ -456,6 +463,10 @@ public struct PSQLError: Error {
         case gss
         case sspi
         case sasl(mechanisms: [String])
+    }
+
+    static var poolClosed: PSQLError {
+        Self.init(code: .poolClosed)
     }
 }
 

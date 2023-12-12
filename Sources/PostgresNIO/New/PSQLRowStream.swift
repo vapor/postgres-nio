@@ -96,10 +96,8 @@ final class PSQLRowStream: @unchecked Sendable {
             let yieldResult = source.yield(contentsOf: bufferedRows)
             self.downstreamState = .asyncSequence(source, dataSource)
 
-            self.eventLoop.execute {
-                self.executeActionBasedOnYieldResult(yieldResult, source: dataSource)
-            }
-            
+            self.executeActionBasedOnYieldResult(yieldResult, source: dataSource)
+
         case .finished(let buffer, let commandTag):
             _ = source.yield(contentsOf: buffer)
             source.finish()
@@ -206,7 +204,7 @@ final class PSQLRowStream: @unchecked Sendable {
     
     // MARK: Consume on EventLoop
     
-    func onRow(_ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    func onRow(_ onRow: @Sendable @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
         if self.eventLoop.inEventLoop {
             return self.onRow0(onRow)
         } else {

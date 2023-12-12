@@ -323,7 +323,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         let eventLoop = eventLoopGroup.next()
 
         struct TestPreparedStatement: PostgresPreparedStatement {
-            static var sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
+            static let sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
             typealias Row = (Int, String)
 
             var state: String

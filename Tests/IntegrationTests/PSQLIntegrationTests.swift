@@ -1,6 +1,7 @@
+import Atomics
 import XCTest
 import Logging
-@testable import PostgresNIO
+import PostgresNIO
 import NIOCore
 import NIOPosix
 import NIOTestUtils
@@ -73,19 +74,17 @@ final class IntegrationTests: XCTestCase {
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var metadata: PostgresQueryMetadata?
-        var received: Int64 = 0
+        let received = ManagedAtomic<Int64>(0)
         XCTAssertNoThrow(metadata = try conn?.query("SELECT generate_series(1, 10000);", logger: .psqlTest) { row in
             func workaround() {
-                var number: Int64?
-                XCTAssertNoThrow(number = try row.decode(Int64.self, context: .default))
-                received += 1
-                XCTAssertEqual(number, received)
+                let expected = received.wrappingIncrementThenLoad(ordering: .relaxed)
+                XCTAssertEqual(expected, try row.decode(Int64.self, context: .default))
             }
 
             workaround()
         }.wait())
 
-        XCTAssertEqual(received, 10000)
+        XCTAssertEqual(received.load(ordering: .relaxed), 10000)
         XCTAssertEqual(metadata?.command, "SELECT")
         XCTAssertEqual(metadata?.rows, 10000)
     }
@@ -252,7 +251,7 @@ final class IntegrationTests: XCTestCase {
         XCTAssertNoThrow(result = try conn?.query("""
             SELECT
                 \(Decimal(string: "123456.789123")!)::numeric     as numeric,
-                \(Decimal(string: "-123456.789123")!)::numeric     as numeric_negative
+                \(Decimal(string: "-123456.789123")!)::numeric    as numeric_negative
             """, logger: .psqlTest).wait())
         XCTAssertEqual(result?.rows.count, 1)
 
@@ -261,6 +260,41 @@ final class IntegrationTests: XCTestCase {
 
         XCTAssertEqual(cells?.0, Decimal(string: "123456.789123"))
         XCTAssertEqual(cells?.1, Decimal(string: "-123456.789123"))
+    }
+
+    func testDecodeRawRepresentables() {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
+        enum StringRR: String, PostgresDecodable {
+            case a
+        }
+
+        enum IntRR: Int, PostgresDecodable {
+            case b
+        }
+
+        let stringValue = StringRR.a
+        let intValue = IntRR.b
+
+        var result: PostgresQueryResult?
+        XCTAssertNoThrow(result = try conn?.query("""
+            SELECT
+                \(stringValue.rawValue)::varchar     as string,
+                \(intValue.rawValue)::int8           as int
+            """, logger: .psqlTest).wait())
+        XCTAssertEqual(result?.rows.count, 1)
+
+        var cells: (StringRR, IntRR)?
+        XCTAssertNoThrow(cells = try result?.rows.first?.decode((StringRR, IntRR).self, context: .default))
+
+        XCTAssertEqual(cells?.0, stringValue)
+        XCTAssertEqual(cells?.1, intValue)
     }
 
     func testRoundTripUUID() {

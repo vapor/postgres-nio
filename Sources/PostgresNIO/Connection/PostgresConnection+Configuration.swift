@@ -224,7 +224,7 @@ extension PostgresConnection {
     /// the deprecated configuration.
     ///
     /// TODO: Drop with next major release
-    struct InternalConfiguration {
+    struct InternalConfiguration: Sendable {
         enum Connection {
             case unresolvedTCP(host: String, port: Int)
             case unresolvedUDS(path: String)

@@ -44,6 +44,7 @@ final class NotificationListener: @unchecked Sendable {
 
     func startListeningSucceeded(handler: PostgresChannelHandler) {
         self.eventLoop.preconditionInEventLoop()
+        let handlerLoopBound = NIOLoopBound(handler, eventLoop: self.eventLoop)
 
         switch self.state {
         case .streamInitialized(let checkedContinuation):
@@ -55,7 +56,7 @@ final class NotificationListener: @unchecked Sendable {
                 switch reason {
                 case .cancelled:
                     eventLoop.execute {
-                        handler.cancelNotificationListener(channel: channel, id: listenerID)
+                        handlerLoopBound.value.cancelNotificationListener(channel: channel, id: listenerID)
                     }
 
                 case .finished:
