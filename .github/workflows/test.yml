@@ -22,7 +22,7 @@ jobs:
           - swift:5.8-jammy
           - swift:5.9-jammy
           - swiftlang/swift:nightly-5.10-jammy
-          #- swiftlang/swift:nightly-main-jammy
+          - swiftlang/swift:nightly-main-jammy
         include:
           - swift-image: swift:5.9-jammy
             code-coverage: true
@@ -133,7 +133,7 @@ jobs:
       matrix:
         postgres-formula:
           # Only test one version on macOS, let Linux do the rest
-          - postgresql@15
+          - postgresql@16
         postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
@@ -157,7 +157,7 @@ jobs:
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
           export PATH="$(brew --prefix)/opt/${POSTGRES_FORMULA}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          (brew unlink postgresql || true) && brew install "${POSTGRES_FORMULA}" && brew link --force "${POSTGRES_FORMULA}"
+          brew install --overwrite "${POSTGRES_FORMULA}"
           initdb --locale=C --auth-host "${POSTGRES_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
         timeout-minutes: 2
@@ -183,7 +183,7 @@ jobs:
 
   gh-codeql:
     runs-on: ubuntu-latest
-    container: swift:5.8-jammy # CodeQL currently broken with 5.9
+    container: swift:5.9-jammy
     permissions: { actions: write, contents: read, security-events: write }
     steps:
       - name: Check out code
