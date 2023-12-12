@@ -368,7 +368,9 @@ final class ConnectionPoolTests: XCTestCase {
             let failingKeepAliveDidRun = ManagedAtomic(false)
             // the following keep alive should not cause a crash
             _ = try? await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { failingKeepAliveDidRun.store(true, ordering: .relaxed) }
+                defer { 
+                    XCTAssertFalse(failingKeepAliveDidRun.store(true, ordering: .relaxed).original)
+                }
                 XCTAssertTrue(keepAliveConnection === lease1Connection)
                 keepAliveConnection.close()
                 throw CancellationError() // any error 
