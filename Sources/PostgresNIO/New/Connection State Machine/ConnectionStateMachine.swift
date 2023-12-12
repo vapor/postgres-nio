@@ -1113,17 +1113,41 @@ struct SendPrepareStatement {
     let query: String
 }
 
-struct AuthContext: Equatable, CustomDebugStringConvertible {
-    let username: String
-    let password: String?
-    let database: String?
-    
+struct AuthContext: CustomDebugStringConvertible {
+    var username: String
+    var password: String?
+    var database: String?
+    var additionalParameters: [(String, String)]
+
+    init(username: String, password: String? = nil, database: String? = nil, additionalParameters: [(String, String)] = []) {
+        self.username = username
+        self.password = password
+        self.database = database
+        self.additionalParameters = additionalParameters
+    }
+
     var debugDescription: String {
         """
         AuthContext(username: \(String(reflecting: self.username)), \
         password: \(self.password != nil ? "********" : "nil"), \
         database: \(self.database != nil ? String(reflecting: self.database!) : "nil"))
         """
+    }
+}
+
+extension AuthContext: Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool {
+        guard lhs.username == rhs.username
+                && lhs.password == rhs.password
+                && lhs.database == rhs.database
+                && lhs.additionalParameters.count == rhs.additionalParameters.count
+        else {
+            return false
+        }
+
+        return lhs.additionalParameters.elementsEqual(rhs.additionalParameters) { lhs, rhs in
+            lhs.0 == rhs.0 && lhs.1 == rhs.1
+        }
     }
 }
 

@@ -602,7 +602,7 @@ class PostgresConnectionTests: XCTestCase {
 
         async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: self.logger)
         let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        XCTAssertEqual(message, .startup(.versionThree(parameters: .init(user: "username", database: "database", replication: .false))))
+        XCTAssertEqual(message, .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
         try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
         try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
         try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))

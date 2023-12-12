@@ -85,7 +85,11 @@ extension PostgresConnection {
             /// This property is provided for compatibility with Amazon RDS Proxy, which requires it to be `false`.
             /// If you are not using Amazon RDS Proxy, you should leave this set to `true` (the default).
             public var requireBackendKeyData: Bool
-            
+
+            /// Additional parameters to send to the server on startup. The name value pairs are added to the initial
+            /// startup message that the client sends to the server.
+            public var additionalStartupParameters: [(String, String)]
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -93,6 +97,7 @@ extension PostgresConnection {
                 self.connectTimeout = .seconds(10)
                 self.tlsServerName = nil
                 self.requireBackendKeyData = true
+                self.additionalStartupParameters = []
             }
         }
         
