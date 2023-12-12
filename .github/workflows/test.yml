@@ -158,9 +158,10 @@ jobs:
         run: |
           export PATH="$(brew --prefix)/opt/${POSTGRES_FORMULA}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
           brew install --overwrite "${POSTGRES_FORMULA}"
+          brew link --overwrite --force "${POSTGRES_FORMULA}"
           initdb --locale=C --auth-host "${POSTGRES_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
-        timeout-minutes: 2
+        timeout-minutes: 15
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run all tests
