@@ -157,6 +157,9 @@ jobs:
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
           export PATH="$(brew --prefix)/opt/${POSTGRES_FORMULA}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
+          # ** BEGIN ** Work around bug in both Homebrew and GHA
+          (brew upgrade python@3.12 || true) && (brew link --force --overwrite python@3.12 || true) && brew upgrade
+          # ** END ** Work around bug in both Homebrew and GHA
           brew install --overwrite "${POSTGRES_FORMULA}"
           brew link --overwrite --force "${POSTGRES_FORMULA}"
           initdb --locale=C --auth-host "${POSTGRES_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
