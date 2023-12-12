@@ -449,6 +449,30 @@ extension PoolStateMachine {
             return (index, context)
         }
 
+        @inlinable
+        mutating func keepAliveFailed(_ connectionID: Connection.ID) -> CloseAction? {
+            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
+                // Connection has already been closed
+                return nil
+            }
+
+            guard let closeAction = self.connections[index].keepAliveFailed() else {
+                return nil
+            }
+
+            self.stats.idle -= 1
+            self.stats.closing += 1
+            self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
+            self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
+
+            // force unwrapping the connection is fine, because a close action due to failed
+            // keepAlive cannot happen without a connection
+            return CloseAction(
+                connection: closeAction.connection!,
+                timersToCancel: closeAction.cancelTimers
+            )
+        }
+
         // MARK: Connection close/removal
 
         @usableFromInline

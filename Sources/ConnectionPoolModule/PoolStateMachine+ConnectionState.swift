@@ -456,6 +456,11 @@ extension PoolStateMachine {
         }
 
         @inlinable
+        mutating func keepAliveFailed() -> CloseAction? {
+            return self.close()
+        }
+
+        @inlinable
         mutating func timerScheduled(
             _ timer: ConnectionTimer,
             cancelContinuation: TimerCancellationToken

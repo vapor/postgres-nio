@@ -375,6 +375,15 @@ struct PoolStateMachine<
     }
 
     @inlinable
+    mutating func connectionKeepAliveFailed(_ connectionID: ConnectionID) -> Action {
+        guard let closeAction = self.connections.keepAliveFailed(connectionID) else {
+            return .none()
+        }
+
+        return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+    }
+
+    @inlinable
     mutating func connectionIdleTimerTriggered(_ connectionID: ConnectionID) -> Action {
         precondition(self.requestQueue.isEmpty)
 

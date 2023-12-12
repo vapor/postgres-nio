@@ -266,4 +266,115 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(releaseRequest1.connection, .none)
     }
 
+    func testKeepAliveOnClosingConnection() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // don't refill pool
+        let requests = stateMachine.refillConnections()
+        XCTAssertEqual(requests.count, 0)
+
+        // request connection while none exists
+        let request1 = MockRequest()
+        let leaseRequest1 = stateMachine.leaseConnection(request1)
+        XCTAssertEqual(leaseRequest1.connection, .makeConnection(.init(connectionID: 0), []))
+        XCTAssertEqual(leaseRequest1.request, .none)
+
+        // make connection 1
+        let connection1 = MockConnection(id: 0)
+        let createdAction1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        XCTAssertEqual(createdAction1.request, .leaseConnection(.init(element: request1), connection1))
+        XCTAssertEqual(createdAction1.connection, .none)
+        _ = stateMachine.releaseConnection(connection1, streams: 1)
+
+        // trigger keep alive
+        let keepAliveAction1 = stateMachine.connectionKeepAliveTimerTriggered(connection1.id)
+        XCTAssertEqual(keepAliveAction1.connection, .runKeepAlive(connection1, nil))
+
+        // fail keep alive and cause closed
+        let keepAliveFailed1 = stateMachine.connectionKeepAliveFailed(connection1.id)
+        XCTAssertEqual(keepAliveFailed1.connection, .closeConnection(connection1, []))
+        connection1.closeIfClosing()
+
+        // request connection while none exists anymore
+        let request2 = MockRequest()
+        let leaseRequest2 = stateMachine.leaseConnection(request2)
+        XCTAssertEqual(leaseRequest2.connection, .makeConnection(.init(connectionID: 1), []))
+        XCTAssertEqual(leaseRequest2.request, .none)
+
+        // make connection 2
+        let connection2 = MockConnection(id: 1)
+        let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
+        XCTAssertEqual(createdAction2.request, .leaseConnection(.init(element: request2), connection2))
+        XCTAssertEqual(createdAction2.connection, .none)
+        _ = stateMachine.releaseConnection(connection2, streams: 1)
+
+        // trigger keep alive while connection is still open
+        let keepAliveAction2 = stateMachine.connectionKeepAliveTimerTriggered(connection2.id)
+        XCTAssertEqual(keepAliveAction2.connection, .runKeepAlive(connection2, nil))
+
+        // close connection in the middle of keep alive
+        connection2.close()
+        connection2.closeIfClosing()
+
+        // fail keep alive and cause closed
+        let keepAliveFailed2 = stateMachine.connectionKeepAliveFailed(connection2.id)
+        XCTAssertEqual(keepAliveFailed2.connection, .closeConnection(connection2, []))
+    }
+
+    func testConnectionIsEstablishedAfterFailedKeepAliveIfNotEnoughConnectionsLeft() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        XCTAssertEqual(requests.count, 1)
+
+        // one connection should exist
+        let request = MockRequest()
+        let leaseRequest = stateMachine.leaseConnection(request)
+        XCTAssertEqual(leaseRequest.connection, .none)
+        XCTAssertEqual(leaseRequest.request, .none)
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        XCTAssertEqual(createdAction.request, .leaseConnection(.init(element: request), connection))
+        XCTAssertEqual(createdAction.connection, .none)
+        _ = stateMachine.releaseConnection(connection, streams: 1)
+
+        // trigger keep alive
+        let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(connection.id)
+        XCTAssertEqual(keepAliveAction.connection, .runKeepAlive(connection, nil))
+
+        // fail keep alive, cause closed and make new connection
+        let keepAliveFailed = stateMachine.connectionKeepAliveFailed(connection.id)
+        XCTAssertEqual(keepAliveFailed.connection, .closeConnection(connection, []))
+        let connectionClosed = stateMachine.connectionClosed(connection)
+        XCTAssertEqual(connectionClosed.connection, .makeConnection(.init(connectionID: 1), []))
+        connection.closeIfClosing()
+    }
+
 }
