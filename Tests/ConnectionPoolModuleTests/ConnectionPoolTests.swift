@@ -369,7 +369,8 @@ final class ConnectionPoolTests: XCTestCase {
             // the following keep alive should not cause a crash
             _ = try? await keepAlive.nextKeepAlive { keepAliveConnection in
                 defer { 
-                    XCTAssertFalse(failingKeepAliveDidRun.store(true, ordering: .relaxed).original)
+                    XCTAssertFalse(failingKeepAliveDidRun
+                        .compareExchange(expected: false, desired: true, ordering: .relaxed).original)
                 }
                 XCTAssertTrue(keepAliveConnection === lease1Connection)
                 keepAliveConnection.close()
