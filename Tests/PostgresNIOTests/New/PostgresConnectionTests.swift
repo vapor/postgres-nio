@@ -311,7 +311,7 @@ class PostgresConnectionTests: XCTestCase {
 
         func makeBindings() -> PostgresBindings {
             var bindings = PostgresBindings()
-            bindings.append(.init(string: self.state))
+            bindings.append(self.state)
             return bindings
         }
 

@@ -223,33 +223,6 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
     }
 }
 
-extension PostgresData {
-    public init(numeric: PostgresNumeric) {
-        var buffer = ByteBufferAllocator().buffer(capacity: 0)
-        buffer.writeInteger(numeric.ndigits, endianness: .big)
-        buffer.writeInteger(numeric.weight, endianness: .big)
-        buffer.writeInteger(numeric.sign, endianness: .big)
-        buffer.writeInteger(numeric.dscale, endianness: .big)
-        var value = numeric.value
-        buffer.writeBuffer(&value)
-        self.init(type: .numeric, value: buffer)
-    }
-    
-    public var numeric: PostgresNumeric? {
-        /// create mutable value since we will be using `.extract` which advances the buffer's view
-        guard var value = self.value else {
-            return nil
-        }
-
-        /// grab the numeric metadata from the beginning of the array
-        guard let metadata = PostgresNumeric(buffer: &value) else {
-            return nil
-        }
-
-        return metadata
-    }
-}
-
 private extension Collection {
     // splits the collection into chunks of the supplied size
     // if the collection is not evenly divisible, the last chunk will be smaller
