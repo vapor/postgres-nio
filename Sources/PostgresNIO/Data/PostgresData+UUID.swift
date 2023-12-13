@@ -28,21 +28,3 @@ extension PostgresData {
         }
     }
 }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension UUID: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .uuid
-    }
-    
-    public init?(postgresData: PostgresData) {
-        guard let uuid = postgresData.uuid else {
-            return nil
-        }
-        self = uuid
-    }
-
-    public var postgresData: PostgresData? {
-        return .init(uuid: self)
-    }
-}

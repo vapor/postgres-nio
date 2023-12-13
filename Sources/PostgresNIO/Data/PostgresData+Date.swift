@@ -36,24 +36,6 @@ extension PostgresData {
     }
 }
 
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension Date: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .timestamptz
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let date = postgresData.date else {
-            return nil
-        }
-        self = date
-    }
-    
-    public var postgresData: PostgresData? {
-        return .init(date: self)
-    }
-}
-
 // MARK: Private
 private let _microsecondsPerSecond: Int64 = 1_000_000
 private let _secondsInDay: Int64 = 24 * 60 * 60

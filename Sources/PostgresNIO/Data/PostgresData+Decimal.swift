@@ -15,21 +15,3 @@ extension PostgresData {
         self.init(string: decimal.description)
     }
 }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension Decimal: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .numeric
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let decimal = postgresData.decimal else {
-            return nil
-        }
-        self = decimal
-    }
-
-    public var postgresData: PostgresData? {
-        return .init(numeric: PostgresNumeric(decimal: self))
-    }
-}

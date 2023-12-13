@@ -93,21 +93,3 @@ extension PostgresData: ExpressibleByStringLiteral {
         self.init(string: value)
     }
 }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension String: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .text
-    }
-    
-    public var postgresData: PostgresData? {
-        return .init(string: self)
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let string = postgresData.string else {
-            return nil
-        }
-        self = string
-    }
-}

@@ -20,21 +20,3 @@ extension PostgresData {
         return bytes
     }
 }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension Data: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .bytea
-    }
-
-    public var postgresData: PostgresData? {
-        return .init(bytes: self)
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let bytes = postgresData.bytes else {
-            return nil
-        }
-        self.init(bytes)
-    }
-}

@@ -61,16 +61,6 @@ extension PostgresData: CustomStringConvertible {
             var value = value
             value.moveReaderIndex(forwardBy: 1)
             description = String(decoding: value.readableBytesView, as: UTF8.self)
-        case .uuidArray:
-            description = self.array(of: UUID.self)?.description
-        case .int8Array:
-            description = self.array(of: Int.self)?.description
-        case .float8Array:
-            description = self.array(of: Double.self)?.description
-        case .float4Array:
-            description = self.array(of: Float.self)?.description
-        case .textArray:
-            description = self.array(of: String.self)?.description
         case .jsonbArray:
             description = self.array?.description
         default:
@@ -102,20 +92,5 @@ extension PostgresData: CustomStringConvertible {
 extension PostgresData: CustomDebugStringConvertible {
     public var debugDescription: String {
         return self.description
-    }
-}
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension PostgresData: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        fatalError("PostgresData cannot be statically represented as a single data type")
-    }
-
-    public init?(postgresData: PostgresData) {
-        self = postgresData
-    }
-
-    public var postgresData: PostgresData? {
-        return self
     }
 }

@@ -36,24 +36,3 @@ extension PostgresData {
         return try PostgresNIO._defaultJSONDecoder.decode(T.self, from: data)
     }
 }
-
-@available(*, deprecated, message: "This protocol is going to be replaced with ``PostgresEncodable`` and ``PostgresDecodable`` and conforming to ``Codable`` at the same time")
-public protocol PostgresJSONCodable: Codable, PostgresDataConvertible { }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension PostgresJSONCodable {
-    public static var postgresDataType: PostgresDataType {
-        return .json
-    }
-
-    public var postgresData: PostgresData? {
-        return try? .init(json: self)
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let value = try? postgresData.json(as: Self.self) else {
-            return nil
-        }
-        self = value
-    }
-}

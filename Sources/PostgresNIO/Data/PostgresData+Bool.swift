@@ -46,21 +46,3 @@ extension PostgresData: ExpressibleByBooleanLiteral {
         self.init(bool: value)
     }
 }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension Bool: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .bool
-    }
-    
-    public var postgresData: PostgresData? {
-        return .init(bool: self)
-    }
-    
-    public init?(postgresData: PostgresData) {
-        guard let bool = postgresData.bool else {
-            return nil
-        }
-        self = bool
-    }
-}

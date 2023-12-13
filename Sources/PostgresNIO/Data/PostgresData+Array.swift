@@ -1,14 +1,6 @@
 import NIOCore
 
 extension PostgresData {
-    @available(*, deprecated, message: "Use ``PostgresQuery`` and ``PostgresBindings`` instead.")
-    public init<T>(array: [T]) where T: PostgresDataConvertible {
-        self.init(
-            array: array.map { $0.postgresData },
-            elementType: T.postgresDataType
-        )
-    }
-
     public init(array: [PostgresData?], elementType: PostgresDataType) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
         // 0 if empty, 1 if not
@@ -44,22 +36,6 @@ extension PostgresData {
             formatCode: .binary,
             value: buffer
         )
-    }
-
-    @available(*, deprecated, message: "Use ``PostgresRow`` and ``PostgresDecodable`` instead.")
-    public func array<T>(of type: T.Type = T.self) -> [T]? where T: PostgresDataConvertible {
-        guard let array = self.array else {
-            return nil
-        }
-        var items: [T] = []
-        for data in array {
-            guard let item = T(postgresData: data) else {
-                // if we fail to convert any data, fail the entire array
-                return nil
-            }
-            items.append(item)
-        }
-        return items
     }
 
     public var array: [PostgresData]? {
@@ -110,26 +86,5 @@ extension PostgresData {
             array.append(data)
         }
         return array
-    }
-}
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension Array: PostgresDataConvertible where Element: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        guard let arrayType = Element.postgresDataType.arrayType else {
-            fatalError("No array type for \(Element.postgresDataType)")
-        }
-        return arrayType
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let array = postgresData.array(of: Element.self) else {
-            return nil
-        }
-        self = array
-    }
-
-    public var postgresData: PostgresData? {
-        return PostgresData(array: self)
     }
 }

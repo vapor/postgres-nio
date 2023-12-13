@@ -33,21 +33,3 @@ extension PostgresData {
         }
     }
 }
-
-@available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
-extension Double: PostgresDataConvertible {
-    public static var postgresDataType: PostgresDataType {
-        return .float8
-    }
-
-    public init?(postgresData: PostgresData) {
-        guard let double = postgresData.double else {
-            return nil
-        }
-        self = double
-    }
-
-    public var postgresData: PostgresData? {
-        return .init(double: self)
-    }
-}

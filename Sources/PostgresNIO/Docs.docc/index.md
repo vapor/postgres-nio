@@ -68,7 +68,6 @@ removed from the public API with the next major release.
 
 - ``PostgresDatabase``
 - ``PostgresData``
-- ``PostgresDataConvertible``
 - ``PostgresQueryResult``
 - ``PostgresJSONCodable``
 - ``PostgresJSONBCodable``
