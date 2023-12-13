@@ -74,7 +74,6 @@ removed from the public API with the next major release.
 - ``PostgresJSONBCodable``
 - ``PostgresMessageEncoder``
 - ``PostgresMessageDecoder``
-- ``PostgresRequest``
 - ``PostgresMessage``
 - ``PostgresMessageType``
 - ``PostgresFormatCode``
