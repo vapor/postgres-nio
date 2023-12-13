@@ -61,22 +61,5 @@ Features:
 - ``PostgresError``
 - ``PostgresDecodingError``
 
-### Deprecated
-
-These types are already deprecated or will be deprecated in the near future. All of them will be 
-removed from the public API with the next major release. 
-
-- ``PostgresDatabase``
-- ``PostgresData``
-- ``PostgresQueryResult``
-- ``PostgresJSONCodable``
-- ``PostgresJSONBCodable``
-- ``PostgresMessage``
-- ``PostgresFormatCode``
-- ``SASLAuthenticationManager``
-- ``SASLAuthenticationMechanism``
-- ``SASLAuthenticationError``
-- ``SASLAuthenticationStepResult``
-
 [SwiftNIO]: https://github.com/apple/swift-nio
 [SwiftLog]: https://github.com/apple/swift-log
