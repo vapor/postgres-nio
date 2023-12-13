@@ -6,16 +6,7 @@ extension PSQLError {
         case .queryCancelled:
             return self
         case .server, .listenFailed:
-            guard let serverInfo = self.serverInfo else {
-                return self
-            }
-
-            var fields = [PostgresMessage.Error.Field: String]()
-            fields.reserveCapacity(serverInfo.underlying.fields.count)
-            serverInfo.underlying.fields.forEach { (key, value) in
-                fields[PostgresMessage.Error.Field(rawValue: key.rawValue)!] = value
-            }
-            return PostgresError.server(PostgresMessage.Error(fields: fields))
+            return self
         case .sslUnsupported:
             return PostgresError.protocol("Server does not support TLS")
         case .failedToAddSSLHandler:

@@ -265,30 +265,6 @@ extension PostgresRandomAccessRow {
 // MARK: Deprecated API
 
 extension PostgresRow {
-    @available(*, deprecated, message: "Will be removed from public API.")
-    public var rowDescription: PostgresMessage.RowDescription {
-        let fields = self.columns.map { column in
-            PostgresMessage.RowDescription.Field(
-                name: column.name,
-                tableOID: UInt32(column.tableOID),
-                columnAttributeNumber: column.columnAttributeNumber,
-                dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
-                dataTypeSize: column.dataTypeSize,
-                dataTypeModifier: column.dataTypeModifier,
-                formatCode: .init(psqlFormatCode: column.format)
-            )
-        }
-        return PostgresMessage.RowDescription(fields: fields)
-    }
-
-    @available(*, deprecated, message: "Iterate the cells on `PostgresRow` instead.")
-    public var dataRow: PostgresMessage.DataRow {
-        let columns = self.data.map {
-            PostgresMessage.DataRow.Column(value: $0)
-        }
-        return PostgresMessage.DataRow(columns: columns)
-    }
-
     @available(*, deprecated, message: """
         This call is O(n) where n is the number of cells in the row. For random access to cells
         in a row create a PostgresRandomAccessRow from the row first and use its subscript

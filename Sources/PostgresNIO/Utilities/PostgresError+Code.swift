@@ -338,11 +338,6 @@ extension PostgresError {
     public var code: Code {
         switch self {
         case .protocol: return .internalError
-        case .server(let server):
-            guard let code = server.fields[.sqlState] else {
-                return .internalError
-            }
-            return Code(raw: code)
         case .connectionClosed: return .internalError
         }
     }

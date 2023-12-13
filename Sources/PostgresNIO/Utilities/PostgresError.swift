@@ -2,7 +2,6 @@ import Foundation
 
 public enum PostgresError: Error, LocalizedError, CustomStringConvertible {
     case `protocol`(String)
-    case server(PostgresMessage.Error)
     case connectionClosed
     
     /// See `LocalizedError`.
@@ -16,8 +15,6 @@ public enum PostgresError: Error, LocalizedError, CustomStringConvertible {
         switch self {
         case .protocol(let message):
             description = "protocol error: \(message)"
-        case .server(let error):
-            return "server: \(error.description)"
         case .connectionClosed:
             description = "connection closed"
         }
