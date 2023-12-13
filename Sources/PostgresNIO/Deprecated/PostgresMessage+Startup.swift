@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// First message sent from the frontend during startup.
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct Startup: PostgresMessageType {
+    public struct Startup {
         public static var identifier: PostgresMessage.Identifier {
             return .none
         }

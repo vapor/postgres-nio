@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies the message as a parameter description.
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct ParameterDescription: PostgresMessageType {
+    public struct ParameterDescription {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> ParameterDescription {
             guard let dataTypes = try buffer.read(array: PostgresDataType.self, { buffer in

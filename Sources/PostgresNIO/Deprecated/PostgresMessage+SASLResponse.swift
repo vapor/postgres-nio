@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// SASL ongoing challenge response message sent by the client.
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct SASLResponse: PostgresMessageType {
+    public struct SASLResponse {
         public static var identifier: PostgresMessage.Identifier {
             return .saslResponse
         }
@@ -52,7 +52,7 @@ extension PostgresMessage {
 }
 
 @available(*, deprecated, message: "Deprecating conformance to `PostgresMessageType` since it is deprecated.")
-extension PostgresMessage.SASLInitialResponse: PostgresMessageType {
+extension PostgresMessage.SASLInitialResponse {
     public static var identifier: PostgresMessage.Identifier {
         return .saslInitialResponse
     }

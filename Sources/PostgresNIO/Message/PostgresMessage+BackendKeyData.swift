@@ -13,7 +13,7 @@ extension PostgresMessage {
 }
 
 @available(*, deprecated, message: "Deprecating conformance to `PostgresMessageType` since it is deprecated.")
-extension PostgresMessage.BackendKeyData: PostgresMessageType {
+extension PostgresMessage.BackendKeyData {
     public static var identifier: PostgresMessage.Identifier {
         .backendKeyData
     }

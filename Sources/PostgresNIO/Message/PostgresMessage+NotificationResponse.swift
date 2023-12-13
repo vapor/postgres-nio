@@ -10,7 +10,7 @@ extension PostgresMessage {
 }
 
 @available(*, deprecated, message: "Deprecating conformance to `PostgresMessageType` since it is deprecated.")
-extension PostgresMessage.NotificationResponse: PostgresMessageType {
+extension PostgresMessage.NotificationResponse {
     public static let identifier = PostgresMessage.Identifier.notificationResponse
 
     /// Parses an instance of this message type from a byte buffer.

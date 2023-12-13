@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies the message as a Parse command.
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct Parse: PostgresMessageType {
+    public struct Parse {
         public static var identifier: PostgresMessage.Identifier {
             return .parse
         }

@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies the message as a Close Command
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct Close: PostgresMessageType {
+    public struct Close {
         public static var identifier: PostgresMessage.Identifier {
             return .close
         }

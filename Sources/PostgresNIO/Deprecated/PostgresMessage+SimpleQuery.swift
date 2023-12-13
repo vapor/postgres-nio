@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies the message as a simple query.
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct SimpleQuery: PostgresMessageType {
+    public struct SimpleQuery {
         public static var identifier: PostgresMessage.Identifier {
             return .query
         }

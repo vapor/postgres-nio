@@ -31,7 +31,7 @@ extension PostgresMessage {
 }
 
 @available(*, deprecated, message: "Deprecating conformance to `PostgresMessageType` since it is deprecated.")
-extension PostgresMessage.DataRow: PostgresMessageType {
+extension PostgresMessage.DataRow {
     public static var identifier: PostgresMessage.Identifier {
         return .dataRow
     }

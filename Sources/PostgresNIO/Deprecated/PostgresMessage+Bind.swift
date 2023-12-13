@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies the message as a Bind command.
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct Bind: PostgresMessageType {
+    public struct Bind {
         public static var identifier: PostgresMessage.Identifier {
             return .bind
         }

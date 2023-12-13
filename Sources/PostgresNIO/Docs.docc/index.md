@@ -72,9 +72,7 @@ removed from the public API with the next major release.
 - ``PostgresQueryResult``
 - ``PostgresJSONCodable``
 - ``PostgresJSONBCodable``
-- ``PostgresMessageDecoder``
 - ``PostgresMessage``
-- ``PostgresMessageType``
 - ``PostgresFormatCode``
 - ``SASLAuthenticationManager``
 - ``SASLAuthenticationMechanism``

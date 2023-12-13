@@ -2,7 +2,7 @@ import NIOCore
 
 extension PostgresMessage {
     @available(*, deprecated, message: "Will be removed from public API")
-    public struct ParameterStatus: PostgresMessageType, CustomStringConvertible {
+    public struct ParameterStatus: CustomStringConvertible {
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> ParameterStatus {
             guard let parameter = buffer.readNullTerminatedString() else {
