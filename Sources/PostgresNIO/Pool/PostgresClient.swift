@@ -332,7 +332,7 @@ struct PostgresKeepAliveBehavor: ConnectionKeepAliveBehavior {
     }
 
     func runKeepAlive(for connection: PostgresConnection) async throws {
-        try await connection.query(self.behavior!.query, logger: self.logger).map { _ in }.get()
+        try await connection.query(self.behavior!.query, logger: self.logger)
     }
 }
 
