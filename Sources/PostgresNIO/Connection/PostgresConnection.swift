@@ -529,61 +529,6 @@ extension PostgresConnection {
     }
 }
 
-// MARK: Notifications
-
-/// Context for receiving NotificationResponse messages on a connection, used for PostgreSQL's `LISTEN`/`NOTIFY` support.
-public final class PostgresListenContext: Sendable {
-    private let promise: EventLoopPromise<Void>
-
-    var future: EventLoopFuture<Void> {
-        self.promise.futureResult
-    }
-
-    init(promise: EventLoopPromise<Void>) {
-        self.promise = promise
-    }
-
-    func cancel() {
-        self.promise.succeed()
-    }
-
-    /// Detach this listener so it no longer receives notifications. Other listeners, including those for the same channel, are unaffected. `UNLISTEN` is not sent; you are responsible for issuing an `UNLISTEN` query yourself if it is appropriate for your application.
-    public func stop() {
-        self.promise.succeed()
-    }
-}
-
-extension PostgresConnection {
-    /// Add a handler for NotificationResponse messages on a certain channel. This is used in conjunction with PostgreSQL's `LISTEN`/`NOTIFY` support: to listen on a channel, you add a listener using this method to handle the NotificationResponse messages, then issue a `LISTEN` query to instruct PostgreSQL to begin sending NotificationResponse messages.
-    @discardableResult
-    @preconcurrency
-    public func addListener(
-        channel: String,
-        handler notificationHandler: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
-    ) -> PostgresListenContext {
-        let listenContext = PostgresListenContext(promise: self.eventLoop.makePromise(of: Void.self))
-        let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
-
-        let listener = NotificationListener(
-            channel: channel,
-            id: id,
-            eventLoop: self.eventLoop,
-            context: listenContext,
-            closure: notificationHandler
-        )
-
-        let task = HandlerTask.startListening(listener)
-        self.channel.write(task, promise: nil)
-
-        listenContext.future.whenComplete { _ in
-            let task = HandlerTask.cancelListening(channel, id)
-            self.channel.write(task, promise: nil)
-        }
-
-        return listenContext
-    }
-}
-
 enum CloseTarget {
     case preparedStatement(String)
     case portal(String)

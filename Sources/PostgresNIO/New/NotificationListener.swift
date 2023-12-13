@@ -13,7 +13,6 @@ final class NotificationListener: @unchecked Sendable {
         case streamInitialized(CheckedContinuation<PostgresNotificationSequence, Error>)
         case streamListening(AsyncThrowingStream<PostgresNotification, Error>.Continuation)
 
-        case closure(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)
         case done
     }
 
@@ -27,19 +26,6 @@ final class NotificationListener: @unchecked Sendable {
         self.id = id
         self.eventLoop = eventLoop
         self.state = .streamInitialized(checkedContinuation)
-    }
-
-    init(
-        channel: String,
-        id: Int,
-        eventLoop: EventLoop,
-        context: PostgresListenContext,
-        closure: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
-    ) {
-        self.channel = channel
-        self.id = id
-        self.eventLoop = eventLoop
-        self.state = .closure(context, closure)
     }
 
     func startListeningSucceeded(handler: PostgresChannelHandler) {
@@ -73,9 +59,6 @@ final class NotificationListener: @unchecked Sendable {
 
         case .streamListening, .done:
             fatalError("Invalid state: \(self.state)")
-
-        case .closure:
-            break // ignore
         }
     }
 
@@ -87,14 +70,6 @@ final class NotificationListener: @unchecked Sendable {
             fatalError("Invalid state: \(self.state)")
         case .streamListening(let continuation):
             continuation.yield(.init(payload: backendMessage.payload))
-
-        case .closure(let postgresListenContext, let closure):
-            let message = PostgresMessage.NotificationResponse(
-                backendPID: backendMessage.backendPID,
-                channel: backendMessage.channel,
-                payload: backendMessage.payload
-            )
-            closure(postgresListenContext, message)
         }
     }
 
@@ -109,10 +84,6 @@ final class NotificationListener: @unchecked Sendable {
         case .streamListening(let continuation):
             self.state = .done
             continuation.finish(throwing: error)
-
-        case .closure(let postgresListenContext, _):
-            self.state = .done
-            postgresListenContext.cancel()
 
         case .done:
             break // ignore
@@ -130,10 +101,6 @@ final class NotificationListener: @unchecked Sendable {
         case .streamListening(let continuation):
             self.state = .done
             continuation.finish()
-
-        case .closure(let postgresListenContext, _):
-            self.state = .done
-            postgresListenContext.cancel()
 
         case .done:
             break // ignore
