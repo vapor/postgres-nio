@@ -1,6 +1,6 @@
 import Crypto
 
-public final class SASLAuthenticationManager<M: SASLAuthenticationMechanism> {
+final class SASLAuthenticationManager<M: SASLAuthenticationMechanism> {
 
     private enum Role {
         case client, server
@@ -24,12 +24,12 @@ public final class SASLAuthenticationManager<M: SASLAuthenticationMechanism> {
     private let role: Role
     private var state: State = .waitingForInitial
     
-    public init(asClientSpeaking mechanism: M) {
+    init(asClientSpeaking mechanism: M) {
         self.mechanism = mechanism
         self.role = .client
     }
 
-    public init(asServerAccepting mechanism: M) {
+    init(asServerAccepting mechanism: M) {
         self.mechanism = mechanism
         self.role = .server
     }
@@ -46,7 +46,7 @@ public final class SASLAuthenticationManager<M: SASLAuthenticationMechanism> {
     ///
     /// Pass a `nil` message to start the initial request from a client. It is
     /// invalid to do this for a server.
-    public func handle(message: [UInt8]?, sender: ([UInt8]) throws -> Void) throws -> Bool {
+    func handle(message: [UInt8]?, sender: ([UInt8]) throws -> Void) throws -> Bool {
         guard self.state != .done else {
             // Already did whatever we were gonna do.
             throw SASLAuthenticationError.resultAlreadyDelivered
@@ -99,7 +99,7 @@ public final class SASLAuthenticationManager<M: SASLAuthenticationMechanism> {
 
 /// Various errors that can occur during SASL negotiation that are not specific
 /// to the particular SASL mechanism in use.
-public enum SASLAuthenticationError: Error {
+enum SASLAuthenticationError: Error {
     /// A server can not handle a nonexistent message. Only an initial-state
     /// client can do that, and even then it's really just a proxy for the API
     /// having difficulty expressing "this must be done once and then never
@@ -128,7 +128,7 @@ public enum SASLAuthenticationError: Error {
 
 /// Signifies an action to be taken as the result of a single step of a SASL
 /// mechanism.
-public enum SASLAuthenticationStepResult {
+enum SASLAuthenticationStepResult {
 
     /// More steps are needed. Assume neither success nor failure. If data is
     /// provided, send it. A value of `nil` signifies sending no response at
@@ -155,7 +155,7 @@ public enum SASLAuthenticationStepResult {
 /// the responsibility of each individual implementation to provide an API for
 /// creating instances of itself which are able to retrieve information from the
 /// caller (such as usernames and passwords) by some mechanism.
-public protocol SASLAuthenticationMechanism {
+protocol SASLAuthenticationMechanism {
     
     /// The IANA-registered SASL mechanism name. This may be a family prefix or
     /// a specific mechanism name. It is explicitly suitable for use in
