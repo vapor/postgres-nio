@@ -72,7 +72,6 @@ removed from the public API with the next major release.
 - ``PostgresQueryResult``
 - ``PostgresJSONCodable``
 - ``PostgresJSONBCodable``
-- ``PostgresMessageEncoder``
 - ``PostgresMessageDecoder``
 - ``PostgresMessage``
 - ``PostgresMessageType``
