@@ -95,16 +95,9 @@ public final class PostgresConnection: @unchecked Sendable {
             return self.eventLoop.makeFailedFuture(error)
         }
 
-        let startupFuture: EventLoopFuture<Void>
-        if configuration.username == nil {
-            startupFuture = eventHandler.readyForStartupFuture
-        } else {
-            startupFuture = eventHandler.authenticateFuture
-        }
-
         // 3. wait for startup future to succeed.
 
-        return startupFuture.flatMapError { error in
+        return eventHandler.authenticateFuture.flatMapError { error in
             // in case of an startup error, the connection must be closed and after that
             // the originating error should be surfaced
 
@@ -284,74 +277,6 @@ public final class PostgresConnection: @unchecked Sendable {
 
 extension PostgresConnection {
     static let idGenerator = ManagedAtomic(0)
-
-    @available(*, deprecated,
-        message: "Use the new connect method that allows you to connect and authenticate in a single step",
-        renamed: "connect(on:configuration:id:logger:)"
-    )
-    public static func connect(
-        to socketAddress: SocketAddress,
-        tlsConfiguration: TLSConfiguration? = nil,
-        serverHostname: String? = nil,
-        logger: Logger = .init(label: "codes.vapor.postgres"),
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<PostgresConnection> {
-        var tlsFuture: EventLoopFuture<PostgresConnection.Configuration.TLS>
-
-        if let tlsConfiguration = tlsConfiguration {
-            tlsFuture = eventLoop.makeSucceededVoidFuture().flatMapBlocking(onto: .global(qos: .default)) {
-                try .require(.init(configuration: tlsConfiguration))
-            }
-        } else {
-            tlsFuture = eventLoop.makeSucceededFuture(.disable)
-        }
-
-        return tlsFuture.flatMap { tls in
-            var options = PostgresConnection.Configuration.Options()
-            options.tlsServerName = serverHostname
-            let configuration = PostgresConnection.InternalConfiguration(
-                connection: .resolved(address: socketAddress),
-                username: nil,
-                password: nil,
-                database: nil,
-                tls: tls,
-                options: options
-            )
-
-            return PostgresConnection.connect(
-                connectionID: self.idGenerator.wrappingIncrementThenLoad(ordering: .relaxed),
-                configuration: configuration,
-                logger: logger,
-                on: eventLoop
-            )
-        }.flatMapErrorThrowing { error in
-            throw error.asAppropriatePostgresError
-        }
-    }
-
-    @available(*, deprecated,
-        message: "Use the new connect method that allows you to connect and authenticate in a single step",
-        renamed: "connect(on:configuration:id:logger:)"
-    )
-    public func authenticate(
-        username: String,
-        database: String? = nil,
-        password: String? = nil,
-        logger: Logger = .init(label: "codes.vapor.postgres")
-    ) -> EventLoopFuture<Void> {
-        let authContext = AuthContext(
-            username: username,
-            password: password,
-            database: database)
-        let outgoing = PSQLOutgoingEvent.authenticate(authContext)
-        self.channel.triggerUserOutboundEvent(outgoing, promise: nil)
-
-        return self.channel.pipeline.handler(type: PSQLEventsHandler.self).flatMap { handler in
-            handler.authenticateFuture
-        }.flatMapErrorThrowing { error in
-            throw error.asAppropriatePostgresError
-        }
-    }
 }
 
 // MARK: Async/Await Interface

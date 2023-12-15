@@ -110,8 +110,6 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     /// `790`
     public static let money = PostgresDataType(790)
     /// `791`
-    @available(*, deprecated, renamed: "moneyArray")
-    public static let _money = PostgresDataType(791)
     public static let moneyArray = PostgresDataType(791)
     /// `829`
     public static let macaddr = PostgresDataType(829)

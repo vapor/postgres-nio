@@ -277,10 +277,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.logger.trace("User outbound event received", metadata: [.userEvent: "\(event)"])
         
         switch event {
-        case PSQLOutgoingEvent.authenticate(let authContext):
-            let action = self.state.provideAuthenticationContext(authContext)
-            self.run(action, with: context)
-
         case PSQLOutgoingEvent.gracefulShutdown:
             let action = self.state.gracefulClose(promise)
             self.run(action, with: context)
@@ -386,15 +382,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         case .provideAuthenticationContext:
             context.fireUserInboundEventTriggered(PSQLEvent.readyForStartup)
             
-            if let username = self.configuration.username {
-                let authContext = AuthContext(
-                    username: username,
-                    password: self.configuration.password,
-                    database: self.configuration.database
-                )
-                let action = self.state.provideAuthenticationContext(authContext)
-                return self.run(action, with: context)
-            }
+            let authContext = AuthContext(
+                username: self.configuration.username,
+                password: self.configuration.password,
+                database: self.configuration.database
+            )
+            let action = self.state.provideAuthenticationContext(authContext)
+            return self.run(action, with: context)
         case .fireEventReadyForQuery:
             context.fireUserInboundEventTriggered(PSQLEvent.readyForQuery)
         case .closeConnection(let promise):

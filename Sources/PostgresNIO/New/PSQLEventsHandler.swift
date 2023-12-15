@@ -3,11 +3,6 @@ import NIOTLS
 import Logging
 
 enum PSQLOutgoingEvent {    
-    /// the event we send down the channel to inform the ``PostgresChannelHandler`` to authenticate
-    ///
-    /// this shall be removed with the next breaking change and always supplied with `PSQLConnection.Configuration`
-    case authenticate(AuthContext)
-
     case gracefulShutdown
 }
 
