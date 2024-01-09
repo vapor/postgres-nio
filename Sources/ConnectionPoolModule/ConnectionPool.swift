@@ -591,7 +591,7 @@ protocol TaskGroupProtocol {
 }
 
 #if swift(>=5.8) && os(Linux) || swift(>=5.9)
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 9.0, *)
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 extension DiscardingTaskGroup: TaskGroupProtocol {}
 #endif
 
