@@ -166,10 +166,9 @@ extension PostgresDynamicTypeEncodable {
 
 /// A context that is passed to Swift objects that are encoded into the Postgres wire format. Used
 /// to pass further information to the encoding method.
-public struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder> {
+public struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder>: Sendable {
     /// A ``PostgresJSONEncoder`` used to encode the object to json.
     public var jsonEncoder: JSONEncoder
-
 
     /// Creates a ``PostgresEncodingContext`` with the given ``PostgresJSONEncoder``. In case you want
     /// to use the a ``PostgresEncodingContext`` with an unconfigured Foundation `JSONEncoder`

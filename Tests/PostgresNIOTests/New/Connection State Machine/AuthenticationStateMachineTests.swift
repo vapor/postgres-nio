@@ -45,6 +45,30 @@ class AuthenticationStateMachineTests: XCTestCase {
         XCTAssertEqual(state.authenticationMessageReceived(.ok), .wait)
     }
     
+    func testAuthenticateSCRAMSHA256WithAtypicalEncoding() {
+        let authContext = AuthContext(username: "test", password: "abc123", database: "test")
+        var state = ConnectionStateMachine(requireBackendKeyData: true)
+        XCTAssertEqual(state.connected(tls: .disable), .provideAuthenticationContext)
+        XCTAssertEqual(state.provideAuthenticationContext(authContext), .sendStartupMessage(authContext))
+        
+        let saslResponse = state.authenticationMessageReceived(.sasl(names: ["SCRAM-SHA-256"]))
+        guard case .sendSaslInitialResponse(name: let name, initialResponse: let responseData) = saslResponse else {
+            return XCTFail("\(saslResponse) is not .sendSaslInitialResponse")
+        }
+        let responseString = String(decoding: responseData, as: UTF8.self)
+        XCTAssertEqual(name, "SCRAM-SHA-256")
+        XCTAssert(responseString.starts(with: "n,,n=test,r="))
+        
+        let saslContinueResponse = state.authenticationMessageReceived(.saslContinue(data: .init(bytes:
+            "r=\(responseString.dropFirst(12))RUJSZHhkeUVFNzRLNERKMkxmU05ITU1NZWcxaQ==,s=ijgUVaWgCDLRJyF963BKNA==,i=4096".utf8
+        )))
+        guard case .sendSaslResponse(let responseData2) = saslContinueResponse else {
+            return XCTFail("\(saslContinueResponse) is not .sendSaslResponse")
+        }
+        let response2String = String(decoding: responseData2, as: UTF8.self)
+        XCTAssertEqual(response2String.prefix(76), "c=biws,r=\(responseString.dropFirst(12))RUJSZHhkeUVFNzRLNERKMkxmU05ITU1NZWcxaQ==,p=")
+    }
+    
     func testAuthenticationFailure() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         var state = ConnectionStateMachine(requireBackendKeyData: true)
