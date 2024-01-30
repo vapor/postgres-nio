@@ -209,14 +209,13 @@ fileprivate struct SCRAMMessageParser {
     }
     
     static func parse(raw: [UInt8], isGS2Header: Bool = false) -> [SCRAMAttribute]? {
-        
         // There are two ways to implement this parse:
         //  1. All-at-once: Split on comma, split each on equals, validate
         //     each results in a valid attribute.
         //  2. Sequential: State machine lookahead parse.
         // The former is simpler. The latter provides better validation.
-        let likelyAttributeSets = raw.split(separator: .comma, maxSplits: isGS2Header ? 3 : Int.max, omittingEmptySubsequences: false)
-        let likelyAttributePairs = likelyAttributeSets.map { $0.split(separator: .equals, maxSplits: 2, omittingEmptySubsequences: false) }
+        let likelyAttributeSets = raw.split(separator: .comma, maxSplits: isGS2Header ? 2 : Int.max, omittingEmptySubsequences: false)
+        let likelyAttributePairs = likelyAttributeSets.map { $0.split(separator: .equals, maxSplits: 1, omittingEmptySubsequences: false) }
         
         let results = likelyAttributePairs.map { parseAttributePair(name: Array($0[0]), value: $0.dropFirst().first.map { Array($0) } ?? [], isGS2Header: isGS2Header) }
         let validResults = results.compactMap { $0 }
@@ -369,7 +368,7 @@ internal struct SHA256_PLUS: SASLAuthenticationMechanism {
 } // enum SCRAM
 } // enum SASLMechanism
 
-/// Common impplementation of SCRAM-SHA-256 and SCRAM-SHA-256-PLUS
+/// Common implementation of SCRAM-SHA-256 and SCRAM-SHA-256-PLUS
 fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
 
     /// Initialized with initial client state
