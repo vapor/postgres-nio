@@ -332,7 +332,7 @@ struct PostgresKeepAliveBehavor: ConnectionKeepAliveBehavior {
     }
 
     func runKeepAlive(for connection: PostgresConnection) async throws {
-        try await connection.query(self.behavior!.query, logger: self.logger).map { _ in }.get()
+        try await connection.query(self.behavior!.query, logger: self.logger)
     }
 }
 
@@ -360,14 +360,14 @@ extension PostgresConnection: PooledConnection {
 
 extension ConnectionPoolError {
     func mapToPSQLError(lastConnectError: Error?) -> Error {
-        var psqlError: PSQLError
+        var psqlError: PostgresError
         switch self {
         case .poolShutdown:
-            psqlError = PSQLError.poolClosed
+            psqlError = PostgresError.poolClosed
             psqlError.underlying = self
 
         case .requestCancelled:
-            psqlError = PSQLError.queryCancelled
+            psqlError = PostgresError.queryCancelled
             psqlError.underlying = self
 
         default:

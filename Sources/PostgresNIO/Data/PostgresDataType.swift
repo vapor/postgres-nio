@@ -17,13 +17,6 @@ extension PostgresFormat: CustomStringConvertible {
     }
 }
 
-// TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
-extension PostgresFormat: Codable {}
-
-// TODO: Renamed during 1.x. Remove this with next major break.
-@available(*, deprecated, renamed: "PostgresFormat")
-public typealias PostgresFormatCode = PostgresFormat
-
 /// Data types and their raw OIDs.
 ///
 /// Use `select * from pg_type where oid = <idhere>` to look up more information for a given type.
@@ -117,8 +110,6 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     /// `790`
     public static let money = PostgresDataType(790)
     /// `791`
-    @available(*, deprecated, renamed: "moneyArray")
-    public static let _money = PostgresDataType(791)
     public static let moneyArray = PostgresDataType(791)
     /// `829`
     public static let macaddr = PostgresDataType(829)
@@ -766,15 +757,5 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     // See `CustomStringConvertible.description`.
     public var description: String {
         return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"
-    }
-}
-
-// TODO: The Codable conformance does not make any sense. Let's remove this with next major break.
-extension PostgresDataType: Codable {}
-
-// TODO: The ExpressibleByIntegerLiteral conformance does not make any sense and is not used anywhere. Remove with next major break.
-extension PostgresDataType: ExpressibleByIntegerLiteral {
-    public init(integerLiteral value: UInt32) {
-        self.init(value)
     }
 }

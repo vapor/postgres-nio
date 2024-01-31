@@ -23,13 +23,13 @@ final class PSQLRowStreamTests: XCTestCase {
     
     func testFailedStream() {
         let stream = PSQLRowStream(
-            source: .noRows(.failure(PSQLError.serverClosedConnection(underlying: nil))),
+            source: .noRows(.failure(PostgresError.serverClosedConnection(underlying: nil))),
             eventLoop: self.eventLoop,
             logger: self.logger
         )
         
         XCTAssertThrowsError(try stream.all().wait()) {
-            XCTAssertEqual($0 as? PSQLError, .serverClosedConnection(underlying: nil))
+            XCTAssertEqual($0 as? PostgresError, .serverClosedConnection(underlying: nil))
         }
     }
     

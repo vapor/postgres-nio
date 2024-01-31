@@ -11,7 +11,7 @@ struct AuthenticationStateMachine {
         case saslChallengeResponseSent(SASLAuthenticationManager<SASLMechanism.SCRAM.SHA256>)
         case saslFinalReceived
         
-        case error(PSQLError)
+        case error(PostgresError)
         case authenticated
     }
     
@@ -23,7 +23,7 @@ struct AuthenticationStateMachine {
         case wait
         case authenticated
         
-        case reportAuthenticationError(PSQLError)
+        case reportAuthenticationError(PostgresError)
     }
     
     let authContext: AuthContext
@@ -51,7 +51,7 @@ struct AuthenticationStateMachine {
                 return .authenticated
             case .md5(let salt):
                 guard self.authContext.password != nil else {
-                    return self.setAndFireError(PSQLError(code: .authMechanismRequiresPassword))
+                    return self.setAndFireError(PostgresError(code: .authMechanismRequiresPassword))
                 }
                 self.state = .passwordAuthenticationSent
                 return .sendPassword(.md5(salt: salt), self.authContext)
@@ -160,11 +160,11 @@ struct AuthenticationStateMachine {
         return self.setAndFireError(.server(message))
     }
     
-    mutating func errorHappened(_ error: PSQLError) -> Action {
+    mutating func errorHappened(_ error: PostgresError) -> Action {
         return self.setAndFireError(error)
     }
 
-    private mutating func setAndFireError(_ error: PSQLError) -> Action {
+    private mutating func setAndFireError(_ error: PostgresError) -> Action {
         switch self.state {
         case .initialized:
             preconditionFailure("""

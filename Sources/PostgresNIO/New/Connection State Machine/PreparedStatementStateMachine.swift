@@ -4,7 +4,7 @@ struct PreparedStatementStateMachine {
     enum State {
         case preparing([PreparedStatementContext])
         case prepared(RowDescription?)
-        case error(PSQLError)
+        case error(PostgresError)
     }
 
     var preparedStatements: [String: State] = [:]
@@ -13,7 +13,7 @@ struct PreparedStatementStateMachine {
         case prepareStatement
         case waitForAlreadyInFlightPreparation
         case executeStatement(RowDescription?)
-        case returnError(PSQLError)
+        case returnError(PostgresError)
     }
 
     mutating func lookup(preparedStatement: PreparedStatementContext) -> LookupAction {
@@ -72,10 +72,10 @@ struct PreparedStatementStateMachine {
 
     struct ErrorHappenedAction {
         var statements: [PreparedStatementContext]
-        var error: PSQLError
+        var error: PostgresError
     }
     
-    mutating func errorHappened(name: String, error: PSQLError) -> ErrorHappenedAction {
+    mutating func errorHappened(name: String, error: PostgresError) -> ErrorHappenedAction {
         guard let state = self.preparedStatements[name] else {
             fatalError("Unknown prepared statement \(name)")
         }

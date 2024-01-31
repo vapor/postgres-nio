@@ -13,7 +13,7 @@ enum PSQLTask {
     case extendedQuery(ExtendedQueryContext)
     case closeCommand(CloseCommandContext)
 
-    func failWithError(_ error: PSQLError) {
+    func failWithError(_ error: PostgresError) {
         switch self {
         case .extendedQuery(let extendedQueryContext):
             switch extendedQueryContext.query {
