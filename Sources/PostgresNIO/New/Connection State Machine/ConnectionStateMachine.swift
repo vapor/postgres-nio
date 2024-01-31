@@ -624,21 +624,19 @@ struct ConnectionStateMachine {
     mutating func readEventCaught() -> ConnectionAction {
         switch self.state {
         case .initialized:
-            preconditionFailure("Received a read event on a connection that was never opened.")
-        case .sslRequestSent:
+            preconditionFailure("Invalid state: \(self.state). Read event before connection established?")
+
+        case .sslRequestSent,
+             .sslNegotiated,
+             .sslHandlerAdded,
+             .waitingToStartAuthentication,
+             .authenticating,
+             .authenticated,
+             .readyForQuery,
+             .closing:
+            // all states in which we definitely want to make further forward progress...
             return .read
-        case .sslNegotiated:
-            return .read
-        case .sslHandlerAdded:
-            return .read
-        case .waitingToStartAuthentication:
-            return .read
-        case .authenticating:
-            return .read
-        case .authenticated:
-            return .read
-        case .readyForQuery:
-            return .read
+
         case .extendedQuery(var extendedQuery, let connectionContext):
             self.state = .modifying // avoid CoW
             let action = extendedQuery.readEventCaught()
@@ -651,12 +649,15 @@ struct ConnectionStateMachine {
             self.state = .closeCommand(closeState, connectionContext)
             return self.modify(with: action)
 
-        case .closing:
-            return .read
         case .closed:
-            preconditionFailure("How can we receive a read, if the connection is closed")
+            // Generally we shouldn't see this event (read after connection closed?!).
+            // But truth is, adopters run into this, again and again. So preconditioning here leads
+            // to unnecessary crashes. So let's be resilient and just make more forward progress.
+            // If we really care, we probably need to dive deep into PostgresNIO and SwiftNIO.
+            return .read
+
         case .modifying:
-            preconditionFailure("Invalid state")
+            preconditionFailure("Invalid state: \(self.state)")
         }
     }
     
