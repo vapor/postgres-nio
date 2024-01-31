@@ -33,8 +33,8 @@ struct ConnectionStateMachine {
         case extendedQuery(ExtendedQueryStateMachine, ConnectionContext)
         case closeCommand(CloseStateMachine, ConnectionContext)
 
-        case closing(PSQLError?)
-        case closed(clientInitiated: Bool, error: PSQLError?)
+        case closing(PostgresError?)
+        case closed(clientInitiated: Bool, error: PostgresError?)
 
         case modifying
     }
@@ -57,7 +57,7 @@ struct ConnectionStateMachine {
             /// Tasks to fail with the error
             let tasks: [PSQLTask]
             
-            let error: PSQLError
+            let error: PostgresError
             
             let closePromise: EventLoopPromise<Void>?
         }
@@ -87,24 +87,24 @@ struct ConnectionStateMachine {
         // --- general actions
         case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendBindExecuteSync(PSQLExecuteStatement)
-        case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError, cleanupContext: CleanUpContext?)
+        case failQuery(EventLoopPromise<PSQLRowStream>, with: PostgresError, cleanupContext: CleanUpContext?)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
 
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
         case forwardRows([DataRow])
         case forwardStreamComplete([DataRow], commandTag: String)
-        case forwardStreamError(PSQLError, read: Bool, cleanupContext: CleanUpContext?)
+        case forwardStreamError(PostgresError, read: Bool, cleanupContext: CleanUpContext?)
         
         // Prepare statement actions
         case sendParseDescribeSync(name: String, query: String)
         case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
-        case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PSQLError, cleanupContext: CleanUpContext?)
+        case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PostgresError, cleanupContext: CleanUpContext?)
 
         // Close actions
         case sendCloseSync(CloseTarget)
         case succeedClose(CloseCommandContext)
-        case failClose(CloseCommandContext, with: PSQLError, cleanupContext: CleanUpContext?)
+        case failClose(CloseCommandContext, with: PostgresError, cleanupContext: CleanUpContext?)
     }
     
     private var state: State
@@ -443,7 +443,7 @@ struct ConnectionStateMachine {
         }
     }
     
-    mutating func errorHappened(_ error: PSQLError) -> ConnectionAction {
+    mutating func errorHappened(_ error: PostgresError) -> ConnectionAction {
         switch self.state {
         case .initialized,
              .sslRequestSent,
@@ -544,12 +544,12 @@ struct ConnectionStateMachine {
     }
     
     mutating func enqueue(task: PSQLTask) -> ConnectionAction {
-        let psqlErrror: PSQLError
+        let psqlErrror: PostgresError
 
         // check if we are quiescing. if so fail task immidiatly
         switch self.quiescingState {
         case .quiescing:
-            psqlErrror = PSQLError.clientClosedConnection(underlying: nil)
+            psqlErrror = PostgresError.clientClosedConnection(underlying: nil)
 
         case .notQuiescing:
             switch self.state {
@@ -569,13 +569,13 @@ struct ConnectionStateMachine {
                 return self.executeTask(task)
 
             case .closing(let error):
-                psqlErrror = PSQLError.clientClosedConnection(underlying: error)
+                psqlErrror = PostgresError.clientClosedConnection(underlying: error)
 
             case .closed(clientInitiated: true, error: let error):
-                psqlErrror = PSQLError.clientClosedConnection(underlying: error)
+                psqlErrror = PostgresError.clientClosedConnection(underlying: error)
 
             case .closed(clientInitiated: false, error: let error):
-                psqlErrror = PSQLError.serverClosedConnection(underlying: error)
+                psqlErrror = PostgresError.serverClosedConnection(underlying: error)
 
             case .modifying:
                 preconditionFailure("Invalid state: \(self.state)")
@@ -812,7 +812,7 @@ struct ConnectionStateMachine {
         return self.modify(with: action)
     }
     
-    private mutating func closeConnectionAndCleanup(_ error: PSQLError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction {
+    private mutating func closeConnectionAndCleanup(_ error: PostgresError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction {
         switch self.state {
         case .initialized,
              .sslRequestSent,
@@ -956,7 +956,7 @@ struct ConnectionStateMachine {
 }
 
 extension ConnectionStateMachine {
-    func shouldCloseConnection(reason error: PSQLError) -> Bool {
+    func shouldCloseConnection(reason error: PostgresError) -> Bool {
         switch error.code.base {
         case .failedToAddSSLHandler,
              .receivedUnencryptedDataAfterSSLRequest,
@@ -993,7 +993,7 @@ extension ConnectionStateMachine {
         }
     }
 
-    mutating func setErrorAndCreateCleanupContextIfNeeded(_ error: PSQLError) -> ConnectionAction.CleanUpContext? {
+    mutating func setErrorAndCreateCleanupContextIfNeeded(_ error: PostgresError) -> ConnectionAction.CleanUpContext? {
         if self.shouldCloseConnection(reason: error) {
             return self.setErrorAndCreateCleanupContext(error)
         }
@@ -1001,7 +1001,7 @@ extension ConnectionStateMachine {
         return nil
     }
     
-    mutating func setErrorAndCreateCleanupContext(_ error: PSQLError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction.CleanUpContext {
+    mutating func setErrorAndCreateCleanupContext(_ error: PostgresError, closePromise: EventLoopPromise<Void>? = nil) -> ConnectionAction.CleanUpContext {
         let tasks = Array(self.taskQueue)
         self.taskQueue.removeAll()
         

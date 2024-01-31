@@ -116,7 +116,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         
         let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel in
             XCTFail("This callback should never be exectuded")
-            throw PSQLError.sslUnsupported
+            throw PostgresError.sslUnsupported
         }
         let embedded = EmbeddedChannel(handlers: [
             ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
@@ -256,11 +256,11 @@ class PostgresChannelHandlerTests: XCTestCase {
 class TestEventHandler: ChannelInboundHandler {
     typealias InboundIn = Never
     
-    var errors = [PSQLError]()
+    var errors = [PostgresError]()
     var events = [PSQLEvent]()
     
     func errorCaught(context: ChannelHandlerContext, error: Error) {
-        guard let psqlError = error as? PSQLError else {
+        guard let psqlError = error as? PostgresError else {
             return XCTFail("Unexpected error type received: \(error)")
         }
         self.errors.append(psqlError)

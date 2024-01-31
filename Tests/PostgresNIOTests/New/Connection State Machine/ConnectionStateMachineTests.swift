@@ -30,7 +30,7 @@ class ConnectionStateMachineTests: XCTestCase {
     func testSSLStartupFailureTooManyBytesRemaining() {
         var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
-        let failError = PSQLError.receivedUnencryptedDataAfterSSLRequest
+        let failError = PostgresError.receivedUnencryptedDataAfterSSLRequest
         XCTAssertEqual(state.sslSupportedReceived(unprocessedBytes: 1), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }
 
@@ -40,7 +40,7 @@ class ConnectionStateMachineTests: XCTestCase {
         var state = ConnectionStateMachine(requireBackendKeyData: true)
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslSupportedReceived(unprocessedBytes: 0), .establishSSLConnection)
-        let failError = PSQLError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
+        let failError = PostgresError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
         XCTAssertEqual(state.errorHappened(failError), .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }
     
@@ -49,7 +49,7 @@ class ConnectionStateMachineTests: XCTestCase {
         
         XCTAssertEqual(state.connected(tls: .require), .sendSSLRequest)
         XCTAssertEqual(state.sslUnsupportedReceived(),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.sslUnsupported, closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PostgresError.sslUnsupported, closePromise: nil)))
     }
 
     func testTLSPreferredStartupSSLUnsupported() {
@@ -114,7 +114,7 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parameterStatusReceived(.init(parameter: "standard_conforming_strings", value: "on")), .wait)
         
         XCTAssertEqual(state.readyForQueryReceived(.idle),
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
+                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PostgresError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
     }
     
     func testReadyForQueryReceivedWithoutUnneededBackendKeyAfterAuthenticated() {
@@ -183,6 +183,6 @@ class ConnectionStateMachineTests: XCTestCase {
         XCTAssertNil(queryPromise.futureResult._value)
 
         // make sure we don't crash
-        queryPromise.fail(PSQLError.server(.init(fields: fields)))
+        queryPromise.fail(PostgresError.server(.init(fields: fields)))
     }
 }

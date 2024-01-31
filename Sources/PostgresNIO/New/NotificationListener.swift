@@ -96,7 +96,7 @@ final class NotificationListener: @unchecked Sendable {
         switch self.state {
         case .streamInitialized(let checkedContinuation):
             self.state = .done
-            checkedContinuation.resume(throwing: PSQLError(code: .queryCancelled))
+            checkedContinuation.resume(throwing: PostgresError(code: .queryCancelled))
 
         case .streamListening(let continuation):
             self.state = .done

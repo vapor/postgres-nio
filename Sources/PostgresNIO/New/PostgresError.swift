@@ -2,7 +2,7 @@ import NIOCore
 
 /// An error that is thrown from the PostgresClient.
 /// Sendability enforced through Copy on Write semantics
-public struct PSQLError: Error, @unchecked Sendable {
+public struct PostgresError: Error, @unchecked Sendable {
 
     public struct Code: Sendable, Hashable, CustomStringConvertible {
         enum Base: Sendable, Hashable {
@@ -115,7 +115,7 @@ public struct PSQLError: Error, @unchecked Sendable {
         }
     }
 
-    /// The ``PSQLError/Code-swift.struct`` code
+    /// The ``PostgresError/Code-swift.struct`` code
     public internal(set) var code: Code {
         get { self.backing.code }
         set {
@@ -390,66 +390,66 @@ public struct PSQLError: Error, @unchecked Sendable {
         return new
     }
 
-    static func clientClosedConnection(underlying: Error?) -> PSQLError {
-        var error = PSQLError(code: .clientClosedConnection)
+    static func clientClosedConnection(underlying: Error?) -> PostgresError {
+        var error = PostgresError(code: .clientClosedConnection)
         error.underlying = underlying
         return error
     }
 
-    static func serverClosedConnection(underlying: Error?) -> PSQLError {
-        var error = PSQLError(code: .serverClosedConnection)
+    static func serverClosedConnection(underlying: Error?) -> PostgresError {
+        var error = PostgresError(code: .serverClosedConnection)
         error.underlying = underlying
         return error
     }
 
-    static let authMechanismRequiresPassword = PSQLError(code: .authMechanismRequiresPassword)
+    static let authMechanismRequiresPassword = PostgresError(code: .authMechanismRequiresPassword)
 
-    static let sslUnsupported = PSQLError(code: .sslUnsupported)
+    static let sslUnsupported = PostgresError(code: .sslUnsupported)
 
-    static let queryCancelled = PSQLError(code: .queryCancelled)
+    static let queryCancelled = PostgresError(code: .queryCancelled)
 
-    static let uncleanShutdown = PSQLError(code: .uncleanShutdown)
+    static let uncleanShutdown = PostgresError(code: .uncleanShutdown)
 
-    static let receivedUnencryptedDataAfterSSLRequest = PSQLError(code: .receivedUnencryptedDataAfterSSLRequest)
+    static let receivedUnencryptedDataAfterSSLRequest = PostgresError(code: .receivedUnencryptedDataAfterSSLRequest)
 
-    static func server(_ response: PostgresBackendMessage.ErrorResponse) -> PSQLError {
-        var error = PSQLError(code: .server)
+    static func server(_ response: PostgresBackendMessage.ErrorResponse) -> PostgresError {
+        var error = PostgresError(code: .server)
         error.serverInfo = .init(response)
         return error
     }
 
-    static func sasl(underlying: Error) -> PSQLError {
-        var error = PSQLError(code: .saslError)
+    static func sasl(underlying: Error) -> PostgresError {
+        var error = PostgresError(code: .saslError)
         error.underlying = underlying
         return error
     }
 
-    static func failedToAddSSLHandler(underlying: Error) -> PSQLError {
-        var error = PSQLError(code: .failedToAddSSLHandler)
+    static func failedToAddSSLHandler(underlying: Error) -> PostgresError {
+        var error = PostgresError(code: .failedToAddSSLHandler)
         error.underlying = underlying
         return error
     }
 
-    static func connectionError(underlying: Error) -> PSQLError {
-        var error = PSQLError(code: .connectionError)
+    static func connectionError(underlying: Error) -> PostgresError {
+        var error = PostgresError(code: .connectionError)
         error.underlying = underlying
         return error
     }
 
-    static func unsupportedAuthMechanism(_ authScheme: UnsupportedAuthScheme) -> PSQLError {
-        var error = PSQLError(code: .unsupportedAuthMechanism)
+    static func unsupportedAuthMechanism(_ authScheme: UnsupportedAuthScheme) -> PostgresError {
+        var error = PostgresError(code: .unsupportedAuthMechanism)
         error.unsupportedAuthScheme = authScheme
         return error
     }
 
-    static func invalidCommandTag(_ value: String) -> PSQLError {
-        var error = PSQLError(code: .invalidCommandTag)
+    static func invalidCommandTag(_ value: String) -> PostgresError {
+        var error = PostgresError(code: .invalidCommandTag)
         error.invalidCommandTag = value
         return error
     }
 
-    static func unlistenError(underlying: Error) -> PSQLError {
-        var error = PSQLError(code: .unlistenFailed)
+    static func unlistenError(underlying: Error) -> PostgresError {
+        var error = PostgresError(code: .unlistenFailed)
         error.underlying = underlying
         return error
     }
@@ -465,12 +465,12 @@ public struct PSQLError: Error, @unchecked Sendable {
         case sasl(mechanisms: [String])
     }
 
-    static var poolClosed: PSQLError {
+    static var poolClosed: PostgresError {
         Self.init(code: .poolClosed)
     }
 }
 
-extension PSQLError: CustomStringConvertible {
+extension PostgresError: CustomStringConvertible {
     public var description: String {
         // This may seem very odd... But we are afraid that users might accidentally send the
         // unfiltered errors out to end-users. This may leak security relevant information. For this
@@ -481,7 +481,7 @@ extension PSQLError: CustomStringConvertible {
     }
 }
 
-extension PSQLError: CustomDebugStringConvertible {
+extension PostgresError: CustomDebugStringConvertible {
     public var debugDescription: String {
         var result = #"PSQLError(code: \#(self.code)"#
 
@@ -490,7 +490,7 @@ extension PSQLError: CustomDebugStringConvertible {
             result.append(
                 serverInfo.fields
                     .sorted(by: { $0.key.rawValue < $1.key.rawValue })
-                    .map { "\(PSQLError.ServerInfo.Field($0.0)): \($0.1)" }
+                    .map { "\(PostgresError.ServerInfo.Field($0.0)): \($0.1)" }
                     .joined(separator: ", ")
             )
             result.append("]")

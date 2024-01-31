@@ -616,12 +616,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             }
 
         case .failure(let error):
-            let finalError: PSQLError
-            if var psqlError = error as? PSQLError {
+            let finalError: PostgresError
+            if var psqlError = error as? PostgresError {
                 psqlError.code = .listenFailed
                 finalError = psqlError
             } else {
-                var psqlError = PSQLError(code: .listenFailed)
+                var psqlError = PostgresError(code: .listenFailed)
                 psqlError.underlying = error
                 finalError = psqlError
             }
@@ -702,8 +702,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                     context: context
                 )
             case .failure(let error):
-                let psqlError: PSQLError
-                if let error = error as? PSQLError {
+                let psqlError: PostgresError
+                if let error = error as? PostgresError {
                     psqlError = error
                 } else {
                     psqlError = .connectionError(underlying: error)
@@ -764,7 +764,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
     private func prepareStatementFailed(
         name: String,
-        error: PSQLError,
+        error: PostgresError,
         context: ChannelHandlerContext
     ) {
         let action = self.preparedStatementState.errorHappened(

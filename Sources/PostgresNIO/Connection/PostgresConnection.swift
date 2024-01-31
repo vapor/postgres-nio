@@ -163,7 +163,7 @@ public final class PostgresConnection: @unchecked Sendable {
                 connectFuture = bootstrap.connect(unixDomainSocketPath: path)
             case .bootstrapped(let channel):
                 guard channel.isActive else {
-                    return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
+                    return eventLoop.makeFailedFuture(PostgresError.connectionError(underlying: ChannelError.alreadyClosed))
                 }
                 connectFuture = eventLoop.makeSucceededFuture(channel)
             }
@@ -173,10 +173,10 @@ public final class PostgresConnection: @unchecked Sendable {
                 return connection.start(configuration: configuration).map { _ in connection }
             }.flatMapErrorThrowing { error -> PostgresConnection in
                 switch error {
-                case is PSQLError:
+                case is PostgresError:
                     throw error
                 default:
-                    throw PSQLError.connectionError(underlying: error)
+                    throw PostgresError.connectionError(underlying: error)
                 }
             }
         }
@@ -205,7 +205,7 @@ public final class PostgresConnection: @unchecked Sendable {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
         guard query.binds.count <= Int(UInt16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError(code: .tooManyParameters, query: query))
+            return self.channel.eventLoop.makeFailedFuture(PostgresError(code: .tooManyParameters, query: query))
         }
 
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
@@ -239,7 +239,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     func execute(_ executeStatement: PSQLExecuteStatement, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
         guard executeStatement.binds.count <= Int(UInt16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError(code: .tooManyParameters))
+            return self.channel.eventLoop.makeFailedFuture(PostgresError(code: .tooManyParameters))
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -341,7 +341,7 @@ extension PostgresConnection {
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
         guard query.binds.count <= Int(UInt16.max) else {
-            throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
+            throw PostgresError(code: .tooManyParameters, query: query, file: file, line: line)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -354,7 +354,7 @@ extension PostgresConnection {
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = query
@@ -409,7 +409,7 @@ extension PostgresConnection {
                 .map { $0.asyncSequence() }
                 .get()
                 .map { try preparedStatement.decodeRow($0) }
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = .init(
@@ -442,7 +442,7 @@ extension PostgresConnection {
             return try await promise.futureResult
                 .map { $0.commandTag }
                 .get()
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = .init(
@@ -462,7 +462,7 @@ enum CloseTarget {
 extension EventLoopFuture {
     func enrichPSQLError(query: PostgresQuery, file: String, line: Int) -> EventLoopFuture<Value> {
         return self.flatMapErrorThrowing { error in
-            if var error = error as? PSQLError {
+            if var error = error as? PostgresError {
                 error.file = file
                 error.line = line
                 error.query = query

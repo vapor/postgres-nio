@@ -1,4 +1,4 @@
-extension PostgresError {
+extension PostgresError.ServerInfo {
     public struct Code: ExpressibleByStringLiteral, Equatable {
         // Class 00 — Successful Completion
         public static let successfulCompletion: Code = "00000"
@@ -332,13 +332,6 @@ extension PostgresError {
 
         public init(raw: String) {
             self.raw = raw
-        }
-    }
-    
-    public var code: Code {
-        switch self {
-        case .protocol: return .internalError
-        case .connectionClosed: return .internalError
         }
     }
 }

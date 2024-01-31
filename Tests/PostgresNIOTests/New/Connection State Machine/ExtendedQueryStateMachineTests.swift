@@ -11,7 +11,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "DELETE FROM table WHERE id=\(1)"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
@@ -29,7 +29,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
@@ -83,7 +83,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "DELETE FROM table WHERE id=\(1)"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
@@ -91,7 +91,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
-        let psqlError = PSQLError.unexpectedBackendMessage(.authentication(.ok))
+        let psqlError = PostgresError.unexpectedBackendMessage(.authentication(.ok))
         XCTAssertEqual(state.authenticationMessageReceived(.ok),
                        .failQuery(promise, with: psqlError, cleanupContext: .init(action: .close, tasks: [], error: psqlError, closePromise: nil)))
     }
@@ -101,7 +101,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
@@ -145,7 +145,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
@@ -187,7 +187,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
@@ -241,7 +241,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
@@ -262,7 +262,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
-        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        promise.fail(PostgresError.uncleanShutdown) // we don't care about the error at all.
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 

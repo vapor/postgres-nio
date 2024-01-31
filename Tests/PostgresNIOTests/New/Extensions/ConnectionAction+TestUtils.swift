@@ -96,8 +96,8 @@ extension ConnectionStateMachine {
     }
 }
 
-extension PSQLError: Equatable {
-    public static func == (lhs: PSQLError, rhs: PSQLError) -> Bool {
+extension PostgresError: Equatable {
+    public static func == (lhs: PostgresError, rhs: PostgresError) -> Bool {
         return true
     }
 }

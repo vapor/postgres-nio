@@ -19,7 +19,7 @@ struct ExtendedQueryStateMachine {
         case drain([RowDescription.Column])
         
         case commandComplete(commandTag: String)
-        case error(PSQLError)
+        case error(PostgresError)
         
         case modifying
     }
@@ -30,19 +30,19 @@ struct ExtendedQueryStateMachine {
         case sendBindExecuteSync(PSQLExecuteStatement)
         
         // --- general actions
-        case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError)
+        case failQuery(EventLoopPromise<PSQLRowStream>, with: PostgresError)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
 
-        case evaluateErrorAtConnectionLevel(PSQLError)
+        case evaluateErrorAtConnectionLevel(PostgresError)
 
         case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
-        case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PSQLError)
+        case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PostgresError)
 
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
         case forwardRows([DataRow])
         case forwardStreamComplete([DataRow], commandTag: String)
-        case forwardStreamError(PSQLError, read: Bool)
+        case forwardStreamError(PostgresError, read: Bool)
 
         case read
         case wait
@@ -323,7 +323,7 @@ struct ExtendedQueryStateMachine {
     }
     
     mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> Action {
-        let error = PSQLError.server(errorMessage)
+        let error = PostgresError.server(errorMessage)
         switch self.state {
         case .initialized:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
@@ -354,7 +354,7 @@ struct ExtendedQueryStateMachine {
         return .wait
     }
     
-    mutating func errorHappened(_ error: PSQLError) -> Action {
+    mutating func errorHappened(_ error: PostgresError) -> Action {
         return self.setAndFireError(error)
     }
             
@@ -461,7 +461,7 @@ struct ExtendedQueryStateMachine {
     
     // MARK: Private Methods
     
-    private mutating func setAndFireError(_ error: PSQLError) -> Action {
+    private mutating func setAndFireError(_ error: PostgresError) -> Action {
         switch self.state {
         case .initialized(let context),
              .messagesSent(let context),

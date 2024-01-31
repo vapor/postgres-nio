@@ -69,7 +69,7 @@ class PreparedStatementStateMachineTests: XCTestCase {
         }
 
         // Simulate an error occurring during preparation
-        let error = PSQLError(code: .server)
+        let error = PostgresError(code: .server)
         let preparationCompleteAction = stateMachine.errorHappened(
             name: "test",
             error: error

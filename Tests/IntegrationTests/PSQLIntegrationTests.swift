@@ -40,7 +40,7 @@ final class IntegrationTests: XCTestCase {
 
         var connection: PostgresConnection?
         XCTAssertThrowsError(connection = try PostgresConnection.connect(on: eventLoopGroup.next(), configuration: config, id: 1, logger: logger).wait()) {
-            XCTAssertTrue($0 is PSQLError)
+            XCTAssertTrue($0 is PostgresError)
         }
 
         // In case of a test failure the created connection must be closed.
