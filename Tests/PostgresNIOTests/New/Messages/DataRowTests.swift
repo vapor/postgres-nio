@@ -113,7 +113,7 @@ class DataRowTests: XCTestCase {
     }
 }
 
-extension DataRow: ExpressibleByArrayLiteral {
+extension PostgresNIO.DataRow: Swift.ExpressibleByArrayLiteral {
     public typealias ArrayLiteralElement = PostgresEncodable
 
     public init(arrayLiteral elements: PostgresEncodable...) {
