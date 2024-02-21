@@ -345,8 +345,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             self.closeConnectionAndCleanup(cleanupContext, context: context)
         case .fireChannelInactive:
             context.fireChannelInactive()
-        case .sendParseDescribeSync(let name, let query):
-            self.sendParseDecribeAndSyncMessage(statementName: name, query: query, context: context)
+        case .sendParseDescribeSync(let name, let query, let bindingDataTypes):
+            self.sendParseDescribeAndSyncMessage(statementName: name, query: query, bindingDataTypes: bindingDataTypes, context: context)
         case .sendBindExecuteSync(let executeStatement):
             self.sendBindExecuteAndSyncMessage(executeStatement: executeStatement, context: context)
         case .sendParseDescribeBindExecuteSync(let query):
@@ -489,13 +489,14 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         }
     }
     
-    private func sendParseDecribeAndSyncMessage(
+    private func sendParseDescribeAndSyncMessage(
         statementName: String,
         query: String,
+        bindingDataTypes: [PostgresDataType],
         context: ChannelHandlerContext
     ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-        self.encoder.parse(preparedStatementName: statementName, query: query, parameters: [])
+        self.encoder.parse(preparedStatementName: statementName, query: query, parameters: bindingDataTypes)
         self.encoder.describePreparedStatement(statementName)
         self.encoder.sync()
         context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
@@ -724,6 +725,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         return .extendedQuery(.init(
             name: preparedStatement.name,
             query: preparedStatement.sql,
+            bindingDataTypes: preparedStatement.bindingDataTypes,
             logger: preparedStatement.logger,
             promise: promise
         ))

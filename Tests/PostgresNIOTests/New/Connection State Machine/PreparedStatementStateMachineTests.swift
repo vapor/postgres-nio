@@ -152,6 +152,7 @@ class PreparedStatementStateMachineTests: XCTestCase {
             name: "test",
             sql: "INSERT INTO test_table (column1) VALUES (1)",
             bindings: PostgresBindings(),
+            bindingDataTypes: [],
             logger: .psqlTest,
             promise: promise
         )
