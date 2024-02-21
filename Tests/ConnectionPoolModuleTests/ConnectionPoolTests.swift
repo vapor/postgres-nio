@@ -803,7 +803,7 @@ final class ConnectionPoolTests: XCTestCase {
 
             pool.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: 21)
 
-            for (index, request) in requests.enumerated() {
+            for (_, request) in requests.enumerated() {
                 let connection = try await request.future.success
                 connections.append(connection)
             }
