@@ -36,8 +36,8 @@ extension PostgresNIO.ConnectionStateMachine.ConnectionAction: Swift.Equatable {
             return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag
         case (.forwardStreamError(let lhsError, let lhsRead, let lhsCleanupContext), .forwardStreamError(let rhsError , let rhsRead, let rhsCleanupContext)):
             return lhsError == rhsError && lhsRead == rhsRead && lhsCleanupContext == rhsCleanupContext
-        case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
-            return lhsName == rhsName && lhsQuery == rhsQuery
+        case (.sendParseDescribeSync(let lhsName, let lhsQuery, let lhsDataTypes), .sendParseDescribeSync(let rhsName, let rhsQuery, let rhsDataTypes)):
+            return lhsName == rhsName && lhsQuery == rhsQuery && lhsDataTypes == rhsDataTypes
         case (.succeedPreparedStatementCreation(let lhsPromise, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsPromise, let rhsRowDescription)):
             return lhsPromise.futureResult === rhsPromise.futureResult && lhsRowDescription == rhsRowDescription
         case (.fireChannelInactive, .fireChannelInactive):

@@ -337,7 +337,7 @@ class PostgresConnectionTests: XCTestCase {
 
             let prepareRequest = try await channel.waitForPrepareRequest()
             XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
-            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            XCTAssertEqual(prepareRequest.parse.parameters.first, .text)
             guard case .preparedStatement(let name) = prepareRequest.describe else {
                 fatalError("Describe should contain a prepared statement")
             }
@@ -393,7 +393,7 @@ class PostgresConnectionTests: XCTestCase {
 
             let prepareRequest = try await channel.waitForPrepareRequest()
             XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
-            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            XCTAssertEqual(prepareRequest.parse.parameters.first, .text)
             guard case .preparedStatement(let name) = prepareRequest.describe else {
                 fatalError("Describe should contain a prepared statement")
             }
@@ -487,7 +487,7 @@ class PostgresConnectionTests: XCTestCase {
             // The channel deduplicates prepare requests, we're going to see only one of them
             let prepareRequest = try await channel.waitForPrepareRequest()
             XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
-            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            XCTAssertEqual(prepareRequest.parse.parameters.first, .text)
             guard case .preparedStatement(let name) = prepareRequest.describe else {
                 fatalError("Describe should contain a prepared statement")
             }
@@ -555,7 +555,7 @@ class PostgresConnectionTests: XCTestCase {
 
             let prepareRequest = try await channel.waitForPrepareRequest()
             XCTAssertEqual(prepareRequest.parse.query, "SELECT datname FROM pg_stat_activity WHERE state = $1")
-            XCTAssertEqual(prepareRequest.parse.parameters.count, 0)
+            XCTAssertEqual(prepareRequest.parse.parameters.first, .text)
             guard case .preparedStatement(let name) = prepareRequest.describe else {
                 fatalError("Describe should contain a prepared statement")
             }

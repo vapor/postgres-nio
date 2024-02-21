@@ -26,7 +26,7 @@ struct ExtendedQueryStateMachine {
     
     enum Action {
         case sendParseDescribeBindExecuteSync(PostgresQuery)
-        case sendParseDescribeSync(name: String, query: String)
+        case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
         case sendBindExecuteSync(PSQLExecuteStatement)
         
         // --- general actions
@@ -79,10 +79,10 @@ struct ExtendedQueryStateMachine {
                 return .sendBindExecuteSync(prepared)
             }
 
-        case .prepareStatement(let name, let query, _):
+        case .prepareStatement(let name, let query, let bindingDataTypes, _):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .messagesSent(queryContext)
-                return .sendParseDescribeSync(name: name, query: query)
+                return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
             }
         }
     }
@@ -107,7 +107,7 @@ struct ExtendedQueryStateMachine {
             case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                 return .failQuery(eventLoopPromise, with: .queryCancelled)
 
-            case .prepareStatement(_, _, let eventLoopPromise):
+            case .prepareStatement(_, _, _, let eventLoopPromise):
                 return .failPreparedStatementCreation(eventLoopPromise, with: .queryCancelled)
             }
 
@@ -165,7 +165,7 @@ struct ExtendedQueryStateMachine {
                 return .wait
             }
 
-        case .prepareStatement(_, _, let promise):
+        case .prepareStatement(_, _, _, let promise):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .noDataMessageReceived(queryContext)
                 return .succeedPreparedStatementCreation(promise, with: nil)
@@ -200,7 +200,7 @@ struct ExtendedQueryStateMachine {
         case .unnamed, .executeStatement:
             return .wait
 
-        case .prepareStatement(_, _, let eventLoopPromise):
+        case .prepareStatement(_, _, _, let eventLoopPromise):
             return .succeedPreparedStatementCreation(eventLoopPromise, with: rowDescription)
         }
     }
@@ -477,7 +477,7 @@ struct ExtendedQueryStateMachine {
                 switch context.query {
                 case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                     return .failQuery(eventLoopPromise, with: error)
-                case .prepareStatement(_, _, let eventLoopPromise):
+                case .prepareStatement(_, _, _, let eventLoopPromise):
                     return .failPreparedStatementCreation(eventLoopPromise, with: error)
                 }
             }
