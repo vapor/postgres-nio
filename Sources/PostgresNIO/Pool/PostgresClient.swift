@@ -290,6 +290,58 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         return try await closure(connection)
     }
 
+    /// Run a query on the Postgres server the client is connected to.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file, the query was started in. Used for better error reporting.
+    ///   - line: The line, the query was started in. Used for better error reporting.
+    /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
+    ///            The sequence  be discarded.
+    @discardableResult
+    public func query(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> PostgresRowSequence {
+        do {
+            guard query.binds.count <= Int(UInt16.max) else {
+                throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
+            }
+
+            let connection = try await self.leaseConnection()
+
+            var logger = logger
+            logger[postgresMetadataKey: .connectionID] = "\(connection.id)"
+
+            let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+            let context = ExtendedQueryContext(
+                query: query,
+                logger: logger,
+                promise: promise
+            )
+
+            connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+
+            promise.futureResult.whenFailure { _ in
+                self.pool.releaseConnection(connection)
+            }
+
+            return try await promise.futureResult.map {
+                $0.asyncSequence(onFinish: {
+                    self.pool.releaseConnection(connection)
+                })
+            }.get()
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+    }
+
     /// The client's run method. Users must call this function in order to start the client's background task processing
     /// like creating and destroying connections and running timers. 
     ///
