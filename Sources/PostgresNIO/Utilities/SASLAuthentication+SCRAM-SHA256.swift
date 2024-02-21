@@ -84,7 +84,7 @@ fileprivate extension Array where Element == UInt8 {
     */
     var isValidScramValue: Bool {
         // TODO: FInd a better way than doing a whole construction of String...
-        return self.count > 0 && !(String(bytes: self, encoding: .utf8)?.contains(",") ?? true)
+        return self.count > 0 && !(String(decoding: self, as: Unicode.UTF8.self).contains(","))
     }
 
 }
@@ -180,19 +180,19 @@ fileprivate struct SCRAMMessageParser {
                 case let (.gp(bind),               .none,         .none): return .c(binding: bind)
                 default: return nil
             }
-        case UInt8(ascii: "n") where !isGS2Header: return String(bytes: value, encoding: .utf8)?.decodedAsSaslName.map { .n($0) }
+        case UInt8(ascii: "n") where !isGS2Header: return String(decoding: value, as: Unicode.UTF8.self).decodedAsSaslName.map { .n($0) }
         case UInt8(ascii: "s") where !isGS2Header: return value.decodingBase64().map { .s($0) }
         case UInt8(ascii: "i") where !isGS2Header: return String(printableAscii: value).flatMap { UInt32.init($0) }.map { .i($0) }
         case UInt8(ascii: "p") where !isGS2Header: return value.decodingBase64().map { .p($0) }
         case UInt8(ascii: "v") where !isGS2Header: return value.decodingBase64().map { .v($0) }
         case UInt8(ascii: "e") where !isGS2Header: // TODO: actually map the specific enum string values
             guard value.isValidScramValue else { return nil }
-            return String(bytes: value, encoding: .utf8).flatMap { SCRAMServerError(rawValue: $0) }.map { .e($0) }
+            return SCRAMServerError(rawValue: String(decoding: value, as: Unicode.UTF8.self)).flatMap { .e($0) }
 
         case UInt8(ascii: "y") where isGS2Header && value.count == 0: return .gp(.unused)
         case UInt8(ascii: "n") where isGS2Header && value.count == 0: return .gp(.unsupported)
         case UInt8(ascii: "p") where isGS2Header: return String(asciiAlphanumericMorse: value).map { .gp(.bind($0, nil)) }
-        case UInt8(ascii: "a") where isGS2Header: return String(bytes: value, encoding: .utf8)?.decodedAsSaslName.map { .a($0) }
+        case UInt8(ascii: "a") where isGS2Header: return String(decoding: value, as: Unicode.UTF8.self).decodedAsSaslName.map { .a($0) }
         case .none where isGS2Header: return .a(nil)
 
         default:
