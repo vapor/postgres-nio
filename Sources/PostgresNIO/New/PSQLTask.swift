@@ -21,7 +21,7 @@ enum PSQLTask {
                 eventLoopPromise.fail(error)
             case .executeStatement(_, let eventLoopPromise):
                 eventLoopPromise.fail(error)
-            case .prepareStatement(_, _, let eventLoopPromise):
+            case .prepareStatement(_, _, _, let eventLoopPromise):
                 eventLoopPromise.fail(error)
             }
 
@@ -35,7 +35,7 @@ final class ExtendedQueryContext {
     enum Query {
         case unnamed(PostgresQuery, EventLoopPromise<PSQLRowStream>)
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
-        case prepareStatement(name: String, query: String, EventLoopPromise<RowDescription?>)
+        case prepareStatement(name: String, query: String, bindingDataTypes: [PostgresDataType], EventLoopPromise<RowDescription?>)
     }
     
     let query: Query
@@ -62,10 +62,11 @@ final class ExtendedQueryContext {
     init(
         name: String,
         query: String,
+        bindingDataTypes: [PostgresDataType],
         logger: Logger,
         promise: EventLoopPromise<RowDescription?>
     ) {
-        self.query = .prepareStatement(name: name, query: query, promise)
+        self.query = .prepareStatement(name: name, query: query, bindingDataTypes: bindingDataTypes, promise)
         self.logger = logger
     }
 }
@@ -73,6 +74,7 @@ final class ExtendedQueryContext {
 final class PreparedStatementContext: Sendable {
     let name: String
     let sql: String
+    let bindingDataTypes: [PostgresDataType]
     let bindings: PostgresBindings
     let logger: Logger
     let promise: EventLoopPromise<PSQLRowStream>
@@ -81,12 +83,18 @@ final class PreparedStatementContext: Sendable {
         name: String,
         sql: String,
         bindings: PostgresBindings,
+        bindingDataTypes: [PostgresDataType],
         logger: Logger,
         promise: EventLoopPromise<PSQLRowStream>
     ) {
         self.name = name
         self.sql = sql
         self.bindings = bindings
+        if bindingDataTypes.isEmpty {
+            self.bindingDataTypes = bindings.metadata.map(\.dataType)
+        } else {
+            self.bindingDataTypes = bindingDataTypes
+        }
         self.logger = logger
         self.promise = promise
     }
