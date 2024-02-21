@@ -342,6 +342,48 @@ public final class PostgresClient: Sendable {
         }
     }
 
+    /// Execute a prepared statement, taking care of the preparation when necessary
+    public func execute<Statement: PostgresPreparedStatement, Row>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Row> where Row == Statement.Row {
+        let bindings = try preparedStatement.makeBindings()
+
+        do {
+            let connection = try await self.leaseConnection()
+
+            let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+            let task = HandlerTask.executePreparedStatement(.init(
+                name: String(reflecting: Statement.self),
+                sql: Statement.sql,
+                bindings: bindings,
+                bindingDataTypes: Statement.bindingDataTypes,
+                logger: logger,
+                promise: promise
+            ))
+            connection.channel.write(task, promise: nil)
+
+            promise.futureResult.whenFailure { _ in
+                self.pool.releaseConnection(connection)
+            }
+
+            return try await promise.futureResult
+                .map { $0.asyncSequence(onFinish: { self.pool.releaseConnection(connection) }) }
+                .get()
+                .map { try preparedStatement.decodeRow($0) }
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = .init(
+                unsafeSQL: Statement.sql,
+                binds: bindings
+            )
+            throw error // rethrow with more metadata
+        }
+    }
+
     /// The client's run method. Users must call this function in order to start the client's background task processing
     /// like creating and destroying connections and running timers. 
     ///
