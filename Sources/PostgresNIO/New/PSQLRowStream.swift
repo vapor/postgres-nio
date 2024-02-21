@@ -86,6 +86,7 @@ final class PSQLRowStream: @unchecked Sendable {
             elementType: DataRow.self,
             failureType: Error.self,
             backPressureStrategy: AdaptiveRowBuffer(),
+            finishOnDeinit: false,
             delegate: self
         )
 
