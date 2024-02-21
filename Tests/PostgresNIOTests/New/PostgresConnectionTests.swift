@@ -155,7 +155,7 @@ class PostgresConnectionTests: XCTestCase {
                     _ = try await iterator.next()
                     XCTFail("Did not expect to not throw")
                 } catch {
-                    print(error)
+                    self.logger.error("error", metadata: ["error": "\(error)"])
                 }
             }
 
