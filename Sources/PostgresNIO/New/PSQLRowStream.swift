@@ -35,7 +35,7 @@ final class PSQLRowStream: @unchecked Sendable {
         case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, PSQLRowsDataSource)
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, PSQLRowsDataSource)
         case consumed(Result<String, Error>)
-        case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource)
+        case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource, onFinish: @Sendable () -> ())
     }
     
     internal let rowDescription: [RowDescription.Column]
@@ -75,7 +75,7 @@ final class PSQLRowStream: @unchecked Sendable {
     
     // MARK: Async Sequence
 
-    func asyncSequence() -> PostgresRowSequence {
+    func asyncSequence(onFinish: @escaping @Sendable () -> () = {}) -> PostgresRowSequence {
         self.eventLoop.preconditionInEventLoop()
 
         guard case .waitingForConsumer(let bufferState) = self.downstreamState else {
@@ -95,13 +95,13 @@ final class PSQLRowStream: @unchecked Sendable {
         switch bufferState {
         case .streaming(let bufferedRows, let dataSource):
             let yieldResult = source.yield(contentsOf: bufferedRows)
-            self.downstreamState = .asyncSequence(source, dataSource)
-
+            self.downstreamState = .asyncSequence(source, dataSource, onFinish: onFinish)
             self.executeActionBasedOnYieldResult(yieldResult, source: dataSource)
 
         case .finished(let buffer, let commandTag):
             _ = source.yield(contentsOf: buffer)
             source.finish()
+            onFinish()
             self.downstreamState = .consumed(.success(commandTag))
             
         case .failure(let error):
@@ -130,7 +130,7 @@ final class PSQLRowStream: @unchecked Sendable {
         case .consumed:
             break
             
-        case .asyncSequence(_, let dataSource):
+        case .asyncSequence(_, let dataSource, _):
             dataSource.request(for: self)
         }
     }
@@ -147,9 +147,10 @@ final class PSQLRowStream: @unchecked Sendable {
 
     private func cancel0() {
         switch self.downstreamState {
-        case .asyncSequence(_, let dataSource):
+        case .asyncSequence(_, let dataSource, let onFinish):
             self.downstreamState = .consumed(.failure(CancellationError()))
             dataSource.cancel(for: self)
+            onFinish()
 
         case .consumed:
             return
@@ -320,7 +321,7 @@ final class PSQLRowStream: @unchecked Sendable {
             // immediately request more
             dataSource.request(for: self)
 
-        case .asyncSequence(let consumer, let source):
+        case .asyncSequence(let consumer, let source, _):
             let yieldResult = consumer.yield(contentsOf: newRows)
             self.executeActionBasedOnYieldResult(yieldResult, source: source)
             
@@ -359,10 +360,11 @@ final class PSQLRowStream: @unchecked Sendable {
             self.downstreamState = .consumed(.success(commandTag))
             promise.succeed(rows)
 
-        case .asyncSequence(let source, _):
-            source.finish()
+        case .asyncSequence(let source, _, let onFinish):
             self.downstreamState = .consumed(.success(commandTag))
-            
+            source.finish()
+            onFinish()
+
         case .consumed:
             break
         }
@@ -384,9 +386,10 @@ final class PSQLRowStream: @unchecked Sendable {
             self.downstreamState = .consumed(.failure(error))
             promise.fail(error)
 
-        case .asyncSequence(let consumer, _):
-            consumer.finish(error)
+        case .asyncSequence(let consumer, _, let onFinish):
             self.downstreamState = .consumed(.failure(error))
+            consumer.finish(error)
+            onFinish()
 
         case .consumed:
             break
