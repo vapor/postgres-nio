@@ -8,11 +8,11 @@ import _ConnectionPoolModule
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
 ///
-/// > Important:
+/// > Warning:
 /// The client can only lease connections if the user is running the client's ``run()`` method in a long running task:
 ///
 /// ```swift
-/// let client = PostgresClient(configuration: configuration, logger: logger)
+/// let client = PostgresClient(configuration: configuration)
 /// await withTaskGroup(of: Void.self) {
 ///   taskGroup.addTask {
 ///     client.run() // !important
@@ -32,7 +32,6 @@ import _ConnectionPoolModule
 /// }
 /// ```
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-@_spi(ConnectionPool)
 public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public struct Configuration: Sendable {
         public struct TLS: Sendable {
@@ -246,8 +245,22 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     let factory: ConnectionFactory
     let runningAtomic = ManagedAtomic(false)
     let backgroundLogger: Logger
-    
+
+    /// Creates a new ``PostgresClient``, that does not log any background information.
+    /// Don't forget to run ``run()`` the client in a long running task.
+    ///
+    /// - Parameters:
+    ///   - configuration: The client's configuration. See ``Configuration`` for details.
+    ///   - eventLoopGroup: The underlying NIO `EventLoopGroup`. Defaults to ``defaultEventLoopGroup``.
+    public convenience init(
+        configuration: Configuration,
+        eventLoopGroup: any EventLoopGroup = PostgresClient.defaultEventLoopGroup
+    ) {
+        self.init(configuration: configuration, eventLoopGroup: eventLoopGroup, backgroundLogger: Self.loggingDisabled)
+    }
+
     /// Creates a new ``PostgresClient``. Don't forget to run ``run()`` the client in a long running task.
+    ///
     /// - Parameters:
     ///   - configuration: The client's configuration. See ``Configuration`` for details.
     ///   - eventLoopGroup: The underlying NIO `EventLoopGroup`. Defaults to ``defaultEventLoopGroup``.
@@ -302,10 +315,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     @discardableResult
     public func query(
         _ query: PostgresQuery,
-        logger: Logger,
+        logger: Logger? = nil,
         file: String = #fileID,
         line: Int = #line
     ) async throws -> PostgresRowSequence {
+        let logger = logger ?? Self.loggingDisabled
         do {
             guard query.binds.count <= Int(UInt16.max) else {
                 throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
@@ -345,11 +359,12 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// Execute a prepared statement, taking care of the preparation when necessary
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
-        logger: Logger,
+        logger: Logger? = nil,
         file: String = #fileID,
         line: Int = #line
     ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Row> where Row == Statement.Row {
         let bindings = try preparedStatement.makeBindings()
+        let logger = logger ?? Self.loggingDisabled
 
         do {
             let connection = try await self.leaseConnection()
@@ -412,6 +427,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public static var defaultEventLoopGroup: EventLoopGroup {
         PostgresConnection.defaultEventLoopGroup
     }
+
+    static let loggingDisabled = Logger(label: "Postgres-do-not-log", factory: { _ in SwiftLogNoOpLogHandler() })
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -444,7 +461,6 @@ extension ConnectionPoolConfiguration {
     }
 }
 
-@_spi(ConnectionPool)
 extension PostgresConnection: PooledConnection {
     public func close() {
         self.channel.close(mode: .all, promise: nil)
