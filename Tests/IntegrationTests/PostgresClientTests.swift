@@ -27,7 +27,7 @@ final class PostgresClientTests: XCTestCase {
 
             let iterations = 1000
 
-            for i in 0..<iterations {
+            for _ in 0..<iterations {
                 taskGroup.addTask {
                     try await client.withConnection() { connection in
                         _ = try await connection.query("SELECT 1", logger: logger)
