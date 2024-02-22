@@ -8,29 +8,28 @@ import _ConnectionPoolModule
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
 ///
-/// > Warning:
-/// The client can only lease connections if the user is running the client's ``run()`` method in a long running task:
+/// ## Creating a client
 ///
-/// ```swift
-/// let client = PostgresClient(configuration: configuration)
-/// await withTaskGroup(of: Void.self) {
-///   taskGroup.addTask {
-///     client.run() // !important
-///   }
+/// You create a ``PostgresClient`` by first creating a ``PostgresClient/Configuration`` struct that you can
+/// use to modify the client's behavior.
 ///
-///   do {
-///     let rows = try await connection.query("SELECT userID, name, age FROM users;")
-///     for try await (userID, name, age) in rows.decode((UUID, String, Int).self) {
-///       // do something with the values
-///     }
-///   } catch {
-///     // handle errors
-///   }
-///   
-///   // shutdown the client
-///   taskGroup.cancelAll()
-/// }
-/// ```
+/// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "configuration")
+///
+/// Now you can create a client with your configuration object:
+///
+/// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "makeClient")
+///
+/// ## Running a client
+///
+/// ``PostgresClient`` relies on structured concurrency. Because of this it needs a task in which it can schedule all the
+/// background work that it needs to do in order to manage connections on the users behave. For this reason, developers
+/// must provide a task to the client by scheduling the client's run method in a long running task:
+///
+/// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
+///
+/// ``PostgresClient`` can not lease connections, if its ``run()`` method isn't active. Cancelling the ``run()`` method
+/// is equivalent to closing the client. Once a client's ``run()`` method has been cancelled, executing queries or prepared
+/// statements will fail.
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public struct Configuration: Sendable {
@@ -247,7 +246,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     let backgroundLogger: Logger
 
     /// Creates a new ``PostgresClient``, that does not log any background information.
-    /// Don't forget to run ``run()`` the client in a long running task.
+    ///
+    /// > Warning:
+    /// The client can only lease connections if the user is running the client's ``run()`` method in a long running task.
     ///
     /// - Parameters:
     ///   - configuration: The client's configuration. See ``Configuration`` for details.
@@ -399,10 +400,21 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         }
     }
 
-    /// The client's run method. Users must call this function in order to start the client's background task processing
-    /// like creating and destroying connections and running timers. 
+    /// The structured root task for the client's background work.
     ///
-    /// Calls to ``withConnection(_:)`` will emit a `logger` warning, if ``run()`` hasn't been called previously.
+    /// > Warning:
+    /// Users must call this function in order to allow the client to process any background work. Executing queries,
+    /// prepared statements or leasing connections will hang until the developer executes the client's ``run()``
+    /// method.
+    ///
+    /// Cancelling the task which executes the ``run()`` method, is equivalent to closing the client. Once the task
+    /// has been cancelled the client is not able to process any new queries or prepared statements.
+    ///
+    /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
+    ///
+    /// > Note:
+    /// ``PostgresClient`` implements [ServiceLifecycle](https://github.com/swift-server/swift-service-lifecycle)'s `Service` protocol. Because of this
+    /// ``PostgresClient`` can be passed to a `ServiceGroup` for easier lifecycle management.
     public func run() async {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")

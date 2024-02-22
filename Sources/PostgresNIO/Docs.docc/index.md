@@ -8,80 +8,51 @@
 
 ## Overview
 
-Features:
+``PostgresNIO`` allows you to connect to, authorize with, query, and retrieve results from a 
+PostgreSQL server. PostgreSQL is an open source relational database.
 
-- A ``PostgresConnection`` which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server using [SwiftNIO].
-- An async/await interface that supports backpressure 
-- Automatic conversions between Swift primitive types and the Postgres wire format
-- Integrated with the Swift server ecosystem, including use of [SwiftLog].
-- Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
-- Support for `Network.framework` when available (e.g. on Apple platforms)
+Use a ``PostgresConnection`` to create a connection to the PostgreSQL server. You can then use it to
+run queries and prepared statements against the server. ``PostgresConnection`` also supports 
+PostgreSQL's Listen & Notify API.
+
+Developers, who don't want to manage connections themselves, can use the ``PostgresClient``, which 
+offers the same functionality as ``PostgresConnection``. ``PostgresClient``
+pools connections for rapid connection reuse and hides the complexities of connection 
+management from the user, allowing developers to focus on their SQL queries. ``PostgresClient``
+implements the `Service` protocol from Service Lifecycle allowing an easy adoption in Swift server
+applications.
+
+``PostgresNIO`` embraces Swift structured concurrency, offering async/await APIs which handle
+task cancellation. The query interface makes use of backpressure to ensure that memory can not grow 
+unbounded for queries that return thousands of rows.
+
+``PostgresNIO`` runs efficiently on Linux and Apple platforms. On Apple platforms developers can 
+configure ``PostgresConnection`` to use `Network.framework` as the underlying transport framework. 
  
 ## Topics
 
-### Articles
+### Essentials
 
-- <doc:migrations>
-
-### Connections
-
+- ``PostgresClient``
+- ``PostgresClient/Configuration``
 - ``PostgresConnection``
+- <doc:running-queries>
 
-### Querying
+### Advanced
 
-- ``PostgresQuery``
-- ``PostgresBindings``
-- ``PostgresRow``
-- ``PostgresRowSequence``
-- ``PostgresRandomAccessRow``
-- ``PostgresCell``
-- ``PreparedQuery``
-- ``PostgresQueryMetadata``
-
-### Encoding and Decoding
-
-- ``PostgresEncodable``
-- ``PostgresEncodingContext``
-- ``PostgresDecodable``
-- ``PostgresDecodingContext``
-- ``PostgresArrayEncodable``
-- ``PostgresArrayDecodable``
-- ``PostgresJSONEncoder``
-- ``PostgresJSONDecoder``
-- ``PostgresDataType``
-- ``PostgresFormat``
-- ``PostgresNumeric``
-
-### Notifications
-
-- ``PostgresListenContext``
+- <doc:coding>
+- <doc:prepared-statement>
+- <doc:listen>
 
 ### Errors
 
 - ``PostgresError``
 - ``PostgresDecodingError``
+- ``PSQLError``
 
-### Deprecated
+### Deprecations
 
-These types are already deprecated or will be deprecated in the near future. All of them will be 
-removed from the public API with the next major release. 
-
-- ``PostgresDatabase``
-- ``PostgresData``
-- ``PostgresDataConvertible``
-- ``PostgresQueryResult``
-- ``PostgresJSONCodable``
-- ``PostgresJSONBCodable``
-- ``PostgresMessageEncoder``
-- ``PostgresMessageDecoder``
-- ``PostgresRequest``
-- ``PostgresMessage``
-- ``PostgresMessageType``
-- ``PostgresFormatCode``
-- ``SASLAuthenticationManager``
-- ``SASLAuthenticationMechanism``
-- ``SASLAuthenticationError``
-- ``SASLAuthenticationStepResult``
+- <doc:deprecated>
 
 [SwiftNIO]: https://github.com/apple/swift-nio
 [SwiftLog]: https://github.com/apple/swift-log
