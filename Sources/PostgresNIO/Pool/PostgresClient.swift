@@ -2,6 +2,7 @@ import NIOCore
 import NIOSSL
 import Atomics
 import Logging
+import ServiceLifecycle
 import _ConnectionPoolModule
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
@@ -17,23 +18,22 @@ import _ConnectionPoolModule
 ///     client.run() // !important
 ///   }
 ///
-///   taskGroup.addTask {
-///     client.withConnection { connection in
-///       do {
-///         let rows = try await connection.query("SELECT userID, name, age FROM users;")
-///         for try await (userID, name, age) in rows.decode((UUID, String, Int).self) {
-///           // do something with the values
-///         }
-///       } catch {
-///         // handle errors
-///       }
+///   do {
+///     let rows = try await connection.query("SELECT userID, name, age FROM users;")
+///     for try await (userID, name, age) in rows.decode((UUID, String, Int).self) {
+///       // do something with the values
 ///     }
+///   } catch {
+///     // handle errors
 ///   }
+///   
+///   // shutdown the client
+///   taskGroup.cancelAll()
 /// }
 /// ```
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 @_spi(ConnectionPool)
-public final class PostgresClient: Sendable {
+public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public struct Configuration: Sendable {
         public struct TLS: Sendable {
             enum Base {
@@ -391,7 +391,10 @@ public final class PostgresClient: Sendable {
     public func run() async {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
-        await self.pool.run()
+
+        await cancelOnGracefulShutdown {
+            await self.pool.run()
+        }
     }
 
     // MARK: - Private Methods -
