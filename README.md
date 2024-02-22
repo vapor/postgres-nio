@@ -52,7 +52,7 @@ Add `PostgresNIO` as dependency to your `Package.swift`:
 
 ```swift
   dependencies: [
-    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.14.0"),
+    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
     ...
   ]
 ```
@@ -147,7 +147,7 @@ Sending parameterized queries to the database is also supported (in the coolest 
 let id = 1
 let username = "fancyuser"
 let birthday = Date()
-try await connection.query("""
+try await client.query("""
   INSERT INTO users (id, username, birthday) VALUES (\(id), \(username), \(birthday))
   """, 
   logger: logger
