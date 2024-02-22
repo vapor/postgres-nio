@@ -28,14 +28,13 @@
 Features:
 
 - A [`PostgresConnection`] which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
+- A [`PostgresClient`] which pools and manages connections 
 - An async/await interface that supports backpressure 
 - Automatic conversions between Swift primitive types and the Postgres wire format
-- Integrated with the Swift server ecosystem, including use of [SwiftLog].
+- Integrated with the Swift server ecosystem, including use of [SwiftLog] and [ServiceLifecycle].
 - Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
 - Support for `Network.framework` when available (e.g. on Apple platforms)
 - Supports running on Unix Domain Sockets
-
-PostgresNIO does not provide a `ConnectionPool` as of today, but this is a [feature high on our list](https://github.com/vapor/postgres-nio/issues/256). If you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
 
 ## API Docs
 
@@ -43,6 +42,9 @@ Check out the [PostgresNIO API docs][Documentation] for a
 detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting started
+
+Interested in an example? We prepared a simple [Birthday example](/vapor/postgres-nio/tree/main/Snippets/Birthdays.swift) 
+in the Snippets folder.
 
 #### Adding the dependency
 
@@ -64,14 +66,14 @@ Add `PostgresNIO` to the target you want to use it in:
   ]
 ```
 
-#### Creating a connection
+#### Creating a client
 
-To create a connection, first create a connection configuration object:
+To create a [`PostgresClient`], which pools connections for you, first create a configuration object:
 
 ```swift
 import PostgresNIO
 
-let config = PostgresConnection.Configuration(
+let config = PostgresClient.Configuration(
   host: "localhost",
   port: 5432,
   username: "my_username",
@@ -81,50 +83,35 @@ let config = PostgresConnection.Configuration(
 )
 ```
 
-To create a connection we need a [`Logger`], that is used to log connection background events.
-
+Next you can create you client with it:
 ```swift
-import Logging
-
-let logger = Logger(label: "postgres-logger")
+let client = PostgresClient(configuration: config)
 ```
 
-Now we can put it together:
-
+Once you have create your client, you must [`run()`] it:
 ```swift
-import PostgresNIO
-import Logging
+await withTaskGroup(of: Void.self) { taskGroup in
+    taskGroup.addTask {
+        await client.run() // !important
+    }
 
-let logger = Logger(label: "postgres-logger")
+    // You can use the client while the `client.run()` method is not cancelled.
 
-let config = PostgresConnection.Configuration(
-  host: "localhost",
-  port: 5432,
-  username: "my_username",
-  password: "my_password",
-  database: "my_database",
-  tls: .disable
-)
-
-let connection = try await PostgresConnection.connect(
-  configuration: config,
-  id: 1,
-  logger: logger
-)
-
-// Close your connection once done
-try await connection.close()
+    // To shutdown the client, cancel its run method, by cancelling the taskGroup.
+    taskGroup.cancelAll()
+}
 ```
 
 #### Querying
 
-Once a connection is established, queries can be sent to the server. This is very straightforward:
+Once a client is running, queries can be sent to the server. This is straightforward:
 
 ```swift
-let rows = try await connection.query("SELECT id, username, birthday FROM users", logger: logger)
+let rows = try await client.query("SELECT id, username, birthday FROM users")
 ```
 
-The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. The rows can be iterated one-by-one: 
+The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. 
+The rows can be iterated one-by-one: 
 
 ```swift
 for try await row in rows {
@@ -184,6 +171,8 @@ Please see [SECURITY.md] for details on the security process.
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
 [`PostgresConnection`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection
+[`PostgresClient`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresclient
+[`run()`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresclient/run()
 [`query(_:logger:)`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
 [`PostgresQuery`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresquery
 [`PostgresRow`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrow
@@ -193,4 +182,5 @@ Please see [SECURITY.md] for details on the security process.
 [SwiftNIO]: https://github.com/apple/swift-nio
 [PostgresKit]: https://github.com/vapor/postgres-kit
 [SwiftLog]: https://github.com/apple/swift-log
+[ServiceLifecycle]: https://github.com/swift-server/swift-service-lifecycle
 [`Logger`]: https://apple.github.io/swift-log/docs/current/Logging/Structs/Logger.html
