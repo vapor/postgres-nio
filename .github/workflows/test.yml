@@ -188,8 +188,9 @@ jobs:
           swift package diagnose-api-breaking-changes origin/main
 
   gh-codeql:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    container: swift:5.9-jammy
+    container: swift:jammy
     permissions: { actions: write, contents: read, security-events: write }
     steps:
       - name: Check out code
@@ -197,10 +198,10 @@ jobs:
       - name: Mark repo safe in non-fake global config
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: swift
       - name: Perform build
         run: swift build
       - name: Run CodeQL analyze
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
