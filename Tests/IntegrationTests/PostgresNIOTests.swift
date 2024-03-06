@@ -9,12 +9,14 @@ import NIOSSL
 final class PostgresNIOTests: XCTestCase {
     
     private var group: EventLoopGroup!
-
     private var eventLoop: EventLoop { self.group.next() }
+    
+    override class func setUp() {
+        XCTAssertTrue(isLoggingConfigured)
+    }
     
     override func setUpWithError() throws {
         try super.setUpWithError()
-        XCTAssertTrue(isLoggingConfigured)
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
     
@@ -1437,7 +1439,7 @@ final class PostgresNIOTests: XCTestCase {
 let isLoggingConfigured: Bool = {
     LoggingSystem.bootstrap { label in
         var handler = StreamLogHandler.standardOutput(label: label)
-        handler.logLevel = env("LOG_LEVEL").flatMap { Logger.Level(rawValue: $0) } ?? .debug
+        handler.logLevel = env("LOG_LEVEL").flatMap { .init(rawValue: $0) } ?? .info
         return handler
     }
     return true
