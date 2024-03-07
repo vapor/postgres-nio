@@ -137,12 +137,14 @@ jobs:
         postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
-        macos-version:
-          - 'macos-13'
-          - 'macos-14'
         xcode-version:
           - '~14.3'
           - '~15.0'
+        include:
+          - xcode-version: '~14.3'
+            macos-version: 'macos-13'
+          - xcode-version: '~15.0'
+            macos-version: 'macos-14'
     runs-on: ${{ matrix.macos-version }}
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
