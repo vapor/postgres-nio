@@ -815,7 +815,10 @@ final class PostgresNIOTests: XCTestCase {
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("select $1::date[] as array", [data]).wait())
         let row = rows?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "array"].array(of: Date.self)?.map { $0.addingTimeInterval(-TimeInterval(TimeZone.autoupdatingCurrent.secondsFromGMT())) }, [date1, date2, date3])
+        XCTAssertEqual(
+            row?[data: "array"].array(of: Date.self)?.map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) },
+            [date1, date2, date3].map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) }
+        )
     }
 
     // https://github.com/vapor/postgres-nio/issues/143
