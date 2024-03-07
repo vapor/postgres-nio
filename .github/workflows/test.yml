@@ -21,10 +21,10 @@ jobs:
           - swift:5.7-jammy
           - swift:5.8-jammy
           - swift:5.9-jammy
-          - swiftlang/swift:nightly-5.10-jammy
+          - swift:5.10-jammy
           - swiftlang/swift:nightly-main-jammy
         include:
-          - swift-image: swift:5.9-jammy
+          - swift-image: swift:5.10-jammy
             code-coverage: true
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -63,7 +63,7 @@ jobs:
           - postgres-image: postgres:12
             postgres-auth: trust
     container:
-      image: swift:5.9-jammy
+      image: swift:5.10-jammy
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
@@ -137,10 +137,13 @@ jobs:
         postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
+        macos-version:
+          - 'macos-13'
+          - 'macos-14'
         xcode-version:
           - '~14.3'
           - '~15.0'
-    runs-on: macos-13
+    runs-on: ${{ matrix.macos-version }}
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
       POSTGRES_USER: 'test_username'
