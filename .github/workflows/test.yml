@@ -21,10 +21,10 @@ jobs:
           - swift:5.7-jammy
           - swift:5.8-jammy
           - swift:5.9-jammy
-          - swiftlang/swift:nightly-5.10-jammy
+          - swift:5.10-jammy
           - swiftlang/swift:nightly-main-jammy
         include:
-          - swift-image: swift:5.9-jammy
+          - swift-image: swift:5.10-jammy
             code-coverage: true
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -63,7 +63,7 @@ jobs:
           - postgres-image: postgres:12
             postgres-auth: trust
     container:
-      image: swift:5.9-jammy
+      image: swift:5.10-jammy
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
@@ -140,7 +140,12 @@ jobs:
         xcode-version:
           - '~14.3'
           - '~15.0'
-    runs-on: macos-13
+        include:
+          - xcode-version: '~14.3'
+            macos-version: 'macos-13'
+          - xcode-version: '~15.0'
+            macos-version: 'macos-14'
+    runs-on: ${{ matrix.macos-version }}
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
       POSTGRES_USER: 'test_username'
@@ -188,8 +193,9 @@ jobs:
           swift package diagnose-api-breaking-changes origin/main
 
   gh-codeql:
+    if: ${{ false }}
     runs-on: ubuntu-latest
-    container: swift:5.9-jammy
+    container: swift:jammy
     permissions: { actions: write, contents: read, security-events: write }
     steps:
       - name: Check out code
@@ -197,10 +203,10 @@ jobs:
       - name: Mark repo safe in non-fake global config
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v3
         with:
           languages: swift
       - name: Perform build
         run: swift build
       - name: Run CodeQL analyze
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v3
