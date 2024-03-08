@@ -787,6 +787,44 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "array"].array(of: Int64?.self), [1, nil, 3])
     }
     
+    @available(*, deprecated, message: "Testing deprecated functionality")
+    func testDateArraySerialize() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        let date1 = Date(timeIntervalSince1970: 1704088800),
+            date2 = Date(timeIntervalSince1970: 1706767200),
+            date3 = Date(timeIntervalSince1970: 1709272800)
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("""
+        select
+            $1::timestamptz[] as array
+        """, [
+            PostgresData(array: [date1, date2, date3])
+        ]).wait())
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "array"].array(of: Date.self), [date1, date2, date3])
+    }
+
+    @available(*, deprecated, message: "Testing deprecated functionality")
+    func testDateArraySerializeAsPostgresDate() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        let date1 = Date(timeIntervalSince1970: 1704088800),//8766
+            date2 = Date(timeIntervalSince1970: 1706767200),//8797
+            date3 = Date(timeIntervalSince1970: 1709272800) //8826
+        var data = PostgresData(array: [date1, date2, date3].map { Int32(($0.timeIntervalSince1970 - 946_684_800) / 86_400).postgresData }, elementType: .date)
+        data.type = .dateArray // N.B.: `.date` format is an Int32 count of days since psqlStartDate
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("select $1::date[] as array", [data]).wait())
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(
+            row?[data: "array"].array(of: Date.self)?.map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) },
+            [date1, date2, date3].map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) }
+        )
+    }
+
     // https://github.com/vapor/postgres-nio/issues/143
     func testEmptyStringFromNonNullColumn() {
         var conn: PostgresConnection?
