@@ -615,21 +615,25 @@ final class PostgresNIOTests: XCTestCase {
         let a = PostgresNumeric(string: "123456.789123")!
         let b = PostgresNumeric(string: "-123456.789123")!
         let c = PostgresNumeric(string: "3.14159265358979")!
+        let d = PostgresNumeric(string: "1234567898765")!
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("""
         select
             $1::numeric as a,
             $2::numeric as b,
-            $3::numeric as c
+            $3::numeric as c,
+            $4::numeric as d
         """, [
             .init(numeric: a),
             .init(numeric: b),
-            .init(numeric: c)
+            .init(numeric: c),
+            .init(numeric: d)
         ]).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "a"].decimal, Decimal(string: "123456.789123")!)
         XCTAssertEqual(row?[data: "b"].decimal, Decimal(string: "-123456.789123")!)
         XCTAssertEqual(row?[data: "c"].decimal, Decimal(string: "3.14159265358979")!)
+        XCTAssertEqual(row?[data: "d"].decimal, Decimal(string: "1234567898765")!)
     }
     
     func testDecimalStringSerialization() {
