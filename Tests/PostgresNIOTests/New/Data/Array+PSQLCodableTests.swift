@@ -56,6 +56,10 @@ class Array_PSQLCodableTests: XCTestCase {
         XCTAssertEqual(UUID.psqlType, .uuid)
         XCTAssertEqual([UUID].psqlType, .uuidArray)
 
+        XCTAssertEqual(Date.psqlArrayType, .timestamptzArray)
+        XCTAssertEqual(Date.psqlType, .timestamptz)
+        XCTAssertEqual([Date].psqlType, .timestamptzArray)
+
         XCTAssertEqual(Range<Int32>.psqlArrayType, .int4RangeArray)
         XCTAssertEqual(Range<Int32>.psqlType, .int4Range)
         XCTAssertEqual([Range<Int32>].psqlType, .int4RangeArray)

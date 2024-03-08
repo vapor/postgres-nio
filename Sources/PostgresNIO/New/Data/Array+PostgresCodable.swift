@@ -1,4 +1,5 @@
 import NIOCore
+import struct Foundation.Date
 import struct Foundation.UUID
 
 // MARK: Protocols
@@ -83,6 +84,12 @@ extension UUID: PostgresArrayDecodable {}
 
 extension UUID: PostgresArrayEncodable {
     public static var psqlArrayType: PostgresDataType { .uuidArray }
+}
+
+extension Date: PostgresArrayDecodable {}
+
+extension Date: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .timestamptzArray }
 }
 
 extension Range: PostgresArrayDecodable where Bound: PostgresRangeArrayDecodable {}
