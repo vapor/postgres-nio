@@ -38,11 +38,11 @@ jobs:
           swift --version
       - name: Check out package
         uses: actions/checkout@v4
-      - name: Run unit tests with Thread Sanitizer
+      - name: Run unit tests
         env:
           CODE_COVERAGE: ${{ matrix.code-coverage && '--enable-code-coverage' || '' }}
         run: |
-          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread ${CODE_COVERAGE}
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' ${CODE_COVERAGE}
       - name: Submit code coverage
         if: ${{ matrix.code-coverage }}
         uses: vapor/swift-codecov-action@v0.2        
@@ -139,11 +139,11 @@ jobs:
           - scram-sha-256
         xcode-version:
           - '~14.3'
-          - '~15.0'
+          - '~15'
         include:
           - xcode-version: '~14.3'
             macos-version: 'macos-13'
-          - xcode-version: '~15.0'
+          - xcode-version: '~15'
             macos-version: 'macos-14'
     runs-on: ${{ matrix.macos-version }}
     env:
@@ -175,7 +175,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run all tests
-        run: swift test
+        run: swift test --sanitize=thread
 
   api-breakage:
     if: github.event_name == 'pull_request'
