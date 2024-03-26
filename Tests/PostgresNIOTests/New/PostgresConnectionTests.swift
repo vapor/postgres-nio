@@ -51,7 +51,7 @@ class PostgresConnectionTests: XCTestCase {
             }
 
             let listenMessage = try await channel.waitForUnpreparedRequest()
-            XCTAssertEqual(listenMessage.parse.query, "LISTEN foo;")
+            XCTAssertEqual(listenMessage.parse.query, #"LISTEN "foo";"#)
 
             try await channel.writeInbound(PostgresBackendMessage.parseComplete)
             try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
@@ -63,7 +63,7 @@ class PostgresConnectionTests: XCTestCase {
             try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
 
             let unlistenMessage = try await channel.waitForUnpreparedRequest()
-            XCTAssertEqual(unlistenMessage.parse.query, "UNLISTEN foo;")
+            XCTAssertEqual(unlistenMessage.parse.query, #"UNLISTEN "foo";"#)
 
             try await channel.writeInbound(PostgresBackendMessage.parseComplete)
             try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
@@ -111,7 +111,7 @@ class PostgresConnectionTests: XCTestCase {
             }
 
             let listenMessage = try await channel.waitForUnpreparedRequest()
-            XCTAssertEqual(listenMessage.parse.query, "LISTEN foo;")
+            XCTAssertEqual(listenMessage.parse.query, #"LISTEN "foo";"#)
 
             try await channel.writeInbound(PostgresBackendMessage.parseComplete)
             try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
@@ -124,7 +124,7 @@ class PostgresConnectionTests: XCTestCase {
             try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo2")))
 
             let unlistenMessage = try await channel.waitForUnpreparedRequest()
-            XCTAssertEqual(unlistenMessage.parse.query, "UNLISTEN foo;")
+            XCTAssertEqual(unlistenMessage.parse.query, #"UNLISTEN "foo";"#)
 
             try await channel.writeInbound(PostgresBackendMessage.parseComplete)
             try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
@@ -160,7 +160,7 @@ class PostgresConnectionTests: XCTestCase {
             }
 
             let listenMessage = try await channel.waitForUnpreparedRequest()
-            XCTAssertEqual(listenMessage.parse.query, "LISTEN foo;")
+            XCTAssertEqual(listenMessage.parse.query, #"LISTEN "foo";"#)
 
             try await channel.writeInbound(PostgresBackendMessage.parseComplete)
             try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))

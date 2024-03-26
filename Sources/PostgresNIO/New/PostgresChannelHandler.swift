@@ -594,7 +594,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private func makeStartListeningQuery(channel: String, context: ChannelHandlerContext) -> PSQLTask {
         let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
         let query = ExtendedQueryContext(
-            query: PostgresQuery(unsafeSQL: "LISTEN \(channel);"),
+            query: PostgresQuery(unsafeSQL: #"LISTEN "\#(channel)";"#),
             logger: self.logger,
             promise: promise
         )
@@ -642,7 +642,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private func makeUnlistenQuery(channel: String, context: ChannelHandlerContext) -> PSQLTask {
         let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
         let query = ExtendedQueryContext(
-            query: PostgresQuery(unsafeSQL: "UNLISTEN \(channel);"),
+            query: PostgresQuery(unsafeSQL: #"UNLISTEN "\#(channel)";"#),
             logger: self.logger,
             promise: promise
         )
