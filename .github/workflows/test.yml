@@ -38,11 +38,11 @@ jobs:
           swift --version
       - name: Check out package
         uses: actions/checkout@v4
-      - name: Run unit tests
+      - name: Run unit tests with Thread Sanitizer
         env:
           CODE_COVERAGE: ${{ matrix.code-coverage && '--enable-code-coverage' || '' }}
         run: |
-          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' ${CODE_COVERAGE}
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread ${CODE_COVERAGE}
       - name: Submit code coverage
         if: ${{ matrix.code-coverage }}
         uses: vapor/swift-codecov-action@v0.2        
@@ -175,7 +175,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run all tests
-        run: swift test --sanitize=thread
+        run: swift test
 
   api-breakage:
     if: github.event_name == 'pull_request'
