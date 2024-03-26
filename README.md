@@ -43,7 +43,7 @@ detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting started
 
-Interested in an example? We prepared a simple [Birthday example](/vapor/postgres-nio/tree/main/Snippets/Birthdays.swift) 
+Interested in an example? We prepared a simple [Birthday example](https://github.com/vapor/postgres-nio/blob/main/Snippets/Birthdays.swift)
 in the Snippets folder.
 
 #### Adding the dependency
