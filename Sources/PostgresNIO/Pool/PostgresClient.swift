@@ -47,7 +47,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             }
 
             /// Do not try to create a TLS connection to the server.
-            public static var disable: Self = Self.init(.disable)
+            public static let disable: Self = Self.init(.disable)
 
             /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
             /// If the server does not support TLS, create an insecure connection.
