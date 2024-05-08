@@ -481,17 +481,30 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(leaseResult.request, .leaseConnection(.init(element: request3), connection0))
         XCTAssertEqual(leaseResult.connection, .none)
 
+
         // a few more timers are getting triggered
-        stateMachine.timerTriggered(connection0KeepAliveTimer2)
-        stateMachine.timerTriggered(connection2KeepAliveTimer2)
-        stateMachine.timerTriggered(connection2IdleTimer1)
         
+        let keepAliveTriggerOnBusyConnectionResult = stateMachine.timerTriggered(connection0KeepAliveTimer2)
+        XCTAssertEqual(keepAliveTriggerOnBusyConnectionResult.request, .none)
+        XCTAssertEqual(keepAliveTriggerOnBusyConnectionResult.connection, .none)
+        
+        let keepAliveTriggerResult = stateMachine.timerTriggered(connection2KeepAliveTimer2)
+        XCTAssertEqual(keepAliveTriggerResult.request, .none)
+        XCTAssertEqual(keepAliveTriggerResult.connection, .runKeepAlive(connection2, connection2KeepAliveTimer2CancellationToken))
+        
+        let idleResult = stateMachine.timerTriggered(connection2IdleTimer1)
+        XCTAssertEqual(idleResult.request, .none)
+        XCTAssertEqual(idleResult.connection, .closeConnection(connection2, [connection2IdleTimer1CancellationToken]))
+
         let request4 = MockRequest() // we need another connection, this will cause a crash
-        stateMachine.leaseConnection(request4) // it adds a request to the queue, as no connections are available
+        let leaseUnavailableResult = stateMachine.leaseConnection(request4) // it adds a request to the queue, as no connections are available
+        XCTAssertEqual(leaseUnavailableResult.request, .none)
+        XCTAssertEqual(leaseUnavailableResult.connection, .makeConnection(.init(connectionID: 3), []))
+        
         stateMachine.timerTriggered(connection0IdleTimer1) // here the crash happens, either in idle or keep alive timer
 
         // The reason for the crash might be that all connections are currently unavailable:
-        // 0: keep alive in progress
+        // 0: currently leased
         // 1: marked as going away
         // 2: marked as going away
 
