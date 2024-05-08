@@ -380,8 +380,10 @@ final class PoolStateMachineTests: XCTestCase {
     func testConnectionsRequestedInBurstsWork() {
         var configuration = PoolConfiguration()
         configuration.minimumConnectionCount = 1
-        configuration.maximumConnectionSoftLimit = 2
-        configuration.maximumConnectionHardLimit = 2
+        configuration.maximumConnectionSoftLimit = 3
+        configuration.maximumConnectionHardLimit = 3
+        configuration.keepAliveDuration = .seconds(30)
+        configuration.idleTimeoutDuration = .seconds(60)
 
 
         var stateMachine = TestPoolStateMachine(
@@ -400,29 +402,101 @@ final class PoolStateMachineTests: XCTestCase {
         }
 
         // Connections
-        let conn0 = MockConnection(id: 0)
-        let conn1 = MockConnection(id: 1)
+        let connection0 = MockConnection(id: 0)
+        let connection2 = MockConnection(id: 2)
+        let connection1 = MockConnection(id: 1)
+
+        let request0 = MockRequest()
+        let request1 = MockRequest()
+        let request2 = MockRequest()
 
         stateMachine.refillConnections()
-        for _ in 0..<configuration.maximumConnectionHardLimit { // request maximum amount connections
-            stateMachine.leaseConnection(.init())
-        }
 
-        stateMachine.connectionEstablished(conn0, maxStreams: 1)
-        let conn0IdleTimer = makeIdleTimer(timerID: 1, connectionID: 0)
-        stateMachine.timerScheduled(conn0IdleTimer.timer, cancelContinuation: conn0IdleTimer.cancellationToken)
-        stateMachine.connectionEstablished(conn1, maxStreams: 1)
-        let conn1IdleTimer = makeIdleTimer(timerID: 0, connectionID: 1)
-        stateMachine.timerScheduled(conn1IdleTimer.timer, cancelContinuation: conn1IdleTimer.cancellationToken)
+        stateMachine.leaseConnection(request1)
+        stateMachine.leaseConnection(request0)
+        stateMachine.leaseConnection(request2)
 
-        let conn1KeepAliveTimer = makeKeepAliveTimer(timerID: 2, connectionID: 1)
-        stateMachine.timerScheduled(conn1KeepAliveTimer.timer, cancelContinuation: conn1KeepAliveTimer.cancellationToken)
-        stateMachine.timerTriggered(conn0IdleTimer.timer)
-        stateMachine.timerTriggered(conn1IdleTimer.timer)
+        stateMachine.connectionEstablished(connection2, maxStreams: 1)
+        stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        // do work...
+        // Optional("hello")
+        // Optional("hello")
+        stateMachine.releaseConnection(connection2, streams: 1)
+        stateMachine.releaseConnection(connection1, streams: 1)
+
+        let connection1KeepAliveTimer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: .seconds(30))
+        let connection1KeepAliveTimer0CancellationToken = MockTimerCancellationToken(connection1KeepAliveTimer0)
+        _ = stateMachine.timerScheduled(connection1KeepAliveTimer0, cancelContinuation: connection1KeepAliveTimer0CancellationToken)
+        let connection1IdleTimer1 = TestPoolStateMachine.Timer(.init(timerID: 1, connectionID: 1, usecase: .idleTimeout), duration: .seconds(60))
+        let connection1IdleTimer1CancellationToken = MockTimerCancellationToken(connection1IdleTimer1)
+        _ = stateMachine.timerScheduled(connection1IdleTimer1, cancelContinuation: connection1IdleTimer1CancellationToken)
+
+        // do more work...
+        // Optional("hello")
+        stateMachine.releaseConnection(connection2, streams: 1)
+        
+        let connection2KeepAliveTimer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 2, usecase: .keepAlive), duration: .seconds(30))
+        let connection2KeepAliveTimer0CancellationToken = MockTimerCancellationToken(connection2KeepAliveTimer0)
+        _ = stateMachine.timerScheduled(connection2KeepAliveTimer0, cancelContinuation: connection2KeepAliveTimer0CancellationToken)
+        let connection2IdleTimer1 = TestPoolStateMachine.Timer(.init(timerID: 1, connectionID: 2, usecase: .idleTimeout), duration: .seconds(60))
+        let connection2IdleTimer1CancellationToken = MockTimerCancellationToken(connection2IdleTimer1)
+        _ = stateMachine.timerScheduled(connection2IdleTimer1, cancelContinuation: connection2IdleTimer1CancellationToken)
+
+        stateMachine.connectionEstablished(connection0, maxStreams: 1)
+        
+        let connection0IdleTimer1 = TestPoolStateMachine.Timer(.init(timerID: 1, connectionID: 0, usecase: .idleTimeout), duration: .seconds(60))
+        let connection0IdleTimer1CancellationToken = MockTimerCancellationToken(connection0IdleTimer1)
+        _ = stateMachine.timerScheduled(connection0IdleTimer1, cancelContinuation: connection0IdleTimer1CancellationToken)
+        let connection0KeepAliveTimer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(30))
+        let connection0KeepAliveTimer0CancellationToken = MockTimerCancellationToken(connection0KeepAliveTimer0)
+        _ = stateMachine.timerScheduled(connection0KeepAliveTimer0, cancelContinuation: connection0KeepAliveTimer0CancellationToken)
+
+        // keep alive timers are triggered after 30s
+        stateMachine.timerTriggered(connection2KeepAliveTimer0)
+        stateMachine.timerTriggered(connection1KeepAliveTimer0)
+        stateMachine.timerTriggered(connection0KeepAliveTimer0)
+        
+        // keep alive requests are done and new timers are scheduled
+        stateMachine.connectionKeepAliveDone(connection1)
+        let connection1KeepAliveTimer2 = TestPoolStateMachine.Timer(.init(timerID: 2, connectionID: 1, usecase: .keepAlive), duration: .seconds(30))
+        let connection1KeepAliveTimer2CancellationToken = MockTimerCancellationToken(connection1KeepAliveTimer2)
+        _ = stateMachine.timerScheduled(connection1KeepAliveTimer2, cancelContinuation: connection1KeepAliveTimer2CancellationToken)
+        stateMachine.connectionKeepAliveDone(connection0)
+        let connection0KeepAliveTimer2 = TestPoolStateMachine.Timer(.init(timerID: 2, connectionID: 0, usecase: .keepAlive), duration: .seconds(30))
+        let connection0KeepAliveTimer2CancellationToken = MockTimerCancellationToken(connection0KeepAliveTimer2)
+        _ = stateMachine.timerScheduled(connection0KeepAliveTimer2, cancelContinuation: connection0KeepAliveTimer2CancellationToken)
+        stateMachine.connectionKeepAliveDone(connection2)
+        let connection2KeepAliveTimer2 = TestPoolStateMachine.Timer(.init(timerID: 2, connectionID: 2, usecase: .keepAlive), duration: .seconds(30))
+        let connection2KeepAliveTimer2CancellationToken = MockTimerCancellationToken(connection2KeepAliveTimer2)
+        _ = stateMachine.timerScheduled(connection2KeepAliveTimer2, cancelContinuation: connection2KeepAliveTimer2CancellationToken)
+
+        // now connections might go idle or trigger another keep alive
+        stateMachine.timerTriggered(connection1IdleTimer1)
         // Burst done: 1/50
-        stateMachine.leaseConnection(MockRequest())
-        stateMachine.connectionClosed(conn1)
-        stateMachine.timerTriggered(conn1KeepAliveTimer.timer)
+        stateMachine.timerTriggered(connection1KeepAliveTimer2)
+        
+        // we want to start new work on all connections, but a few are occupied or closed already
+        let request3 = MockRequest()
+        let leaseResult = stateMachine.leaseConnection(request3) // this one works, connections are available
+        XCTAssertEqual(leaseResult.request, .leaseConnection(.init(element: request3), connection0))
+        XCTAssertEqual(leaseResult.connection, .none)
+
+        // a few more timers are getting triggered
+        stateMachine.timerTriggered(connection0KeepAliveTimer2)
+        stateMachine.timerTriggered(connection2KeepAliveTimer2)
+        stateMachine.timerTriggered(connection2IdleTimer1)
+        
+        let request4 = MockRequest() // we need another connection, this will cause a crash
+        stateMachine.leaseConnection(request4) // it adds a request to the queue, as no connections are available
+        stateMachine.timerTriggered(connection0IdleTimer1) // here the crash happens, either in idle or keep alive timer
+
+        // The reason for the crash might be that all connections are currently unavailable:
+        // 0: keep alive in progress
+        // 1: marked as going away
+        // 2: marked as going away
+
+//        _ConnectionPoolModule/PoolStateMachine.swift:422: Precondition failed
     }
+
 
 }
