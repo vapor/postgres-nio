@@ -390,7 +390,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 let authContext = AuthContext(
                     username: username,
                     password: self.configuration.password,
-                    database: self.configuration.database
+                    database: self.configuration.database,
+                    additionalParameters: self.configuration.options.additionalStartupParameters
                 )
                 let action = self.state.provideAuthenticationContext(authContext)
                 return self.run(action, with: context)

@@ -343,7 +343,8 @@ extension PostgresConnection {
         let authContext = AuthContext(
             username: username,
             password: password,
-            database: database)
+            database: database
+        )
         let outgoing = PSQLOutgoingEvent.authenticate(authContext)
         self.channel.triggerUserOutboundEvent(outgoing, promise: nil)
 

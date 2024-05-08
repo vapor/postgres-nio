@@ -12,7 +12,7 @@ extension PostgresConnection {
     static func address() throws -> SocketAddress {
         try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)
     }
-    
+
     @available(*, deprecated, message: "Test deprecated functionality")
     static func testUnauthenticated(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
         var logger = Logger(label: "postgres.connection.test")
@@ -24,9 +24,9 @@ extension PostgresConnection {
         }
     }
 
-    static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+    static func test(on eventLoop: EventLoop, options: Configuration.Options? = nil) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
-        let config = PostgresConnection.Configuration(
+        var config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
             username: env("POSTGRES_USER") ?? "test_username",
@@ -34,10 +34,13 @@ extension PostgresConnection {
             database: env("POSTGRES_DB") ?? "test_database",
             tls: .disable
         )
+        if let options {
+            config.options = options
+        }
 
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
-    
+
     static func testUDS(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
         let config = PostgresConnection.Configuration(
@@ -46,10 +49,10 @@ extension PostgresConnection {
             password: env("POSTGRES_PASSWORD") ?? "test_password",
             database: env("POSTGRES_DB") ?? "test_database"
         )
-        
+
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
-    
+
     static func testChannel(_ channel: Channel, on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
         let config = PostgresConnection.Configuration(
@@ -58,7 +61,7 @@ extension PostgresConnection {
             password: env("POSTGRES_PASSWORD") ?? "test_password",
             database: env("POSTGRES_DB") ?? "test_database"
         )
-        
+
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
 }
@@ -74,7 +77,7 @@ func env(_ name: String) -> String? {
 }
 
 extension XCTestCase {
-    
+
     public static var shouldRunLongRunningTests: Bool {
         // The env var must be set and have the value `"true"`, `"1"`, or `"yes"` (case-insensitive).
         // For the sake of sheer annoying pedantry, values like `"2"` are treated as false.
@@ -83,7 +86,7 @@ extension XCTestCase {
         if let intValue = Int(rawValue) { return intValue == 1 }
         return rawValue.lowercased() == "yes"
     }
-    
+
     public static var shouldRunPerformanceTests: Bool {
         // Same semantics as above. Any present non-truthy value will explicitly disable performance
         // tests even if they would've overwise run in the current configuration.
