@@ -382,8 +382,6 @@ final class PoolStateMachineTests: XCTestCase {
         configuration.minimumConnectionCount = 1
         configuration.maximumConnectionSoftLimit = 2
         configuration.maximumConnectionHardLimit = 2
-        configuration.keepAliveDuration = .seconds(30)
-        configuration.idleTimeoutDuration = .seconds(60)
 
 
         var stateMachine = TestPoolStateMachine(
