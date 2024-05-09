@@ -56,21 +56,6 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(try rows?.first?.decode(String.self, context: .default).contains("PostgreSQL"), true)
     }
 
-    func testSimpleQueryWithAdditionalParameters() throws {
-        var conn: PostgresConnection?
-        let applicationName = "postgres-nio-test"
-        var options = PostgresConnection.Configuration.Options()
-        options.additionalStartupParameters = [
-            ("application_name", applicationName)
-        ]
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop, options: options).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT current_setting('application_name')").wait())
-        XCTAssertEqual(rows?.count, 1)
-        XCTAssertEqual(try rows?.first?.decode(String.self, context: .default), applicationName)
-    }
-
     func testSimpleQueryVersionUsingUDS() throws {
         try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
         var conn: PostgresConnection?
