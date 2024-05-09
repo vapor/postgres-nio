@@ -84,6 +84,36 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testAdditionalParametersTakeEffect() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let query: PostgresQuery = """
+            SELECT
+                current_setting('application_name');
+            """
+
+        let applicationName = "postgres-nio-test"
+        var options = PostgresConnection.Configuration.Options()
+        options.additionalStartupParameters = [
+            ("application_name", applicationName)
+        ]
+
+        try await withTestConnection(on: eventLoop, options: options) { connection in
+            let rows = try await connection.query(query, logger: .psqlTest)
+            var counter = 0
+
+            for try await element in rows.decode(String.self) {
+                XCTAssertEqual(element, applicationName)
+                
+                counter += 1
+            }
+
+            XCTAssertGreaterThanOrEqual(counter, 1)
+        }
+    }
+
     func testSelectTimeoutWhileLongRunningQuery() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -452,11 +482,12 @@ extension XCTestCase {
 
     func withTestConnection<Result>(
         on eventLoop: EventLoop,
+        options: PostgresConnection.Configuration.Options? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,
         _ closure: (PostgresConnection) async throws -> Result
     ) async throws -> Result  {
-        let connection = try await PostgresConnection.test(on: eventLoop).get()
+        let connection = try await PostgresConnection.test(on: eventLoop, options: options).get()
 
         do {
             let result = try await closure(connection)

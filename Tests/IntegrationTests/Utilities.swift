@@ -24,9 +24,9 @@ extension PostgresConnection {
         }
     }
 
-    static func test(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+    static func test(on eventLoop: EventLoop, options: Configuration.Options? = nil) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
-        let config = PostgresConnection.Configuration(
+        var config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
             username: env("POSTGRES_USER") ?? "test_username",
@@ -34,7 +34,10 @@ extension PostgresConnection {
             database: env("POSTGRES_DB") ?? "test_database",
             tls: .disable
         )
-
+        if let options {
+            config.options = options
+        }
+        
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     

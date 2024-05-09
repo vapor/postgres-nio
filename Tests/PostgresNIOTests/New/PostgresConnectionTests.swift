@@ -38,6 +38,48 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testOptionsAreSentOnTheWire() async throws {
+        let eventLoop = NIOAsyncTestingEventLoop()
+        let channel = await NIOAsyncTestingChannel(handlers: [
+            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+        ], loop: eventLoop)
+        try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
+
+        let configuration = {
+            var config = PostgresConnection.Configuration(
+                establishedChannel: channel,
+                username: "username",
+                password: "postgres",
+                database: "database"
+            )
+            config.options.additionalStartupParameters = [
+                ("DateStyle", "ISO, MDY"),
+                ("application_name", "postgres-nio-test"),
+                ("server_encoding", "UTF8"),
+                ("integer_datetimes", "on"),
+                ("client_encoding", "UTF8"),
+                ("TimeZone", "Etc/UTC"),
+                ("is_superuser", "on"),
+                ("server_version", "13.1 (Debian 13.1-1.pgdg100+1)"),
+                ("session_authorization", "postgres"),
+                ("IntervalStyle", "postgres"),
+                ("standard_conforming_strings", "on")
+            ]
+            return config
+        }()
+
+        async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: .psqlTest)
+        let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        XCTAssertEqual(message, .startup(.versionThree(parameters: .init(user: "username", database: "database", options: configuration.options.additionalStartupParameters, replication: .false))))
+        try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
+        try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
+        try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+        let connection = try await connectionPromise
+        try await connection.close()
+    }
+
     func testSimpleListen() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
