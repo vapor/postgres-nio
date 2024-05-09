@@ -37,7 +37,7 @@ extension PostgresConnection {
         if let options {
             config.options = options
         }
-
+        
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
