@@ -49,7 +49,7 @@ extension PostgresConnection {
             password: env("POSTGRES_PASSWORD") ?? "test_password",
             database: env("POSTGRES_DB") ?? "test_database"
         )
-
+        
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
