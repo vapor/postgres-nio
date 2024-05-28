@@ -22,6 +22,7 @@ jobs:
           - swift:5.8-jammy
           - swift:5.9-jammy
           - swift:5.10-jammy
+          - swiftlang/swift:nightly-6.0-jammy
           - swiftlang/swift:nightly-main-jammy
         include:
           - swift-image: swift:5.10-jammy
@@ -45,7 +46,9 @@ jobs:
           swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread ${CODE_COVERAGE}
       - name: Submit code coverage
         if: ${{ matrix.code-coverage }}
-        uses: vapor/swift-codecov-action@v0.2        
+        uses: vapor/swift-codecov-action@v0.3
+        with:
+          codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
   linux-integration-and-dependencies:
     strategy:
@@ -165,7 +168,7 @@ jobs:
           # ** BEGIN ** Work around bug in both Homebrew and GHA
           (brew upgrade python@3.11 || true) && (brew link --force --overwrite python@3.11 || true)
           (brew upgrade python@3.12 || true) && (brew link --force --overwrite python@3.12 || true)
-          brew upgrade
+          (brew upgrade || true)
           # ** END ** Work around bug in both Homebrew and GHA
           brew install --overwrite "${POSTGRES_FORMULA}"
           brew link --overwrite --force "${POSTGRES_FORMULA}"
