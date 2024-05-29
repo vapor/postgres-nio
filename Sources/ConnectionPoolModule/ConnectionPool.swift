@@ -419,7 +419,7 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func makeConnection(for request: StateMachine.ConnectionRequest, in taskGroup: inout some TaskGroupProtocol) {
-        taskGroup.addTask {
+        taskGroup.addTask_ {
             self.observabilityDelegate.startedConnecting(id: request.connectionID)
 
             do {
@@ -468,7 +468,7 @@ public final class ConnectionPool<
     /*private*/ func runKeepAlive(_ connection: Connection, in taskGroup: inout some TaskGroupProtocol) {
         self.observabilityDelegate.keepAliveTriggered(id: connection.id)
 
-        taskGroup.addTask {
+        taskGroup.addTask_ {
             do {
                 try await self.keepAliveBehavior.runKeepAlive(for: connection)
 
@@ -503,7 +503,7 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func runTimer(_ timer: StateMachine.Timer, in poolGroup: inout some TaskGroupProtocol) {
-        poolGroup.addTask { () async -> () in
+        poolGroup.addTask_ { () async -> () in
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
@@ -587,17 +587,25 @@ extension AsyncStream {
 
 @usableFromInline
 protocol TaskGroupProtocol {
-    mutating func addTask(operation: @escaping @Sendable () async -> Void)
+    // We need to call this `addTask_` because some Swift versions define this
+    // under exactly this name and others have different attributes. So let's pick
+    // a name that doesn't clash anywhere and implement it using the standard `addTask`.
+    mutating func addTask_(operation: @escaping @Sendable () async -> Void)
 }
 
 #if swift(>=5.8) && os(Linux) || swift(>=5.9)
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
-extension DiscardingTaskGroup: TaskGroupProtocol {}
+extension DiscardingTaskGroup: TaskGroupProtocol {
+    @inlinable
+    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
+        self.addTask(priority: nil, operation: operation)
+    }
+}
 #endif
 
 extension TaskGroup<Void>: TaskGroupProtocol {
     @inlinable
-    mutating func addTask(operation: @escaping @Sendable () async -> Void) {
+    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
 }
