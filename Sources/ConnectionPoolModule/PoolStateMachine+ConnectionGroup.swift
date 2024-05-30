@@ -592,7 +592,7 @@ extension PoolStateMachine {
 
             let newConnectionRequest: ConnectionRequest?
             if self.connections.count < self.minimumConcurrentConnections {
-                newConnectionRequest = .init(connectionID: self.generator.next())
+                newConnectionRequest = self.createNewConnection()
             } else {
                 newConnectionRequest = .none
             }
