@@ -416,6 +416,15 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testWeDontCrashOnUnexpectedChannelEvents() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        enum MyEvent {
+            case pleaseDontCrash
+        }
+        channel.pipeline.fireUserInboundEventTriggered(MyEvent.pleaseDontCrash)
+    }
+
     func testSerialExecutionOfSamePreparedStatement() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
