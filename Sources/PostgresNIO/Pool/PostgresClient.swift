@@ -478,7 +478,7 @@ extension PostgresConnection: PooledConnection {
         self.channel.close(mode: .all, promise: nil)
     }
 
-    public func onClose(_ closure: @escaping ((any Error)?) -> ()) {
+    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
         self.closeFuture.whenComplete { _ in closure(nil) }
     }
 }

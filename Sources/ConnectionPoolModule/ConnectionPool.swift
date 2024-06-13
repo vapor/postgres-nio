@@ -1,6 +1,6 @@
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-public struct ConnectionAndMetadata<Connection: PooledConnection> {
+public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
 
     public var connection: Connection
 
@@ -495,7 +495,7 @@ public final class ConnectionPool<
     }
 
     @usableFromInline
-    enum TimerRunResult {
+    enum TimerRunResult: Sendable {
         case timerTriggered
         case timerCancelled
         case cancellationContinuationFinished
