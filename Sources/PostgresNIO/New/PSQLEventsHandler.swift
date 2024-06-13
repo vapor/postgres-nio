@@ -68,10 +68,8 @@ final class PSQLEventsHandler: ChannelInboundHandler {
             case .authenticated:
                 break
             }
-        case TLSUserEvent.shutdownCompleted:
-            break
         default:
-            preconditionFailure()
+            context.fireUserInboundEventTriggered(event)
         }
     }
     
