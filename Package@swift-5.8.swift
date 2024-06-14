@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:5.8
 import PackageDescription
 
 let package = Package(
@@ -22,7 +22,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", "2.0.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
-        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.4.1"),
     ],
     targets: [
         .target(
@@ -41,6 +41,9 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
+            ],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
         .target(
@@ -49,7 +52,10 @@ let package = Package(
                 .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "DequeModule", package: "swift-collections"),
             ],
-            path: "Sources/ConnectionPoolModule"
+            path: "Sources/ConnectionPoolModule",
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
+            ]
         ),
         .testTarget(
             name: "PostgresNIOTests",
@@ -57,6 +63,9 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+            ],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
         .testTarget(
@@ -67,6 +76,9 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
+            ],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
         .testTarget(
@@ -74,6 +86,9 @@ let package = Package(
             dependencies: [
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+            ],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency")
             ]
         ),
     ]
