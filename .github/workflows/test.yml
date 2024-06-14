@@ -18,7 +18,6 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:5.7-jammy
           - swift:5.8-jammy
           - swift:5.9-jammy
           - swift:5.10-noble
