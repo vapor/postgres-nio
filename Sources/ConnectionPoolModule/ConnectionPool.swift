@@ -273,7 +273,7 @@ public final class ConnectionPool<
 
     public func run() async {
         await withTaskCancellationHandler {
-            #if swift(>=5.8) && os(Linux) || swift(>=5.9)
+            #if os(Linux) || compiler(>=5.9)
             if #available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *) {
                 return await withDiscardingTaskGroup() { taskGroup in
                     await self.run(in: &taskGroup)
@@ -313,7 +313,7 @@ public final class ConnectionPool<
         case scheduleTimer(StateMachine.Timer)
     }
 
-    #if swift(>=5.8) && os(Linux) || swift(>=5.9)
+    #if os(Linux) || compiler(>=5.9)
     @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
     private func run(in taskGroup: inout DiscardingTaskGroup) async {
         for await event in self.eventStream {
@@ -507,7 +507,7 @@ public final class ConnectionPool<
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
-                        #if swift(>=5.8) && os(Linux) || swift(>=5.9)
+                        #if os(Linux) || compiler(>=5.9)
                         try await self.clock.sleep(for: timer.duration)
                         #else
                         try await self.clock.sleep(until: self.clock.now.advanced(by: timer.duration), tolerance: nil)
@@ -593,7 +593,7 @@ protocol TaskGroupProtocol {
     mutating func addTask_(operation: @escaping @Sendable () async -> Void)
 }
 
-#if swift(>=5.8) && os(Linux) || swift(>=5.9)
+#if os(Linux) || swift(>=5.9)
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 extension DiscardingTaskGroup: TaskGroupProtocol {
     @inlinable
