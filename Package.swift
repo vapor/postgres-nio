@@ -1,6 +1,10 @@
 // swift-tools-version:5.8
 import PackageDescription
 
+let swiftSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("StrictConcurrency")
+]
+
 let package = Package(
     name: "postgres-nio",
     platforms: [
@@ -41,7 +45,8 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "_ConnectionPoolModule",
@@ -49,7 +54,8 @@ let package = Package(
                 .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "DequeModule", package: "swift-collections"),
             ],
-            path: "Sources/ConnectionPoolModule"
+            path: "Sources/ConnectionPoolModule",
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "PostgresNIOTests",
@@ -57,7 +63,8 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "ConnectionPoolModuleTests",
@@ -67,14 +74,16 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "IntegrationTests",
             dependencies: [
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
     ]
 )
