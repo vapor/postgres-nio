@@ -419,7 +419,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
 
-        await cancelOnGracefulShutdown {
+        await cancelWhenGracefulShutdown {
             await self.pool.run()
         }
     }
