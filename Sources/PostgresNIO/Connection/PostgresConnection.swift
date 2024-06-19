@@ -468,7 +468,11 @@ extension PostgresConnection {
 
                 let task = HandlerTask.startListening(listener)
 
-                self.channel.write(task, promise: nil)
+                let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
+                self.channel.write(task, promise: writePromise)
+                writePromise.futureResult.whenFailure { error in
+                    continuation.resume(throwing: error)
+                }
             }
         } onCancel: {
             let task = HandlerTask.cancelListening(channel, id)
@@ -536,7 +540,7 @@ extension PostgresConnection {
         let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
         self.channel.write(task, promise: writePromise)
         writePromise.futureResult.cascadeFailure(to: promise)
-        
+
         do {
             return try await promise.futureResult
                 .map { $0.commandTag }
