@@ -368,24 +368,16 @@ final class IntegrationTests: XCTestCase {
         try await withThrowingTaskGroup(
             of: Void.self
         ) { taskGroup in
-
             for _ in (0 ..< 1_000) {
                 taskGroup.addTask {
-                    print("-0---0-000- in")
-                    do {
-                        let conn = try await PostgresConnection.test(
-                            on: NIOSingletons.posixEventLoopGroup.next()
-                        ).get()
+                    let conn = try await PostgresConnection.test(
+                        on: NIOSingletons.posixEventLoopGroup.next()
+                    ).get()
 
-                        async let close: () = conn.closeGracefully()
-                        async let query = conn.query(badQuery, logger: .psqlTest)
+                    async let close: () = conn.closeGracefully()
+                    async let query = conn.query(badQuery, logger: .psqlTest)
 
-                        _ = try? await (close, query)
-                        print("-0---0-000- out")
-                    } catch {
-                        print("-0---0-000- out")
-                        throw error
-                    }
+                    _ = try await (close, query)
                 }
             }
 
