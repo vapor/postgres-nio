@@ -365,9 +365,7 @@ final class IntegrationTests: XCTestCase {
         SELECT * FROM non_existent_table
         """
 
-        _ = try await withThrowingTaskGroup(
-            of: Void.self
-        ) { taskGroup in
+        _ = await withThrowingTaskGroup(of: Void.self) { taskGroup in
             for _ in (0 ..< 1_000) {
                 taskGroup.addTask {
                     let conn = try await PostgresConnection.test(
@@ -381,7 +379,7 @@ final class IntegrationTests: XCTestCase {
                 }
             }
 
-            /// Ignore failures
+            // Ignore failures
         }
     }
 }
