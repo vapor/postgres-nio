@@ -361,9 +361,7 @@ final class IntegrationTests: XCTestCase {
     }
     
     func testConnectionClosureMidQueryDoesNotHang() async throws {
-        let badQuery: PostgresQuery = """
-        SELECT * FROM non_existent_table
-        """
+        let query: PostgresQuery = "SELECT 1"
 
         _ = await withThrowingTaskGroup(of: Void.self) { taskGroup in
             for _ in (0 ..< 1_000) {
@@ -373,7 +371,7 @@ final class IntegrationTests: XCTestCase {
                     ).get()
 
                     async let close: () = conn.closeGracefully()
-                    async let query = conn.query(badQuery, logger: .psqlTest)
+                    async let query = conn.query(query, logger: .psqlTest)
 
                     _ = try await (close, query)
                 }
