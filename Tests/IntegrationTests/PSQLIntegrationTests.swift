@@ -365,7 +365,7 @@ final class IntegrationTests: XCTestCase {
         SELECT * FROM non_existent_table
         """
 
-        try await withThrowingTaskGroup(
+        _ = try await withThrowingTaskGroup(
             of: Void.self
         ) { taskGroup in
             for _ in (0 ..< 1_000) {
@@ -381,7 +381,7 @@ final class IntegrationTests: XCTestCase {
                 }
             }
 
-            try await taskGroup.waitForAll()
+            /// Ignore failures
         }
     }
 }

@@ -428,9 +428,7 @@ extension PostgresConnection {
 
         let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
         self.channel.write(HandlerTask.extendedQuery(context), promise: writePromise)
-        writePromise.futureResult.whenFailure { error in
-            promise.fail(error)
-        }
+        writePromise.futureResult.cascadeFailure(to: promise)
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()
