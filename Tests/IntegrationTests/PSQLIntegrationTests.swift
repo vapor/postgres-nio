@@ -361,8 +361,6 @@ final class IntegrationTests: XCTestCase {
     }
     
     func testConnectionClosureMidQueryDoesNotHang() async throws {
-        let query: PostgresQuery = "SELECT 1"
-
         _ = await withThrowingTaskGroup(of: Void.self) { taskGroup in
             for _ in (0 ..< 1_000) {
                 taskGroup.addTask {
@@ -371,7 +369,7 @@ final class IntegrationTests: XCTestCase {
                     ).get()
 
                     async let close: () = conn.closeGracefully()
-                    async let query = conn.query(query, logger: .psqlTest)
+                    async let query = conn.query("SELECT 1", logger: .psqlTest)
 
                     _ = try await (close, query)
                 }
