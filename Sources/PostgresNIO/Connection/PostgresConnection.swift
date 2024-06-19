@@ -239,7 +239,10 @@ public final class PostgresConnection: @unchecked Sendable {
             promise: promise
         )
 
-        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
+        self.channel.write(HandlerTask.extendedQuery(context), promise: writePromise)
+        writePromise.futureResult.cascadeFailure(to: promise)
+
         return promise.futureResult.map { rowDescription in
             PSQLPreparedStatement(name: name, query: query, connection: self, rowDescription: rowDescription)
         }
