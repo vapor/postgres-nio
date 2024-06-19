@@ -360,4 +360,36 @@ final class IntegrationTests: XCTestCase {
         }
     }
     
+    func testConnectionClosureMidQueryDoesNotHang() async throws {
+        let badQuery: PostgresQuery = """
+        SELECT * FROM non_existent_table
+        """
+
+        try await withThrowingTaskGroup(
+            of: Void.self
+        ) { taskGroup in
+
+            for _ in (0 ..< 1_000) {
+                taskGroup.addTask {
+                    print("-0---0-000- in")
+                    do {
+                        let conn = try await PostgresConnection.test(
+                            on: NIOSingletons.posixEventLoopGroup.next()
+                        ).get()
+
+                        async let close: () = conn.closeGracefully()
+                        async let query = conn.query(badQuery, logger: .psqlTest)
+
+                        _ = try? await (close, query)
+                        print("-0---0-000- out")
+                    } catch {
+                        print("-0---0-000- out")
+                        throw error
+                    }
+                }
+            }
+
+            try await taskGroup.waitForAll()
+        }
+    }
 }
