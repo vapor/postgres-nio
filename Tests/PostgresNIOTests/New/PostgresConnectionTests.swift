@@ -653,6 +653,21 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testListenFailsIfConnectionIsClosed() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await connection.closeGracefully()
+
+        XCTAssertEqual(channel.isActive, false)
+
+        do {
+            _ = try await connection.listen("test_channel")
+            XCTFail("Expected to fail")
+        } catch let error as ChannelError {
+            XCTAssertEqual(error, .ioOnClosedChannel)
+        }
+    }
+
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = await NIOAsyncTestingChannel(handlers: [
