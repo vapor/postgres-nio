@@ -461,6 +461,7 @@ extension PostgresConnection {
                 let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
                 self.channel.write(task, promise: writePromise)
                 writePromise.futureResult.whenFailure { error in
+                    listener.failed(error)
                     continuation.resume(throwing: error)
                 }
             }

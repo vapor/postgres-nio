@@ -668,6 +668,33 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testListenFailsIfConnectionIsClosedMidway() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                do {
+                    let listenSequence = try await connection.listen("test_channel")
+
+                    for try await _ in listenSequence {
+                        XCTFail("Expected to fail")
+                    }
+                } catch let error as PSQLError {
+                    XCTAssertEqual(error.code, .listenFailed)
+                }
+            }
+
+            taskGroup.addTask {
+                try await Task.sleep(for: .seconds(3))
+
+                try await connection.close().get()
+                XCTAssertEqual(channel.isActive, false)
+            }
+
+            try await taskGroup.waitForAll()
+        }
+    }
+
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = await NIOAsyncTestingChannel(handlers: [
