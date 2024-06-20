@@ -359,23 +359,4 @@ final class IntegrationTests: XCTestCase {
             XCTAssertEqual(obj?.bar, 2)
         }
     }
-    
-    func testConnectionClosureMidQueryDoesNotHang() async throws {
-        _ = await withThrowingTaskGroup(of: Void.self) { taskGroup in
-            for _ in (0 ..< 1_000) {
-                taskGroup.addTask {
-                    let conn = try await PostgresConnection.test(
-                        on: NIOSingletons.posixEventLoopGroup.next()
-                    ).get()
-
-                    async let close: () = conn.closeGracefully()
-                    async let query = conn.query("SELECT 1", logger: .psqlTest)
-
-                    _ = try await (close, query)
-                }
-            }
-
-            // Ignore failures
-        }
-    }
 }
