@@ -222,7 +222,7 @@ public final class PostgresConnection: @unchecked Sendable {
             promise: promise
         )
 
-        self.write(HandlerTask.extendedQuery(context), cascadingFailureTo: promise)
+        self.write(.extendedQuery(context), cascadingFailureTo: promise)
 
         return promise.futureResult
     }
@@ -239,7 +239,7 @@ public final class PostgresConnection: @unchecked Sendable {
             promise: promise
         )
 
-        self.write(HandlerTask.extendedQuery(context), cascadingFailureTo: promise)
+        self.write(.extendedQuery(context), cascadingFailureTo: promise)
 
         return promise.futureResult.map { rowDescription in
             PSQLPreparedStatement(name: name, query: query, connection: self, rowDescription: rowDescription)
@@ -256,7 +256,7 @@ public final class PostgresConnection: @unchecked Sendable {
             logger: logger,
             promise: promise)
 
-        self.write(HandlerTask.extendedQuery(context), cascadingFailureTo: promise)
+        self.write(.extendedQuery(context), cascadingFailureTo: promise)
 
         return promise.futureResult
     }
@@ -265,7 +265,7 @@ public final class PostgresConnection: @unchecked Sendable {
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let context = CloseCommandContext(target: target, logger: logger, promise: promise)
 
-        self.write(HandlerTask.closeCommand(context), cascadingFailureTo: promise)
+        self.write(.closeCommand(context), cascadingFailureTo: promise)
 
         return promise.futureResult
     }
@@ -429,7 +429,7 @@ extension PostgresConnection {
             promise: promise
         )
 
-        self.write(HandlerTask.extendedQuery(context), cascadingFailureTo: promise)
+        self.write(.extendedQuery(context), cascadingFailureTo: promise)
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()
@@ -542,7 +542,7 @@ extension PostgresConnection {
         }
     }
 
-    private func write<T, Value>(_ any: T, cascadingFailureTo promise: EventLoopPromise<Value>) {
+    private func write<T>(_ task: HandlerTask, cascadingFailureTo promise: EventLoopPromise<T>) {
         let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
         self.channel.write(any, promise: writePromise)
         writePromise.futureResult.cascadeFailure(to: promise)
@@ -730,7 +730,7 @@ extension PostgresConnection {
             closure: notificationHandler
         )
 
-        self.write(HandlerTask.startListening(listener), cascadingFailureTo: listenContext.promise)
+        self.write(.startListening(listener), cascadingFailureTo: listenContext.promise)
 
         listenContext.future.whenComplete { _ in
             let task = HandlerTask.cancelListening(channel, id)
