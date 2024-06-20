@@ -544,7 +544,7 @@ extension PostgresConnection {
 
     private func write<T>(_ task: HandlerTask, cascadingFailureTo promise: EventLoopPromise<T>) {
         let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
-        self.channel.write(any, promise: writePromise)
+        self.channel.write(task, promise: writePromise)
         writePromise.futureResult.cascadeFailure(to: promise)
     }
 }
