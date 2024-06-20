@@ -462,7 +462,6 @@ extension PostgresConnection {
                 self.channel.write(task, promise: writePromise)
                 writePromise.futureResult.whenFailure { error in
                     listener.failed(error)
-                    continuation.resume(throwing: error)
                 }
             }
         } onCancel: {
