@@ -710,7 +710,7 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testPrepareStatementQueryFailsIfConnectionIsClosed() async throws {
+    func testPrepareStatementFailsIfConnectionIsClosed() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
         try await connection.closeGracefully()
@@ -718,15 +718,96 @@ class PostgresConnectionTests: XCTestCase {
         XCTAssertEqual(channel.isActive, false)
 
         do {
-            _ = try await connection.prepareStatement(
-                "SELECT version;",
-                with: "test_query",
-                logger: .psqlTest
-            ).get()
+            _ = try await connection.prepareStatement("SELECT version;", with: "test_query", logger: .psqlTest).get()
             XCTFail("Expected to fail")
         } catch let error as ChannelError {
             XCTAssertEqual(error, .ioOnClosedChannel)
         }
+    }
+
+    func testExecuteFailsIfConnectionIsClosed() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await connection.closeGracefully()
+
+        XCTAssertEqual(channel.isActive, false)
+
+        do {
+            let statement = PSQLExecuteStatement(name: "SELECT version;", binds: .init(), rowDescription: nil)
+            _ = try await connection.execute(statement, logger: .psqlTest).get()
+            XCTFail("Expected to fail")
+        } catch let error as ChannelError {
+            XCTAssertEqual(error, .ioOnClosedChannel)
+        }
+    }
+
+    func testExecutePreparedStatementFailsIfConnectionIsClosed() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await connection.closeGracefully()
+
+        XCTAssertEqual(channel.isActive, false)
+
+        struct TestPreparedStatement: PostgresPreparedStatement {
+            static let sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
+            typealias Row = (Int, String)
+
+            var state: String
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.state)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                try row.decode(Row.self)
+            }
+        }
+
+        do {
+            let preparedStatement = TestPreparedStatement(state: "active")
+            _ = try await connection.execute(preparedStatement, logger: .psqlTest)
+            XCTFail("Expected to fail")
+        } catch let error as ChannelError {
+            XCTAssertEqual(error, .ioOnClosedChannel)
+        }
+    }
+
+    func testExecutePreparedStatementWithVoidRowFailsIfConnectionIsClosed() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await connection.closeGracefully()
+
+        XCTAssertEqual(channel.isActive, false)
+
+        struct TestPreparedStatement: PostgresPreparedStatement {
+            static let sql = "SELECT * FROM pg_stat_activity WHERE state = $1"
+            typealias Row = ()
+
+            var state: String
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.state)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                ()
+            }
+        }
+
+        do {
+            let preparedStatement = TestPreparedStatement(state: "active")
+            _ = try await connection.execute(preparedStatement, logger: .psqlTest)
+            XCTFail("Expected to fail")
+        } catch let error as ChannelError {
+            XCTAssertEqual(error, .ioOnClosedChannel)
+        }
+    }
+
+    func testAddListenerFailsIfConnectionIsClosed() async throws {
     }
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
