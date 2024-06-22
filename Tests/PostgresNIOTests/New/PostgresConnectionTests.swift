@@ -224,6 +224,63 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testSimpleListenFailsIfConnectionIsClosed() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await connection.closeGracefully()
+
+        XCTAssertEqual(channel.isActive, false)
+
+        do {
+            _ = try await connection.listen("test_channel")
+            XCTFail("Expected to fail")
+        } catch let error as ChannelError {
+            XCTAssertEqual(error, .ioOnClosedChannel)
+        }
+    }
+
+    func testSimpleListenFailsIfConnectionIsClosedWhileListening() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                let events = try await connection.listen("foo")
+                var iterator = events.makeAsyncIterator()
+                let first = try await iterator.next()
+                XCTAssertEqual(first?.payload, "wooohooo")
+                do {
+                    _ = try await iterator.next()
+                    XCTFail("Did not expect to not throw")
+                } catch let error as PSQLError {
+                    XCTAssertEqual(error.code, .clientClosedConnection)
+                }
+            }
+
+            let listenMessage = try await channel.waitForUnpreparedRequest()
+            XCTAssertEqual(listenMessage.parse.query, #"LISTEN "foo";"#)
+
+            try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+            try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+            try await channel.writeInbound(PostgresBackendMessage.noData)
+            try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+            try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+
+            try await connection.closeGracefully()
+
+            XCTAssertEqual(channel.isActive, false)
+
+            switch await taskGroup.nextResult()! {
+            case .success:
+                break
+            case .failure(let failure):
+                XCTFail("Unexpected error: \(failure)")
+            }
+        }
+    }
+
     func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
         try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
@@ -650,63 +707,6 @@ class PostgresConnectionTests: XCTestCase {
             XCTFail("Expected to fail")
         } catch let error as ChannelError {
             XCTAssertEqual(error, .ioOnClosedChannel)
-        }
-    }
-
-    func testListenFailsIfConnectionIsClosed() async throws {
-        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
-
-        try await connection.closeGracefully()
-
-        XCTAssertEqual(channel.isActive, false)
-
-        do {
-            _ = try await connection.listen("test_channel")
-            XCTFail("Expected to fail")
-        } catch let error as ChannelError {
-            XCTAssertEqual(error, .ioOnClosedChannel)
-        }
-    }
-
-    func testListenFailsIfConnectionIsClosedMidway() async throws {
-        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
-
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
-                let events = try await connection.listen("foo")
-                var iterator = events.makeAsyncIterator()
-                let first = try await iterator.next()
-                XCTAssertEqual(first?.payload, "wooohooo")
-                do {
-                    _ = try await iterator.next()
-                    XCTFail("Did not expect to not throw")
-                } catch let error as PSQLError {
-                    XCTAssertEqual(error.code, .clientClosedConnection)
-                }
-            }
-
-            let listenMessage = try await channel.waitForUnpreparedRequest()
-            XCTAssertEqual(listenMessage.parse.query, #"LISTEN "foo";"#)
-
-            try await channel.writeInbound(PostgresBackendMessage.parseComplete)
-            try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
-            try await channel.writeInbound(PostgresBackendMessage.noData)
-            try await channel.writeInbound(PostgresBackendMessage.bindComplete)
-            try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
-            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
-
-            try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
-
-            try await connection.closeGracefully()
-
-            XCTAssertEqual(channel.isActive, false)
-
-            switch await taskGroup.nextResult()! {
-            case .success:
-                break
-            case .failure(let failure):
-                XCTFail("Unexpected error: \(failure)")
-            }
         }
     }
 
