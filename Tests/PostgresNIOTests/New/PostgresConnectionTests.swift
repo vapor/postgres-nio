@@ -268,7 +268,7 @@ class PostgresConnectionTests: XCTestCase {
 
             try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
 
-            try await connection.closeGracefully()
+            try await connection.close().get()
 
             XCTAssertEqual(channel.isActive, false)
 
