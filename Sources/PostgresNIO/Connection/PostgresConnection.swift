@@ -227,6 +227,7 @@ public final class PostgresConnection: @unchecked Sendable {
         let context = ExtendedQueryContext(
             name: name,
             query: query,
+            bindingDataTypes: [],
             logger: logger,
             promise: promise
         )
@@ -397,9 +398,10 @@ extension PostgresConnection {
         let bindings = try preparedStatement.makeBindings()
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
-            name: String(reflecting: Statement.self),
+            name: Statement.name,
             sql: Statement.sql,
             bindings: bindings,
+            bindingDataTypes: Statement.bindingDataTypes,
             logger: logger,
             promise: promise
         ))
@@ -418,10 +420,10 @@ extension PostgresConnection {
             )
             throw error // rethrow with more metadata
         }
-
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
+    @_disfavoredOverload
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
         logger: Logger,
@@ -431,9 +433,10 @@ extension PostgresConnection {
         let bindings = try preparedStatement.makeBindings()
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let task = HandlerTask.executePreparedStatement(.init(
-            name: String(reflecting: Statement.self),
+            name: Statement.name,
             sql: Statement.sql,
             bindings: bindings,
+            bindingDataTypes: Statement.bindingDataTypes,
             logger: logger,
             promise: promise
         ))

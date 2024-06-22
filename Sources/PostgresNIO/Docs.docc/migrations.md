@@ -87,16 +87,4 @@ connection.query("SELECT id, name, email, age FROM users").whenComplete {
 }
 ```
 
-## Topics
-
-### Relevant types
-
-- ``PostgresConnection``
-- ``PostgresQuery``
-- ``PostgresBindings``
-- ``PostgresRow``
-- ``PostgresRandomAccessRow``
-- ``PostgresEncodable``
-- ``PostgresDecodable``
-
 [`1.9.0`]: https://github.com/vapor/postgres-nio/releases/tag/1.9.0

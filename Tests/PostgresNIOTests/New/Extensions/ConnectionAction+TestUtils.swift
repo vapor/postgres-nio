@@ -2,7 +2,8 @@ import class Foundation.JSONEncoder
 import NIOCore
 @testable import PostgresNIO
 
-extension ConnectionStateMachine.ConnectionAction: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
+extension PostgresNIO.ConnectionStateMachine.ConnectionAction: Swift.Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.read, read):
@@ -35,8 +36,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag
         case (.forwardStreamError(let lhsError, let lhsRead, let lhsCleanupContext), .forwardStreamError(let rhsError , let rhsRead, let rhsCleanupContext)):
             return lhsError == rhsError && lhsRead == rhsRead && lhsCleanupContext == rhsCleanupContext
-        case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
-            return lhsName == rhsName && lhsQuery == rhsQuery
+        case (.sendParseDescribeSync(let lhsName, let lhsQuery, let lhsDataTypes), .sendParseDescribeSync(let rhsName, let rhsQuery, let rhsDataTypes)):
+            return lhsName == rhsName && lhsQuery == rhsQuery && lhsDataTypes == rhsDataTypes
         case (.succeedPreparedStatementCreation(let lhsPromise, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsPromise, let rhsRowDescription)):
             return lhsPromise.futureResult === rhsPromise.futureResult && lhsRowDescription == rhsRowDescription
         case (.fireChannelInactive, .fireChannelInactive):
@@ -47,7 +48,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
     }
 }
 
-extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol'
+extension PostgresNIO.ConnectionStateMachine.ConnectionAction.CleanUpContext: Swift.Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         guard lhs.closePromise?.futureResult === rhs.closePromise?.futureResult else {
             return false
@@ -96,13 +98,15 @@ extension ConnectionStateMachine {
     }
 }
 
-extension PostgresError: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
+extension PostgresNIO.PostgresError: Swift.Equatable {
     public static func == (lhs: PostgresError, rhs: PostgresError) -> Bool {
         return true
     }
 }
 
-extension PSQLTask: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
+extension PostgresNIO.PSQLTask: Swift.Equatable {
     public static func == (lhs: PSQLTask, rhs: PSQLTask) -> Bool {
         switch (lhs, rhs) {
         case (.extendedQuery(let lhs), .extendedQuery(let rhs)):

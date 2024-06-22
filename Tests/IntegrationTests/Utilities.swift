@@ -13,11 +13,9 @@ extension PostgresConnection {
         try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)
     }
 
-    static func test(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
-        var logger = Logger(label: "postgres.connection.test")
-        logger.logLevel = logLevel
-
-        let config = PostgresConnection.Configuration(
+    static func test(on eventLoop: EventLoop, options: Configuration.Options? = nil) -> EventLoopFuture<PostgresConnection> {
+        let logger = Logger(label: "postgres.connection.test")
+        var config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
             username: env("POSTGRES_USER") ?? "test_username",
@@ -25,14 +23,15 @@ extension PostgresConnection {
             database: env("POSTGRES_DB") ?? "test_database",
             tls: .disable
         )
-
+        if let options {
+            config.options = options
+        }
+        
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
-    static func testUDS(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
-        var logger = Logger(label: "postgres.connection.test")
-        logger.logLevel = logLevel
-        
+    static func testUDS(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+        let logger = Logger(label: "postgres.connection.test")
         let config = PostgresConnection.Configuration(
             unixSocketPath: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)",
             username: env("POSTGRES_USER") ?? "test_username",
@@ -43,10 +42,8 @@ extension PostgresConnection {
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
-    static func testChannel(_ channel: Channel, on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
-        var logger = Logger(label: "postgres.connection.test")
-        logger.logLevel = logLevel
-        
+    static func testChannel(_ channel: Channel, on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+        let logger = Logger(label: "postgres.connection.test")
         let config = PostgresConnection.Configuration(
             establishedChannel: channel,
             username: env("POSTGRES_USER") ?? "test_username",
@@ -60,9 +57,7 @@ extension PostgresConnection {
 
 extension Logger {
     static var psqlTest: Logger {
-        var logger = Logger(label: "psql.test")
-        logger.logLevel = .info
-        return logger
+        .init(label: "psql.test")
     }
 }
 

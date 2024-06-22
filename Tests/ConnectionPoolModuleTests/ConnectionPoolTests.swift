@@ -26,7 +26,7 @@ final class ConnectionPoolTests: XCTestCase {
         // the same connection is reused 1000 times
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
+            taskGroup.addTask_ {
                 await pool.run()
             }
 
@@ -82,14 +82,14 @@ final class ConnectionPoolTests: XCTestCase {
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
+            taskGroup.addTask_ {
                 await pool.run()
             }
 
             let (blockCancelStream, blockCancelContinuation) = AsyncStream.makeStream(of: Void.self)
             let (blockConnCreationStream, blockConnCreationContinuation) = AsyncStream.makeStream(of: Void.self)
 
-            taskGroup.addTask {
+            taskGroup.addTask_ {
                 _ = try? await factory.nextConnectAttempt { _ in
                     blockCancelContinuation.yield()
                     var iterator = blockConnCreationStream.makeAsyncIterator()
@@ -127,7 +127,7 @@ final class ConnectionPoolTests: XCTestCase {
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
+            taskGroup.addTask_ {
                 await pool.run()
             }
 
@@ -170,12 +170,12 @@ final class ConnectionPoolTests: XCTestCase {
         // the same connection is reused 1000 times
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
+            taskGroup.addTask_ {
                 await pool.run()
                 XCTAssertFalse(hasFinished.compareExchange(expected: false, desired: true, ordering: .relaxed).original)
             }
 
-            taskGroup.addTask {
+            taskGroup.addTask_ {
                 var usedConnectionIDs = Set<Int>()
                 for _ in 0..<config.maximumConnectionHardLimit {
                     await factory.nextConnectAttempt { connectionID in
@@ -192,7 +192,7 @@ final class ConnectionPoolTests: XCTestCase {
             let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
 
             for _ in 0..<iterations {
-                taskGroup.addTask {
+                taskGroup.addTask_ {
                     do {
                         let leasedConnection = try await pool.leaseConnection()
                         pool.releaseConnection(leasedConnection)
@@ -803,7 +803,7 @@ final class ConnectionPoolTests: XCTestCase {
 
             pool.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: 21)
 
-            for (index, request) in requests.enumerated() {
+            for (_, request) in requests.enumerated() {
                 let connection = try await request.future.success
                 connections.append(connection)
             }

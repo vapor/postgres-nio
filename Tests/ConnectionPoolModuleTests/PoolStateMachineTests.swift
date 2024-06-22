@@ -375,6 +375,10 @@ final class PoolStateMachineTests: XCTestCase {
         let connectionClosed = stateMachine.connectionClosed(connection)
         XCTAssertEqual(connectionClosed.connection, .makeConnection(.init(connectionID: 1), []))
         connection.closeIfClosing()
+        let establishAction = stateMachine.connectionEstablished(.init(id: 1), maxStreams: 1)
+        XCTAssertEqual(establishAction.request, .none)
+        guard case .scheduleTimers(let timers) = establishAction.connection else { return XCTFail("Unexpected connection action") }
+        XCTAssertEqual(timers, [.init(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: configuration.keepAliveDuration!)])
     }
 
 }

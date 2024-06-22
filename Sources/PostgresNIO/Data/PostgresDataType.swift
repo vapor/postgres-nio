@@ -106,7 +106,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     /// `774`
     public static let macaddr8 = PostgresDataType(774)
     /// `775`
-    public static let macaddr8Aray = PostgresDataType(775)
+    public static let macaddr8Array = PostgresDataType(775)
     /// `790`
     public static let money = PostgresDataType(790)
     /// `791`
@@ -183,6 +183,10 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     public static let timestamp = PostgresDataType(1114)
     /// `1115` _timestamp
     public static let timestampArray = PostgresDataType(1115)
+    /// `1182`
+    public static let dateArray = PostgresDataType(1182)
+    /// `1183`
+    public static let timeArray = PostgresDataType(1183)
     /// `1184`
     public static let timestamptz = PostgresDataType(1184)
     /// `1185`
@@ -437,7 +441,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .circle: return "CIRCLE"
         case .circleArray: return "CIRCLE[]"
         case .macaddr8: return "MACADDR8"
-        case .macaddr8Aray: return "MACADDR8[]"
+        case .macaddr8Array: return "MACADDR8[]"
         case .money: return "MONEY"
         case .moneyArray: return "MONEY[]"
         case .macaddr: return "MACADDR"
@@ -476,6 +480,8 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .time: return "TIME"
         case .timestamp: return "TIMESTAMP"
         case .timestampArray: return "TIMESTAMP[]"
+        case .dateArray: return "DATE[]"
+        case .timeArray: return "TIME[]"
         case .timestamptz: return "TIMESTAMPTZ"
         case .timestamptzArray: return "TIMESTAMPTZ[]"
         case .interval: return "INTERVAL"
@@ -587,7 +593,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .line: return .lineArray
         case .cidr: return .cidrArray
         case .circle: return .circleArray
-        case .macaddr8Aray: return .macaddr8
+        case .macaddr8: return .macaddr8Array
         case .money: return .moneyArray
         case .int2vector: return .int2vectorArray
         case .regproc: return .regprocArray
@@ -604,6 +610,9 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .aclitem: return .aclitemArray
         case .macaddr: return .macaddrArray
         case .inet: return .inetArray
+        case .timestamp: return .timestampArray
+        case .date: return .dateArray
+        case .time: return .timeArray
         case .timestamptz: return .timestamptzArray
         case .interval: return .intervalArray
         case .numeric: return .numericArray
@@ -626,6 +635,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .regdictionary: return .regdictionaryArray
         case .numrange: return .numrangeArray
         case .tsrange: return .tsrangeArray
+        case .tstzrange: return .tstzrangeArray
         case .daterange: return .daterangeArray
         case .jsonpath: return .jsonpathArray
         case .regnamespace: return .regnamespaceArray
@@ -634,7 +644,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .int4multirange: return .int4multirangeArray
         case .tsmultirange: return .tsmultirangeArray
         case .tstzmultirange: return .tstzmultirangeArray
-        case .datemultirange: return .datemultirange
+        case .datemultirange: return .datemultirangeArray
         case .int8multirange: return .int8multirangeArray
         case .bool: return .boolArray
         case .bytea: return .byteaArray
@@ -668,7 +678,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .lineArray: return .line
         case .cidrArray: return .cidr
         case .circleArray: return .circle
-        case .macaddr8: return .macaddr8Aray
+        case .macaddr8Array: return .macaddr8
         case .moneyArray: return .money
         case .int2vectorArray: return .int2vector
         case .regprocArray: return .regproc
@@ -685,6 +695,9 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .aclitemArray: return .aclitem
         case .macaddrArray: return .macaddr
         case .inetArray: return .inet
+        case .timestampArray: return .timestamp
+        case .dateArray: return .date
+        case .timeArray: return .time
         case .timestamptzArray: return .timestamptz
         case .intervalArray: return .interval
         case .numericArray: return .numeric
@@ -707,6 +720,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .regdictionaryArray: return .regdictionary
         case .numrangeArray: return .numrange
         case .tsrangeArray: return .tsrange
+        case .tstzrangeArray: return .tstzrange
         case .daterangeArray: return .daterange
         case .jsonpathArray: return .jsonpath
         case .regnamespaceArray: return .regnamespace
@@ -715,7 +729,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         case .int4multirangeArray: return .int4multirange
         case .tsmultirangeArray: return .tsmultirange
         case .tstzmultirangeArray: return .tstzmultirange
-        case .datemultirange: return .datemultirange
+        case .datemultirangeArray: return .datemultirange
         case .int8multirangeArray: return .int8multirange
         case .boolArray: return .bool
         case .byteaArray: return .bytea

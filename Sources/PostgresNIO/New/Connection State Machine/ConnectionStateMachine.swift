@@ -97,7 +97,7 @@ struct ConnectionStateMachine {
         case forwardStreamError(PostgresError, read: Bool, cleanupContext: CleanUpContext?)
         
         // Prepare statement actions
-        case sendParseDescribeSync(name: String, query: String)
+        case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
         case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
         case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PostgresError, cleanupContext: CleanUpContext?)
 
@@ -587,7 +587,7 @@ struct ConnectionStateMachine {
             switch queryContext.query {
             case .executeStatement(_, let promise), .unnamed(_, let promise):
                 return .failQuery(promise, with: psqlErrror, cleanupContext: nil)
-            case .prepareStatement(_, _, let promise):
+            case .prepareStatement(_, _, _, let promise):
                 return .failPreparedStatementCreation(promise, with: psqlErrror, cleanupContext: nil)
             }
         case .closeCommand(let closeContext):
@@ -1057,8 +1057,8 @@ extension ConnectionStateMachine {
             return .read
         case .wait:
             return .wait
-        case .sendParseDescribeSync(name: let name, query: let query):
-            return .sendParseDescribeSync(name: name, query: query)
+        case .sendParseDescribeSync(name: let name, query: let query, bindingDataTypes: let bindingDataTypes):
+            return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
         case .succeedPreparedStatementCreation(let promise, with: let rowDescription):
             return .succeedPreparedStatementCreation(promise, with: rowDescription)
         case .failPreparedStatementCreation(let promise, with: let error):

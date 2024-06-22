@@ -84,6 +84,36 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testAdditionalParametersTakeEffect() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let query: PostgresQuery = """
+            SELECT
+                current_setting('application_name');
+            """
+
+        let applicationName = "postgres-nio-test"
+        var options = PostgresConnection.Configuration.Options()
+        options.additionalStartupParameters = [
+            ("application_name", applicationName)
+        ]
+
+        try await withTestConnection(on: eventLoop, options: options) { connection in
+            let rows = try await connection.query(query, logger: .psqlTest)
+            var counter = 0
+
+            for try await element in rows.decode(String.self) {
+                XCTAssertEqual(element, applicationName)
+                
+                counter += 1
+            }
+
+            XCTAssertGreaterThanOrEqual(counter, 1)
+        }
+    }
+
     func testSelectTimeoutWhileLongRunningQuery() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -225,25 +255,32 @@ final class AsyncPostgresConnectionTests: XCTestCase {
     }
 
     func testListenAndNotify() async throws {
+        let channelNames = [
+            "foo",
+            "default"
+        ]
+        
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
-        try await self.withTestConnection(on: eventLoop) { connection in
-            let stream = try await connection.listen("foo")
-            var iterator = stream.makeAsyncIterator()
+        for channelName in channelNames {
+            try await self.withTestConnection(on: eventLoop) { connection in
+                let stream = try await connection.listen(channelName)
+                var iterator = stream.makeAsyncIterator()
 
-            try await self.withTestConnection(on: eventLoop) { other in
-                try await other.query(#"NOTIFY foo, 'bar';"#, logger: .psqlTest)
+                try await self.withTestConnection(on: eventLoop) { other in
+                    try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'bar';"#, logger: .psqlTest)
 
-                try await other.query(#"NOTIFY foo, 'foo';"#, logger: .psqlTest)
+                    try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'foo';"#, logger: .psqlTest)
+                }
+
+                let first = try await iterator.next()
+                XCTAssertEqual(first?.payload, "bar")
+
+                let second = try await iterator.next()
+                XCTAssertEqual(second?.payload, "foo")
             }
-
-            let first = try await iterator.next()
-            XCTAssertEqual(first?.payload, "bar")
-
-            let second = try await iterator.next()
-            XCTAssertEqual(second?.payload, "foo")
         }
     }
 
@@ -358,17 +395,99 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             }
         }
     }
+
+    static let preparedStatementTestTable = "AsyncTestPreparedStatementTestTable"
+    func testPreparedStatementWithIntegerBinding() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        struct InsertPreparedStatement: PostgresPreparedStatement {
+            static let name = "INSERT-AsyncTestPreparedStatementTestTable"
+
+            static let sql = #"INSERT INTO "\#(AsyncPostgresConnectionTests.preparedStatementTestTable)" (uuid) VALUES ($1);"#
+            typealias Row = ()
+
+            var uuid: UUID
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.uuid)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                ()
+            }
+        }
+
+        struct SelectPreparedStatement: PostgresPreparedStatement {
+            static let name = "SELECT-AsyncTestPreparedStatementTestTable"
+
+            static let sql = #"SELECT id, uuid FROM "\#(AsyncPostgresConnectionTests.preparedStatementTestTable)" WHERE id <= $1;"#
+            typealias Row = (Int, UUID)
+
+            var id: Int
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.id)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                try row.decode((Int, UUID).self)
+            }
+        }
+
+        do {
+            try await withTestConnection(on: eventLoop) { connection in
+                try await connection.query("""
+                    CREATE TABLE IF NOT EXISTS "\(unescaped: Self.preparedStatementTestTable)" (
+                        id SERIAL PRIMARY KEY,
+                        uuid UUID NOT NULL
+                    )
+                    """,
+                    logger: .psqlTest
+                )
+
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+
+                let rows = try await connection.execute(SelectPreparedStatement(id: 3), logger: .psqlTest)
+                var counter = 0
+                for try await (id, uuid) in rows {
+                    Logger.psqlTest.info("Received row", metadata: [
+                        "id": "\(id)", "uuid": "\(uuid)"
+                    ])
+                    counter += 1
+                }
+
+                try await connection.query("""
+                    DROP TABLE "\(unescaped: Self.preparedStatementTestTable)";
+                    """,
+                    logger: .psqlTest
+                )
+            }
+        } catch {
+            XCTFail("Unexpected error: \(String(describing: error))")
+        }
+    }
 }
 
 extension XCTestCase {
 
     func withTestConnection<Result>(
         on eventLoop: EventLoop,
+        options: PostgresConnection.Configuration.Options? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,
         _ closure: (PostgresConnection) async throws -> Result
     ) async throws -> Result  {
-        let connection = try await PostgresConnection.test(on: eventLoop).get()
+        let connection = try await PostgresConnection.test(on: eventLoop, options: options).get()
 
         do {
             let result = try await closure(connection)

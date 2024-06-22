@@ -12,11 +12,11 @@ class PrepareStatementStateMachineTests: XCTestCase {
         let name = "haha"
         let query = #"SELECT id FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, logger: .psqlTest, promise: promise
+            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
         )
 
         XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
-                       .sendParseDescribeSync(name: name, query: query))
+                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
@@ -38,11 +38,11 @@ class PrepareStatementStateMachineTests: XCTestCase {
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, logger: .psqlTest, promise: promise
+            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
         )
 
         XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
-                       .sendParseDescribeSync(name: name, query: query))
+                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
@@ -60,11 +60,11 @@ class PrepareStatementStateMachineTests: XCTestCase {
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, logger: .psqlTest, promise: promise
+            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
         )
 
         XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
-                       .sendParseDescribeSync(name: name, query: query))
+                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
 

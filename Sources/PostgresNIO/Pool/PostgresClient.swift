@@ -2,38 +2,36 @@ import NIOCore
 import NIOSSL
 import Atomics
 import Logging
+import ServiceLifecycle
 import _ConnectionPoolModule
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
 ///
-/// > Important:
-/// The client can only lease connections if the user is running the client's ``run()`` method in a long running task:
+/// ## Creating a client
 ///
-/// ```swift
-/// let client = PostgresClient(configuration: configuration, logger: logger)
-/// await withTaskGroup(of: Void.self) {
-///   taskGroup.addTask {
-///     client.run() // !important
-///   }
+/// You create a ``PostgresClient`` by first creating a ``PostgresClient/Configuration`` struct that you can
+/// use to modify the client's behavior.
 ///
-///   taskGroup.addTask {
-///     client.withConnection { connection in
-///       do {
-///         let rows = try await connection.query("SELECT userID, name, age FROM users;")
-///         for try await (userID, name, age) in rows.decode((UUID, String, Int).self) {
-///           // do something with the values
-///         }
-///       } catch {
-///         // handle errors
-///       }
-///     }
-///   }
-/// }
-/// ```
+/// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "configuration")
+///
+/// Now you can create a client with your configuration object:
+///
+/// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "makeClient")
+///
+/// ## Running a client
+///
+/// ``PostgresClient`` relies on structured concurrency. Because of this it needs a task in which it can schedule all the
+/// background work that it needs to do in order to manage connections on the users behave. For this reason, developers
+/// must provide a task to the client by scheduling the client's run method in a long running task:
+///
+/// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
+///
+/// ``PostgresClient`` can not lease connections, if its ``run()`` method isn't active. Cancelling the ``run()`` method
+/// is equivalent to closing the client. Once a client's ``run()`` method has been cancelled, executing queries or prepared
+/// statements will fail.
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-@_spi(ConnectionPool)
-public final class PostgresClient: Sendable {
+public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public struct Configuration: Sendable {
         public struct TLS: Sendable {
             enum Base {
@@ -49,7 +47,7 @@ public final class PostgresClient: Sendable {
             }
 
             /// Do not try to create a TLS connection to the server.
-            public static var disable: Self = Self.init(.disable)
+            public static let disable: Self = Self.init(.disable)
 
             /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
             /// If the server does not support TLS, create an insecure connection.
@@ -246,8 +244,24 @@ public final class PostgresClient: Sendable {
     let factory: ConnectionFactory
     let runningAtomic = ManagedAtomic(false)
     let backgroundLogger: Logger
-    
+
+    /// Creates a new ``PostgresClient``, that does not log any background information.
+    ///
+    /// > Warning:
+    /// The client can only lease connections if the user is running the client's ``run()`` method in a long running task.
+    ///
+    /// - Parameters:
+    ///   - configuration: The client's configuration. See ``Configuration`` for details.
+    ///   - eventLoopGroup: The underlying NIO `EventLoopGroup`. Defaults to ``defaultEventLoopGroup``.
+    public convenience init(
+        configuration: Configuration,
+        eventLoopGroup: any EventLoopGroup = PostgresClient.defaultEventLoopGroup
+    ) {
+        self.init(configuration: configuration, eventLoopGroup: eventLoopGroup, backgroundLogger: Self.loggingDisabled)
+    }
+
     /// Creates a new ``PostgresClient``. Don't forget to run ``run()`` the client in a long running task.
+    ///
     /// - Parameters:
     ///   - configuration: The client's configuration. See ``Configuration`` for details.
     ///   - eventLoopGroup: The underlying NIO `EventLoopGroup`. Defaults to ``defaultEventLoopGroup``.
@@ -290,14 +304,124 @@ public final class PostgresClient: Sendable {
         return try await closure(connection)
     }
 
-    /// The client's run method. Users must call this function in order to start the client's background task processing
-    /// like creating and destroying connections and running timers. 
+    /// Run a query on the Postgres server the client is connected to.
     ///
-    /// Calls to ``withConnection(_:)`` will emit a `logger` warning, if ``run()`` hasn't been called previously.
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file, the query was started in. Used for better error reporting.
+    ///   - line: The line, the query was started in. Used for better error reporting.
+    /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
+    ///            The sequence  be discarded.
+    @discardableResult
+    public func query(
+        _ query: PostgresQuery,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> PostgresRowSequence {
+        let logger = logger ?? Self.loggingDisabled
+        do {
+            guard query.binds.count <= Int(UInt16.max) else {
+                throw PostgresError(code: .tooManyParameters, query: query, file: file, line: line)
+            }
+
+            let connection = try await self.leaseConnection()
+
+            var logger = logger
+            logger[postgresMetadataKey: .connectionID] = "\(connection.id)"
+
+            let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+            let context = ExtendedQueryContext(
+                query: query,
+                logger: logger,
+                promise: promise
+            )
+
+            connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+
+            promise.futureResult.whenFailure { _ in
+                self.pool.releaseConnection(connection)
+            }
+
+            return try await promise.futureResult.map {
+                $0.asyncSequence(onFinish: {
+                    self.pool.releaseConnection(connection)
+                })
+            }.get()
+        } catch var error as PostgresError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary
+    public func execute<Statement: PostgresPreparedStatement, Row>(
+        _ preparedStatement: Statement,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Row> where Row == Statement.Row {
+        let bindings = try preparedStatement.makeBindings()
+        let logger = logger ?? Self.loggingDisabled
+
+        do {
+            let connection = try await self.leaseConnection()
+
+            let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+            let task = HandlerTask.executePreparedStatement(.init(
+                name: String(reflecting: Statement.self),
+                sql: Statement.sql,
+                bindings: bindings,
+                bindingDataTypes: Statement.bindingDataTypes,
+                logger: logger,
+                promise: promise
+            ))
+            connection.channel.write(task, promise: nil)
+
+            promise.futureResult.whenFailure { _ in
+                self.pool.releaseConnection(connection)
+            }
+
+            return try await promise.futureResult
+                .map { $0.asyncSequence(onFinish: { self.pool.releaseConnection(connection) }) }
+                .get()
+                .map { try preparedStatement.decodeRow($0) }
+        } catch var error as PostgresError {
+            error.file = file
+            error.line = line
+            error.query = .init(
+                unsafeSQL: Statement.sql,
+                binds: bindings
+            )
+            throw error // rethrow with more metadata
+        }
+    }
+
+    /// The structured root task for the client's background work.
+    ///
+    /// > Warning:
+    /// Users must call this function in order to allow the client to process any background work. Executing queries,
+    /// prepared statements or leasing connections will hang until the developer executes the client's ``run()``
+    /// method.
+    ///
+    /// Cancelling the task which executes the ``run()`` method, is equivalent to closing the client. Once the task
+    /// has been cancelled the client is not able to process any new queries or prepared statements.
+    ///
+    /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
+    ///
+    /// > Note:
+    /// ``PostgresClient`` implements [ServiceLifecycle](https://github.com/swift-server/swift-service-lifecycle)'s `Service` protocol. Because of this
+    /// ``PostgresClient`` can be passed to a `ServiceGroup` for easier lifecycle management.
     public func run() async {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
-        await self.pool.run()
+
+        await cancelWhenGracefulShutdown {
+            await self.pool.run()
+        }
     }
 
     // MARK: - Private Methods -
@@ -315,6 +439,8 @@ public final class PostgresClient: Sendable {
     public static var defaultEventLoopGroup: EventLoopGroup {
         PostgresConnection.defaultEventLoopGroup
     }
+
+    static let loggingDisabled = Logger(label: "Postgres-do-not-log", factory: { _ in SwiftLogNoOpLogHandler() })
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -347,13 +473,12 @@ extension ConnectionPoolConfiguration {
     }
 }
 
-@_spi(ConnectionPool)
 extension PostgresConnection: PooledConnection {
     public func close() {
         self.channel.close(mode: .all, promise: nil)
     }
 
-    public func onClose(_ closure: @escaping ((any Error)?) -> ()) {
+    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
         self.closeFuture.whenComplete { _ in closure(nil) }
     }
 }
