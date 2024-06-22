@@ -50,9 +50,5 @@ configure ``PostgresConnection`` to use `Network.framework` as the underlying tr
 - ``PostgresDecodingError``
 - ``PSQLError``
 
-### Deprecations
-
-- <doc:deprecated>
-
 [SwiftNIO]: https://github.com/apple/swift-nio
 [SwiftLog]: https://github.com/apple/swift-log

@@ -34,7 +34,7 @@ class PostgresConnectionTests: XCTestCase {
         logger.logLevel = .trace
         
         XCTAssertThrowsError(try PostgresConnection.connect(on: eventLoopGroup.next(), configuration: config, id: 1, logger: logger).wait()) {
-            XCTAssertTrue($0 is PSQLError)
+            XCTAssertTrue($0 is PostgresError)
         }
     }
 
@@ -308,7 +308,7 @@ class PostgresConnectionTests: XCTestCase {
                 case .success:
                     XCTFail("Expected queries to fail")
                 case .failure(let failure):
-                    guard let error = failure as? PSQLError else {
+                    guard let error = failure as? PostgresError else {
                         return XCTFail("Unexpected error type: \(failure)")
                     }
                     XCTAssertEqual(error.code, .clientClosedConnection)
@@ -333,7 +333,7 @@ class PostgresConnectionTests: XCTestCase {
             _ = try await response
             XCTFail("Expected to throw")
         } catch {
-            XCTAssertEqual((error as? PSQLError)?.code, .serverClosedConnection)
+            XCTAssertEqual((error as? PostgresError)?.code, .serverClosedConnection)
         }
 
         // retry on same connection
@@ -342,7 +342,7 @@ class PostgresConnectionTests: XCTestCase {
             _ = try await connection.query("SELECT 1;", logger: self.logger)
             XCTFail("Expected to throw")
         } catch {
-            XCTAssertEqual((error as? PSQLError)?.code, .serverClosedConnection)
+            XCTAssertEqual((error as? PostgresError)?.code, .serverClosedConnection)
         }
     }
 
@@ -354,7 +354,7 @@ class PostgresConnectionTests: XCTestCase {
 
         func makeBindings() -> PostgresBindings {
             var bindings = PostgresBindings()
-            bindings.append(.init(string: self.state))
+            bindings.append(self.state)
             return bindings
         }
 
@@ -602,7 +602,7 @@ class PostgresConnectionTests: XCTestCase {
                     _ = try await connection.execute(preparedStatement, logger: .psqlTest)
                     XCTFail("Was supposed to fail")
                 } catch {
-                    XCTAssert(error is PSQLError)
+                    XCTAssert(error is PostgresError)
                 }
             }
 
@@ -632,7 +632,7 @@ class PostgresConnectionTests: XCTestCase {
                     _ = try await connection.execute(preparedStatement, logger: .psqlTest)
                     XCTFail("Was supposed to fail")
                 } catch {
-                    XCTAssert(error is PSQLError)
+                    XCTAssert(error is PostgresError)
                 }
             }
         }

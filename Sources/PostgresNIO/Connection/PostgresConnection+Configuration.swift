@@ -233,7 +233,7 @@ extension PostgresConnection {
         }
 
         let connection: InternalConfiguration.Connection
-        let username: String?
+        let username: String
         let password: String?
         let database: String?
         var tls: Configuration.TLS

@@ -12,17 +12,6 @@ extension PostgresConnection {
     static func address() throws -> SocketAddress {
         try .makeAddressResolvingHost(env("POSTGRES_HOSTNAME") ?? "localhost", port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)
     }
-    
-    @available(*, deprecated, message: "Test deprecated functionality")
-    static func testUnauthenticated(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
-        var logger = Logger(label: "postgres.connection.test")
-        logger.logLevel = logLevel
-        do {
-            return connect(to: try address(), logger: logger, on: eventLoop)
-        } catch {
-            return eventLoop.makeFailedFuture(error)
-        }
-    }
 
     static func test(on eventLoop: EventLoop, options: Configuration.Options? = nil) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")

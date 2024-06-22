@@ -99,8 +99,8 @@ extension ConnectionStateMachine {
 }
 
 // fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
-extension PostgresNIO.PSQLError: Swift.Equatable {
-    public static func == (lhs: PSQLError, rhs: PSQLError) -> Bool {
+extension PostgresNIO.PostgresError: Swift.Equatable {
+    public static func == (lhs: PostgresError, rhs: PostgresError) -> Bool {
         return true
     }
 }

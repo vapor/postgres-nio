@@ -37,7 +37,7 @@ final class PSQLErrorTests: XCTestCase {
     }
 
     func testPSQLErrorDescription() {
-        var error1 = PSQLError.server(.init(fields: [.localizedSeverity: "ERROR", .severity: "ERROR", .sqlState: "00000", .message: "Test message", .detail: "More test message", .hint: "It's a test, that's your hint", .position: "1", .schemaName: "testsch", .tableName: "testtab", .columnName: "testcol", .dataTypeName: "testtyp", .constraintName: "testcon", .file: #fileID, .line: "0", .routine: #function]))
+        var error1 = PostgresError.server(.init(fields: [.localizedSeverity: "ERROR", .severity: "ERROR", .sqlState: "00000", .message: "Test message", .detail: "More test message", .hint: "It's a test, that's your hint", .position: "1", .schemaName: "testsch", .tableName: "testtab", .columnName: "testcol", .dataTypeName: "testtyp", .constraintName: "testcon", .file: #fileID, .line: "0", .routine: #function]))
         var testBinds = PostgresBindings(capacity: 1)
         testBinds.append(1, context: .default)
         error1.query = .init(unsafeSQL: "TEST QUERY", binds: testBinds)

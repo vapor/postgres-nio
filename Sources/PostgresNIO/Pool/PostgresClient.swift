@@ -323,7 +323,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let logger = logger ?? Self.loggingDisabled
         do {
             guard query.binds.count <= Int(UInt16.max) else {
-                throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
+                throw PostgresError(code: .tooManyParameters, query: query, file: file, line: line)
             }
 
             let connection = try await self.leaseConnection()
@@ -349,7 +349,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                     self.pool.releaseConnection(connection)
                 })
             }.get()
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = query
@@ -389,7 +389,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                 .map { $0.asyncSequence(onFinish: { self.pool.releaseConnection(connection) }) }
                 .get()
                 .map { try preparedStatement.decodeRow($0) }
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = .init(
@@ -458,7 +458,7 @@ struct PostgresKeepAliveBehavor: ConnectionKeepAliveBehavior {
     }
 
     func runKeepAlive(for connection: PostgresConnection) async throws {
-        try await connection.query(self.behavior!.query, logger: self.logger).map { _ in }.get()
+        try await connection.query(self.behavior!.query, logger: self.logger)
     }
 }
 
@@ -485,14 +485,14 @@ extension PostgresConnection: PooledConnection {
 
 extension ConnectionPoolError {
     func mapToPSQLError(lastConnectError: Error?) -> Error {
-        var psqlError: PSQLError
+        var psqlError: PostgresError
         switch self {
         case .poolShutdown:
-            psqlError = PSQLError.poolClosed
+            psqlError = PostgresError.poolClosed
             psqlError.underlying = self
 
         case .requestCancelled:
-            psqlError = PSQLError.queryCancelled
+            psqlError = PostgresError.queryCancelled
             psqlError.underlying = self
 
         default:

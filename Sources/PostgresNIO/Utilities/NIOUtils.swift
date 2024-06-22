@@ -52,9 +52,3 @@ internal extension ByteBuffer {
         return array
     }
 }
-
-internal extension Sequence where Element == UInt8 {
-    func hexdigest() -> String {
-        return reduce("") { $0 + String(format: "%02x", $1) }
-    }
-}
