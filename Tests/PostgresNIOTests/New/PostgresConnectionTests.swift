@@ -638,7 +638,7 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testQueriesFailIfConnectionIsClosed() async throws {
+    func testPostgresQueryQueriesFailIfConnectionIsClosed() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
         try await connection.closeGracefully()
@@ -673,25 +673,40 @@ class PostgresConnectionTests: XCTestCase {
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
+                let events = try await connection.listen("foo")
+                var iterator = events.makeAsyncIterator()
+                let first = try await iterator.next()
+                XCTAssertEqual(first?.payload, "wooohooo")
                 do {
-                    let listenSequence = try await connection.listen("test_channel")
-
-                    for try await _ in listenSequence {
-                        XCTFail("Expected to fail")
-                    }
+                    _ = try await iterator.next()
+                    XCTFail("Did not expect to not throw")
                 } catch let error as PSQLError {
-                    XCTAssertEqual(error.code, .listenFailed)
+                    XCTAssertEqual(error.code, .clientClosedConnection)
                 }
             }
 
-            taskGroup.addTask {
-                try await Task.sleep(nanoseconds: 3_000_000_000)
+            let listenMessage = try await channel.waitForUnpreparedRequest()
+            XCTAssertEqual(listenMessage.parse.query, #"LISTEN "foo";"#)
 
-                try await connection.close().get()
-                XCTAssertEqual(channel.isActive, false)
+            try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+            try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+            try await channel.writeInbound(PostgresBackendMessage.noData)
+            try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+            try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+
+            try await connection.closeGracefully()
+
+            XCTAssertEqual(channel.isActive, false)
+
+            switch await taskGroup.nextResult()! {
+            case .success:
+                break
+            case .failure(let failure):
+                XCTFail("Unexpected error: \(failure)")
             }
-
-            try await taskGroup.waitForAll()
         }
     }
 

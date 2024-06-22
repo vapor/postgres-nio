@@ -224,7 +224,7 @@ extension ListenStateMachine {
         mutating func fail(_ error: Error) -> FailAction {
             switch self.state {
             case .initialized:
-                return .none
+                fatalError("Invalid state: \(self.state)")
                 
             case .starting(let listeners), .listening(let listeners), .stopping(let listeners):
                 self.state = .failed(error)
