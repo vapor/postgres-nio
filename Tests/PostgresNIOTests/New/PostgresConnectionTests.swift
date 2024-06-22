@@ -695,7 +695,7 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testPostgresQueryQueriesFailIfConnectionIsClosed() async throws {
+    func testQueryFailsIfConnectionIsClosed() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
         try await connection.closeGracefully()
@@ -704,6 +704,25 @@ class PostgresConnectionTests: XCTestCase {
 
         do {
             _ = try await connection.query("SELECT version;", logger: self.logger)
+            XCTFail("Expected to fail")
+        } catch let error as ChannelError {
+            XCTAssertEqual(error, .ioOnClosedChannel)
+        }
+    }
+
+    func testPrepareStatementQueryFailsIfConnectionIsClosed() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await connection.closeGracefully()
+
+        XCTAssertEqual(channel.isActive, false)
+
+        do {
+            _ = try await connection.prepareStatement(
+                "SELECT version;",
+                with: "test_query",
+                logger: .psqlTest
+            ).get()
             XCTFail("Expected to fail")
         } catch let error as ChannelError {
             XCTAssertEqual(error, .ioOnClosedChannel)
