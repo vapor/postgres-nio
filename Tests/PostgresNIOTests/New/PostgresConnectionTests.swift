@@ -268,7 +268,7 @@ class PostgresConnectionTests: XCTestCase {
 
             try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
 
-            try await connection.close().get()
+            try await connection.close()
 
             XCTAssertEqual(channel.isActive, false)
 
@@ -805,9 +805,6 @@ class PostgresConnectionTests: XCTestCase {
         } catch let error as ChannelError {
             XCTAssertEqual(error, .ioOnClosedChannel)
         }
-    }
-
-    func testAddListenerFailsIfConnectionIsClosed() async throws {
     }
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
