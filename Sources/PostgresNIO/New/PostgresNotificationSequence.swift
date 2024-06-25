@@ -20,3 +20,6 @@ public struct PostgresNotificationSequence: AsyncSequence, Sendable {
         }
     }
 }
+
+@available(*, unavailable)
+extension PostgresNotificationSequence.AsyncIterator :Sendable {}
