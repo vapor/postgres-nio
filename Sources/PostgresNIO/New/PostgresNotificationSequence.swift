@@ -22,4 +22,4 @@ public struct PostgresNotificationSequence: AsyncSequence, Sendable {
 }
 
 @available(*, unavailable)
-extension PostgresNotificationSequence.AsyncIterator :Sendable {}
+extension PostgresNotificationSequence.AsyncIterator: Sendable {}

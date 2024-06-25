@@ -57,7 +57,7 @@ extension PostgresRowSequence {
 }
 
 @available(*, unavailable)
-extension PostgresRowSequence.AsyncIterator :Sendable {}
+extension PostgresRowSequence.AsyncIterator: Sendable {}
 
 extension PostgresRowSequence {
     public func collect() async throws -> [PostgresRow] {
