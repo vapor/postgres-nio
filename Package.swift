@@ -3,7 +3,6 @@ import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
     .enableUpcomingFeature("StrictConcurrency"),
-    .unsafeFlags(["-require-explicit-sendable"]),
 ]
 
 let package = Package(
