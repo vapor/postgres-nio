@@ -26,7 +26,7 @@ extension PostgresQuery: ExpressibleByStringInterpolation {
 }
 
 extension PostgresQuery {
-    public struct StringInterpolation: StringInterpolationProtocol {
+    public struct StringInterpolation: StringInterpolationProtocol, Sendable {
         public typealias StringLiteralType = String
 
         @usableFromInline

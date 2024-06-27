@@ -2,7 +2,7 @@
 import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
-    .enableUpcomingFeature("StrictConcurrency")
+    .enableUpcomingFeature("StrictConcurrency"),
 ]
 
 let package = Package(
