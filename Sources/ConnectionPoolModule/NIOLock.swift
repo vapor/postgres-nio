@@ -52,12 +52,12 @@ extension LockOperations {
         debugOnly {
             pthread_mutexattr_settype(&attr, .init(PTHREAD_MUTEX_ERRORCHECK))
         }
-        
+
         let err = pthread_mutex_init(mutex, &attr)
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
 #endif
     }
-    
+
     @inlinable
     static func destroy(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
@@ -69,7 +69,7 @@ extension LockOperations {
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
 #endif
     }
-    
+
     @inlinable
     static func lock(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
@@ -81,7 +81,7 @@ extension LockOperations {
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
 #endif
     }
-    
+
     @inlinable
     static func unlock(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
@@ -125,49 +125,50 @@ extension LockOperations {
 // See also: https://github.com/apple/swift/pull/40000
 @usableFromInline
 final class LockStorage<Value>: ManagedBuffer<Value, LockPrimitive> {
-    
+
     @inlinable
     static func create(value: Value) -> Self {
         let buffer = Self.create(minimumCapacity: 1) { _ in
             return value
         }
-        let storage = unsafeDowncast(buffer, to: Self.self)
-        
+        // Avoid 'unsafeDowncast' as there is a miscompilation on 5.10.
+        let storage = buffer as! Self
+
         storage.withUnsafeMutablePointers { _, lockPtr in
             LockOperations.create(lockPtr)
         }
-        
+
         return storage
     }
-    
+
     @inlinable
     func lock() {
         self.withUnsafeMutablePointerToElements { lockPtr in
             LockOperations.lock(lockPtr)
         }
     }
-    
+
     @inlinable
     func unlock() {
         self.withUnsafeMutablePointerToElements { lockPtr in
             LockOperations.unlock(lockPtr)
         }
     }
-    
+
     @inlinable
     deinit {
         self.withUnsafeMutablePointerToElements { lockPtr in
             LockOperations.destroy(lockPtr)
         }
     }
-    
+
     @inlinable
     func withLockPrimitive<T>(_ body: (UnsafeMutablePointer<LockPrimitive>) throws -> T) rethrows -> T {
         try self.withUnsafeMutablePointerToElements { lockPtr in
             return try body(lockPtr)
         }
     }
-    
+
     @inlinable
     func withLockedValue<T>(_ mutate: (inout Value) throws -> T) rethrows -> T {
         try self.withUnsafeMutablePointers { valuePtr, lockPtr in
@@ -192,7 +193,7 @@ extension LockStorage: @unchecked Sendable { }
 struct NIOLock {
     @usableFromInline
     internal let _storage: LockStorage<Void>
-    
+
     /// Create a new lock.
     @inlinable
     init() {
