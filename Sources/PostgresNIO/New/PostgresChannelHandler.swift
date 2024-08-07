@@ -212,16 +212,19 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 psqlTask = self.makeStartListeningQuery(channel: channel, context: context)
 
             case .none:
+                promise?.succeed(())
                 return
 
             case .succeedListenStart(let listener):
                 listener.startListeningSucceeded(handler: self)
+                promise?.succeed(())
                 return
             }
 
         case .cancelListening(let channel, let id):
             switch self.listenState.cancelNotificationListener(channel: channel, id: id) {
             case .none:
+                promise?.succeed(())
                 return
 
             case .stopListening(let channel, let listener):
@@ -230,6 +233,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
             case .cancelListener(let listener):
                 listener.failed(CancellationError())
+                promise?.fail(CancellationError())
                 return
             }
         case .executePreparedStatement(let preparedStatement):
@@ -245,6 +249,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             case .waitForAlreadyInFlightPreparation:
                 // The state machine already keeps track of this
                 // and will execute the statement as soon as it's prepared
+                promise?.succeed(())
                 return
             case .executeStatement(let rowDescription):
                 psqlTask = self.makeExecutePreparedStatementTask(
@@ -253,11 +258,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 )
             case .returnError(let error):
                 preparedStatement.promise.fail(error)
+                promise?.fail(error)
                 return
             }
         }
 
         let action = self.state.enqueue(task: psqlTask)
+        psqlTask.cascadeResult(to: promise)
         self.run(action, with: context)
     }
     

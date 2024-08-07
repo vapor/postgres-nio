@@ -29,6 +29,38 @@ enum PSQLTask {
             closeCommandContext.promise.fail(error)
         }
     }
+
+    func cascadeResult(to otherPromise: EventLoopPromise<Void>?) {
+        guard let otherPromise else { return }
+        switch self {
+        case .extendedQuery(let extendedQueryContext):
+            switch extendedQueryContext.query {
+            case .unnamed(_, let promise):
+                promise.futureResult.whenComplete { result in
+                    switch result {
+                    case .success: otherPromise.succeed(())
+                    case let .failure(error): otherPromise.fail(error)
+                    }
+                }
+            case .executeStatement(_, let promise):
+                promise.futureResult.whenComplete { result in
+                    switch result {
+                    case .success: otherPromise.succeed(())
+                    case let .failure(error): otherPromise.fail(error)
+                    }
+                }
+            case .prepareStatement(_, _, _, let promise):
+                promise.futureResult.whenComplete { result in
+                    switch result {
+                    case .success: otherPromise.succeed(())
+                    case let .failure(error): otherPromise.fail(error)
+                    }
+                }
+            }
+        case .closeCommand(let closeCommandContext):
+            closeCommandContext.promise.futureResult.cascade(to: otherPromise)
+        }
+    }
 }
 
 final class ExtendedQueryContext {
