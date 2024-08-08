@@ -15,7 +15,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "DELETE FROM table WHERE id=\(1)"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
@@ -33,7 +33,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
@@ -87,7 +87,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "DELETE FROM table WHERE id=\(1)"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
         
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         
@@ -105,7 +105,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
 
@@ -149,7 +149,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
 
@@ -191,7 +191,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
 
@@ -245,7 +245,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
 
@@ -266,7 +266,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "SELECT version()"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.cancelQueryStream(), .failQuery(promise, with: .queryCancelled, cleanupContext: .none))
