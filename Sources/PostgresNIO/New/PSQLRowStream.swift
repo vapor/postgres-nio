@@ -3,6 +3,7 @@ import Logging
 
 struct QueryResult {
     enum Value: Equatable {
+        case emptyResponse
         case noRows(String)
         case rowDescription([RowDescription.Column])
     }
@@ -19,6 +20,7 @@ final class PSQLRowStream: @unchecked Sendable {
     enum Source {
         case stream([RowDescription.Column], PSQLRowsDataSource)
         case noRows(Result<String, Error>)
+        case emptyResponse
     }
     
     let eventLoop: EventLoop
@@ -27,14 +29,20 @@ final class PSQLRowStream: @unchecked Sendable {
     private enum BufferState {
         case streaming(buffer: CircularBuffer<DataRow>, dataSource: PSQLRowsDataSource)
         case finished(buffer: CircularBuffer<DataRow>, commandTag: String)
+        case empty
         case failure(Error)
     }
-    
+
+    private enum Consumed {
+        case tag(String)
+        case emptyResponse
+    }
+
     private enum DownstreamState {
         case waitingForConsumer(BufferState)
         case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, PSQLRowsDataSource)
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, PSQLRowsDataSource)
-        case consumed(Result<String, Error>)
+        case consumed(Result<Consumed, Error>)
         case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource, onFinish: @Sendable () -> ())
     }
     
@@ -58,6 +66,9 @@ final class PSQLRowStream: @unchecked Sendable {
         case .noRows(.failure(let error)):
             self.rowDescription = []
             bufferState = .failure(error)
+        case .emptyResponse:
+            self.rowDescription = []
+            bufferState = .empty
         }
         
         self.downstreamState = .waitingForConsumer(bufferState)
@@ -98,11 +109,16 @@ final class PSQLRowStream: @unchecked Sendable {
             self.downstreamState = .asyncSequence(source, dataSource, onFinish: onFinish)
             self.executeActionBasedOnYieldResult(yieldResult, source: dataSource)
 
+        case .empty:
+            source.finish()
+            onFinish()
+            self.downstreamState = .consumed(.success(.emptyResponse))
+
         case .finished(let buffer, let commandTag):
             _ = source.yield(contentsOf: buffer)
             source.finish()
             onFinish()
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             
         case .failure(let error):
             source.finish(error)
@@ -195,12 +211,16 @@ final class PSQLRowStream: @unchecked Sendable {
                 PostgresRow(data: $0, lookupTable: self.lookupTable, columns: self.rowDescription)
             }
             
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             return self.eventLoop.makeSucceededFuture(rows)
             
         case .failure(let error):
             self.downstreamState = .consumed(.failure(error))
             return self.eventLoop.makeFailedFuture(error)
+
+        case .empty:
+            self.downstreamState = .consumed(.success(.emptyResponse))
+            return self.eventLoop.makeSucceededFuture([])
         }
     }
     
@@ -247,7 +267,11 @@ final class PSQLRowStream: @unchecked Sendable {
             }
             
             return promise.futureResult
-            
+
+        case .empty:
+            self.downstreamState = .consumed(.success(.emptyResponse))
+            return self.eventLoop.makeSucceededVoidFuture()
+
         case .finished(let buffer, let commandTag):
             do {
                 for data in buffer {
@@ -259,7 +283,7 @@ final class PSQLRowStream: @unchecked Sendable {
                     try onRow(row)
                 }
                 
-                self.downstreamState = .consumed(.success(commandTag))
+                self.downstreamState = .consumed(.success(.tag(commandTag)))
                 return self.eventLoop.makeSucceededVoidFuture()
             } catch {
                 self.downstreamState = .consumed(.failure(error))
@@ -290,9 +314,9 @@ final class PSQLRowStream: @unchecked Sendable {
             buffer.append(contentsOf: newRows)
             self.downstreamState = .waitingForConsumer(.streaming(buffer: buffer, dataSource: dataSource))
             
-        case .waitingForConsumer(.finished), .waitingForConsumer(.failure):
+        case .waitingForConsumer(.finished), .waitingForConsumer(.failure), .waitingForConsumer(.empty):
             preconditionFailure("How can new rows be received, if an end was already signalled?")
-            
+
         case .iteratingRows(let onRow, let promise, let dataSource):
             do {
                 for data in newRows {
@@ -353,20 +377,23 @@ final class PSQLRowStream: @unchecked Sendable {
             preconditionFailure("How can we get another end, if an end was already signalled?")
             
         case .iteratingRows(_, let promise, _):
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             promise.succeed(())
             
         case .waitingForAll(let rows, let promise, _):
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             promise.succeed(rows)
 
         case .asyncSequence(let source, _, let onFinish):
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             source.finish()
             onFinish()
 
-        case .consumed:
+        case .consumed(.success(.tag)), .consumed(.failure):
             break
+
+        case .consumed(.success(.emptyResponse)), .waitingForConsumer(.empty):
+            preconditionFailure("How can we get an end for empty query response?")
         }
     }
         
@@ -375,7 +402,7 @@ final class PSQLRowStream: @unchecked Sendable {
         case .waitingForConsumer(.streaming):
             self.downstreamState = .waitingForConsumer(.failure(error))
             
-        case .waitingForConsumer(.finished), .waitingForConsumer(.failure):
+        case .waitingForConsumer(.finished), .waitingForConsumer(.failure), .waitingForConsumer(.empty):
             preconditionFailure("How can we get another end, if an end was already signalled?")
             
         case .iteratingRows(_, let promise, _):
@@ -391,8 +418,11 @@ final class PSQLRowStream: @unchecked Sendable {
             consumer.finish(error)
             onFinish()
 
-        case .consumed:
+        case .consumed(.success(.tag)), .consumed(.failure):
             break
+
+        case .consumed(.success(.emptyResponse)):
+            preconditionFailure("How can we get an error for empty query response?")
         }
     }
 
@@ -413,10 +443,15 @@ final class PSQLRowStream: @unchecked Sendable {
     }
     
     var commandTag: String {
-        guard case .consumed(.success(let commandTag)) = self.downstreamState else {
+        guard case .consumed(.success(let consumed)) = self.downstreamState else {
             preconditionFailure("commandTag may only be called if all rows have been consumed")
         }
-        return commandTag
+        switch consumed {
+        case .tag(let tag):
+            return tag
+        case .emptyResponse:
+            return ""
+        }
     }
 }
 

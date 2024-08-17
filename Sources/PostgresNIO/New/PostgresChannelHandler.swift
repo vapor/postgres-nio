@@ -556,6 +556,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 eventLoop: context.channel.eventLoop,
                 logger: result.logger
             )
+
+        case .emptyResponse:
+            rows = PSQLRowStream(
+                source: .emptyResponse,
+                eventLoop: context.channel.eventLoop,
+                logger: result.logger
+            )
         }
 
         promise.succeed(rows)

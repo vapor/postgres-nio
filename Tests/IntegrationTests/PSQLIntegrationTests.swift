@@ -123,6 +123,25 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(foo, "hello")
     }
 
+    func testQueryNothing() throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
+        var _result: PostgresQueryResult?
+        XCTAssertNoThrow(_result = try conn?.query("""
+            -- Some comments
+            """, logger: .psqlTest).wait())
+
+        let result = try XCTUnwrap(_result)
+        XCTAssertEqual(result.rows, [])
+        XCTAssertEqual(result.metadata.command, "")
+    }
+
     func testDecodeIntegers() {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
