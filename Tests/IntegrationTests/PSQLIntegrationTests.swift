@@ -359,4 +359,5 @@ final class IntegrationTests: XCTestCase {
             XCTAssertEqual(obj?.bar, 2)
         }
     }
+    
 }
