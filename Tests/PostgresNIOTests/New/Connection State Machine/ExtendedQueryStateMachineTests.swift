@@ -20,7 +20,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .wait)
-        XCTAssertEqual(state.commandCompletedReceived("DELETE 1"), .succeedQuery(promise, with: .init(value: .noRows("DELETE 1"), logger: logger)))
+        XCTAssertEqual(state.commandCompletedReceived("DELETE 1"), .succeedQuery(promise, with: .init(value: .noRows(.tag("DELETE 1")), logger: logger)))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
@@ -77,7 +77,25 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.commandCompletedReceived("SELECT 2"), .forwardStreamComplete([row5, row6], commandTag: "SELECT 2"))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
-    
+
+    func testExtendedQueryWithNoQuery() {
+        var state = ConnectionStateMachine.readyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "-- some comments"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.parseCompleteReceived(), .wait)
+        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+        XCTAssertEqual(state.noDataReceived(), .wait)
+        XCTAssertEqual(state.bindCompleteReceived(), .wait)
+        XCTAssertEqual(state.emptyQueryResponseReceived(), .succeedQuery(promise, with: .init(value: .noRows(.emptyResponse), logger: logger)))
+        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+    }
+
     func testReceiveTotallyUnexpectedMessageInQuery() {
         var state = ConnectionStateMachine.readyForQuery()
         

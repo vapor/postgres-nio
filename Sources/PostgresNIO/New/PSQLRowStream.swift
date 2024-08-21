@@ -3,7 +3,7 @@ import Logging
 
 struct QueryResult {
     enum Value: Equatable {
-        case noRows(String)
+        case noRows(PSQLRowStream.StatementSummary)
         case rowDescription([RowDescription.Column])
     }
 
@@ -16,25 +16,30 @@ struct QueryResult {
 final class PSQLRowStream: @unchecked Sendable {
     private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
 
+    enum StatementSummary: Equatable {
+        case tag(String)
+        case emptyResponse
+    }
+    
     enum Source {
         case stream([RowDescription.Column], PSQLRowsDataSource)
-        case noRows(Result<String, Error>)
+        case noRows(Result<StatementSummary, Error>)
     }
     
     let eventLoop: EventLoop
     let logger: Logger
-    
+
     private enum BufferState {
         case streaming(buffer: CircularBuffer<DataRow>, dataSource: PSQLRowsDataSource)
-        case finished(buffer: CircularBuffer<DataRow>, commandTag: String)
+        case finished(buffer: CircularBuffer<DataRow>, summary: StatementSummary)
         case failure(Error)
     }
-    
+
     private enum DownstreamState {
         case waitingForConsumer(BufferState)
         case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, PSQLRowsDataSource)
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, PSQLRowsDataSource)
-        case consumed(Result<String, Error>)
+        case consumed(Result<StatementSummary, Error>)
         case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource, onFinish: @Sendable () -> ())
     }
     
@@ -52,9 +57,9 @@ final class PSQLRowStream: @unchecked Sendable {
         case .stream(let rowDescription, let dataSource):
             self.rowDescription = rowDescription
             bufferState = .streaming(buffer: .init(), dataSource: dataSource)
-        case .noRows(.success(let commandTag)):
+        case .noRows(.success(let summary)):
             self.rowDescription = []
-            bufferState = .finished(buffer: .init(), commandTag: commandTag)
+            bufferState = .finished(buffer: .init(), summary: summary)
         case .noRows(.failure(let error)):
             self.rowDescription = []
             bufferState = .failure(error)
@@ -98,12 +103,12 @@ final class PSQLRowStream: @unchecked Sendable {
             self.downstreamState = .asyncSequence(source, dataSource, onFinish: onFinish)
             self.executeActionBasedOnYieldResult(yieldResult, source: dataSource)
 
-        case .finished(let buffer, let commandTag):
+        case .finished(let buffer, let summary):
             _ = source.yield(contentsOf: buffer)
             source.finish()
             onFinish()
-            self.downstreamState = .consumed(.success(commandTag))
-            
+            self.downstreamState = .consumed(.success(summary))
+
         case .failure(let error):
             source.finish(error)
             self.downstreamState = .consumed(.failure(error))
@@ -190,12 +195,12 @@ final class PSQLRowStream: @unchecked Sendable {
             dataSource.request(for: self)
             return promise.futureResult
             
-        case .finished(let buffer, let commandTag):
+        case .finished(let buffer, let summary):
             let rows = buffer.map {
                 PostgresRow(data: $0, lookupTable: self.lookupTable, columns: self.rowDescription)
             }
             
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(summary))
             return self.eventLoop.makeSucceededFuture(rows)
             
         case .failure(let error):
@@ -247,8 +252,8 @@ final class PSQLRowStream: @unchecked Sendable {
             }
             
             return promise.futureResult
-            
-        case .finished(let buffer, let commandTag):
+
+        case .finished(let buffer, let summary):
             do {
                 for data in buffer {
                     let row = PostgresRow(
@@ -259,7 +264,7 @@ final class PSQLRowStream: @unchecked Sendable {
                     try onRow(row)
                 }
                 
-                self.downstreamState = .consumed(.success(commandTag))
+                self.downstreamState = .consumed(.success(summary))
                 return self.eventLoop.makeSucceededVoidFuture()
             } catch {
                 self.downstreamState = .consumed(.failure(error))
@@ -292,7 +297,7 @@ final class PSQLRowStream: @unchecked Sendable {
             
         case .waitingForConsumer(.finished), .waitingForConsumer(.failure):
             preconditionFailure("How can new rows be received, if an end was already signalled?")
-            
+
         case .iteratingRows(let onRow, let promise, let dataSource):
             do {
                 for data in newRows {
@@ -347,25 +352,25 @@ final class PSQLRowStream: @unchecked Sendable {
     private func receiveEnd(_ commandTag: String) {
         switch self.downstreamState {
         case .waitingForConsumer(.streaming(buffer: let buffer, _)):
-            self.downstreamState = .waitingForConsumer(.finished(buffer: buffer, commandTag: commandTag))
-            
-        case .waitingForConsumer(.finished), .waitingForConsumer(.failure):
+            self.downstreamState = .waitingForConsumer(.finished(buffer: buffer, summary: .tag(commandTag)))
+
+        case .waitingForConsumer(.finished), .waitingForConsumer(.failure), .consumed(.success(.emptyResponse)):
             preconditionFailure("How can we get another end, if an end was already signalled?")
             
         case .iteratingRows(_, let promise, _):
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             promise.succeed(())
             
         case .waitingForAll(let rows, let promise, _):
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             promise.succeed(rows)
 
         case .asyncSequence(let source, _, let onFinish):
-            self.downstreamState = .consumed(.success(commandTag))
+            self.downstreamState = .consumed(.success(.tag(commandTag)))
             source.finish()
             onFinish()
 
-        case .consumed:
+        case .consumed(.success(.tag)), .consumed(.failure):
             break
         }
     }
@@ -375,7 +380,7 @@ final class PSQLRowStream: @unchecked Sendable {
         case .waitingForConsumer(.streaming):
             self.downstreamState = .waitingForConsumer(.failure(error))
             
-        case .waitingForConsumer(.finished), .waitingForConsumer(.failure):
+        case .waitingForConsumer(.finished), .waitingForConsumer(.failure), .consumed(.success(.emptyResponse)):
             preconditionFailure("How can we get another end, if an end was already signalled?")
             
         case .iteratingRows(_, let promise, _):
@@ -391,7 +396,7 @@ final class PSQLRowStream: @unchecked Sendable {
             consumer.finish(error)
             onFinish()
 
-        case .consumed:
+        case .consumed(.success(.tag)), .consumed(.failure):
             break
         }
     }
@@ -413,10 +418,15 @@ final class PSQLRowStream: @unchecked Sendable {
     }
     
     var commandTag: String {
-        guard case .consumed(.success(let commandTag)) = self.downstreamState else {
+        guard case .consumed(.success(let consumed)) = self.downstreamState else {
             preconditionFailure("commandTag may only be called if all rows have been consumed")
         }
-        return commandTag
+        switch consumed {
+        case .tag(let tag):
+            return tag
+        case .emptyResponse:
+            return ""
+        }
     }
 }
 
