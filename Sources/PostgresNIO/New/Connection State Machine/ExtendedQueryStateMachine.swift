@@ -529,7 +529,7 @@ struct ExtendedQueryStateMachine {
     
     var isComplete: Bool {
         switch self.state {
-        case .commandComplete, .error:
+        case .commandComplete, .emptyQueryResponseReceived, .error:
             return true
 
         case .noDataMessageReceived(let context), .rowDescriptionReceived(let context, _):
@@ -539,9 +539,6 @@ struct ExtendedQueryStateMachine {
             case .unnamed, .executeStatement:
                 return false
             }
-
-        case .emptyQueryResponseReceived:
-            return true
 
         case .initialized, .messagesSent, .parseCompleteReceived, .parameterDescriptionReceived, .bindCompleteReceived, .streaming, .drain:
             return false
