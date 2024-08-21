@@ -288,7 +288,7 @@ struct ExtendedQueryStateMachine {
             case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                 return self.avoidingStateMachineCoW { state -> Action in
                     state = .commandComplete(commandTag: commandTag)
-                    let result = QueryResult(value: .noRows(commandTag), logger: context.logger)
+                    let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
                     return .succeedQuery(eventLoopPromise, with: result)
                 }
 
@@ -332,7 +332,7 @@ struct ExtendedQueryStateMachine {
              .executeStatement(_, let eventLoopPromise):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .emptyQueryResponseReceived
-                let result = QueryResult(value: .emptyResponse, logger: queryContext.logger)
+                let result = QueryResult(value: .noRows(.emptyResponse), logger: queryContext.logger)
                 return .succeedQuery(eventLoopPromise, with: result)
             }
 

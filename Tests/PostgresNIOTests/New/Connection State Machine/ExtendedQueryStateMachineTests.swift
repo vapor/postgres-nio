@@ -20,7 +20,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .wait)
-        XCTAssertEqual(state.commandCompletedReceived("DELETE 1"), .succeedQuery(promise, with: .init(value: .noRows("DELETE 1"), logger: logger)))
+        XCTAssertEqual(state.commandCompletedReceived("DELETE 1"), .succeedQuery(promise, with: .init(value: .noRows(.tag("DELETE 1")), logger: logger)))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
     
@@ -92,7 +92,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .wait)
-        XCTAssertEqual(state.emptyQueryResponseReceived(), .succeedQuery(promise, with: .init(value: .emptyResponse, logger: logger)))
+        XCTAssertEqual(state.emptyQueryResponseReceived(), .succeedQuery(promise, with: .init(value: .noRows(.emptyResponse), logger: logger)))
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
 

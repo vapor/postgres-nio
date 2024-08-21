@@ -550,16 +550,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             )
             self.rowStream = rows
 
-        case .noRows(let commandTag):
+        case .noRows(let summary):
             rows = PSQLRowStream(
-                source: .noRows(.success(commandTag)),
-                eventLoop: context.channel.eventLoop,
-                logger: result.logger
-            )
-
-        case .emptyResponse:
-            rows = PSQLRowStream(
-                source: .emptyResponse,
+                source: .noRows(.success(summary)),
                 eventLoop: context.channel.eventLoop,
                 logger: result.logger
             )
