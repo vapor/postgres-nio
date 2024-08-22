@@ -10,7 +10,8 @@ struct ExtendedQueryStateMachine {
         case parameterDescriptionReceived(ExtendedQueryContext)
         case rowDescriptionReceived(ExtendedQueryContext, [RowDescription.Column])
         case noDataMessageReceived(ExtendedQueryContext)
-        
+        case emptyQueryResponseReceived
+
         /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
         /// used after receiving a `bindComplete` message
         case bindCompleteReceived(ExtendedQueryContext)
@@ -123,7 +124,7 @@ struct ExtendedQueryStateMachine {
                 return .forwardStreamError(.queryCancelled, read: true)
             }
 
-        case .commandComplete, .error, .drain:
+        case .commandComplete, .emptyQueryResponseReceived, .error, .drain:
             // the stream has already finished.
             return .wait
 
@@ -230,6 +231,7 @@ struct ExtendedQueryStateMachine {
              .messagesSent,
              .parseCompleteReceived,
              .parameterDescriptionReceived,
+             .emptyQueryResponseReceived,
              .bindCompleteReceived,
              .streaming,
              .drain,
@@ -269,6 +271,7 @@ struct ExtendedQueryStateMachine {
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .noDataMessageReceived,
+             .emptyQueryResponseReceived,
              .rowDescriptionReceived,
              .bindCompleteReceived,
              .commandComplete,
@@ -286,7 +289,7 @@ struct ExtendedQueryStateMachine {
             case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                 return self.avoidingStateMachineCoW { state -> Action in
                     state = .commandComplete(commandTag: commandTag)
-                    let result = QueryResult(value: .noRows(commandTag), logger: context.logger)
+                    let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
                     return .succeedQuery(eventLoopPromise, with: result)
                 }
 
@@ -310,6 +313,7 @@ struct ExtendedQueryStateMachine {
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .noDataMessageReceived,
+             .emptyQueryResponseReceived,
              .rowDescriptionReceived,
              .commandComplete,
              .error:
@@ -320,7 +324,22 @@ struct ExtendedQueryStateMachine {
     }
     
     mutating func emptyQueryResponseReceived() -> Action {
-        preconditionFailure("Unimplemented")
+        guard case .bindCompleteReceived(let queryContext) = self.state else {
+            return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
+        }
+
+        switch queryContext.query {
+        case .unnamed(_, let eventLoopPromise),
+             .executeStatement(_, let eventLoopPromise):
+            return self.avoidingStateMachineCoW { state -> Action in
+                state = .emptyQueryResponseReceived
+                let result = QueryResult(value: .noRows(.emptyResponse), logger: queryContext.logger)
+                return .succeedQuery(eventLoopPromise, with: result)
+            }
+
+        case .prepareStatement(_, _, _, _):
+            return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
+        }
     }
     
     mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> Action {
@@ -337,7 +356,7 @@ struct ExtendedQueryStateMachine {
             return self.setAndFireError(error)
         case .streaming, .drain:
             return self.setAndFireError(error)
-        case .commandComplete:
+        case .commandComplete, .emptyQueryResponseReceived:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
         case .error:
             preconditionFailure("""
@@ -383,6 +402,7 @@ struct ExtendedQueryStateMachine {
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .noDataMessageReceived,
+             .emptyQueryResponseReceived,
              .rowDescriptionReceived,
              .bindCompleteReceived:
             preconditionFailure("Requested to consume next row without anything going on.")
@@ -406,6 +426,7 @@ struct ExtendedQueryStateMachine {
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .noDataMessageReceived,
+             .emptyQueryResponseReceived,
              .rowDescriptionReceived,
              .bindCompleteReceived:
             return .wait
@@ -450,6 +471,7 @@ struct ExtendedQueryStateMachine {
             }
         case .initialized,
              .commandComplete,
+             .emptyQueryResponseReceived,
              .drain,
              .error:
             // we already have the complete stream received, now we are waiting for a
@@ -496,7 +518,7 @@ struct ExtendedQueryStateMachine {
                 return .forwardStreamError(error, read: true)
             }
             
-        case .commandComplete, .error:
+        case .commandComplete, .emptyQueryResponseReceived, .error:
             preconditionFailure("""
                 This state must not be reached. If the query `.isComplete`, the
                 ConnectionStateMachine must not send any further events to the substate machine.
@@ -508,7 +530,7 @@ struct ExtendedQueryStateMachine {
     
     var isComplete: Bool {
         switch self.state {
-        case .commandComplete, .error:
+        case .commandComplete, .emptyQueryResponseReceived, .error:
             return true
 
         case .noDataMessageReceived(let context), .rowDescriptionReceived(let context, _):

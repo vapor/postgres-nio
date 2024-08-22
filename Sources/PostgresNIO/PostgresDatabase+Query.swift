@@ -73,10 +73,7 @@ public struct PostgresQueryMetadata: Sendable {
 
     init?(string: String) {
         let parts = string.split(separator: " ")
-        guard parts.count >= 1 else {
-            return nil
-        }
-        switch parts[0] {
+        switch parts.first {
         case "INSERT":
             // INSERT oid rows
             guard parts.count == 3 else {
