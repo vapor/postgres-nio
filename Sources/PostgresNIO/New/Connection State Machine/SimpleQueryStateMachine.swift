@@ -1,43 +1,32 @@
 import NIOCore
 
-struct ExtendedQueryStateMachine {
-    
+struct SimpleQueryStateMachine {
+
     private enum State {
-        case initialized(ExtendedQueryContext)
-        case messagesSent(ExtendedQueryContext)
-        
-        case parseCompleteReceived(ExtendedQueryContext)
-        case parameterDescriptionReceived(ExtendedQueryContext)
-        case rowDescriptionReceived(ExtendedQueryContext, [RowDescription.Column])
-        case noDataMessageReceived(ExtendedQueryContext)
+        case initialized(SimpleQueryContext)
+        case messagesSent(SimpleQueryContext)
+
+        case rowDescriptionReceived(SimpleQueryContext, [RowDescription.Column])
         case emptyQueryResponseReceived
 
-        /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
-        /// used after receiving a `bindComplete` message
-        case bindCompleteReceived(ExtendedQueryContext)
         case streaming([RowDescription.Column], RowStreamStateMachine)
         /// Indicates that the current query was cancelled and we want to drain rows from the connection ASAP
         case drain([RowDescription.Column])
-        
+
         case commandComplete(commandTag: String)
         case error(PSQLError)
-        
+
         case modifying
     }
-    
+
     enum Action {
-        case sendParseDescribeBindExecuteSync(PostgresQuery)
-        case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
-        case sendBindExecuteSync(PSQLExecuteStatement)
-        
+        case sendQuery(String)
+
         // --- general actions
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
 
         case evaluateErrorAtConnectionLevel(PSQLError)
-
-        case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
-        case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PSQLError)
 
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
@@ -48,43 +37,23 @@ struct ExtendedQueryStateMachine {
         case read
         case wait
     }
-    
+
     private var state: State
     private var isCancelled: Bool
-    
-    init(queryContext: ExtendedQueryContext) {
+
+    init(queryContext: SimpleQueryContext) {
         self.isCancelled = false
         self.state = .initialized(queryContext)
     }
-    
+
     mutating func start() -> Action {
         guard case .initialized(let queryContext) = self.state else {
             preconditionFailure("Start should only be called, if the query has been initialized")
         }
-        
-        switch queryContext.query {
-        case .unnamed(let query, _):
-            return self.avoidingStateMachineCoW { state -> Action in
-                state = .messagesSent(queryContext)
-                return .sendParseDescribeBindExecuteSync(query)
-            }
 
-        case .executeStatement(let prepared, _):
-            return self.avoidingStateMachineCoW { state -> Action in
-                switch prepared.rowDescription {
-                case .some(let rowDescription):
-                    state = .rowDescriptionReceived(queryContext, rowDescription.columns)
-                case .none:
-                    state = .noDataMessageReceived(queryContext)
-                }
-                return .sendBindExecuteSync(prepared)
-            }
-
-        case .prepareStatement(let name, let query, let bindingDataTypes, _):
-            return self.avoidingStateMachineCoW { state -> Action in
-                state = .messagesSent(queryContext)
-                return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
-            }
+        return self.avoidingStateMachineCoW { state -> Action in
+            state = .messagesSent(queryContext)
+            return .sendQuery(queryContext.query)
         }
     }
 
@@ -93,24 +62,22 @@ struct ExtendedQueryStateMachine {
         case .initialized:
             preconditionFailure("Start must be called immediatly after the query was created")
 
-        case .messagesSent(let queryContext),
-             .parseCompleteReceived(let queryContext),
-             .parameterDescriptionReceived(let queryContext),
-             .rowDescriptionReceived(let queryContext, _),
-             .noDataMessageReceived(let queryContext),
-             .bindCompleteReceived(let queryContext):
+        case .messagesSent(let queryContext):
             guard !self.isCancelled else {
                 return .wait
             }
 
             self.isCancelled = true
-            switch queryContext.query {
-            case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
-                return .failQuery(eventLoopPromise, with: .queryCancelled)
+            return .failQuery(queryContext.promise, with: .queryCancelled)
 
-            case .prepareStatement(_, _, _, let eventLoopPromise):
-                return .failPreparedStatementCreation(eventLoopPromise, with: .queryCancelled)
+        case .rowDescriptionReceived(let queryContext, let columns):
+            guard !self.isCancelled else {
+                return .wait
             }
+
+            self.isCancelled = true
+            self.state = .drain(columns)
+            return .failQuery(queryContext.promise, with: .queryCancelled)
 
         case .streaming(let columns, var streamStateMachine):
             precondition(!self.isCancelled)
@@ -131,127 +98,62 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state: \(self.state)")
         }
     }
-    
-    mutating func parseCompletedReceived() -> Action {
-        guard case .messagesSent(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.parseComplete))
-        }
-        
-        return self.avoidingStateMachineCoW { state -> Action in
-            state = .parseCompleteReceived(queryContext)
-            return .wait
-        }
-    }
-    
-    mutating func parameterDescriptionReceived(_ parameterDescription: PostgresBackendMessage.ParameterDescription) -> Action {
-        guard case .parseCompleteReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.parameterDescription(parameterDescription)))
-        }
-        
-        return self.avoidingStateMachineCoW { state -> Action in
-            state = .parameterDescriptionReceived(queryContext)
-            return .wait
-        }
-    }
-    
-    mutating func noDataReceived() -> Action {
-        guard case .parameterDescriptionReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.noData))
-        }
-        
-        switch queryContext.query {
-        case .unnamed, .executeStatement:
-            return self.avoidingStateMachineCoW { state -> Action in
-                state = .noDataMessageReceived(queryContext)
-                return .wait
-            }
 
-        case .prepareStatement(_, _, _, let promise):
-            return self.avoidingStateMachineCoW { state -> Action in
-                state = .noDataMessageReceived(queryContext)
-                return .succeedPreparedStatementCreation(promise, with: nil)
-            }
-        }
-    }
-    
     mutating func rowDescriptionReceived(_ rowDescription: RowDescription) -> Action {
-        guard case .parameterDescriptionReceived(let queryContext) = self.state else {
+        let queryContext: SimpleQueryContext
+        switch self.state {
+        case .messagesSent(let simpleQueryContext):
+            queryContext = simpleQueryContext
+        default:
             return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
         }
 
-        // In Postgres extended queries we receive the `rowDescription` before we send the
-        // `Bind` message. Well actually it's vice versa, but this is only true since we do
-        // pipelining during a query.
-        //
-        // In the actual protocol description we receive a rowDescription before the Bind
-
         // In Postgres extended queries we always request the response rows to be returned in
         // `.binary` format.
+        // However, this is a simple query and almost all responses will be in text format anyway.
         let columns = rowDescription.columns.map { column -> RowDescription.Column in
             var column = column
+            // FIXME: .binary is not valid in a simple-query
             column.format = .binary
             return column
+        }
+
+        guard !self.isCancelled else {
+            self.state = .drain(rowDescription.columns)
+            return .failQuery(queryContext.promise, with: .queryCancelled)
         }
 
         self.avoidingStateMachineCoW { state in
             state = .rowDescriptionReceived(queryContext, columns)
         }
 
-        switch queryContext.query {
-        case .unnamed, .executeStatement:
-            return .wait
-
-        case .prepareStatement(_, _, _, let eventLoopPromise):
-            return .succeedPreparedStatementCreation(eventLoopPromise, with: rowDescription)
-        }
+        return .wait
     }
-    
-    mutating func bindCompleteReceived() -> Action {
-        switch self.state {
-        case .rowDescriptionReceived(let queryContext, let columns):
-            switch queryContext.query {
-            case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
-                return self.avoidingStateMachineCoW { state -> Action in
-                    state = .streaming(columns, .init())
-                    let result = QueryResult(value: .rowDescription(columns), logger: queryContext.logger)
-                    return .succeedQuery(eventLoopPromise, with: result)
-                }
 
-            case .prepareStatement:
-                return .evaluateErrorAtConnectionLevel(.unexpectedBackendMessage(.bindComplete))
-            }
-
-        case .noDataMessageReceived(let queryContext):
-            return self.avoidingStateMachineCoW { state -> Action in
-                state = .bindCompleteReceived(queryContext)
-                return .wait
-            }
-        case .initialized,
-             .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .emptyQueryResponseReceived,
-             .bindCompleteReceived,
-             .streaming,
-             .drain,
-             .commandComplete,
-             .error:
-            return self.setAndFireError(.unexpectedBackendMessage(.bindComplete))
-
-        case .modifying:
-            preconditionFailure("Invalid state")
-        }
-    }
-    
     mutating func dataRowReceived(_ dataRow: DataRow) -> Action {
         switch self.state {
+        case .rowDescriptionReceived(let queryContext, let columns):
+            // When receiving a data row, we must ensure that the data row column count
+            // matches the previously received row description column count.
+            guard dataRow.columnCount == columns.count else {
+                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            }
+
+            return self.avoidingStateMachineCoW { state -> Action in
+                var demandStateMachine = RowStreamStateMachine()
+                demandStateMachine.receivedRow(dataRow)
+                state = .streaming(columns, demandStateMachine)
+                let result = QueryResult(value: .rowDescription(columns), logger: queryContext.logger)
+                return .succeedQuery(queryContext.promise, with: result)
+            }
+
         case .streaming(let columns, var demandStateMachine):
             // When receiving a data row, we must ensure that the data row column count
             // matches the previously received row description column count.
             guard dataRow.columnCount == columns.count else {
                 return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
             }
-            
+
             return self.avoidingStateMachineCoW { state -> Action in
                 demandStateMachine.receivedRow(dataRow)
                 state = .streaming(columns, demandStateMachine)
@@ -264,15 +166,10 @@ struct ExtendedQueryStateMachine {
             }
             // we ignore all rows and wait for readyForQuery
             return .wait
-            
+
         case .initialized,
              .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .noDataMessageReceived,
              .emptyQueryResponseReceived,
-             .rowDescriptionReceived,
-             .bindCompleteReceived,
              .commandComplete,
              .error:
             return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
@@ -280,22 +177,23 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state")
         }
     }
-    
+
     mutating func commandCompletedReceived(_ commandTag: String) -> Action {
         switch self.state {
-        case .bindCompleteReceived(let context):
-            switch context.query {
-            case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
-                return self.avoidingStateMachineCoW { state -> Action in
-                    state = .commandComplete(commandTag: commandTag)
-                    let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
-                    return .succeedQuery(eventLoopPromise, with: result)
-                }
-
-            case .prepareStatement:
-                preconditionFailure("Invalid state: \(self.state)")
+        case .messagesSent(let context):
+            return self.avoidingStateMachineCoW { state -> Action in
+                state = .commandComplete(commandTag: commandTag)
+                let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
+                return .succeedQuery(context.promise, with: result)
             }
-            
+
+        case .rowDescriptionReceived(let context, _):
+            return self.avoidingStateMachineCoW { state -> Action in
+                state = .commandComplete(commandTag: commandTag)
+                let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
+                return .succeedQuery(context.promise, with: result)
+            }
+
         case .streaming(_, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .commandComplete(commandTag: commandTag)
@@ -306,14 +204,9 @@ struct ExtendedQueryStateMachine {
             precondition(self.isCancelled)
             self.state = .commandComplete(commandTag: commandTag)
             return .wait
-        
+
         case .initialized,
-             .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .noDataMessageReceived,
              .emptyQueryResponseReceived,
-             .rowDescriptionReceived,
              .commandComplete,
              .error:
             return self.setAndFireError(.unexpectedBackendMessage(.commandComplete(commandTag)))
@@ -321,37 +214,29 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state")
         }
     }
-    
-    mutating func emptyQueryResponseReceived() -> Action {
-        guard case .bindCompleteReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
-        }
 
-        switch queryContext.query {
-        case .unnamed(_, let eventLoopPromise),
-             .executeStatement(_, let eventLoopPromise):
+    mutating func emptyQueryResponseReceived() -> Action {
+        switch self.state {
+        case .messagesSent(let queryContext):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .emptyQueryResponseReceived
                 let result = QueryResult(value: .noRows(.emptyResponse), logger: queryContext.logger)
-                return .succeedQuery(eventLoopPromise, with: result)
+                return .succeedQuery(queryContext.promise, with: result)
             }
 
-        case .prepareStatement(_, _, _, _):
+        default:
             return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
         }
     }
-    
+
     mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> Action {
         let error = PSQLError.server(errorMessage)
         switch self.state {
         case .initialized:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
-        case .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .bindCompleteReceived:
+        case .messagesSent:
             return self.setAndFireError(error)
-        case .rowDescriptionReceived, .noDataMessageReceived:
+        case .rowDescriptionReceived:
             return self.setAndFireError(error)
         case .streaming, .drain:
             return self.setAndFireError(error)
@@ -362,23 +247,23 @@ struct ExtendedQueryStateMachine {
                 This state must not be reached. If the query `.isComplete`, the
                 ConnectionStateMachine must not send any further events to the substate machine.
                 """)
-            
+
         case .modifying:
             preconditionFailure("Invalid state")
         }
     }
-    
+
     mutating func noticeReceived(_ notice: PostgresBackendMessage.NoticeResponse) -> Action {
         //self.queryObject.noticeReceived(notice)
         return .wait
     }
-    
+
     mutating func errorHappened(_ error: PSQLError) -> Action {
         return self.setAndFireError(error)
     }
-            
+
     // MARK: Customer Actions
-    
+
     mutating func requestQueryRows() -> Action {
         switch self.state {
         case .streaming(let columns, var demandStateMachine):
@@ -398,23 +283,19 @@ struct ExtendedQueryStateMachine {
 
         case .initialized,
              .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .noDataMessageReceived,
              .emptyQueryResponseReceived,
-             .rowDescriptionReceived,
-             .bindCompleteReceived:
+             .rowDescriptionReceived:
             preconditionFailure("Requested to consume next row without anything going on.")
-            
+
         case .commandComplete, .error:
             preconditionFailure("The stream is already closed or in a failure state; rows can not be consumed at this time.")
         case .modifying:
             preconditionFailure("Invalid state")
         }
     }
-    
+
     // MARK: Channel actions
-    
+
     mutating func channelReadComplete() -> Action {
         switch self.state {
         case .initialized,
@@ -422,14 +303,10 @@ struct ExtendedQueryStateMachine {
              .drain,
              .error,
              .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .noDataMessageReceived,
              .emptyQueryResponseReceived,
-             .rowDescriptionReceived,
-             .bindCompleteReceived:
+             .rowDescriptionReceived:
             return .wait
-            
+
         case .streaming(let columns, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
                 let rows = demandStateMachine.channelReadComplete()
@@ -446,15 +323,11 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state")
         }
     }
-    
+
     mutating func readEventCaught() -> Action {
         switch self.state {
         case .messagesSent,
-             .parseCompleteReceived,
-             .parameterDescriptionReceived,
-             .noDataMessageReceived,
-             .rowDescriptionReceived,
-             .bindCompleteReceived:
+             .rowDescriptionReceived:
             return .read
         case .streaming(let columns, var demandStateMachine):
             precondition(!self.isCancelled)
@@ -469,10 +342,10 @@ struct ExtendedQueryStateMachine {
                 }
             }
         case .initialized,
-             .commandComplete,
-             .emptyQueryResponseReceived,
-             .drain,
-             .error:
+                .commandComplete,
+                .emptyQueryResponseReceived,
+                .drain,
+                .error:
             // we already have the complete stream received, now we are waiting for a
             // `readyForQuery` package. To receive this we need to read!
             return .read
@@ -480,34 +353,25 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state")
         }
     }
-    
+
     // MARK: Private Methods
-    
+
     private mutating func setAndFireError(_ error: PSQLError) -> Action {
         switch self.state {
         case .initialized(let context),
              .messagesSent(let context),
-             .parseCompleteReceived(let context),
-             .parameterDescriptionReceived(let context),
-             .rowDescriptionReceived(let context, _),
-             .noDataMessageReceived(let context),
-             .bindCompleteReceived(let context):
+             .rowDescriptionReceived(let context, _):
             self.state = .error(error)
             if self.isCancelled {
                 return .evaluateErrorAtConnectionLevel(error)
             } else {
-                switch context.query {
-                case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
-                    return .failQuery(eventLoopPromise, with: error)
-                case .prepareStatement(_, _, _, let eventLoopPromise):
-                    return .failPreparedStatementCreation(eventLoopPromise, with: error)
-                }
+                return .failQuery(context.promise, with: error)
             }
 
         case .drain:
             self.state = .error(error)
             return .evaluateErrorAtConnectionLevel(error)
-            
+
         case .streaming(_, var streamStateMachine):
             self.state = .error(error)
             switch streamStateMachine.fail() {
@@ -516,7 +380,7 @@ struct ExtendedQueryStateMachine {
             case .read:
                 return .forwardStreamError(error, read: true)
             }
-            
+
         case .commandComplete, .emptyQueryResponseReceived, .error:
             preconditionFailure("""
                 This state must not be reached. If the query `.isComplete`, the
@@ -526,21 +390,13 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state")
         }
     }
-    
+
     var isComplete: Bool {
         switch self.state {
         case .commandComplete, .emptyQueryResponseReceived, .error:
             return true
 
-        case .noDataMessageReceived(let context), .rowDescriptionReceived(let context, _):
-            switch context.query {
-            case .prepareStatement:
-                return true
-            case .unnamed, .executeStatement:
-                return false
-            }
-
-        case .initialized, .messagesSent, .parseCompleteReceived, .parameterDescriptionReceived, .bindCompleteReceived, .streaming, .drain:
+        case .rowDescriptionReceived, .initialized, .messagesSent, .streaming, .drain:
             return false
 
         case .modifying:
@@ -549,7 +405,7 @@ struct ExtendedQueryStateMachine {
     }
 }
 
-extension ExtendedQueryStateMachine {
+extension SimpleQueryStateMachine {
     /// So, uh...this function needs some explaining.
     ///
     /// While the state machine logic above is great, there is a downside to having all of the state machine data in

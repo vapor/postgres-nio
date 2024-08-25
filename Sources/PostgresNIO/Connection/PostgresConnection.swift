@@ -439,7 +439,7 @@ extension PostgresConnection {
     }
 
     /// Run a simple text-only query on the Postgres server the connection is connected to.
-    /// WARNING: This functions is not yet API and is incomplete.
+    /// WARNING: This function is not yet API and is incomplete.
     /// The return type will change to another stream.
     ///
     /// - Parameters:
@@ -460,13 +460,13 @@ extension PostgresConnection {
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
-        let context = ExtendedQueryContext(
-            simpleQuery: query,
+        let context = SimpleQueryContext(
+            query: query,
             logger: logger,
             promise: promise
         )
 
-        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        self.channel.write(HandlerTask.simpleQuery(context), promise: nil)
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()

@@ -205,6 +205,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             psqlTask = .closeCommand(command)
         case .extendedQuery(let query):
             psqlTask = .extendedQuery(query)
+        case .simpleQuery(let query):
+            psqlTask = .simpleQuery(query)
 
         case .startListening(let listener):
             switch self.listenState.startListening(listener) {

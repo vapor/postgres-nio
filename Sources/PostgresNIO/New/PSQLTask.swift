@@ -3,6 +3,7 @@ import NIOCore
 
 enum HandlerTask {
     case extendedQuery(ExtendedQueryContext)
+    case simpleQuery(SimpleQueryContext)
     case closeCommand(CloseCommandContext)
     case startListening(NotificationListener)
     case cancelListening(String, Int)
@@ -11,6 +12,7 @@ enum HandlerTask {
 
 enum PSQLTask {
     case extendedQuery(ExtendedQueryContext)
+    case simpleQuery(SimpleQueryContext)
     case closeCommand(CloseCommandContext)
 
     func failWithError(_ error: PSQLError) {
@@ -23,9 +25,10 @@ enum PSQLTask {
                 eventLoopPromise.fail(error)
             case .prepareStatement(_, _, _, let eventLoopPromise):
                 eventLoopPromise.fail(error)
-            case .simpleQuery(_, let eventLoopPromise):
-                eventLoopPromise.fail(error)
             }
+
+        case .simpleQuery(let simpleQueryContext):
+            simpleQueryContext.promise.fail(error)
 
         case .closeCommand(let closeCommandContext):
             closeCommandContext.promise.fail(error)
@@ -33,13 +36,11 @@ enum PSQLTask {
     }
 }
 
-// FIXME: Either rename all these `ExtendedQuery`s to just like `Query` or pull out `simpleQuery`
 final class ExtendedQueryContext {
     enum Query {
         case unnamed(PostgresQuery, EventLoopPromise<PSQLRowStream>)
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
         case prepareStatement(name: String, query: String, bindingDataTypes: [PostgresDataType], EventLoopPromise<RowDescription?>)
-        case simpleQuery(String, EventLoopPromise<PSQLRowStream>)
     }
     
     let query: Query
@@ -73,15 +74,6 @@ final class ExtendedQueryContext {
         self.query = .prepareStatement(name: name, query: query, bindingDataTypes: bindingDataTypes, promise)
         self.logger = logger
     }
-
-    init(
-        simpleQuery: String,
-        logger: Logger,
-        promise: EventLoopPromise<PSQLRowStream>
-    ) {
-        self.query = .simpleQuery(simpleQuery, promise)
-        self.logger = logger
-    }
 }
 
 final class PreparedStatementContext: Sendable {
@@ -108,6 +100,22 @@ final class PreparedStatementContext: Sendable {
         } else {
             self.bindingDataTypes = bindingDataTypes
         }
+        self.logger = logger
+        self.promise = promise
+    }
+}
+
+final class SimpleQueryContext {
+    let query: String
+    let logger: Logger
+    let promise: EventLoopPromise<PSQLRowStream>
+
+    init(
+        query: String,
+        logger: Logger,
+        promise: EventLoopPromise<PSQLRowStream>
+    ) {
+        self.query = query
         self.logger = logger
         self.promise = promise
     }
