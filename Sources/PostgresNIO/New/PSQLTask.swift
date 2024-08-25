@@ -23,6 +23,8 @@ enum PSQLTask {
                 eventLoopPromise.fail(error)
             case .prepareStatement(_, _, _, let eventLoopPromise):
                 eventLoopPromise.fail(error)
+            case .simpleQuery(_, let eventLoopPromise):
+                eventLoopPromise.fail(error)
             }
 
         case .closeCommand(let closeCommandContext):
@@ -31,16 +33,18 @@ enum PSQLTask {
     }
 }
 
+// FIXME: Either rename all these `ExtendedQuery`s to just like `Query` or pull out `simpleQuery`
 final class ExtendedQueryContext {
     enum Query {
         case unnamed(PostgresQuery, EventLoopPromise<PSQLRowStream>)
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
         case prepareStatement(name: String, query: String, bindingDataTypes: [PostgresDataType], EventLoopPromise<RowDescription?>)
+        case simpleQuery(String, EventLoopPromise<PSQLRowStream>)
     }
     
     let query: Query
     let logger: Logger
-    
+
     init(
         query: PostgresQuery,
         logger: Logger,
@@ -67,6 +71,15 @@ final class ExtendedQueryContext {
         promise: EventLoopPromise<RowDescription?>
     ) {
         self.query = .prepareStatement(name: name, query: query, bindingDataTypes: bindingDataTypes, promise)
+        self.logger = logger
+    }
+
+    init(
+        simpleQuery: String,
+        logger: Logger,
+        promise: EventLoopPromise<PSQLRowStream>
+    ) {
+        self.query = .simpleQuery(simpleQuery, promise)
         self.logger = logger
     }
 }

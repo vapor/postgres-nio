@@ -87,6 +87,7 @@ struct ConnectionStateMachine {
         // --- general actions
         case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendBindExecuteSync(PSQLExecuteStatement)
+        case sendQuery(String)
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError, cleanupContext: CleanUpContext?)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
 
@@ -537,7 +538,7 @@ struct ConnectionStateMachine {
             
             self.state = .readyForQuery(connectionContext)
             return self.executeNextQueryFromQueue()
-            
+
         default:
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.readyForQuery(transactionState)))
         }
@@ -585,7 +586,7 @@ struct ConnectionStateMachine {
         switch task {
         case .extendedQuery(let queryContext):
             switch queryContext.query {
-            case .executeStatement(_, let promise), .unnamed(_, let promise):
+            case .executeStatement(_, let promise), .unnamed(_, let promise), .simpleQuery(_, let promise):
                 return .failQuery(promise, with: psqlErrror, cleanupContext: nil)
             case .prepareStatement(_, _, _, let promise):
                 return .failPreparedStatementCreation(promise, with: psqlErrror, cleanupContext: nil)
@@ -745,7 +746,7 @@ struct ConnectionStateMachine {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.commandComplete(commandTag)))
         }
-        
+
         self.state = .modifying // avoid CoW
         let action = queryState.commandCompletedReceived(commandTag)
         self.state = .extendedQuery(queryState, connectionContext)
@@ -855,6 +856,7 @@ struct ConnectionStateMachine {
             case .sendParseDescribeBindExecuteSync,
                  .sendParseDescribeSync,
                  .sendBindExecuteSync,
+                 .sendQuery,
                  .succeedQuery,
                  .succeedPreparedStatementCreation,
                  .forwardRows,
@@ -1035,6 +1037,8 @@ extension ConnectionStateMachine {
             return .sendParseDescribeBindExecuteSync(query)
         case .sendBindExecuteSync(let executeStatement):
             return .sendBindExecuteSync(executeStatement)
+        case .sendQuery(let query):
+            return .sendQuery(query)
         case .failQuery(let requestContext, with: let error):
             let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
             return .failQuery(requestContext, with: error, cleanupContext: cleanupContext)

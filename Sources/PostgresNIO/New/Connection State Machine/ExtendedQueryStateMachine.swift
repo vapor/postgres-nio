@@ -29,7 +29,8 @@ struct ExtendedQueryStateMachine {
         case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
         case sendBindExecuteSync(PSQLExecuteStatement)
-        
+        case sendQuery(String)
+
         // --- general actions
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
@@ -85,6 +86,12 @@ struct ExtendedQueryStateMachine {
                 state = .messagesSent(queryContext)
                 return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
             }
+
+        case .simpleQuery(let query, _):
+            return self.avoidingStateMachineCoW { state -> Action in
+                state = .messagesSent(queryContext)
+                return .sendQuery(query)
+            }
         }
     }
 
@@ -105,7 +112,7 @@ struct ExtendedQueryStateMachine {
 
             self.isCancelled = true
             switch queryContext.query {
-            case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
+            case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise), .simpleQuery(_, let eventLoopPromise):
                 return .failQuery(eventLoopPromise, with: .queryCancelled)
 
             case .prepareStatement(_, _, _, let eventLoopPromise):
@@ -171,11 +178,19 @@ struct ExtendedQueryStateMachine {
                 state = .noDataMessageReceived(queryContext)
                 return .succeedPreparedStatementCreation(promise, with: nil)
             }
+
+        case .simpleQuery:
+            return self.setAndFireError(.unexpectedBackendMessage(.noData))
         }
     }
     
     mutating func rowDescriptionReceived(_ rowDescription: RowDescription) -> Action {
-        guard case .parameterDescriptionReceived(let queryContext) = self.state else {
+        let queryContext: ExtendedQueryContext
+        switch self.state {
+        case .messagesSent(let extendedQueryContext),
+             .parameterDescriptionReceived(let extendedQueryContext):
+            queryContext = extendedQueryContext
+        default:
             return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
         }
 
@@ -198,7 +213,7 @@ struct ExtendedQueryStateMachine {
         }
 
         switch queryContext.query {
-        case .unnamed, .executeStatement:
+        case .unnamed, .executeStatement, .simpleQuery:
             return .wait
 
         case .prepareStatement(_, _, _, let eventLoopPromise):
@@ -219,6 +234,9 @@ struct ExtendedQueryStateMachine {
 
             case .prepareStatement:
                 return .evaluateErrorAtConnectionLevel(.unexpectedBackendMessage(.bindComplete))
+
+            case .simpleQuery:
+                return self.setAndFireError(.unexpectedBackendMessage(.bindComplete))
             }
 
         case .noDataMessageReceived(let queryContext):
@@ -258,20 +276,40 @@ struct ExtendedQueryStateMachine {
                 return .wait
             }
 
+        case .rowDescriptionReceived(let queryContext, let columns):
+            switch queryContext.query {
+            case .simpleQuery(_, let eventLoopPromise):
+                // When receiving a data row, we must ensure that the data row column count
+                // matches the previously received row description column count.
+                guard dataRow.columnCount == columns.count else {
+                    return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+                }
+
+                return self.avoidingStateMachineCoW { state -> Action in
+                    var demandStateMachine = RowStreamStateMachine()
+                    demandStateMachine.receivedRow(dataRow)
+                    state = .streaming(columns, demandStateMachine)
+                    let result = QueryResult(value: .rowDescription(columns), logger: queryContext.logger)
+                    return .succeedQuery(eventLoopPromise, with: result)
+                }
+
+            case .unnamed, .executeStatement, .prepareStatement:
+                return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
+            }
+
         case .drain(let columns):
             guard dataRow.columnCount == columns.count else {
                 return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
             }
             // we ignore all rows and wait for readyForQuery
             return .wait
-            
+
         case .initialized,
              .messagesSent,
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .noDataMessageReceived,
              .emptyQueryResponseReceived,
-             .rowDescriptionReceived,
              .bindCompleteReceived,
              .commandComplete,
              .error:
@@ -292,10 +330,36 @@ struct ExtendedQueryStateMachine {
                     return .succeedQuery(eventLoopPromise, with: result)
                 }
 
-            case .prepareStatement:
+            case .prepareStatement, .simpleQuery:
                 preconditionFailure("Invalid state: \(self.state)")
             }
-            
+
+        case .messagesSent(let context):
+            switch context.query {
+            case .simpleQuery(_, let eventLoopGroup):
+                return self.avoidingStateMachineCoW { state -> Action in
+                    state = .commandComplete(commandTag: commandTag)
+                    let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
+                    return .succeedQuery(eventLoopGroup, with: result)
+                }
+
+            case .unnamed, .executeStatement, .prepareStatement:
+                return self.setAndFireError(.unexpectedBackendMessage(.commandComplete(commandTag)))
+            }
+
+        case .rowDescriptionReceived(let context, _):
+            switch context.query {
+            case .simpleQuery(_, let eventLoopPromise):
+                return self.avoidingStateMachineCoW { state -> Action in
+                    state = .commandComplete(commandTag: commandTag)
+                    let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
+                    return .succeedQuery(eventLoopPromise, with: result)
+                }
+
+            case .unnamed, .executeStatement, .prepareStatement:
+                return self.setAndFireError(.unexpectedBackendMessage(.commandComplete(commandTag)))
+            }
+
         case .streaming(_, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .commandComplete(commandTag: commandTag)
@@ -306,14 +370,12 @@ struct ExtendedQueryStateMachine {
             precondition(self.isCancelled)
             self.state = .commandComplete(commandTag: commandTag)
             return .wait
-        
+
         case .initialized,
-             .messagesSent,
              .parseCompleteReceived,
              .parameterDescriptionReceived,
              .noDataMessageReceived,
              .emptyQueryResponseReceived,
-             .rowDescriptionReceived,
              .commandComplete,
              .error:
             return self.setAndFireError(.unexpectedBackendMessage(.commandComplete(commandTag)))
@@ -323,20 +385,32 @@ struct ExtendedQueryStateMachine {
     }
     
     mutating func emptyQueryResponseReceived() -> Action {
-        guard case .bindCompleteReceived(let queryContext) = self.state else {
-            return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
-        }
+        switch self.state {
+        case .bindCompleteReceived(let queryContext):
+            switch queryContext.query {
+            case .unnamed(_, let eventLoopPromise),
+                 .executeStatement(_, let eventLoopPromise):
+                return self.avoidingStateMachineCoW { state -> Action in
+                    state = .emptyQueryResponseReceived
+                    let result = QueryResult(value: .noRows(.emptyResponse), logger: queryContext.logger)
+                    return .succeedQuery(eventLoopPromise, with: result)
+                }
 
-        switch queryContext.query {
-        case .unnamed(_, let eventLoopPromise),
-             .executeStatement(_, let eventLoopPromise):
-            return self.avoidingStateMachineCoW { state -> Action in
-                state = .emptyQueryResponseReceived
-                let result = QueryResult(value: .noRows(.emptyResponse), logger: queryContext.logger)
-                return .succeedQuery(eventLoopPromise, with: result)
+            case .prepareStatement, .simpleQuery:
+                return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
             }
-
-        case .prepareStatement(_, _, _, _):
+        case .messagesSent(let queryContext):
+            switch queryContext.query {
+            case .simpleQuery(_, let eventLoopPromise):
+                return self.avoidingStateMachineCoW { state -> Action in
+                    state = .emptyQueryResponseReceived
+                    let result = QueryResult(value: .noRows(.emptyResponse), logger: queryContext.logger)
+                    return .succeedQuery(eventLoopPromise, with: result)
+                }
+            case .unnamed, .executeStatement, .prepareStatement:
+                return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
+            }
+        default:
             return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
         }
     }
@@ -497,7 +571,7 @@ struct ExtendedQueryStateMachine {
                 return .evaluateErrorAtConnectionLevel(error)
             } else {
                 switch context.query {
-                case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
+                case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise), .simpleQuery(_, let eventLoopPromise):
                     return .failQuery(eventLoopPromise, with: error)
                 case .prepareStatement(_, _, _, let eventLoopPromise):
                     return .failPreparedStatementCreation(eventLoopPromise, with: error)
@@ -536,7 +610,7 @@ struct ExtendedQueryStateMachine {
             switch context.query {
             case .prepareStatement:
                 return true
-            case .unnamed, .executeStatement:
+            case .unnamed, .executeStatement, .simpleQuery:
                 return false
             }
 
