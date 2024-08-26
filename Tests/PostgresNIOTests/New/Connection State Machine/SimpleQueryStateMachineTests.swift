@@ -59,7 +59,7 @@ class SimpleQueryStateMachineTests: XCTestCase {
         ]
         let expected: [RowDescription.Column] = input.map {
             .init(name: $0.name, tableOID: $0.tableOID, columnAttributeNumber: $0.columnAttributeNumber, dataType: $0.dataType,
-                  dataTypeSize: $0.dataTypeSize, dataTypeModifier: $0.dataTypeModifier, format: .binary)
+                  dataTypeSize: $0.dataTypeSize, dataTypeModifier: $0.dataTypeModifier, format: .text)
         }
 
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
@@ -202,7 +202,7 @@ class SimpleQueryStateMachineTests: XCTestCase {
         ]
         let expected: [RowDescription.Column] = input.map {
             .init(name: $0.name, tableOID: $0.tableOID, columnAttributeNumber: $0.columnAttributeNumber, dataType: $0.dataType,
-                  dataTypeSize: $0.dataTypeSize, dataTypeModifier: $0.dataTypeModifier, format: .binary)
+                  dataTypeSize: $0.dataTypeSize, dataTypeModifier: $0.dataTypeModifier, format: .text)
         }
 
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)

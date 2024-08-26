@@ -108,23 +108,14 @@ struct SimpleQueryStateMachine {
             return self.setAndFireError(.unexpectedBackendMessage(.rowDescription(rowDescription)))
         }
 
-        // In Postgres extended queries we always request the response rows to be returned in
-        // `.binary` format.
-        // However, this is a simple query and almost all responses will be in text format anyway.
-        let columns = rowDescription.columns.map { column -> RowDescription.Column in
-            var column = column
-            // FIXME: .binary is not valid in a simple-query
-            column.format = .binary
-            return column
-        }
-
         guard !self.isCancelled else {
             self.state = .drain(rowDescription.columns)
             return .failQuery(queryContext.promise, with: .queryCancelled)
         }
 
         self.avoidingStateMachineCoW { state in
-            state = .rowDescriptionReceived(queryContext, columns)
+            // In a simple query almost all responses/columns will be in text format.
+            state = .rowDescriptionReceived(queryContext, rowDescription.columns)
         }
 
         return .wait

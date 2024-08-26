@@ -79,6 +79,27 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testSelect10kRowsSimpleQuery() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let start = 1
+        let end = 10000
+
+        try await withTestConnection(on: eventLoop) { connection in
+            let rows = try await connection.__simpleQuery("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
+            var counter = 0
+            for try await row in rows {
+                let element = try row.decode(Int.self)
+                XCTAssertEqual(element, counter + 1)
+                counter += 1
+            }
+
+            XCTAssertEqual(counter, end)
+        }
+    }
+
     func testSelectActiveConnection() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
