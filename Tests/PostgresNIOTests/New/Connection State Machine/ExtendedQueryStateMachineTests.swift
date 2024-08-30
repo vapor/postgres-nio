@@ -87,7 +87,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         let query: PostgresQuery = "-- some comments"
         let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext, writePromise: nil)), .sendParseDescribeBindExecuteSync(query, promise: nil))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
         XCTAssertEqual(state.noDataReceived(), .wait)
