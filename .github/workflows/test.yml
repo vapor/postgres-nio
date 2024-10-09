@@ -18,10 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:5.8-jammy
           - swift:5.9-jammy
           - swift:5.10-noble
-          - swiftlang/swift:nightly-6.0-jammy
+          - swift:6.0-noble
           - swiftlang/swift:nightly-main-jammy
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -48,13 +47,13 @@ jobs:
       fail-fast: false
       matrix:
         postgres-image:
-          - postgres:16
-          - postgres:14
+          - postgres:17
+          - postgres:15
           - postgres:12
         include:
-          - postgres-image: postgres:16
+          - postgres-image: postgres:17
             postgres-auth: scram-sha-256
-          - postgres-image: postgres:14
+          - postgres-image: postgres:15
             postgres-auth: md5
           - postgres-image: postgres:12
             postgres-auth: trust
@@ -134,11 +133,8 @@ jobs:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         xcode-version:
-          - '~14.3'
           - '~15'
         include:
-          - xcode-version: '~14.3'
-            macos-version: 'macos-13'
           - xcode-version: '~15'
             macos-version: 'macos-14'
     runs-on: ${{ matrix.macos-version }}
@@ -172,7 +168,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run all tests
         run: swift test
-
+          
   api-breakage:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
