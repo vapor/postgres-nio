@@ -167,11 +167,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Run all tests
-        run: swift test --enable-code-coverage
-      - name: Submit code coverage
-        uses: vapor/swift-codecov-action@v0.3
-        with:
-          codecov_token: ${{ secrets.CODECOV_TOKEN }}
+        run: swift test
           
   api-breakage:
     if: github.event_name == 'pull_request'
