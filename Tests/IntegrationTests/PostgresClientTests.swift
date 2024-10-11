@@ -42,6 +42,41 @@ final class PostgresClientTests: XCTestCase {
             taskGroup.cancelAll()
         }
     }
+    
+    func testTransaction() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+        
+        let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+        
+        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+            
+            let iterations = 1000
+            
+            for _ in 0..<iterations {
+                taskGroup.addTask {
+                    try await client.withTransaction(logger: logger) { connection in
+                        _ = try await connection.query("SELECT 1", logger: logger)
+                    }
+                }
+            }
+            
+            for _ in 0..<iterations {
+                _ = await taskGroup.nextResult()!
+            }
+            
+            taskGroup.cancelAll()
+        }
+    }
 
     func testQueryDirectly() async throws {
         var mlogger = Logger(label: "test")
