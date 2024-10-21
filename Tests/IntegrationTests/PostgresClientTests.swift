@@ -52,29 +52,80 @@ final class PostgresClientTests: XCTestCase {
             try await eventLoopGroup.shutdownGracefully()
         }
         
+        let tableName = "test_client_trasactions"
+        
         let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
         let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
         
-        await withThrowingTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask {
-                await client.run()
-            }
-            
-            let iterations = 1000
-            
-            for _ in 0..<iterations {
+        do {
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 taskGroup.addTask {
-                    try await client.withTransaction(logger: logger) { connection in
-                        _ = try await connection.query("SELECT 1", logger: logger)
+                    await client.run()
+                }
+                
+                try await client.query(
+                    """
+                    CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
+                        id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                        uuid UUID NOT NULL
+                    );
+                    """,
+                    logger: logger
+                )
+                
+                let iterations = 1000
+                
+                for _ in 0..<iterations {
+                    taskGroup.addTask {
+                        let _ = try await client.withTransaction(logger: logger) { transaction in
+                            try await transaction.query(
+                            """
+                            INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(UUID()));
+                            """,
+                            logger: logger
+                            )
+                        }
                     }
                 }
+                
+                for _ in 0..<iterations {
+                    _ = await taskGroup.nextResult()!
+                }
+                
+                let rows = try await client.query(#"SELECT COUNT(1)::INT AS table_size FROM "\#(unescaped: tableName)";"#, logger: logger).decode(Int.self)
+                for try await (count) in rows {
+                    XCTAssertEqual(count, iterations)
+                }
+                
+                /// Test roll back
+                taskGroup.addTask {
+                    let _ = try await client.withTransaction(logger: logger) { transaction in
+                        try await transaction.query(
+                            """
+                            INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(iterations));
+                            """,
+                            logger: logger
+                        )
+                    }
+                }
+                
+                let row = try await client.query(#"SELECT COUNT(1)::INT AS table_size FROM "\#(unescaped: tableName)";"#, logger: logger).decode(Int.self)
+                
+                for try await (count) in row {
+                    XCTAssertEqual(count, iterations)
+                }
+                
+                try await client.query(
+                    """
+                    DROP TABLE "\(unescaped: tableName)";
+                    """,
+                    logger: logger
+                )
+                
+                taskGroup.cancelAll()
             }
-            
-            for _ in 0..<iterations {
-                _ = await taskGroup.nextResult()!
-            }
-            
-            taskGroup.cancelAll()
+        } catch {
+            XCTFail("Unexpected error: \(String(reflecting: error))")
         }
     }
 

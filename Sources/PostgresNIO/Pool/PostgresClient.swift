@@ -314,8 +314,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Returns: The closure's return value.
     public func withTransaction<Result>(logger: Logger, _ process: (PostgresConnection) async throws -> Result) async throws -> Result {
         try await withConnection { connection in
+            try await connection.query("BEGIN;", logger: logger)
             do {
-                try await connection.query("BEGIN;", logger: logger)
                 let value = try await process(connection)
                 try await connection.query("COMMIT;", logger: logger)
                 return value
