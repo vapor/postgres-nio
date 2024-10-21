@@ -129,6 +129,41 @@ final class PostgresClientTests: XCTestCase {
         }
     }
 
+    func testApplicationNameIsForwardedCorrectly() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        let applicationName = "postgres_nio_test_run"
+        clientConfig.options.additionalStartupParameters = [("application_name", applicationName)]
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            let rows = try await client.query("select * from pg_stat_activity;");
+            var applicationNameFound = 0
+            for try await row in rows {
+                let randomAccessRow = row.makeRandomAccess()
+                if try randomAccessRow["application_name"].decode(String?.self) == applicationName {
+                    applicationNameFound += 1
+                }
+            }
+
+            XCTAssertGreaterThanOrEqual(applicationNameFound, 1)
+
+            taskGroup.cancelAll()
+        }
+    }
+
+
     func testQueryDirectly() async throws {
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
