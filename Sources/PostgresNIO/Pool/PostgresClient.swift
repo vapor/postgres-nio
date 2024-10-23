@@ -106,6 +106,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// If you are not using Amazon RDS Proxy, you should leave this set to `true` (the default).
             public var requireBackendKeyData: Bool = true
 
+            /// Additional parameters to send to the server on startup. The name value pairs are added to the initial
+            /// startup message that the client sends to the server.
+            public var additionalStartupParameters: [(String, String)] = []
+
             /// The minimum number of connections that the client shall keep open at any time, even if there is no
             /// demand. Default to `0`.
             ///

@@ -89,6 +89,7 @@ final class ConnectionFactory: Sendable {
         connectionConfig.options.connectTimeout = TimeAmount(config.options.connectTimeout)
         connectionConfig.options.tlsServerName = config.options.tlsServerName
         connectionConfig.options.requireBackendKeyData = config.options.requireBackendKeyData
+        connectionConfig.options.additionalStartupParameters = config.options.additionalStartupParameters
 
         return connectionConfig
     }

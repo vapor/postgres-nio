@@ -173,6 +173,16 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
+    public mutating func append<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Optional<Value>) throws {
+        switch value {
+        case .none:
+            self.appendNull()
+        case let .some(value):
+            try self.append(value)
+        }
+    }
+
+    @inlinable
     public mutating func append<Value: PostgresThrowingDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
         _ value: Value,
         context: PostgresEncodingContext<JSONEncoder>
@@ -182,8 +192,31 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
+    public mutating func append<Value: PostgresThrowingDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Optional<Value>,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) throws {
+        switch value {
+        case .none:
+            self.appendNull()
+        case let .some(value):
+            try self.append(value, context: context)
+        }
+    }
+
+    @inlinable
     public mutating func append<Value: PostgresDynamicTypeEncodable>(_ value: Value) {
         self.append(value, context: .default)
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresDynamicTypeEncodable>(_ value: Optional<Value>) {
+        switch value {
+        case .none:
+            self.appendNull()
+        case let .some(value):
+            self.append(value)
+        }
     }
 
     @inlinable
@@ -193,6 +226,19 @@ public struct PostgresBindings: Sendable, Hashable {
     ) {
         value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value, protected: true))
+    }
+
+    @inlinable
+    public mutating func append<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
+        _ value: Optional<Value>,
+        context: PostgresEncodingContext<JSONEncoder>
+    ) {
+        switch value {
+        case .none:
+            self.appendNull()
+        case let .some(value):
+            self.append(value, context: context)
+        }
     }
 
     @inlinable
