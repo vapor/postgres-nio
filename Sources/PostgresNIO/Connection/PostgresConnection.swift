@@ -60,18 +60,18 @@ public final class PostgresConnection: @unchecked Sendable {
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
-        let configureSSLCallback: ((Channel) throws -> ())?
+        let configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> ())?
         
         switch configuration.tls.base {
         case .prefer(let context), .require(let context):
-            configureSSLCallback = { channel in
+            configureSSLCallback = { channel, postgreChannelHandler in
                 channel.eventLoop.assertInEventLoop()
 
                 let sslHandler = try NIOSSLClientHandler(
                     context: context,
                     serverHostname: configuration.serverNameForTLS
                 )
-                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .first)
+                try channel.pipeline.syncOperations.addHandler(sslHandler, position: .before(postgreChannelHandler))
             }
         case .disable:
             configureSSLCallback = nil
