@@ -193,8 +193,8 @@ extension PostgresConnection {
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
         ///   - tls: The TLS mode to use. Defaults to ``TLS-swift.struct/disable``.
-        public init(establishedChannel channel: Channel, username: String, password: String?, database: String?) {
-            self.init(endpointInfo: .configureChannel(channel), tls: .disable, username: username, password: password, database: database)
+        public init(establishedChannel channel: Channel, tls: PostgresConnection.Configuration.TLS = .disable, username: String, password: String?, database: String?) {
+            self.init(endpointInfo: .configureChannel(channel), tls: tls, username: username, password: password, database: database)
         }
 
         // MARK: - Implementation details
