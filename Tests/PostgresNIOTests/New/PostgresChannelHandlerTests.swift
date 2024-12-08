@@ -48,7 +48,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         var config = self.testConnectionConfiguration()
         XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         var addSSLCallbackIsHit = false
-        let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel in
+        let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel, _ in
             addSSLCallbackIsHit = true
         }
         let embedded = EmbeddedChannel(handlers: [
@@ -84,7 +84,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         var config = self.testConnectionConfiguration()
         XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         var addSSLCallbackIsHit = false
-        let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel in
+        let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel, _ in
             addSSLCallbackIsHit = true
         }
         let eventHandler = TestEventHandler()
@@ -114,7 +114,7 @@ class PostgresChannelHandlerTests: XCTestCase {
     func testSSLUnsupportedClosesConnection() throws {
         let config = self.testConnectionConfiguration(tls: .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
         
-        let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel in
+        let handler = PostgresChannelHandler(configuration: config, eventLoop: self.eventLoop) { channel, _ in
             XCTFail("This callback should never be exectuded")
             throw PSQLError.sslUnsupported
         }
