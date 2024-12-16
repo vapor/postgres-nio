@@ -52,7 +52,7 @@ final class PostgresClientTests: XCTestCase {
             try await eventLoopGroup.shutdownGracefully()
         }
         
-        let tableName = "test_client_trasactions"
+        let tableName = "test_client_transactions"
         
         let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
         let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
@@ -99,13 +99,27 @@ final class PostgresClientTests: XCTestCase {
                 
                 /// Test roll back
                 taskGroup.addTask {
-                    let _ = try await client.withTransaction(logger: logger) { transaction in
-                        try await transaction.query(
-                            """
-                            INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(iterations));
-                            """,
-                            logger: logger
-                        )
+                    
+                    do {
+                        let _ = try await client.withTransaction(logger: logger) { transaction in
+                            /// insert valid data
+                            try await transaction.query(
+                                """
+                                INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(UUID()));
+                                """,
+                                logger: logger
+                            )
+                            
+                            /// insert invalid data
+                            try await transaction.query(
+                                """
+                                INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(iterations));
+                                """,
+                                logger: logger
+                            )
+                        }
+                    } catch {
+                        XCTAssertNotNil(error)
                     }
                 }
                 
