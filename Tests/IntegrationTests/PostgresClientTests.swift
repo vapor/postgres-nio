@@ -120,6 +120,11 @@ final class PostgresClientTests: XCTestCase {
                         }
                     } catch {
                         XCTAssertNotNil(error)
+                        XCTAssertNotNil(error)
+                        guard let error = error as? PSQLError else { return XCTFail("Unexpected error type") }
+                    
+                        XCTAssertEqual(error.code, .server)
+                        XCTAssertEqual(error.serverInfo?[.severity], "ERROR")
                     }
                 }
                 
