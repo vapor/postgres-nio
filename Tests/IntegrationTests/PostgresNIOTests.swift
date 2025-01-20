@@ -673,7 +673,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table1\"").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("""
         CREATE TABLE table1 (
-            "date" timestampz NOT NULL
+            "date" TIMESTAMP WITH TIME ZONE NOT NULL
         );
         """).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table1\"").wait()) }
@@ -687,7 +687,7 @@ final class PostgresNIOTests: XCTestCase {
         FROM table1
         """).wait())
         let row = rows?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "date"].date, date)
+        XCTAssertEqual(row?[data: "date"].date?.timeIntervalSince1970, date.timeIntervalSince1970)
     }
 
     func testMoney() {
