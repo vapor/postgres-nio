@@ -664,6 +664,32 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "balance"].decimal, Decimal(string: "123456.789123")!)
     }
 
+    func testDateSerialization() {
+        let date = Date()
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table1\"").wait())
+        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
+        CREATE TABLE table1 (
+            "date" timestampz NOT NULL
+        );
+        """).wait())
+        defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table1\"").wait()) }
+
+        XCTAssertNoThrow(_ = try conn?.query("INSERT INTO table1 VALUES ($1)", [.init(date: date)]).wait())
+
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("""
+        SELECT
+            "date"
+        FROM table1
+        """).wait())
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "date"].date, date)
+    }
+
     func testMoney() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
