@@ -57,8 +57,11 @@ jobs:
             postgres-auth: md5
           - postgres-image: postgres:12
             postgres-auth: trust
+        swift-version:
+          - swift-6.0
+          - swift-5.10-noble
     container:
-      image: swift:5.10-noble
+      image: ${{ matrix.swift-version }}
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
