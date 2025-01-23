@@ -316,15 +316,15 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
     ///                      the provided `PostgresConnection`.
     /// - Returns: The closure's return value.
-    public func withTransaction<Result>(logger: Logger, _ process: (PostgresConnection) async throws -> Result) async throws -> Result {
+    public func withTransaction<Result>(_ process: (PostgresConnection) async throws -> Result) async throws -> Result {
         try await withConnection { connection in
-            try await connection.query("BEGIN;", logger: logger)
+            try await connection.query("BEGIN;", logger: self.backgroundLogger)
             do {
                 let value = try await process(connection)
-                try await connection.query("COMMIT;", logger: logger)
+                try await connection.query("COMMIT;", logger: self.backgroundLogger)
                 return value
             } catch {
-                try await connection.query("ROLLBACK;", logger: logger)
+                try await connection.query("ROLLBACK;", logger: self.backgroundLogger)
                 throw error
             }
         }
