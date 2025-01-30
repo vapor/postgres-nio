@@ -40,7 +40,7 @@ extension PostgresDatabase {
     }
 }
 
-public struct PostgresQueryResult {
+public struct PostgresQueryResult: Sendable {
     public let metadata: PostgresQueryMetadata
     public let rows: [PostgresRow]
 }

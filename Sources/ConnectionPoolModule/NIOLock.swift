@@ -24,6 +24,13 @@ import WinSDK
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Bionic)
+import Bionic
+#elseif canImport(WASILibc)
+import WASILibc
+#if canImport(wasi_pthread)
+import wasi_pthread
+#endif
 #else
 #error("The concurrency NIOLock module was unable to identify your C library.")
 #endif
@@ -37,16 +44,16 @@ typealias LockPrimitive = pthread_mutex_t
 #endif
 
 @usableFromInline
-enum LockOperations { }
+enum LockOperations {}
 
 extension LockOperations {
     @inlinable
     static func create(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
 
-#if os(Windows)
+        #if os(Windows)
         InitializeSRWLock(mutex)
-#else
+        #elseif (compiler(<6.1) && !os(WASI)) || (compiler(>=6.1) && _runtime(_multithreaded))
         var attr = pthread_mutexattr_t()
         pthread_mutexattr_init(&attr)
         debugOnly {
@@ -55,43 +62,43 @@ extension LockOperations {
 
         let err = pthread_mutex_init(mutex, &attr)
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
-#endif
+        #endif
     }
 
     @inlinable
     static func destroy(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
 
-#if os(Windows)
+        #if os(Windows)
         // SRWLOCK does not need to be free'd
-#else
+        #elseif (compiler(<6.1) && !os(WASI)) || (compiler(>=6.1) && _runtime(_multithreaded))
         let err = pthread_mutex_destroy(mutex)
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
-#endif
+        #endif
     }
 
     @inlinable
     static func lock(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
 
-#if os(Windows)
+        #if os(Windows)
         AcquireSRWLockExclusive(mutex)
-#else
+        #elseif (compiler(<6.1) && !os(WASI)) || (compiler(>=6.1) && _runtime(_multithreaded))
         let err = pthread_mutex_lock(mutex)
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
-#endif
+        #endif
     }
 
     @inlinable
     static func unlock(_ mutex: UnsafeMutablePointer<LockPrimitive>) {
         mutex.assertValidAlignment()
 
-#if os(Windows)
+        #if os(Windows)
         ReleaseSRWLockExclusive(mutex)
-#else
+        #elseif (compiler(<6.1) && !os(WASI)) || (compiler(>=6.1) && _runtime(_multithreaded))
         let err = pthread_mutex_unlock(mutex)
         precondition(err == 0, "\(#function) failed in pthread_mutex with error \(err)")
-#endif
+        #endif
     }
 }
 
@@ -129,9 +136,11 @@ final class LockStorage<Value>: ManagedBuffer<Value, LockPrimitive> {
     @inlinable
     static func create(value: Value) -> Self {
         let buffer = Self.create(minimumCapacity: 1) { _ in
-            return value
+            value
         }
-        // Avoid 'unsafeDowncast' as there is a miscompilation on 5.10.
+        // Intentionally using a force cast here to avoid a miss compiliation in 5.10.
+        // This is as fast as an unsafeDownCast since ManagedBuffer is inlined and the optimizer
+        // can eliminate the upcast/downcast pair
         let storage = buffer as! Self
 
         storage.withUnsafeMutablePointers { _, lockPtr in
@@ -165,7 +174,7 @@ final class LockStorage<Value>: ManagedBuffer<Value, LockPrimitive> {
     @inlinable
     func withLockPrimitive<T>(_ body: (UnsafeMutablePointer<LockPrimitive>) throws -> T) rethrows -> T {
         try self.withUnsafeMutablePointerToElements { lockPtr in
-            return try body(lockPtr)
+            try body(lockPtr)
         }
     }
 
@@ -179,17 +188,14 @@ final class LockStorage<Value>: ManagedBuffer<Value, LockPrimitive> {
     }
 }
 
-extension LockStorage: @unchecked Sendable { }
-
 /// A threading lock based on `libpthread` instead of `libdispatch`.
 ///
-/// - note: ``NIOLock`` has reference semantics.
+/// - Note: ``NIOLock`` has reference semantics.
 ///
 /// This object provides a lock on top of a single `pthread_mutex_t`. This kind
 /// of lock is safe to use with `libpthread`-based threading models, such as the
 /// one used by NIO. On Windows, the lock is based on the substantially similar
 /// `SRWLOCK` type.
-@usableFromInline
 struct NIOLock {
     @usableFromInline
     internal let _storage: LockStorage<Void>
@@ -220,7 +226,7 @@ struct NIOLock {
 
     @inlinable
     internal func withLockPrimitive<T>(_ body: (UnsafeMutablePointer<LockPrimitive>) throws -> T) rethrows -> T {
-        return try self._storage.withLockPrimitive(body)
+        try self._storage.withLockPrimitive(body)
     }
 }
 
@@ -243,12 +249,12 @@ extension NIOLock {
     }
 
     @inlinable
-    func withLockVoid(_ body: () throws -> Void) rethrows -> Void {
+    func withLockVoid(_ body: () throws -> Void) rethrows {
         try self.withLock(body)
     }
 }
 
-extension NIOLock: Sendable {}
+extension NIOLock: @unchecked Sendable {}
 
 extension UnsafeMutablePointer {
     @inlinable
@@ -264,6 +270,10 @@ extension UnsafeMutablePointer {
 /// https://forums.swift.org/t/support-debug-only-code/11037 for a discussion.
 @inlinable
 internal func debugOnly(_ body: () -> Void) {
-    // FIXME: duplicated with NIO.
-    assert({ body(); return true }())
+    assert(
+        {
+            body()
+            return true
+        }()
+    )
 }
