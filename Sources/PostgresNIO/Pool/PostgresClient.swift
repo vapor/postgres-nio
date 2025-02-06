@@ -47,7 +47,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             }
 
             /// Do not try to create a TLS connection to the server.
-            public static var disable: Self = Self.init(.disable)
+            public static let disable: Self = Self.init(.disable)
 
             /// Try to create a TLS connection to the server. If the server supports TLS, create a TLS connection.
             /// If the server does not support TLS, create an insecure connection.
@@ -105,6 +105,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// This property is provided for compatibility with Amazon RDS Proxy, which requires it to be `false`.
             /// If you are not using Amazon RDS Proxy, you should leave this set to `true` (the default).
             public var requireBackendKeyData: Bool = true
+
+            /// Additional parameters to send to the server on startup. The name value pairs are added to the initial
+            /// startup message that the client sends to the server.
+            public var additionalStartupParameters: [(String, String)] = []
 
             /// The minimum number of connections that the client shall keep open at any time, even if there is no
             /// demand. Default to `0`.
@@ -419,7 +423,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
 
-        await cancelOnGracefulShutdown {
+        await cancelWhenGracefulShutdown {
             await self.pool.run()
         }
     }
@@ -478,7 +482,7 @@ extension PostgresConnection: PooledConnection {
         self.channel.close(mode: .all, promise: nil)
     }
 
-    public func onClose(_ closure: @escaping ((any Error)?) -> ()) {
+    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
         self.closeFuture.whenComplete { _ in closure(nil) }
     }
 }

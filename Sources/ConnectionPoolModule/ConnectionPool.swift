@@ -1,6 +1,6 @@
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-public struct ConnectionAndMetadata<Connection: PooledConnection> {
+public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
 
     public var connection: Connection
 
@@ -273,7 +273,7 @@ public final class ConnectionPool<
 
     public func run() async {
         await withTaskCancellationHandler {
-            #if swift(>=5.8) && os(Linux) || swift(>=5.9)
+            #if os(Linux) || compiler(>=5.9)
             if #available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *) {
                 return await withDiscardingTaskGroup() { taskGroup in
                     await self.run(in: &taskGroup)
@@ -313,7 +313,7 @@ public final class ConnectionPool<
         case scheduleTimer(StateMachine.Timer)
     }
 
-    #if swift(>=5.8) && os(Linux) || swift(>=5.9)
+    #if os(Linux) || compiler(>=5.9)
     @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
     private func run(in taskGroup: inout DiscardingTaskGroup) async {
         for await event in self.eventStream {
@@ -419,7 +419,7 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func makeConnection(for request: StateMachine.ConnectionRequest, in taskGroup: inout some TaskGroupProtocol) {
-        taskGroup.addTask {
+        taskGroup.addTask_ {
             self.observabilityDelegate.startedConnecting(id: request.connectionID)
 
             do {
@@ -468,7 +468,7 @@ public final class ConnectionPool<
     /*private*/ func runKeepAlive(_ connection: Connection, in taskGroup: inout some TaskGroupProtocol) {
         self.observabilityDelegate.keepAliveTriggered(id: connection.id)
 
-        taskGroup.addTask {
+        taskGroup.addTask_ {
             do {
                 try await self.keepAliveBehavior.runKeepAlive(for: connection)
 
@@ -495,7 +495,7 @@ public final class ConnectionPool<
     }
 
     @usableFromInline
-    enum TimerRunResult {
+    enum TimerRunResult: Sendable {
         case timerTriggered
         case timerCancelled
         case cancellationContinuationFinished
@@ -503,11 +503,11 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func runTimer(_ timer: StateMachine.Timer, in poolGroup: inout some TaskGroupProtocol) {
-        poolGroup.addTask { () async -> () in
+        poolGroup.addTask_ { () async -> () in
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
-                        #if swift(>=5.8) && os(Linux) || swift(>=5.9)
+                        #if os(Linux) || compiler(>=5.9)
                         try await self.clock.sleep(for: timer.duration)
                         #else
                         try await self.clock.sleep(until: self.clock.now.advanced(by: timer.duration), tolerance: nil)
@@ -571,33 +571,27 @@ extension PoolConfiguration {
     }
 }
 
-#if swift(<5.9)
-// This should be removed once we support Swift 5.9+ only
-extension AsyncStream {
-    static func makeStream(
-        of elementType: Element.Type = Element.self,
-        bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
-    ) -> (stream: AsyncStream<Element>, continuation: AsyncStream<Element>.Continuation) {
-        var continuation: AsyncStream<Element>.Continuation!
-        let stream = AsyncStream<Element>(bufferingPolicy: limit) { continuation = $0 }
-        return (stream: stream, continuation: continuation!)
+@usableFromInline
+protocol TaskGroupProtocol {
+    // We need to call this `addTask_` because some Swift versions define this
+    // under exactly this name and others have different attributes. So let's pick
+    // a name that doesn't clash anywhere and implement it using the standard `addTask`.
+    mutating func addTask_(operation: @escaping @Sendable () async -> Void)
+}
+
+#if os(Linux) || swift(>=5.9)
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+extension DiscardingTaskGroup: TaskGroupProtocol {
+    @inlinable
+    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
+        self.addTask(priority: nil, operation: operation)
     }
 }
 #endif
 
-@usableFromInline
-protocol TaskGroupProtocol {
-    mutating func addTask(operation: @escaping @Sendable () async -> Void)
-}
-
-#if swift(>=5.8) && os(Linux) || swift(>=5.9)
-@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
-extension DiscardingTaskGroup: TaskGroupProtocol {}
-#endif
-
 extension TaskGroup<Void>: TaskGroupProtocol {
     @inlinable
-    mutating func addTask(operation: @escaping @Sendable () async -> Void) {
+    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
 }

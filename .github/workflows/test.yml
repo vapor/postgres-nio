@@ -18,14 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:5.7-jammy
-          - swift:5.8-jammy
           - swift:5.9-jammy
-          - swift:5.10-jammy
+          - swift:5.10-noble
+          - swift:6.0-noble
           - swiftlang/swift:nightly-main-jammy
-        include:
-          - swift-image: swift:5.10-jammy
-            code-coverage: true
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
     steps:
@@ -39,31 +35,30 @@ jobs:
       - name: Check out package
         uses: actions/checkout@v4
       - name: Run unit tests with Thread Sanitizer
-        env:
-          CODE_COVERAGE: ${{ matrix.code-coverage && '--enable-code-coverage' || '' }}
         run: |
-          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread ${CODE_COVERAGE}
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
       - name: Submit code coverage
-        if: ${{ matrix.code-coverage }}
-        uses: vapor/swift-codecov-action@v0.2        
+        uses: vapor/swift-codecov-action@v0.3
+        with:
+          codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
   linux-integration-and-dependencies:
     strategy:
       fail-fast: false
       matrix:
         postgres-image:
-          - postgres:16
-          - postgres:14
+          - postgres:17
+          - postgres:15
           - postgres:12
         include:
-          - postgres-image: postgres:16
+          - postgres-image: postgres:17
             postgres-auth: scram-sha-256
-          - postgres-image: postgres:14
+          - postgres-image: postgres:15
             postgres-auth: md5
           - postgres-image: postgres:12
             postgres-auth: trust
     container:
-      image: swift:5.10-jammy
+      image: swift:5.10-noble
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
@@ -138,11 +133,8 @@ jobs:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         xcode-version:
-          - '~14.3'
           - '~15'
         include:
-          - xcode-version: '~14.3'
-            macos-version: 'macos-13'
           - xcode-version: '~15'
             macos-version: 'macos-14'
     runs-on: ${{ matrix.macos-version }}
@@ -165,7 +157,7 @@ jobs:
           # ** BEGIN ** Work around bug in both Homebrew and GHA
           (brew upgrade python@3.11 || true) && (brew link --force --overwrite python@3.11 || true)
           (brew upgrade python@3.12 || true) && (brew link --force --overwrite python@3.12 || true)
-          brew upgrade
+          (brew upgrade || true)
           # ** END ** Work around bug in both Homebrew and GHA
           brew install --overwrite "${POSTGRES_FORMULA}"
           brew link --overwrite --force "${POSTGRES_FORMULA}"
@@ -176,11 +168,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Run all tests
         run: swift test
-
+          
   api-breakage:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container: swift:jammy
+    container: swift:noble
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -192,21 +184,21 @@ jobs:
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
           swift package diagnose-api-breaking-changes origin/main
 
-  gh-codeql:
-    if: ${{ false }}
-    runs-on: ubuntu-latest
-    container: swift:jammy
-    permissions: { actions: write, contents: read, security-events: write }
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-      - name: Mark repo safe in non-fake global config
-        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: swift
-      - name: Perform build
-        run: swift build
-      - name: Run CodeQL analyze
-        uses: github/codeql-action/analyze@v3
+#  gh-codeql:
+#    if: ${{ false }}
+#    runs-on: ubuntu-latest
+#    container: swift:noble
+#    permissions: { actions: write, contents: read, security-events: write }
+#    steps:
+#      - name: Check out code
+#        uses: actions/checkout@v4
+#      - name: Mark repo safe in non-fake global config
+#        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+#      - name: Initialize CodeQL
+#        uses: github/codeql-action/init@v3
+#        with:
+#          languages: swift
+#      - name: Perform build
+#        run: swift build
+#      - name: Run CodeQL analyze
+#        uses: github/codeql-action/analyze@v3

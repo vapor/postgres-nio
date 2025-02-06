@@ -38,6 +38,48 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testOptionsAreSentOnTheWire() async throws {
+        let eventLoop = NIOAsyncTestingEventLoop()
+        let channel = await NIOAsyncTestingChannel(handlers: [
+            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+        ], loop: eventLoop)
+        try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
+
+        let configuration = {
+            var config = PostgresConnection.Configuration(
+                establishedChannel: channel,
+                username: "username",
+                password: "postgres",
+                database: "database"
+            )
+            config.options.additionalStartupParameters = [
+                ("DateStyle", "ISO, MDY"),
+                ("application_name", "postgres-nio-test"),
+                ("server_encoding", "UTF8"),
+                ("integer_datetimes", "on"),
+                ("client_encoding", "UTF8"),
+                ("TimeZone", "Etc/UTC"),
+                ("is_superuser", "on"),
+                ("server_version", "13.1 (Debian 13.1-1.pgdg100+1)"),
+                ("session_authorization", "postgres"),
+                ("IntervalStyle", "postgres"),
+                ("standard_conforming_strings", "on")
+            ]
+            return config
+        }()
+
+        async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: .psqlTest)
+        let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        XCTAssertEqual(message, .startup(.versionThree(parameters: .init(user: "username", database: "database", options: configuration.options.additionalStartupParameters, replication: .false))))
+        try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
+        try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
+        try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+        let connection = try await connectionPromise
+        try await connection.close()
+    }
+
     func testSimpleListen() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
@@ -145,7 +187,7 @@ class PostgresConnectionTests: XCTestCase {
     func testSimpleListenConnectionDrops() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup in
             taskGroup.addTask {
                 let events = try await connection.listen("foo")
                 var iterator = events.makeAsyncIterator()
@@ -155,7 +197,7 @@ class PostgresConnectionTests: XCTestCase {
                     _ = try await iterator.next()
                     XCTFail("Did not expect to not throw")
                 } catch {
-                    self.logger.error("error", metadata: ["error": "\(error)"])
+                    logger.error("error", metadata: ["error": "\(error)"])
                 }
             }
 
@@ -184,10 +226,10 @@ class PostgresConnectionTests: XCTestCase {
 
     func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+        try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
             for _ in 1...2 {
                 taskGroup.addTask {
-                    let rows = try await connection.query("SELECT 1;", logger: self.logger)
+                    let rows = try await connection.query("SELECT 1;", logger: logger)
                     var iterator = rows.decode(Int.self).makeAsyncIterator()
                     let first = try await iterator.next()
                     XCTAssertEqual(first, 1)
@@ -244,10 +286,10 @@ class PostgresConnectionTests: XCTestCase {
     func testCloseClosesImmediatly() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+        try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
             for _ in 1...2 {
                 taskGroup.addTask {
-                    try await connection.query("SELECT 1;", logger: self.logger)
+                    try await connection.query("SELECT 1;", logger: logger)
                 }
             }
 
@@ -277,8 +319,9 @@ class PostgresConnectionTests: XCTestCase {
 
     func testIfServerJustClosesTheErrorReflectsThat() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+        let logger = self.logger
 
-        async let response = try await connection.query("SELECT 1;", logger: self.logger)
+        async let response = try await connection.query("SELECT 1;", logger: logger)
 
         let listenMessage = try await channel.waitForUnpreparedRequest()
         XCTAssertEqual(listenMessage.parse.query, "SELECT 1;")
@@ -372,6 +415,16 @@ class PostgresConnectionTests: XCTestCase {
                 commandTag: TestPrepareStatement.sql
             )
         }
+    }
+
+    func testWeDontCrashOnUnexpectedChannelEvents() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        enum MyEvent {
+            case pleaseDontCrash
+        }
+        channel.pipeline.fireUserInboundEventTriggered(MyEvent.pleaseDontCrash)
+        try await connection.close()
     }
 
     func testSerialExecutionOfSamePreparedStatement() async throws {
@@ -600,7 +653,8 @@ class PostgresConnectionTests: XCTestCase {
             database: "database"
         )
 
-        async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: self.logger)
+        let logger = self.logger
+        async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: logger)
         let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
         XCTAssertEqual(message, .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
         try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))

@@ -37,7 +37,7 @@ public protocol ConnectionPoolObservabilityDelegate: Sendable {
     func requestQueueDepthChanged(_ newDepth: Int)
 }
 
-public struct NoOpConnectionPoolMetrics<ConnectionID: Hashable>: ConnectionPoolObservabilityDelegate {
+public struct NoOpConnectionPoolMetrics<ConnectionID: Hashable & Sendable>: ConnectionPoolObservabilityDelegate {
     public init(connectionIDType: ConnectionID.Type) {}
 
     public func startedConnecting(id: ConnectionID) {}

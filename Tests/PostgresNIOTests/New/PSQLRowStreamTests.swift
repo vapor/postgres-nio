@@ -12,7 +12,7 @@ final class PSQLRowStreamTests: XCTestCase {
 
     func testEmptyStream() {
         let stream = PSQLRowStream(
-            source: .noRows(.success("INSERT 0 1")),
+            source: .noRows(.success(.tag("INSERT 0 1"))),
             eventLoop: self.eventLoop,
             logger: self.logger
         )

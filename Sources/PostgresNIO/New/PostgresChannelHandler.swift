@@ -20,7 +20,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private var decoder: NIOSingleStepByteToMessageProcessor<PostgresBackendMessageDecoder>
     private var encoder: PostgresFrontendMessageEncoder!
     private let configuration: PostgresConnection.InternalConfiguration
-    private let configureSSLCallback: ((Channel) throws -> Void)?
+    private let configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> Void)?
 
     private var listenState = ListenStateMachine()
     private var preparedStatementState = PreparedStatementStateMachine()
@@ -29,7 +29,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         configuration: PostgresConnection.InternalConfiguration,
         eventLoop: EventLoop,
         logger: Logger,
-        configureSSLCallback: ((Channel) throws -> Void)?
+        configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> Void)?
     ) {
         self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
         self.eventLoop = eventLoop
@@ -46,7 +46,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         eventLoop: EventLoop,
         state: ConnectionStateMachine = .init(.initialized),
         logger: Logger = .psqlNoOpLogger,
-        configureSSLCallback: ((Channel) throws -> Void)?
+        configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> Void)?
     ) {
         self.state = state
         self.eventLoop = eventLoop
@@ -390,7 +390,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                 let authContext = AuthContext(
                     username: username,
                     password: self.configuration.password,
-                    database: self.configuration.database
+                    database: self.configuration.database,
+                    additionalParameters: self.configuration.options.additionalStartupParameters
                 )
                 let action = self.state.provideAuthenticationContext(authContext)
                 return self.run(action, with: context)
@@ -438,7 +439,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         // This method must only be called, if we signalized the StateMachine before that we are
         // able to setup a SSL connection.
         do {
-            try self.configureSSLCallback!(context.channel)
+            try self.configureSSLCallback!(context.channel, self)
             let action = self.state.sslHandlerAdded()
             self.run(action, with: context)
         } catch {
@@ -549,9 +550,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             )
             self.rowStream = rows
 
-        case .noRows(let commandTag):
+        case .noRows(let summary):
             rows = PSQLRowStream(
-                source: .noRows(.success(commandTag)),
+                source: .noRows(.success(summary)),
                 eventLoop: context.channel.eventLoop,
                 logger: result.logger
             )
