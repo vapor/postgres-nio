@@ -1,6 +1,6 @@
 import Atomics
 import NIOEmbedded
-import Dispatch
+import NIOPosix
 import XCTest
 @testable import PostgresNIO
 import NIOCore
@@ -8,10 +8,10 @@ import Logging
 
 final class PostgresRowSequenceTests: XCTestCase {
     let logger = Logger(label: "PSQLRowStreamTests")
-    let eventLoop = EmbeddedEventLoop()
 
     func testBackpressureWorks() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -19,7 +19,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ], 
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -41,6 +41,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testCancellationWorksWhileIterating() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -48,7 +49,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -72,6 +73,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testCancellationWorksBeforeIterating() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -79,7 +81,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -97,6 +99,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testDroppingTheSequenceCancelsTheSource() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -104,7 +107,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -117,6 +120,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testStreamBasedOnCompletedQuery() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -124,7 +128,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -144,6 +148,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testStreamIfInitializedWithAllData() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -151,7 +156,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -172,6 +177,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testStreamIfInitializedWithError() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -179,7 +185,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -200,6 +206,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testSucceedingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
+        let eventLoop = NIOSingletons.posixEventLoopGroup.next()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -207,14 +214,14 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: eventLoop,
             logger: self.logger
         )
 
-        let rowSequence = stream.asyncSequence()
+        let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             let dataRows: [DataRow] = (0..<1).map { [ByteBuffer(integer: Int64($0))] }
             stream.receive(dataRows)
         }
@@ -222,7 +229,7 @@ final class PostgresRowSequenceTests: XCTestCase {
         let row1 = try await rowIterator.next()
         XCTAssertEqual(try row1?.decode(Int.self), 0)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             stream.receive(completion: .success("SELECT 1"))
         }
 
@@ -232,6 +239,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testFailingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
+        let eventLoop = NIOSingletons.posixEventLoopGroup.next()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -239,14 +247,14 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: eventLoop,
             logger: self.logger
         )
 
-        let rowSequence = stream.asyncSequence()
+        let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             let dataRows: [DataRow] = (0..<1).map { [ByteBuffer(integer: Int64($0))] }
             stream.receive(dataRows)
         }
@@ -254,7 +262,7 @@ final class PostgresRowSequenceTests: XCTestCase {
         let row1 = try await rowIterator.next()
         XCTAssertEqual(try row1?.decode(Int.self), 0)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
         }
 
@@ -268,6 +276,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testAdaptiveRowBufferShrinksAndGrows() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -275,7 +284,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -332,6 +341,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testAdaptiveRowShrinksToMin() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -339,7 +349,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -386,6 +396,7 @@ final class PostgresRowSequenceTests: XCTestCase {
 
     func testStreamBufferAcceptsNewRowsEventhoughItDidntAskForIt() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -393,7 +404,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 

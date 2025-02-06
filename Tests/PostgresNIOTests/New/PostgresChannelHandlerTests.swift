@@ -124,7 +124,7 @@ class PostgresChannelHandlerTests: XCTestCase {
             handler
         ], loop: self.eventLoop)
         let eventHandler = TestEventHandler()
-        try embedded.pipeline.addHandler(eventHandler, position: .last).wait()
+        try embedded.pipeline.syncOperations.addHandler(eventHandler, position: .last)
         
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
         XCTAssertTrue(embedded.isActive)
