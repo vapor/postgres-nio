@@ -1032,28 +1032,6 @@ final class PostgresNIOTests: XCTestCase {
         }
     }
 
-    func testRemoteTLSServer() {
-        // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
-        var conn: PostgresConnection?
-        let logger = Logger(label: "test")
-        let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
-        let config = PostgresConnection.Configuration(
-            host: "elmer.db.elephantsql.com",
-            port: 5432,
-            username: "uymgphwj",
-            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
-            database: "uymgphwj",
-            tls: .require(sslContext)
-        )
-        XCTAssertNoThrow(conn = try PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
-        XCTAssertEqual(rows?.count, 1)
-        let row = rows?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "version"].string?.contains("PostgreSQL"), true)
-    }
-
     @available(*, deprecated, message: "Test deprecated functionality")
     func testFailingTLSConnectionClosesConnection() {
         // There was a bug (https://github.com/vapor/postgres-nio/issues/133) where we would hit
