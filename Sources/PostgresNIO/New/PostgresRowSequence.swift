@@ -4,7 +4,7 @@ import NIOConcurrencyHelpers
 /// An async sequence of ``PostgresRow``s.
 ///
 /// - Note: This is a struct to allow us to move to a move only type easily once they become available.
-public struct PostgresRowSequence: AsyncSequence {
+public struct PostgresRowSequence: AsyncSequence, Sendable {
     public typealias Element = PostgresRow
 
     typealias BackingSequence = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>
@@ -55,6 +55,9 @@ extension PostgresRowSequence {
         }
     }
 }
+
+@available(*, unavailable)
+extension PostgresRowSequence.AsyncIterator: Sendable {}
 
 extension PostgresRowSequence {
     public func collect() async throws -> [PostgresRow] {

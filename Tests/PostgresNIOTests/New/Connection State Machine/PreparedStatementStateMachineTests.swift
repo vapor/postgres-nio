@@ -28,7 +28,7 @@ class PreparedStatementStateMachineTests: XCTestCase {
         XCTAssertEqual(preparationCompleteAction.statements.count, 1)
         XCTAssertNil(preparationCompleteAction.rowDescription)
         firstPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success("tag")),
+            source: .noRows(.success(.tag("tag"))),
             eventLoop: eventLoop,
             logger: .psqlTest
         ))
@@ -46,7 +46,7 @@ class PreparedStatementStateMachineTests: XCTestCase {
             return
         }
         secondPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success("tag")),
+            source: .noRows(.success(.tag("tag"))),
             eventLoop: eventLoop,
             logger: .psqlTest
         ))
@@ -135,12 +135,12 @@ class PreparedStatementStateMachineTests: XCTestCase {
         XCTAssertNil(preparationCompleteAction.rowDescription)
 
         firstPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success("tag")),
+            source: .noRows(.success(.tag("tag"))),
             eventLoop: eventLoop,
             logger: .psqlTest
         ))
         secondPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success("tag")),
+            source: .noRows(.success(.tag("tag"))),
             eventLoop: eventLoop,
             logger: .psqlTest
         ))
