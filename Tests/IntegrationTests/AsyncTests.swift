@@ -134,7 +134,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 }
                 XCTFail("Expected to get cancelled while reading the query")
             } catch {
-                guard let error = error as? PSQLError else { return XCTFail("Unexpected error type") }
+                guard let error = error as? PostgresError else { return XCTFail("Unexpected error type") }
 
                 XCTAssertEqual(error.code, .server)
                 XCTAssertEqual(error.serverInfo?[.severity], "ERROR")
@@ -164,7 +164,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                     try await connection.query("SELECT generte_series(\(start), \(end));", logger: .psqlTest)
                     XCTFail("Expected to throw from the request")
                 } catch {
-                    guard let error = error as? PSQLError else { return XCTFail("Unexpected error type: \(error)") }
+                    guard let error = error as? PostgresError else { return XCTFail("Unexpected error type: \(error)") }
 
                     XCTAssertEqual(error.code, .server)
                     XCTAssertEqual(error.serverInfo?[.severity], "ERROR")

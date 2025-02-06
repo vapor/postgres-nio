@@ -6,13 +6,13 @@ struct CloseStateMachine {
         case closeSyncSent(CloseCommandContext)
         case closeCompleteReceived
         
-        case error(PSQLError)
+        case error(PostgresError)
     }
     
     enum Action {
         case sendCloseSync(CloseTarget)
         case succeedClose(CloseCommandContext)
-        case failClose(CloseCommandContext, with: PSQLError)
+        case failClose(CloseCommandContext, with: PostgresError)
 
         case read
         case wait
@@ -44,7 +44,7 @@ struct CloseStateMachine {
     }
     
     mutating func errorReceived(_ errorMessage: PostgresBackendMessage.ErrorResponse) -> Action {
-        let error = PSQLError.server(errorMessage)
+        let error = PostgresError.server(errorMessage)
         switch self.state {
         case .initialized:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
@@ -63,7 +63,7 @@ struct CloseStateMachine {
         }
     }
     
-    mutating func errorHappened(_ error: PSQLError) -> Action {
+    mutating func errorHappened(_ error: PostgresError) -> Action {
         return self.setAndFireError(error)
     }
 
@@ -84,7 +84,7 @@ struct CloseStateMachine {
     
     // MARK: Private Methods
 
-    private mutating func setAndFireError(_ error: PSQLError) -> Action {
+    private mutating func setAndFireError(_ error: PostgresError) -> Action {
         switch self.state {
         case .closeSyncSent(let closeContext):
             self.state = .error(error)

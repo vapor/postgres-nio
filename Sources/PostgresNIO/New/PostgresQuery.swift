@@ -258,17 +258,6 @@ public struct PostgresBindings: Sendable, Hashable {
         value.encodeRaw(into: &self.bytes, context: context)
         self.metadata.append(.init(value: value, protected: false))
     }
-
-    public mutating func append(_ postgresData: PostgresData) {
-        switch postgresData.value {
-        case .none:
-            self.bytes.writeInteger(-1, as: Int32.self)
-        case .some(var input):
-            self.bytes.writeInteger(Int32(input.readableBytes))
-            self.bytes.writeBuffer(&input)
-        }
-        self.metadata.append(.init(dataType: postgresData.type, format: .binary, protected: true))
-    }
 }
 
 extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertible {

@@ -184,28 +184,6 @@ extension PostgresRandomAccessRow: Sendable, RandomAccessCollection {
 }
 
 extension PostgresRandomAccessRow {
-    public subscript(data index: Int) -> PostgresData {
-        guard index < self.endIndex else {
-            preconditionFailure("index out of bounds")
-        }
-        let column = self.columns[index]
-        return PostgresData(
-            type: column.dataType,
-            typeModifier: column.dataTypeModifier,
-            formatCode: .binary,
-            value: self.cells[index]
-        )
-    }
-
-    public subscript(data column: String) -> PostgresData {
-        guard let index = self.lookupTable[column] else {
-            fatalError(#"A column "\#(column)" does not exist."#)
-        }
-        return self[data: index]
-    }
-}
-
-extension PostgresRandomAccessRow {
     /// Access the data in the provided column and decode it into the target type.
     ///
     /// - Parameters:
@@ -259,66 +237,5 @@ extension PostgresRandomAccessRow {
                 line: line
             )
         }
-    }
-}
-
-// MARK: Deprecated API
-
-extension PostgresRow {
-    @available(*, deprecated, message: "Will be removed from public API.")
-    public var rowDescription: PostgresMessage.RowDescription {
-        let fields = self.columns.map { column in
-            PostgresMessage.RowDescription.Field(
-                name: column.name,
-                tableOID: UInt32(column.tableOID),
-                columnAttributeNumber: column.columnAttributeNumber,
-                dataType: PostgresDataType(UInt32(column.dataType.rawValue)),
-                dataTypeSize: column.dataTypeSize,
-                dataTypeModifier: column.dataTypeModifier,
-                formatCode: .init(psqlFormatCode: column.format)
-            )
-        }
-        return PostgresMessage.RowDescription(fields: fields)
-    }
-
-    @available(*, deprecated, message: "Iterate the cells on `PostgresRow` instead.")
-    public var dataRow: PostgresMessage.DataRow {
-        let columns = self.data.map {
-            PostgresMessage.DataRow.Column(value: $0)
-        }
-        return PostgresMessage.DataRow(columns: columns)
-    }
-
-    @available(*, deprecated, message: """
-        This call is O(n) where n is the number of cells in the row. For random access to cells
-        in a row create a PostgresRandomAccessRow from the row first and use its subscript
-        methods. (see `makeRandomAccess()`)
-        """)
-    public func column(_ column: String) -> PostgresData? {
-        guard let index = self.lookupTable[column] else {
-            return nil
-        }
-
-        return PostgresData(
-            type: self.columns[index].dataType,
-            typeModifier: self.columns[index].dataTypeModifier,
-            formatCode: .binary,
-            value: self.data[column: index]
-        )
-    }
-}
-
-extension PostgresRow: CustomStringConvertible {
-    public var description: String {
-        var row: [String: PostgresData] = [:]
-        for cell in self {
-            row[cell.columnName] = PostgresData(
-                type: cell.dataType,
-                typeModifier: 0,
-                formatCode: cell.format,
-                value: cell.bytes
-            )
-        }
-        return row.description
     }
 }

@@ -95,16 +95,9 @@ public final class PostgresConnection: @unchecked Sendable {
             return self.eventLoop.makeFailedFuture(error)
         }
 
-        let startupFuture: EventLoopFuture<Void>
-        if configuration.username == nil {
-            startupFuture = eventHandler.readyForStartupFuture
-        } else {
-            startupFuture = eventHandler.authenticateFuture
-        }
-
         // 3. wait for startup future to succeed.
 
-        return startupFuture.flatMapError { error in
+        return eventHandler.authenticateFuture.flatMapError { error in
             // in case of an startup error, the connection must be closed and after that
             // the originating error should be surfaced
 
@@ -170,7 +163,7 @@ public final class PostgresConnection: @unchecked Sendable {
                 connectFuture = bootstrap.connect(unixDomainSocketPath: path)
             case .bootstrapped(let channel):
                 guard channel.isActive else {
-                    return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
+                    return eventLoop.makeFailedFuture(PostgresError.connectionError(underlying: ChannelError.alreadyClosed))
                 }
                 connectFuture = eventLoop.makeSucceededFuture(channel)
             }
@@ -180,10 +173,10 @@ public final class PostgresConnection: @unchecked Sendable {
                 return connection.start(configuration: configuration).map { _ in connection }
             }.flatMapErrorThrowing { error -> PostgresConnection in
                 switch error {
-                case is PSQLError:
+                case is PostgresError:
                     throw error
                 default:
-                    throw PSQLError.connectionError(underlying: error)
+                    throw PostgresError.connectionError(underlying: error)
                 }
             }
         }
@@ -212,7 +205,7 @@ public final class PostgresConnection: @unchecked Sendable {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
         guard query.binds.count <= Int(UInt16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError(code: .tooManyParameters, query: query))
+            return self.channel.eventLoop.makeFailedFuture(PostgresError(code: .tooManyParameters, query: query))
         }
 
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
@@ -247,7 +240,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     func execute(_ executeStatement: PSQLExecuteStatement, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
         guard executeStatement.binds.count <= Int(UInt16.max) else {
-            return self.channel.eventLoop.makeFailedFuture(PSQLError(code: .tooManyParameters))
+            return self.channel.eventLoop.makeFailedFuture(PostgresError(code: .tooManyParameters))
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -285,74 +278,6 @@ public final class PostgresConnection: @unchecked Sendable {
 
 extension PostgresConnection {
     static let idGenerator = ManagedAtomic(0)
-
-    @available(*, deprecated,
-        message: "Use the new connect method that allows you to connect and authenticate in a single step",
-        renamed: "connect(on:configuration:id:logger:)"
-    )
-    public static func connect(
-        to socketAddress: SocketAddress,
-        tlsConfiguration: TLSConfiguration? = nil,
-        serverHostname: String? = nil,
-        logger: Logger = .init(label: "codes.vapor.postgres"),
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<PostgresConnection> {
-        var tlsFuture: EventLoopFuture<PostgresConnection.Configuration.TLS>
-
-        if let tlsConfiguration = tlsConfiguration {
-            tlsFuture = eventLoop.makeSucceededVoidFuture().flatMapBlocking(onto: .global(qos: .default)) {
-                try .require(.init(configuration: tlsConfiguration))
-            }
-        } else {
-            tlsFuture = eventLoop.makeSucceededFuture(.disable)
-        }
-
-        return tlsFuture.flatMap { tls in
-            var options = PostgresConnection.Configuration.Options()
-            options.tlsServerName = serverHostname
-            let configuration = PostgresConnection.InternalConfiguration(
-                connection: .resolved(address: socketAddress),
-                username: nil,
-                password: nil,
-                database: nil,
-                tls: tls,
-                options: options
-            )
-
-            return PostgresConnection.connect(
-                connectionID: self.idGenerator.wrappingIncrementThenLoad(ordering: .relaxed),
-                configuration: configuration,
-                logger: logger,
-                on: eventLoop
-            )
-        }.flatMapErrorThrowing { error in
-            throw error.asAppropriatePostgresError
-        }
-    }
-
-    @available(*, deprecated,
-        message: "Use the new connect method that allows you to connect and authenticate in a single step",
-        renamed: "connect(on:configuration:id:logger:)"
-    )
-    public func authenticate(
-        username: String,
-        database: String? = nil,
-        password: String? = nil,
-        logger: Logger = .init(label: "codes.vapor.postgres")
-    ) -> EventLoopFuture<Void> {
-        let authContext = AuthContext(
-            username: username,
-            password: password,
-            database: database)
-        let outgoing = PSQLOutgoingEvent.authenticate(authContext)
-        self.channel.triggerUserOutboundEvent(outgoing, promise: nil)
-
-        return self.channel.pipeline.handler(type: PSQLEventsHandler.self).flatMap { handler in
-            handler.authenticateFuture
-        }.flatMapErrorThrowing { error in
-            throw error.asAppropriatePostgresError
-        }
-    }
 }
 
 // MARK: Async/Await Interface
@@ -417,7 +342,7 @@ extension PostgresConnection {
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
 
         guard query.binds.count <= Int(UInt16.max) else {
-            throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
+            throw PostgresError(code: .tooManyParameters, query: query, file: file, line: line)
         }
         let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
         let context = ExtendedQueryContext(
@@ -430,7 +355,7 @@ extension PostgresConnection {
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = query
@@ -486,7 +411,7 @@ extension PostgresConnection {
                 .map { $0.asyncSequence() }
                 .get()
                 .map { try preparedStatement.decodeRow($0) }
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = .init(
@@ -520,7 +445,7 @@ extension PostgresConnection {
             return try await promise.futureResult
                 .map { $0.commandTag }
                 .get()
-        } catch var error as PSQLError {
+        } catch var error as PostgresError {
             error.file = file
             error.line = line
             error.query = .init(
@@ -532,199 +457,6 @@ extension PostgresConnection {
     }
 }
 
-// MARK: EventLoopFuture interface
-
-extension PostgresConnection {
-
-    /// Run a query on the Postgres server the connection is connected to and collect all rows.
-    ///
-    /// - Parameters:
-    ///   - query: The ``PostgresQuery`` to run
-    ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
-    /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryResult``.
-    public func query(
-        _ query: PostgresQuery,
-        logger: Logger,
-        file: String = #fileID,
-        line: Int = #line
-    ) -> EventLoopFuture<PostgresQueryResult> {
-        self.queryStream(query, logger: logger).flatMap { rowStream in
-            rowStream.all().flatMapThrowing { rows -> PostgresQueryResult in
-                guard let metadata = PostgresQueryMetadata(string: rowStream.commandTag) else {
-                    throw PSQLError.invalidCommandTag(rowStream.commandTag)
-                }
-                return PostgresQueryResult(metadata: metadata, rows: rows)
-            }
-        }.enrichPSQLError(query: query, file: file, line: line)
-    }
-
-    /// Run a query on the Postgres server the connection is connected to and iterate the rows in a callback.
-    ///
-    /// - Note: This API does not support back-pressure. If you need back-pressure please use the query
-    ///         API, that supports structured concurrency.
-    /// - Parameters:
-    ///   - query: The ``PostgresQuery`` to run
-    ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
-    ///   - onRow: A closure that is invoked for every row.
-    /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryMetadata``.
-    @preconcurrency
-    public func query(
-        _ query: PostgresQuery,
-        logger: Logger,
-        file: String = #fileID,
-        line: Int = #line,
-        _ onRow: @escaping @Sendable (PostgresRow) throws -> ()
-    ) -> EventLoopFuture<PostgresQueryMetadata> {
-        self.queryStream(query, logger: logger).flatMap { rowStream in
-            rowStream.onRow(onRow).flatMapThrowing { () -> PostgresQueryMetadata in
-                guard let metadata = PostgresQueryMetadata(string: rowStream.commandTag) else {
-                    throw PSQLError.invalidCommandTag(rowStream.commandTag)
-                }
-                return metadata
-            }
-        }.enrichPSQLError(query: query, file: file, line: line)
-    }
-}
-
-// MARK: PostgresDatabase conformance
-
-extension PostgresConnection: PostgresDatabase {
-    public func send(
-        _ request: PostgresRequest,
-        logger: Logger
-    ) -> EventLoopFuture<Void> {
-        guard let command = request as? PostgresCommands else {
-            preconditionFailure("\(#function) requires an instance of PostgresCommands. This will be a compile-time error in the future.")
-        }
-
-        let resultFuture: EventLoopFuture<Void>
-
-        switch command {
-        case .query(let query, let onMetadata, let onRow):
-            resultFuture = self.queryStream(query, logger: logger).flatMap { stream in
-                return stream.onRow(onRow).map { _ in
-                    onMetadata(PostgresQueryMetadata(string: stream.commandTag)!)
-                }
-            }
-
-        case .queryAll(let query, let onResult):
-            resultFuture = self.queryStream(query, logger: logger).flatMap { rows in
-                return rows.all().map { allrows in
-                    onResult(.init(metadata: PostgresQueryMetadata(string: rows.commandTag)!, rows: allrows))
-                }
-            }
-
-        case .prepareQuery(let request):
-            resultFuture = self.prepareStatement(request.query, with: request.name, logger: logger).map {
-                request.prepared = PreparedQuery(underlying: $0, database: self)
-            }
-
-        case .executePreparedStatement(let preparedQuery, let binds, let onRow):
-            var bindings = PostgresBindings(capacity: binds.count)
-            binds.forEach { bindings.append($0) }
-
-            let statement = PSQLExecuteStatement(
-                name: preparedQuery.underlying.name,
-                binds: bindings,
-                rowDescription: preparedQuery.underlying.rowDescription
-            )
-
-            resultFuture = self.execute(statement, logger: logger).flatMap { rows in
-                return rows.onRow(onRow)
-            }
-        }
-
-        return resultFuture.flatMapErrorThrowing { error in
-            throw error.asAppropriatePostgresError
-        }
-    }
-
-    @preconcurrency
-    public func withConnection<T>(_ closure: (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
-        closure(self)
-    }
-}
-
-internal enum PostgresCommands: PostgresRequest {
-    case query(PostgresQuery,
-               onMetadata: @Sendable (PostgresQueryMetadata) -> () = { _ in },
-               onRow: @Sendable (PostgresRow) throws -> ())
-    case queryAll(PostgresQuery, onResult: @Sendable (PostgresQueryResult) -> ())
-    case prepareQuery(request: PrepareQueryRequest)
-    case executePreparedStatement(query: PreparedQuery, binds: [PostgresData], onRow: @Sendable (PostgresRow) throws -> ())
-
-    func respond(to message: PostgresMessage) throws -> [PostgresMessage]? {
-        fatalError("This function must not be called")
-    }
-
-    func start() throws -> [PostgresMessage] {
-        fatalError("This function must not be called")
-    }
-
-    func log(to logger: Logger) {
-        fatalError("This function must not be called")
-    }
-}
-
-// MARK: Notifications
-
-/// Context for receiving NotificationResponse messages on a connection, used for PostgreSQL's `LISTEN`/`NOTIFY` support.
-public final class PostgresListenContext: Sendable {
-    private let promise: EventLoopPromise<Void>
-
-    var future: EventLoopFuture<Void> {
-        self.promise.futureResult
-    }
-
-    init(promise: EventLoopPromise<Void>) {
-        self.promise = promise
-    }
-
-    func cancel() {
-        self.promise.succeed()
-    }
-
-    /// Detach this listener so it no longer receives notifications. Other listeners, including those for the same channel, are unaffected. `UNLISTEN` is not sent; you are responsible for issuing an `UNLISTEN` query yourself if it is appropriate for your application.
-    public func stop() {
-        self.promise.succeed()
-    }
-}
-
-extension PostgresConnection {
-    /// Add a handler for NotificationResponse messages on a certain channel. This is used in conjunction with PostgreSQL's `LISTEN`/`NOTIFY` support: to listen on a channel, you add a listener using this method to handle the NotificationResponse messages, then issue a `LISTEN` query to instruct PostgreSQL to begin sending NotificationResponse messages.
-    @discardableResult
-    @preconcurrency
-    public func addListener(
-        channel: String,
-        handler notificationHandler: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
-    ) -> PostgresListenContext {
-        let listenContext = PostgresListenContext(promise: self.eventLoop.makePromise(of: Void.self))
-        let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
-
-        let listener = NotificationListener(
-            channel: channel,
-            id: id,
-            eventLoop: self.eventLoop,
-            context: listenContext,
-            closure: notificationHandler
-        )
-
-        let task = HandlerTask.startListening(listener)
-        self.channel.write(task, promise: nil)
-
-        listenContext.future.whenComplete { _ in
-            let task = HandlerTask.cancelListening(channel, id)
-            self.channel.write(task, promise: nil)
-        }
-
-        return listenContext
-    }
-}
-
 enum CloseTarget {
     case preparedStatement(String)
     case portal(String)
@@ -733,7 +465,7 @@ enum CloseTarget {
 extension EventLoopFuture {
     func enrichPSQLError(query: PostgresQuery, file: String, line: Int) -> EventLoopFuture<Value> {
         return self.flatMapErrorThrowing { error in
-            if var error = error as? PSQLError {
+            if var error = error as? PostgresError {
                 error.file = file
                 error.line = line
                 error.query = query

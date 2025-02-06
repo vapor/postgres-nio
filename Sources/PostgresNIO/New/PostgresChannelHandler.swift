@@ -277,10 +277,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.logger.trace("User outbound event received", metadata: [.userEvent: "\(event)"])
         
         switch event {
-        case PSQLOutgoingEvent.authenticate(let authContext):
-            let action = self.state.provideAuthenticationContext(authContext)
-            self.run(action, with: context)
-
         case PSQLOutgoingEvent.gracefulShutdown:
             let action = self.state.gracefulClose(promise)
             self.run(action, with: context)
@@ -385,17 +381,15 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             
         case .provideAuthenticationContext:
             context.fireUserInboundEventTriggered(PSQLEvent.readyForStartup)
-            
-            if let username = self.configuration.username {
-                let authContext = AuthContext(
-                    username: username,
-                    password: self.configuration.password,
-                    database: self.configuration.database,
-                    additionalParameters: self.configuration.options.additionalStartupParameters
-                )
-                let action = self.state.provideAuthenticationContext(authContext)
-                return self.run(action, with: context)
-            }
+            let authContext = AuthContext(
+                username: self.configuration.username,
+                password: self.configuration.password,
+                database: self.configuration.database,
+                additionalParameters: self.configuration.options.additionalStartupParameters
+            )
+            let action = self.state.provideAuthenticationContext(authContext)
+            return self.run(action, with: context)
+
         case .fireEventReadyForQuery:
             context.fireUserInboundEventTriggered(PSQLEvent.readyForQuery)
         case .closeConnection(let promise):
@@ -624,12 +618,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             }
 
         case .failure(let error):
-            let finalError: PSQLError
-            if var psqlError = error as? PSQLError {
+            let finalError: PostgresError
+            if var psqlError = error as? PostgresError {
                 psqlError.code = .listenFailed
                 finalError = psqlError
             } else {
-                var psqlError = PSQLError(code: .listenFailed)
+                var psqlError = PostgresError(code: .listenFailed)
                 psqlError.underlying = error
                 finalError = psqlError
             }
@@ -710,8 +704,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
                     context: context
                 )
             case .failure(let error):
-                let psqlError: PSQLError
-                if let error = error as? PSQLError {
+                let psqlError: PostgresError
+                if let error = error as? PostgresError {
                     psqlError = error
                 } else {
                     psqlError = .connectionError(underlying: error)
@@ -773,7 +767,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
     private func prepareStatementFailed(
         name: String,
-        error: PSQLError,
+        error: PostgresError,
         context: ChannelHandlerContext
     ) {
         let action = self.preparedStatementState.errorHappened(
