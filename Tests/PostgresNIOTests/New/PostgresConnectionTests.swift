@@ -40,10 +40,10 @@ class PostgresConnectionTests: XCTestCase {
 
     func testOptionsAreSentOnTheWire() async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
-        let channel = await NIOAsyncTestingChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-        ], loop: eventLoop)
+        let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
+            try channel.pipeline.syncOperations.addHandlers(ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()))
+            try channel.pipeline.syncOperations.addHandlers(ReverseMessageToByteHandler(PSQLBackendMessageEncoder()))
+        }
         try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
 
         let configuration = {
@@ -640,10 +640,10 @@ class PostgresConnectionTests: XCTestCase {
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()
-        let channel = await NIOAsyncTestingChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-        ], loop: eventLoop)
+        let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
+            try channel.pipeline.syncOperations.addHandlers(ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()))
+            try channel.pipeline.syncOperations.addHandlers(ReverseMessageToByteHandler(PSQLBackendMessageEncoder()))
+        }
         try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
 
         let configuration = PostgresConnection.Configuration(
