@@ -530,6 +530,56 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
     }
+
+    /// Puts the connection into an open transaction state, for the provided `closure`'s lifetime.
+    ///
+    /// The function starts a transaction by running a `BEGIN` query on the connection against the database. It then
+    /// lends the connection to the user provided closure. The user can then modify the database as they wish. If the user
+    /// provided closure returns successfully, the function will attempt to commit the changes by running a `COMMIT`
+    /// query against the database. If the user provided closure throws an error, the function will attempt to rollback the
+    /// changes made within the closure.
+    ///
+    /// - Parameters:
+    ///   - logger: The `Logger` to log into for the transaction.
+    ///   - file: The file, the transaction was started in. Used for better error reporting.
+    ///   - line: The line, the transaction was started in. Used for better error reporting.
+    ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
+    ///              The connection must stay in the transaction mode. Otherwise this method will throw!
+    /// - Returns: The closure's return value.
+    public func withTransaction<Result>(
+        logger: Logger,
+        file: String = #file,
+        line: Int = #line,
+        _ process: (PostgresConnection) async throws -> Result
+    ) async throws -> Result {
+        do {
+            try await self.query("BEGIN;", logger: logger)
+        } catch {
+            throw PostgresTransactionError(file: file, line: line, beginError: error)
+        }
+
+        var closureHasFinished: Bool = false
+        do {
+            let value = try await process(self)
+            closureHasFinished = true
+            try await self.query("COMMIT;", logger: logger)
+            return value
+        } catch {
+            var transactionError = PostgresTransactionError(file: file, line: line)
+            if !closureHasFinished {
+                transactionError.closureError = error
+                do {
+                    try await self.query("ROLLBACK;", logger: logger)
+                } catch {
+                    transactionError.rollbackError = error
+                }
+            } else {
+                transactionError.commitError = error
+            }
+
+            throw transactionError
+        }
+    }
 }
 
 // MARK: EventLoopFuture interface

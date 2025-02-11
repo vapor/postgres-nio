@@ -308,25 +308,29 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         return try await closure(connection)
     }
     
-    /// Lease a connection for the provided `closure`'s lifetime.
-    /// A transation starts with call to withConnection
-    /// A transaction should end with a call to COMMIT or ROLLBACK
-    /// COMMIT is called upon successful completion and ROLLBACK is called should any steps fail
+    /// Lease a connection, which is in an open transaction state, for the provided `closure`'s lifetime.
     ///
-    /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
-    ///                      the provided `PostgresConnection`.
+    /// The function leases a connection from the underlying connection pool and starts a transaction by running a `BEGIN`
+    /// query on the leased connection against the database. It then lends the connection to the user provided closure.
+    /// The user can then modify the database as they wish. If the user provided closure returns successfully, the function
+    /// will attempt to commit the changes by running a `COMMIT` query against the database. If the user provided closure
+    /// throws an error, the function will attempt to rollback the changes made within the closure.
+    ///
+    /// - Parameters:
+    ///   - logger: The `Logger` to log into for the transaction.
+    ///   - file: The file, the transaction was started in. Used for better error reporting.
+    ///   - line: The line, the transaction was started in. Used for better error reporting.
+    ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
+    ///              The connection must stay in the transaction mode. Otherwise this method will throw!
     /// - Returns: The closure's return value.
-    public func withTransaction<Result>(_ process: (PostgresConnection) async throws -> Result) async throws -> Result {
-        try await withConnection { connection in
-            try await connection.query("BEGIN;", logger: self.backgroundLogger)
-            do {
-                let value = try await process(connection)
-                try await connection.query("COMMIT;", logger: self.backgroundLogger)
-                return value
-            } catch {
-                try await connection.query("ROLLBACK;", logger: self.backgroundLogger)
-                throw error
-            }
+    public func withTransaction<Result>(
+        logger: Logger,
+        file: String = #file,
+        line: Int = #line,
+        _ closure: (PostgresConnection) async throws -> Result
+    ) async throws -> Result {
+        try await self.withConnection { connection in
+            try await connection.withTransaction(logger: logger, file: file, line: line, closure)
         }
     }
 
