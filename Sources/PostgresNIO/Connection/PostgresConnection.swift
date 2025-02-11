@@ -550,8 +550,9 @@ extension PostgresConnection {
         logger: Logger,
         file: String = #file,
         line: Int = #line,
-        _ process: (PostgresConnection) async throws -> Result
-    ) async throws -> Result {
+        isolation: isolated (any Actor)? = #isolation,
+        _ process: (PostgresConnection) async throws -> sending Result
+    ) async throws -> sending Result {
         do {
             try await self.query("BEGIN;", logger: logger)
         } catch {

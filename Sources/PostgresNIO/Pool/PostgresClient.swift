@@ -300,6 +300,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
     ///                      the provided `PostgresConnection`.
     /// - Returns: The closure's return value.
+    @_disfavoredOverload
     public func withConnection<Result>(_ closure: (PostgresConnection) async throws -> Result) async throws -> Result {
         let connection = try await self.leaseConnection()
 
@@ -307,7 +308,23 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         return try await closure(connection)
     }
-    
+
+    /// Lease a connection for the provided `closure`'s lifetime.
+    ///
+    /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
+    ///                      the provided `PostgresConnection`.
+    /// - Returns: The closure's return value.
+    public func withConnection<Result>(
+        isolation: isolated (any Actor)? = #isolation,
+        _ closure: (PostgresConnection) async throws -> sending Result
+    ) async throws -> sending Result {
+        let connection = try await self.leaseConnection()
+
+        defer { self.pool.releaseConnection(connection) }
+
+        return try await closure(connection)
+    }
+
     /// Lease a connection, which is in an open transaction state, for the provided `closure`'s lifetime.
     ///
     /// The function leases a connection from the underlying connection pool and starts a transaction by running a `BEGIN`
@@ -327,8 +344,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         logger: Logger,
         file: String = #file,
         line: Int = #line,
-        _ closure: (PostgresConnection) async throws -> Result
-    ) async throws -> Result {
+        isolation: isolated (any Actor)? = #isolation,
+        _ closure: (PostgresConnection) async throws -> sending Result
+    ) async throws -> sending Result {
         try await self.withConnection { connection in
             try await connection.withTransaction(logger: logger, file: file, line: line, closure)
         }

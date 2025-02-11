@@ -77,7 +77,7 @@ final class PostgresClientTests: XCTestCase {
                 
                 for _ in 0..<iterations {
                     taskGroup.addTask {
-                        let _ = try await client.withTransaction { transaction in
+                        let _ = try await client.withTransaction(logger: logger) { transaction in
                             try await transaction.query(
                             """
                             INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(UUID()));
@@ -101,7 +101,7 @@ final class PostgresClientTests: XCTestCase {
                 taskGroup.addTask {
                     
                     do {
-                        let _ = try await client.withTransaction { transaction in
+                        let _ = try await client.withTransaction(logger: logger) { transaction in
                             /// insert valid data
                             try await transaction.query(
                                 """
