@@ -293,7 +293,6 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
         }
     }
-
     
     /// Lease a connection for the provided `closure`'s lifetime.
     ///
@@ -317,8 +316,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Returns: The closure's return value.
     public func withConnection<Result>(
         isolation: isolated (any Actor)? = #isolation,
-        _ closure: (PostgresConnection) async throws -> sending Result
-    ) async throws -> sending Result {
+        // DO NOT FIX THE WHITESPACE IN THE NEXT LINE UNTIL 5.10 IS UNSUPPORTED
+        // https://github.com/swiftlang/swift/issues/79285
+        _ closure: (PostgresConnection) async throws -> sending Result) async throws -> sending Result {
         let connection = try await self.leaseConnection()
 
         defer { self.pool.releaseConnection(connection) }
@@ -346,8 +346,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         file: String = #file,
         line: Int = #line,
         isolation: isolated (any Actor)? = #isolation,
-        _ closure: (PostgresConnection) async throws -> sending Result
-    ) async throws -> sending Result {
+        // DO NOT FIX THE WHITESPACE IN THE NEXT LINE UNTIL 5.10 IS UNSUPPORTED
+        // https://github.com/swiftlang/swift/issues/79285
+        _ closure: (PostgresConnection) async throws -> sending Result) async throws -> sending Result {
         try await self.withConnection { connection in
             try await connection.withTransaction(logger: logger, file: file, line: line, closure)
         }

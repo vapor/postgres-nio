@@ -552,8 +552,9 @@ extension PostgresConnection {
         file: String = #file,
         line: Int = #line,
         isolation: isolated (any Actor)? = #isolation,
-        _ process: (PostgresConnection) async throws -> sending Result
-    ) async throws -> sending Result {
+        // DO NOT FIX THE WHITESPACE IN THE NEXT LINE UNTIL 5.10 IS UNSUPPORTED
+        // https://github.com/swiftlang/swift/issues/79285
+        _ process: (PostgresConnection) async throws -> sending Result) async throws -> sending Result {
         do {
             try await self.query("BEGIN;", logger: logger)
         } catch {
