@@ -1,7 +1,7 @@
 import Logging
 import NIOCore
 
-enum HandlerTask {
+enum HandlerTask: Sendable {
     case extendedQuery(ExtendedQueryContext)
     case simpleQuery(SimpleQueryContext)
     case closeCommand(CloseCommandContext)
@@ -36,7 +36,7 @@ enum PSQLTask {
     }
 }
 
-final class ExtendedQueryContext {
+final class ExtendedQueryContext: Sendable {
     enum Query {
         case unnamed(PostgresQuery, EventLoopPromise<PSQLRowStream>)
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
@@ -121,14 +121,15 @@ final class SimpleQueryContext {
     }
 }
 
-final class CloseCommandContext {
+final class CloseCommandContext: Sendable {
     let target: CloseTarget
     let logger: Logger
     let promise: EventLoopPromise<Void>
     
-    init(target: CloseTarget,
-         logger: Logger,
-         promise: EventLoopPromise<Void>
+    init(
+        target: CloseTarget,
+        logger: Logger,
+        promise: EventLoopPromise<Void>
     ) {
         self.target = target
         self.logger = logger
