@@ -438,6 +438,48 @@ extension PostgresConnection {
         }
     }
 
+    // use this for queries where you want to consume the rows.
+    // we can use the `consume` scope to better ensure structured concurrency when consuming the rows.
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ consume: (PostgresRowSequence) async throws -> Result
+    ) async throws -> (Result, PostgresQueryMetadata) {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.id)"
+
+        guard query.binds.count <= Int(UInt16.max) else {
+            throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
+        }
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let context = ExtendedQueryContext(
+            query: query,
+            logger: logger,
+            promise: promise
+        )
+
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+
+        do {
+            let (rowStream, rowSequence) = try await promise.futureResult.map { rowStream in
+                (rowStream, rowStream.asyncSequence())
+            }.get()
+            let result = try await consume(rowSequence)
+            try await rowStream.drain().get()
+            guard let metadata = PostgresQueryMetadata(string: rowStream.commandTag) else {
+                throw PSQLError.invalidCommandTag(rowStream.commandTag)
+            }
+            return (result, metadata)
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+    }
+
     /// Start listening for a channel
     public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
         let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
@@ -527,6 +569,45 @@ extension PostgresConnection {
                 unsafeSQL: Statement.sql,
                 binds: bindings
             )
+            throw error // rethrow with more metadata
+        }
+    }
+
+    // use this for queries where you want to consume the rows.
+    // we can use the `consume` scope to better ensure structured concurrency when consuming the rows.
+    @discardableResult
+    public func execute(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    ) async throws -> PostgresQueryMetadata {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.id)"
+
+        guard query.binds.count <= Int(UInt16.max) else {
+            throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
+        }
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let context = ExtendedQueryContext(
+            query: query,
+            logger: logger,
+            promise: promise
+        )
+
+        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+
+        do {
+            let rowStream = try await promise.futureResult.get()
+            try await rowStream.drain().get()
+            guard let metadata = PostgresQueryMetadata(string: rowStream.commandTag) else {
+                throw PSQLError.invalidCommandTag(rowStream.commandTag)
+            }
+            return metadata
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
             throw error // rethrow with more metadata
         }
     }
