@@ -132,6 +132,12 @@ extension PoolStateMachine {
 
             @usableFromInline
             var info: ConnectionAvailableInfo
+
+            @inlinable
+            init(use: ConnectionUse, info: ConnectionAvailableInfo) {
+                self.use = use
+                self.info = info
+            }
         }
 
         mutating func refillConnections() -> [ConnectionRequest] {
@@ -623,7 +629,7 @@ extension PoolStateMachine {
 
         // MARK: - Private functions -
 
-        @usableFromInline
+        @inlinable
         /*private*/ func getConnectionUse(index: Int) -> ConnectionUse {
             switch index {
             case 0..<self.minimumConcurrentConnections:
@@ -637,7 +643,7 @@ extension PoolStateMachine {
             }
         }
 
-        @usableFromInline
+        @inlinable
         /*private*/ func makeAvailableConnectionContextForConnection(at index: Int, info: ConnectionAvailableInfo) -> AvailableConnectionContext {
             precondition(self.connections[index].isAvailable)
             let use = self.getConnectionUse(index: index)

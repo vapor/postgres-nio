@@ -164,7 +164,7 @@ extension PoolStateMachine {
             }
         }
 
-        @usableFromInline
+        @inlinable
         var isLeased: Bool {
             switch self.state {
             case .leased:
@@ -174,7 +174,7 @@ extension PoolStateMachine {
             }
         }
 
-        @usableFromInline
+        @inlinable
         var isConnected: Bool {
             switch self.state {
             case .idle, .leased:

@@ -3,7 +3,7 @@ import _ConnectionPoolModule
 public final class MockRequest: ConnectionRequestProtocol, Hashable, Sendable {
     public typealias Connection = MockConnection
 
-    public struct ID: Hashable {
+    public struct ID: Hashable, Sendable {
         var objectID: ObjectIdentifier
 
         init(_ request: MockRequest) {
