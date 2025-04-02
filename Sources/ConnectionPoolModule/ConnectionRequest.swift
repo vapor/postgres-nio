@@ -21,7 +21,8 @@ public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequest
     }
 }
 
-fileprivate let requestIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator()
+@usableFromInline
+let requestIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator()
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension ConnectionPool where Request == ConnectionRequest<Connection> {
@@ -44,6 +45,7 @@ extension ConnectionPool where Request == ConnectionRequest<Connection> {
         )
     }
 
+    @inlinable
     public func leaseConnection() async throws -> Connection {
         let requestID = requestIDGenerator.next()
 
@@ -67,6 +69,7 @@ extension ConnectionPool where Request == ConnectionRequest<Connection> {
         return connection
     }
 
+    @inlinable
     public func withConnection<Result>(_ closure: (Connection) async throws -> Result) async throws -> Result {
         let connection = try await self.leaseConnection()
         defer { self.releaseConnection(connection) }
