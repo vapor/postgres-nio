@@ -21,7 +21,11 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
         var runningConnections = [ConnectionID: Connection]()
     }
 
-    public init() {}
+    let autoMaxStreams: UInt16?
+
+    public init(autoMaxStreams: UInt16? = nil) {
+        self.autoMaxStreams = autoMaxStreams
+    }
 
     public var pendingConnectionAttemptsCount: Int {
         self.stateBox.withLockedValue { $0.attempts.count }
@@ -35,6 +39,15 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
         id: Int,
         for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>, NoOpConnectionPoolMetrics<Int>, Clock>
     ) async throws -> ConnectionAndMetadata<MockConnection> {
+        if let autoMaxStreams = self.autoMaxStreams {
+            let connection = MockConnection(id: id)
+            Task {
+                try? await connection.signalToClose
+                connection.closeIfClosing()
+            }
+            return .init(connection: connection, maximalStreamsOnConnection: autoMaxStreams)
+        }
+
         // we currently don't support cancellation when creating a connection
         let result = try await withCheckedThrowingContinuation { (checkedContinuation: CheckedContinuation<(MockConnection, UInt16), any Error>) in
             let waiter = self.stateBox.withLockedValue { state -> (CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>)? in

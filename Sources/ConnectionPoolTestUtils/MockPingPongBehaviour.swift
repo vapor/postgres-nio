@@ -1,5 +1,6 @@
-@testable import _ConnectionPoolModule
+import _ConnectionPoolModule
 import DequeModule
+import NIOConcurrencyHelpers
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class MockPingPongBehavior<Connection: PooledConnection>: ConnectionKeepAliveBehavior {
