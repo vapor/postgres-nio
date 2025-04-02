@@ -1,4 +1,5 @@
 @testable import _ConnectionPoolModule
+import ConnectionPoolTestUtils
 import XCTest
 
 final class ConnectionRequestTests: XCTestCase {
