@@ -1,3 +1,4 @@
+import ConnectionPoolTestUtils
 import XCTest
 @testable import _ConnectionPoolModule
 

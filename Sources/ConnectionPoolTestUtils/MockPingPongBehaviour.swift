@@ -2,8 +2,8 @@
 import DequeModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-final class MockPingPongBehavior<Connection: PooledConnection>: ConnectionKeepAliveBehavior {
-    let keepAliveFrequency: Duration?
+public final class MockPingPongBehavior<Connection: PooledConnection>: ConnectionKeepAliveBehavior {
+    public let keepAliveFrequency: Duration?
 
     let stateBox = NIOLockedValueBox(State())
 
@@ -13,11 +13,11 @@ final class MockPingPongBehavior<Connection: PooledConnection>: ConnectionKeepAl
         var waiter = Deque<CheckedContinuation<(Connection, CheckedContinuation<Bool, any Error>), Never>>()
     }
 
-    init(keepAliveFrequency: Duration?, connectionType: Connection.Type) {
+    public init(keepAliveFrequency: Duration?, connectionType: Connection.Type) {
         self.keepAliveFrequency = keepAliveFrequency
     }
 
-    func runKeepAlive(for connection: Connection) async throws {
+    public func runKeepAlive(for connection: Connection) async throws {
         precondition(self.keepAliveFrequency != nil)
 
         // we currently don't support cancellation when creating a connection
@@ -40,7 +40,7 @@ final class MockPingPongBehavior<Connection: PooledConnection>: ConnectionKeepAl
     }
 
     @discardableResult
-    func nextKeepAlive(_ closure: (Connection) async throws -> Bool) async rethrows -> Connection {
+    public func nextKeepAlive(_ closure: (Connection) async throws -> Bool) async rethrows -> Connection {
         let (connection, continuation) = await withCheckedContinuation { (continuation: CheckedContinuation<(Connection, CheckedContinuation<Bool, any Error>), Never>) in
             let run = self.stateBox.withLockedValue { state -> (Connection, CheckedContinuation<Bool, any Error>)? in
                 if let run = state.runs.popFirst() {

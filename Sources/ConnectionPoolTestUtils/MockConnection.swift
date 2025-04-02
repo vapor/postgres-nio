@@ -1,11 +1,11 @@
+import _ConnectionPoolModule
 import DequeModule
-@testable import _ConnectionPoolModule
+import NIOConcurrencyHelpers
 
-// Sendability enforced through the lock
-final class MockConnection: PooledConnection, Sendable {
-    typealias ID = Int
+public final class MockConnection: PooledConnection, Sendable {
+    public typealias ID = Int
 
-    let id: ID
+    public let id: ID
 
     private enum State {
         case running([CheckedContinuation<Void, any Error>], [@Sendable ((any Error)?) -> ()])
@@ -15,11 +15,11 @@ final class MockConnection: PooledConnection, Sendable {
 
     private let lock: NIOLockedValueBox<State> = NIOLockedValueBox(.running([], []))
 
-    init(id: Int) {
+    public init(id: Int) {
         self.id = id
     }
 
-    var signalToClose: Void {
+    public var signalToClose: Void {
         get async throws {
             try await withCheckedThrowingContinuation { continuation in
                 let runRightAway = self.lock.withLockedValue { state -> Bool in
@@ -41,7 +41,7 @@ final class MockConnection: PooledConnection, Sendable {
         }
     }
 
-    func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
+    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
         let enqueued = self.lock.withLockedValue { state -> Bool in
             switch state {
             case .closed:
@@ -64,7 +64,7 @@ final class MockConnection: PooledConnection, Sendable {
         }
     }
 
-    func close() {
+    public func close() {
         let continuations = self.lock.withLockedValue { state -> [CheckedContinuation<Void, any Error>] in
             switch state {
             case .running(let continuations, let callbacks):
@@ -81,7 +81,7 @@ final class MockConnection: PooledConnection, Sendable {
         }
     }
 
-    func closeIfClosing() {
+    public func closeIfClosing() {
         let callbacks = self.lock.withLockedValue { state -> [@Sendable ((any Error)?) -> ()] in
             switch state {
             case .running, .closed:
@@ -100,7 +100,7 @@ final class MockConnection: PooledConnection, Sendable {
 }
 
 extension MockConnection: CustomStringConvertible {
-    var description: String {
+    public var description: String {
         let state = self.lock.withLockedValue { $0 }
         return "MockConnection(id: \(self.id), state: \(state))"
     }
