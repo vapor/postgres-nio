@@ -107,7 +107,7 @@ await withTaskGroup(of: Void.self) { taskGroup in
 Once a client is running, queries can be sent to the server. This is straightforward:
 
 ```swift
-let rows = try await client.query("SELECT id, username, birthday FROM users")
+let rows = try await client.query("SELECT id, username, birthday FROM users", logger: Logger(label: "my-example-logger"))
 ```
 
 The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. 
