@@ -16,6 +16,7 @@ let package = Package(
     products: [
         .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
         .library(name: "_ConnectionPoolModule", targets: ["_ConnectionPoolModule"]),
+        .library(name: "_ConnectionPoolTestUtils", targets: ["_ConnectionPoolTestUtils"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
@@ -57,6 +58,15 @@ let package = Package(
             path: "Sources/ConnectionPoolModule",
             swiftSettings: swiftSettings
         ),
+        .target(
+            name: "_ConnectionPoolTestUtils",
+            dependencies: [
+                "_ConnectionPoolModule",
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+            ],
+            path: "Sources/ConnectionPoolTestUtils",
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "PostgresNIOTests",
             dependencies: [
@@ -70,6 +80,7 @@ let package = Package(
             name: "ConnectionPoolModuleTests",
             dependencies: [
                 .target(name: "_ConnectionPoolModule"),
+                .target(name: "_ConnectionPoolTestUtils"),
                 .product(name: "DequeModule", package: "swift-collections"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
