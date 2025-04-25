@@ -292,6 +292,61 @@ final class PostgresClientTests: XCTestCase {
             XCTFail("Unexpected error: \(String(reflecting: error))")
         }
     }
+
+    func testLTree() async throws {
+        let tableName = "test_client_ltree"
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            try await client.query("DROP TABLE IF EXISTS \"\(unescaped: tableName)\";")
+
+            try await client.query(
+                """
+                CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
+                    id SERIAL PRIMARY KEY,
+                    label ltree NOT NULL
+                );
+                """
+            )
+
+            try await client.query(
+                """
+                INSERT INTO "\(unescaped: tableName)" (label) VALUES ('foo.bar.baz')
+                """
+            )
+
+            let rows = try await client.query(
+                """
+                SELECT id, label FROM "\(unescaped: tableName)" WHERE label ~ 'foo.*'
+                """
+            )
+
+            var count = 0
+            for try await (id, label) in rows.decode((Int, String).self) {
+                count += 1
+            }
+            XCTAssertEqual(count, 1)
+
+            taskGroup.cancelAll()
+        }
+    }
+
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
