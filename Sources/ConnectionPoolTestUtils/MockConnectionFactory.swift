@@ -37,7 +37,8 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
 
     public func makeConnection(
         id: Int,
-        for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>, NoOpConnectionPoolMetrics<Int>, Clock>
+        configuration: MockConnectionConfiguration,
+        for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, MockConnectionConfiguration, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>, MockExecutor, NoOpConnectionPoolMetrics<Int>, Clock>
     ) async throws -> ConnectionAndMetadata<MockConnection> {
         if let autoMaxStreams = self.autoMaxStreams {
             let connection = MockConnection(id: id)

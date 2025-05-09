@@ -28,17 +28,21 @@ let requestIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator()
 extension ConnectionPool where Request == ConnectionRequest<Connection> {
     public convenience init(
         configuration: ConnectionPoolConfiguration,
+        connectionConfiguration: ConnectionConfiguration,
         idGenerator: ConnectionIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator(),
         keepAliveBehavior: KeepAliveBehavior,
+        executor: Executor,
         observabilityDelegate: ObservabilityDelegate,
         clock: Clock = ContinuousClock(),
         connectionFactory: @escaping ConnectionFactory
     ) {
         self.init(
             configuration: configuration,
+            connectionConfiguration: connectionConfiguration,
             idGenerator: idGenerator,
             requestType: ConnectionRequest<Connection>.self,
             keepAliveBehavior: keepAliveBehavior,
+            executor: executor,
             observabilityDelegate: observabilityDelegate,
             clock: clock,
             connectionFactory: connectionFactory

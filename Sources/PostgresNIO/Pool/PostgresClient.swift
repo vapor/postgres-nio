@@ -237,8 +237,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         PostgresConnection,
         PostgresConnection.ID,
         ConnectionIDGenerator,
+        PostgresConnection.Configuration,
         ConnectionRequest<PostgresConnection>,
         ConnectionRequest.ID,
+        NothingConnectionPoolExecutor,
         PostgresKeepAliveBehavor,
         PostgresClientMetrics,
         ContinuousClock

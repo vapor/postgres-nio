@@ -15,13 +15,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: ContinuousClock()
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         // the same connection is reused 1000 times
@@ -73,13 +75,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
@@ -118,13 +122,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
@@ -155,13 +161,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: ContinuousClock()
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         let hasFinished = ManagedAtomic(false)
@@ -236,13 +244,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -315,13 +325,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -401,13 +413,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -470,13 +484,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -530,13 +546,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -594,13 +612,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -649,13 +669,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -710,13 +732,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -775,13 +799,15 @@ final class ConnectionPoolTests: XCTestCase {
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
+            executor: MockExecutor(),
             observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
