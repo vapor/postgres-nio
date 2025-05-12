@@ -12,7 +12,7 @@ public struct MockConnectionConfiguration: Sendable, Hashable {
     }
 }
 
-public final class MockConnection: PooledConnection, Sendable {
+public final class MockConnection<Executor: ConnectionPoolExecutor>: PooledConnection, Sendable {
     public typealias ID = Int
 
     public let id: ID
@@ -25,7 +25,7 @@ public final class MockConnection: PooledConnection, Sendable {
 
     private let lock: NIOLockedValueBox<State> = NIOLockedValueBox(.running([], []))
 
-    public init(id: Int) {
+    public init(id: Int, executor: Executor) {
         self.id = id
     }
 

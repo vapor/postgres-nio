@@ -88,7 +88,7 @@ public protocol ConnectionRequestProtocol: Sendable {
 
     /// A function that is called with a connection or a
     /// `PoolError`.
-    func complete(with: Result<Connection, ConnectionPoolError>)
+    func complete(with: Result<ConnectionLease<Connection>, ConnectionPoolError>)
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -420,8 +420,11 @@ public final class ConnectionPool<
     /*private*/ func runRequestAction(_ action: StateMachine.RequestAction) {
         switch action {
         case .leaseConnection(let requests, let connection):
+            let lease = ConnectionLease(connection: connection) {
+                self.releaseConnection(connection)
+            }
             for request in requests {
-                request.complete(with: .success(connection))
+                request.complete(with: .success(lease))
             }
 
         case .failRequest(let request, let error):
@@ -521,6 +524,7 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func runTimer(_ timer: StateMachine.Timer, in taskGroup: inout some TaskGroupProtocol) {
+        print("timer: \(timer.connectionID), underlying: \(timer.underlying.usecase)")
         self.addTask(into: &taskGroup) { () async -> () in
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {

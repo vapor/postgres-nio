@@ -89,6 +89,7 @@ public final class ConnectionPoolManager<
     @usableFromInline
     let eventContinuation: AsyncStream<Actions>.Continuation
 
+    @inlinable
     public init(
         configuration: ConnectionPoolManagerConfiguration,
         connectionConfiguration: ConnectionConfiguration,
