@@ -271,6 +271,7 @@ public final class ConnectionPool<
         }
     }
 
+    @inlinable
     public func run() async {
         await withTaskCancellationHandler {
             if #available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *) {
@@ -312,13 +313,15 @@ public final class ConnectionPool<
     }
 
     @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
-    private func run(in taskGroup: inout DiscardingTaskGroup) async {
+    @inlinable
+    /* private */ func run(in taskGroup: inout DiscardingTaskGroup) async {
         for await event in self.eventStream {
             self.runEvent(event, in: &taskGroup)
         }
     }
 
-    private func run(in taskGroup: inout TaskGroup<Void>) async {
+    @inlinable
+    /* private */ func run(in taskGroup: inout TaskGroup<Void>) async {
         var running = 0
         for await event in self.eventStream {
             running += 1
@@ -331,7 +334,8 @@ public final class ConnectionPool<
         }
     }
 
-    private func runEvent(_ event: NewPoolActions, in taskGroup: inout some TaskGroupProtocol) {
+    @inlinable
+    /* private */ func runEvent(_ event: NewPoolActions, in taskGroup: inout some TaskGroupProtocol) {
         switch event {
         case .makeConnection(let request):
             self.makeConnection(for: request, in: &taskGroup)
