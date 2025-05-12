@@ -9,6 +9,8 @@ public protocol ConnectionPoolExecutor: AnyObject, Sendable {
 public final class NothingConnectionPoolExecutor: ConnectionPoolExecutor {
     public typealias ID = ObjectIdentifier
 
+    public init() {}
+
     public var id: ObjectIdentifier { ObjectIdentifier(self) }
 
     public static func getExecutorID() -> ObjectIdentifier? { nil }

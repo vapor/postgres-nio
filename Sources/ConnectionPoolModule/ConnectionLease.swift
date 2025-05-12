@@ -5,18 +5,21 @@
 //  Created by Fabian Fett on 05.05.25.
 //
 
-struct ConnectionLease<Connection: PooledConnection> {
+public struct ConnectionLease<Connection: PooledConnection>: Sendable {
 
-    var connection: Connection
-    var _release: () -> ()
+    public var connection: Connection
+    
+    @usableFromInline
+    let _release: @Sendable () -> ()
 
-    init(connection: Connection, release: @escaping () -> Void) {
+    @inlinable
+    public init(connection: Connection, release: @escaping @Sendable () -> Void) {
         self.connection = connection
         self._release = release
     }
 
-    func release() {
+    @inlinable
+    public func release() {
         self._release()
     }
-
 }

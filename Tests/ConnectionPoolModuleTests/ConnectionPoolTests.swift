@@ -41,15 +41,13 @@ final class ConnectionPoolTests: XCTestCase {
             do {
                 for _ in 0..<1000 {
                     async let connectionFuture = try await pool.leaseConnection()
-                    var leasedConnection: MockConnection?
+                    var connectionLease: ConnectionLease<MockConnection>?
                     XCTAssertEqual(factory.pendingConnectionAttemptsCount, 0)
-                    leasedConnection = try await connectionFuture
-                    XCTAssertNotNil(leasedConnection)
-                    XCTAssert(createdConnection === leasedConnection)
+                    connectionLease = try await connectionFuture
+                    XCTAssertNotNil(connectionLease)
+                    XCTAssert(createdConnection === connectionLease?.connection)
 
-                    if let leasedConnection {
-                        pool.releaseConnection(leasedConnection)
-                    }
+                    connectionLease?.release()
                 }
             } catch {
                 XCTFail("Unexpected error: \(error)")
@@ -203,8 +201,8 @@ final class ConnectionPoolTests: XCTestCase {
             for _ in 0..<iterations {
                 taskGroup.addTask_ {
                     do {
-                        let leasedConnection = try await pool.leaseConnection()
-                        pool.releaseConnection(leasedConnection)
+                        let connectionLease = try await pool.leaseConnection()
+                        connectionLease.release()
                     } catch {
                         XCTFail("Unexpected error: \(error)")
                     }
@@ -260,16 +258,16 @@ final class ConnectionPoolTests: XCTestCase {
                 await pool.run()
             }
 
-            async let lease1ConnectionAsync = pool.leaseConnection()
+            async let connectionLeaseFuture = pool.leaseConnection()
 
             let connection = await factory.nextConnectAttempt { connectionID in
                 return 1
             }
 
-            let lease1Connection = try await lease1ConnectionAsync
-            XCTAssert(connection === lease1Connection)
+            let connectionLease = try await connectionLeaseFuture
+            XCTAssert(connection === connectionLease.connection)
 
-            pool.releaseConnection(lease1Connection)
+            connectionLease.release()
 
             // keep alive 1
 
@@ -290,7 +288,7 @@ final class ConnectionPoolTests: XCTestCase {
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
                 defer { print("keep alive 1 has run") }
-                XCTAssertTrue(keepAliveConnection === lease1Connection)
+                XCTAssertTrue(keepAliveConnection === connectionLease.connection)
                 return true
             }
 
@@ -341,16 +339,16 @@ final class ConnectionPoolTests: XCTestCase {
                 await pool.run()
             }
 
-            async let lease1ConnectionAsync = pool.leaseConnection()
+            async let connectionLeaseFuture = pool.leaseConnection()
 
             let connection = await factory.nextConnectAttempt { connectionID in
                 return 1
             }
 
-            let lease1Connection = try await lease1ConnectionAsync
-            XCTAssert(connection === lease1Connection)
+            let connectionLease = try await connectionLeaseFuture
+            XCTAssert(connection === connectionLease.connection)
 
-            pool.releaseConnection(lease1Connection)
+            connectionLease.release()
 
             // keep alive 1
 
@@ -369,7 +367,7 @@ final class ConnectionPoolTests: XCTestCase {
             clock.advance(to: newTime)
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
-                XCTAssertTrue(keepAliveConnection === lease1Connection)
+                XCTAssertTrue(keepAliveConnection === connectionLease.connection)
                 return true
             }
 
@@ -385,7 +383,7 @@ final class ConnectionPoolTests: XCTestCase {
                     XCTAssertFalse(failingKeepAliveDidRun
                         .compareExchange(expected: false, desired: true, ordering: .relaxed).original)
                 }
-                XCTAssertTrue(keepAliveConnection === lease1Connection)
+                XCTAssertTrue(keepAliveConnection === connectionLease.connection)
                 keepAliveConnection.close()
                 throw CancellationError() // any error 
             } // will fail and it's expected
@@ -429,16 +427,16 @@ final class ConnectionPoolTests: XCTestCase {
                 await pool.run()
             }
 
-            async let lease1ConnectionAsync = pool.leaseConnection()
+            async let connectionLeaseFuture = pool.leaseConnection()
 
             let connection = await factory.nextConnectAttempt { connectionID in
                 return 1
             }
 
-            let lease1Connection = try await lease1ConnectionAsync
-            XCTAssert(connection === lease1Connection)
+            let connectionLease = try await connectionLeaseFuture
+            XCTAssert(connection === connectionLease.connection)
 
-            pool.releaseConnection(lease1Connection)
+            connectionLease.release()
 
             // keep alive 1
 
@@ -456,7 +454,7 @@ final class ConnectionPoolTests: XCTestCase {
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
                 defer { print("keep alive 1 has run") }
-                XCTAssertTrue(keepAliveConnection === lease1Connection)
+                XCTAssertTrue(keepAliveConnection === connectionLease.connection)
                 return true
             }
 
@@ -574,19 +572,19 @@ final class ConnectionPoolTests: XCTestCase {
 
             // lease 4 connections at once
             pool.leaseConnections(requests)
-            var connections = [MockConnection]()
+            var connectionLeases = [ConnectionLease<MockConnection>]()
 
             for request in requests {
                 let connection = try await request.future.success
-                connections.append(connection)
+                connectionLeases.append(connection)
             }
 
             // Ensure that we got 4 distinct connections
-            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 4)
+            XCTAssertEqual(Set(connectionLeases.lazy.map(\.connection.id)).count, 4)
 
             // release all 4 leased connections
-            for connection in connections {
-                pool.releaseConnection(connection)
+            for lease in connectionLeases {
+                lease.release()
             }
 
             // shutdown
@@ -751,7 +749,7 @@ final class ConnectionPoolTests: XCTestCase {
             // create 4 connection requests
             let requests = (0..<10).map { ConnectionFuture(id: $0) }
             pool.leaseConnections(requests)
-            var connections = [MockConnection]()
+            var connectionLeases = [ConnectionLease<MockConnection>]()
 
             await factory.nextConnectAttempt { connectionID in
                 return 10
@@ -759,15 +757,15 @@ final class ConnectionPoolTests: XCTestCase {
 
             for request in requests {
                 let connection = try await request.future.success
-                connections.append(connection)
+                connectionLeases.append(connection)
             }
 
             // Ensure that all requests got the same connection
-            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 1)
+            XCTAssertEqual(Set(connectionLeases.lazy.map(\.connection.id)).count, 1)
 
             // release all 10 leased streams
-            for connection in connections {
-                pool.releaseConnection(connection)
+            for lease in connectionLeases {
+                lease.release()
             }
 
             for _ in 0..<9 {
@@ -818,41 +816,41 @@ final class ConnectionPoolTests: XCTestCase {
             // create 4 connection requests
             var requests = (0..<21).map { ConnectionFuture(id: $0) }
             pool.leaseConnections(requests)
-            var connections = [MockConnection]()
+            var connectionLease = [ConnectionLease<MockConnection>]()
 
             await factory.nextConnectAttempt { connectionID in
                 return 1
             }
 
-            let connection = try await requests.first!.future.success
-            connections.append(connection)
+            let lease = try await requests.first!.future.success
+            connectionLease.append(lease)
             requests.removeFirst()
 
-            pool.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: 21)
+            pool.connectionReceivedNewMaxStreamSetting(lease.connection, newMaxStreamSetting: 21)
 
             for (_, request) in requests.enumerated() {
                 let connection = try await request.future.success
-                connections.append(connection)
+                connectionLease.append(connection)
             }
 
             // Ensure that all requests got the same connection
-            XCTAssertEqual(Set(connections.lazy.map(\.id)).count, 1)
+            XCTAssertEqual(Set(connectionLease.lazy.map(\.connection.id)).count, 1)
 
             requests = (22..<42).map { ConnectionFuture(id: $0) }
             pool.leaseConnections(requests)
 
             // release all 21 leased streams in a single call
-            pool.releaseConnection(connection, streams: 21)
+            pool.releaseConnection(lease.connection, streams: 21)
 
             // ensure all 20 new requests got fulfilled
             for request in requests {
                 let connection = try await request.future.success
-                connections.append(connection)
+                connectionLease.append(connection)
             }
 
             // release all 20 leased streams one by one
             for _ in requests {
-                pool.releaseConnection(connection, streams: 1)
+                pool.releaseConnection(lease.connection, streams: 1)
             }
 
             // shutdown
@@ -866,14 +864,14 @@ final class ConnectionPoolTests: XCTestCase {
 
 struct ConnectionFuture: ConnectionRequestProtocol {
     let id: Int
-    let future: Future<MockConnection>
+    let future: Future<ConnectionLease<MockConnection>>
 
     init(id: Int) {
         self.id = id
-        self.future = Future(of: MockConnection.self)
+        self.future = Future(of: ConnectionLease<MockConnection>.self)
     }
 
-    func complete(with result: Result<MockConnection, ConnectionPoolError>) {
+    func complete(with result: Result<ConnectionLease<MockConnection>, ConnectionPoolError>) {
         switch result {
         case .success(let success):
             self.future.yield(value: success)
