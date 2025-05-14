@@ -36,6 +36,7 @@ let package = Package(
                 .target(name: "_ConnectionPoolModule"),
                 .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "NIO", package: "swift-nio"),
