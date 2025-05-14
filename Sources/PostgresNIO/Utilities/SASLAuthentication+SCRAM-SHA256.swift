@@ -292,7 +292,7 @@ internal struct SHA256: SASLAuthenticationMechanism {
     ///               authenticating user. If the closure throws, authentication
     ///               immediately fails with the thrown error.
     internal init(username: String, password: @escaping () throws -> String) {
-        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().data(using: .utf8)!), []) }, bindingInfo: .unsupported)
+        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().utf8), []) }, bindingInfo: .unsupported)
     }
     
     /// Set up a server-side `SCRAM-SHA-256` authentication.
@@ -338,7 +338,7 @@ internal struct SHA256_PLUS: SASLAuthenticationMechanism {
     ///   - channelBindingData: The appropriate data associated with the RFC5056
     ///                         channel binding specified.
     internal init(username: String, password: @escaping () throws -> String, channelBindingName: String, channelBindingData: [UInt8]) {
-        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().data(using: .utf8)!), []) }, bindingInfo: .bind(channelBindingName, channelBindingData))
+        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().utf8), []) }, bindingInfo: .bind(channelBindingName, channelBindingData))
     }
     
     /// Set up a server-side `SCRAM-SHA-256` authentication.
@@ -467,7 +467,7 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         
         // Calculate `AuthMessage`, `ClientSignature`, and `ClientProof`
         let saltedPassword = Hi(string: password, salt: serverSalt, iterations: serverIterations)
-        let clientKey = HMAC<SHA256>.authenticationCode(for: "Client Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+        let clientKey = HMAC<SHA256>.authenticationCode(for: Data("Client Key".utf8), using: .init(data: saltedPassword))
         let storedKey = SHA256.hash(data: Data(clientKey))
         var authMessage = firstMessageBare; authMessage.append(.comma); authMessage.append(contentsOf: message); authMessage.append(.comma); authMessage.append(contentsOf: clientFinalNoProof)
         let clientSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: storedKey))
@@ -501,7 +501,7 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         switch incomingAttributes.first {
             case .v(let verifier):
                 // Verify server signature
-                let serverKey = HMAC<SHA256>.authenticationCode(for: "Server Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+                let serverKey = HMAC<SHA256>.authenticationCode(for: Data("Server Key".utf8), using: .init(data: saltedPassword))
                 let serverSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: serverKey))
                 
                 guard Array(serverSignature) == verifier else {
@@ -585,7 +585,7 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         guard nonce == repeatNonce else { throw SASLAuthenticationError.genericAuthenticationFailure }
         
         // Compute client signature
-        let clientKey = HMAC<SHA256>.authenticationCode(for: "Client Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+        let clientKey = HMAC<SHA256>.authenticationCode(for: Data("Client Key".utf8), using: .init(data: saltedPassword))
         let storedKey = SHA256.hash(data: Data(clientKey))
         var authMessage = clientBareFirstMessage; authMessage.append(.comma); authMessage.append(contentsOf: serverFirstMessage); authMessage.append(.comma); authMessage.append(contentsOf: message.dropLast(proof.count + 3))
         let clientSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: storedKey))
@@ -604,7 +604,7 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         guard storedKey == restoredKey else { throw SCRAMServerError.invalidProof }
         
         // Compute server signature
-        let serverKey = HMAC<SHA256>.authenticationCode(for: "Server Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+        let serverKey = HMAC<SHA256>.authenticationCode(for: Data("Server Key".utf8), using: .init(data: saltedPassword))
         let serverSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: serverKey))
         
         // Generate a `server-final-message`
@@ -644,11 +644,16 @@ private func Hi(string: [UInt8], salt: [UInt8], iterations: UInt32) -> [UInt8] {
     let key = SymmetricKey(data: string)
     var Ui = HMAC<SHA256>.authenticationCode(for: salt + [0x00, 0x00, 0x00, 0x01], using: key) // salt + 0x00000001 as big-endian
     var Hi = Array(Ui)
-    
+    var uiData = [UInt8]()
+    uiData.reserveCapacity(32)
+
     Hi.withUnsafeMutableBytes { Hibuf -> Void in
         for _ in 2...iterations {
-            Ui = HMAC<SHA256>.authenticationCode(for: Data(Ui), using: key)
-            
+            uiData.removeAll(keepingCapacity: true)
+            uiData.append(contentsOf: Ui)
+
+            Ui = HMAC<SHA256>.authenticationCode(for: uiData, using: key)
+
             Ui.withUnsafeBytes { Uibuf -> Void in
                 for i in 0..<Uibuf.count { Hibuf[i] ^= Uibuf[i] }
             }
