@@ -1,4 +1,5 @@
 import Crypto
+import _CryptoExtras
 import Foundation
 
 extension UInt8 {
@@ -466,8 +467,8 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         // TODO: Perform `Normalize(password)`, aka the SASLprep profile (RFC4013) of stringprep (RFC3454)
         
         // Calculate `AuthMessage`, `ClientSignature`, and `ClientProof`
-        let saltedPassword = Hi(string: password, salt: serverSalt, iterations: serverIterations)
-        let clientKey = HMAC<SHA256>.authenticationCode(for: Data("Client Key".utf8), using: .init(data: saltedPassword))
+        let saltedPassword = try Hi(string: password, salt: serverSalt, iterations: serverIterations)
+        let clientKey = HMAC<SHA256>.authenticationCode(for: Data("Client Key".utf8), using: saltedPassword)
         let storedKey = SHA256.hash(data: Data(clientKey))
         var authMessage = firstMessageBare; authMessage.append(.comma); authMessage.append(contentsOf: message); authMessage.append(.comma); authMessage.append(contentsOf: clientFinalNoProof)
         let clientSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: storedKey))
@@ -485,9 +486,11 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         var clientFinalMessage = clientFinalNoProof; clientFinalMessage.append(.comma)
         guard let proofPart = SCRAMMessageParser.serialize([.p(Array(clientProof))]) else { throw SASLAuthenticationError.genericAuthenticationFailure }
         clientFinalMessage.append(contentsOf: proofPart)
-        
+
+        let saltedPasswordBytes = saltedPassword.withUnsafeBytes { [UInt8]($0) }
+
         // Save state and send
-        self.state = .clientSentFinalMessage(saltedPassword: saltedPassword, authMessage: authMessage)
+        self.state = .clientSentFinalMessage(saltedPassword: saltedPasswordBytes, authMessage: authMessage)
         return .continue(response: clientFinalMessage)
     }
     
@@ -640,24 +643,12 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
   HMAC() == output length of H().
   ````
 */
-private func Hi(string: [UInt8], salt: [UInt8], iterations: UInt32) -> [UInt8] {
-    let key = SymmetricKey(data: string)
-    var Ui = HMAC<SHA256>.authenticationCode(for: salt + [0x00, 0x00, 0x00, 0x01], using: key) // salt + 0x00000001 as big-endian
-    var Hi = Array(Ui)
-    var uiData = [UInt8]()
-    uiData.reserveCapacity(32)
-
-    Hi.withUnsafeMutableBytes { Hibuf -> Void in
-        for _ in 2...iterations {
-            uiData.removeAll(keepingCapacity: true)
-            uiData.append(contentsOf: Ui)
-
-            Ui = HMAC<SHA256>.authenticationCode(for: uiData, using: key)
-
-            Ui.withUnsafeBytes { Uibuf -> Void in
-                for i in 0..<Uibuf.count { Hibuf[i] ^= Uibuf[i] }
-            }
-        }
-    }
-    return Hi
+private func Hi(string: [UInt8], salt: [UInt8], iterations: UInt32) throws -> SymmetricKey {
+    try KDF.Insecure.PBKDF2.deriveKey(
+        from: string,
+        salt: salt,
+        using: .sha256,
+        outputByteCount: 32,
+        unsafeUncheckedRounds: Int(iterations)
+    )
 }
