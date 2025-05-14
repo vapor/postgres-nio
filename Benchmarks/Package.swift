@@ -10,7 +10,8 @@ let package = Package(
     dependencies: [
         .package(path: "../"),
         .package(url: "https://github.com/ordo-one/package-benchmark.git", from: "1.29.0"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.82.0"),
+        .package(url: "https://github.com/vapor/postgres-kit.git", from: "2.14.0"),
+        .package(name: "swift-nio", path: "../../../apple/swift-nio"),
     ],
     targets: [
         .executableTarget(
@@ -27,5 +28,14 @@ let package = Package(
                 .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
             ]
         ),
+        .executableTarget(
+            name: "PostgresPerf",
+            dependencies: [
+                .product(name: "PostgresNIO", package: "postgres-nio"),
+                .product(name: "PostgresKit", package: "postgres-kit"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+            ],
+        )
     ]
 )
