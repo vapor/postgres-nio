@@ -233,6 +233,19 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         }
     }
 
+    typealias PoolManager = ConnectionPoolManager<
+        PostgresConnection,
+        PostgresConnection.ID,
+        ConnectionIDGenerator,
+        Foo,
+        ConnectionRequest<PostgresConnection>,
+        ConnectionRequest.ID,
+        PostgresKeepAliveBehavor,
+        NothingConnectionPoolExecutor,
+        PostgresClientMetrics,
+        ContinuousClock
+    >
+
     typealias Pool = ConnectionPool<
         PostgresConnection,
         PostgresConnection.ID,
@@ -246,7 +259,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         ContinuousClock
     >
 
-    let pool: Pool
+    let pool: PoolManager
     let factory: ConnectionFactory
     let runningAtomic = ManagedAtomic(false)
     let backgroundLogger: Logger
@@ -282,13 +295,19 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         self.factory = factory
         self.backgroundLogger = backgroundLogger
 
-        self.pool = ConnectionPool(
-            configuration: .init(configuration),
+        let executors = (0..<10).map { _ in NothingConnectionPoolExecutor() }
+        var poolManagerConfiguration = ConnectionPoolManagerConfiguration()
+        poolManagerConfiguration.minimumConnectionPerExecutorCount = configuration.options.minimumConnections / executors.count
+        poolManagerConfiguration.maximumConnectionPerExecutorSoftLimit = configuration.options.maximumConnections / executors.count
+        poolManagerConfiguration.maximumConnectionPerExecutorHardLimit = configuration.options.maximumConnections / executors.count
+
+        self.pool = ConnectionPoolManager(
+            configuration: poolManagerConfiguration,
             connectionConfiguration: Foo(),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<PostgresConnection>.self,
             keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-            executor: NothingConnectionPoolExecutor(),
+            executors: executors,
             observabilityDelegate: .init(logger: backgroundLogger),
             clock: ContinuousClock()
         ) { (connectionID, connectionConfiguration, pool) in

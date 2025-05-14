@@ -524,7 +524,6 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func runTimer(_ timer: StateMachine.Timer, in taskGroup: inout some TaskGroupProtocol) {
-        print("timer: \(timer.connectionID), underlying: \(timer.underlying.usecase)")
         self.addTask(into: &taskGroup) { () async -> () in
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {
