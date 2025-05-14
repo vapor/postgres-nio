@@ -644,7 +644,7 @@ private func Hi(string: [UInt8], salt: [UInt8], iterations: UInt32) -> [UInt8] {
     let key = SymmetricKey(data: string)
     var Ui = HMAC<SHA256>.authenticationCode(for: salt + [0x00, 0x00, 0x00, 0x01], using: key) // salt + 0x00000001 as big-endian
     var Hi = Array(Ui)
-    var uiData = Data()
+    var uiData = [UInt8]()
     uiData.reserveCapacity(32)
 
     Hi.withUnsafeMutableBytes { Hibuf -> Void in
