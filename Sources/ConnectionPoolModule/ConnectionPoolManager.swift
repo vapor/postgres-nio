@@ -146,6 +146,16 @@ public final class ConnectionPoolManager<
         self.roundRobinPools[index].leaseConnection(request)
     }
 
+    @inlinable
+    public func cancelLeaseConnection(_ requestID: RequestID) {
+        // TODO: This is expensive!
+        for pool in self.roundRobinPools {
+            if pool.cancelLeaseConnection(requestID) {
+                break
+            }
+        }
+    }
+
     @usableFromInline
     enum Actions: Sendable {
         case runPool(ConnectionPool)

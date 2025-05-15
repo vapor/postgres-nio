@@ -264,10 +264,19 @@ public final class ConnectionPool<
         }
     }
 
-    public func cancelLeaseConnection(_ requestID: RequestID) {
+    @discardableResult
+    public func cancelLeaseConnection(_ requestID: RequestID) -> Bool {
+        var found = false
         self.modifyStateAndRunActions { state in
-            state.stateMachine.cancelRequest(id: requestID)
+            let action = state.stateMachine.cancelRequest(id: requestID)
+            if case .failRequest = action.request {
+                found = true
+            } else {
+                found = false
+            }
+            return action
         }
+        return found
     }
 
     /// Mark a connection as going away. Connection implementors have to call this method if the connection

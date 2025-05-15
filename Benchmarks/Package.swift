@@ -11,7 +11,7 @@ let package = Package(
         .package(path: "../"),
         .package(url: "https://github.com/ordo-one/package-benchmark.git", from: "1.29.0"),
         .package(url: "https://github.com/vapor/postgres-kit.git", from: "2.14.0"),
-        .package(name: "swift-nio", path: "../../../apple/swift-nio"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.82.0"),
     ],
     targets: [
         .executableTarget(

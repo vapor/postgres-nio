@@ -35,7 +35,7 @@ final class ConnectionFactory: Sendable {
         self.logger = logger
     }
 
-    func makeConnection(_ connectionID: PostgresConnection.ID, pool: PostgresClient.Pool) async throws -> PostgresConnection {
+    func makeConnection(_ connectionID: PostgresConnection.ID, pool: PostgresClient.ConnectionPool) async throws -> PostgresConnection {
         let config = try await self.makeConnectionConfig()
 
         var connectionLogger = self.logger

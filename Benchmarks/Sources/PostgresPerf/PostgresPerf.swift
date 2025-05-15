@@ -14,7 +14,7 @@ import PostgresNIO
 @available(macOS 15.0, *)
 enum PostgresPerf {
 
-    static let maxConnections: Int = 400
+    static let maxConnections: Int = 50
     static let tasks: Int = 400
     static let iterationsPerTask: Int = 1000
     static let logger = Logger(label: "TestLogger")
