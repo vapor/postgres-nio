@@ -49,13 +49,13 @@ jobs:
         postgres-image:
           - postgres:17
           - postgres:15
-          - postgres:12
+          - postgres:13
         include:
           - postgres-image: postgres:17
             postgres-auth: scram-sha-256
           - postgres-image: postgres:15
             postgres-auth: md5
-          - postgres-image: postgres:12
+          - postgres-image: postgres:13
             postgres-auth: trust
     container:
       image: swift:6.1-noble
