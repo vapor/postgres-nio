@@ -272,12 +272,13 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             let idGenerator = ConnectionIDGenerator.globalGenerator
 
             if configuration.options.maximumConnections > 50 {
-                // make as many executors as we have NIO els
-                let executors = (0..<10).map { _ in NothingConnectionPoolExecutor() }
+                // make as many executors as we have NIO else
+                let executorCount = Int(ceil(Double(configuration.options.maximumConnections) / 50.0))
+                let executors = (0..<executorCount).map { _ in NothingConnectionPoolExecutor() }
                 var poolManagerConfiguration = ConnectionPoolManagerConfiguration()
-                poolManagerConfiguration.minimumConnectionPerExecutorCount = configuration.options.minimumConnections / executors.count
-                poolManagerConfiguration.maximumConnectionPerExecutorSoftLimit = configuration.options.maximumConnections / executors.count
-                poolManagerConfiguration.maximumConnectionPerExecutorHardLimit = configuration.options.maximumConnections / executors.count
+                poolManagerConfiguration.minimumConnectionPerExecutorCount = configuration.options.minimumConnections / executorCount
+                poolManagerConfiguration.maximumConnectionPerExecutorSoftLimit = configuration.options.maximumConnections / executorCount
+                poolManagerConfiguration.maximumConnectionPerExecutorHardLimit = configuration.options.maximumConnections / executorCount
 
                 self = .manager(
                     ConnectionPoolManager(
