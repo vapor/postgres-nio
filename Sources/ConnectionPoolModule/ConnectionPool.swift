@@ -587,11 +587,13 @@ public final class ConnectionPool<
 
     @inlinable
     func addTask(into taskGroup: inout some TaskGroupProtocol, operation: @escaping @Sendable () async -> Void) {
+        #if compiler(>=6.0)
         if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *), let executor = self.executor as? TaskExecutor {
             taskGroup.addTask_(executorPreference: executor, operation: operation)
-        } else {
-            taskGroup.addTask_(operation: operation)
+            return
         }
+        #endif
+        taskGroup.addTask_(operation: operation)
     }
 }
 
@@ -613,8 +615,10 @@ protocol TaskGroupProtocol {
     // a name that doesn't clash anywhere and implement it using the standard `addTask`.
     mutating func addTask_(operation: @escaping @Sendable () async -> Void)
 
+    #if compiler(>=6.0)
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *)
     mutating func addTask_(executorPreference: ((any TaskExecutor)?), operation: @escaping @Sendable () async -> Void)
+    #endif
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
@@ -624,11 +628,13 @@ extension DiscardingTaskGroup: TaskGroupProtocol {
         self.addTask(priority: nil, operation: operation)
     }
 
+    #if compiler(>=6.0)
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *)
     @inlinable
     mutating func addTask_(executorPreference: (any TaskExecutor)?, operation: @escaping @Sendable () async -> Void) {
         self.addTask(executorPreference: executorPreference, operation: operation)
     }
+    #endif
 }
 
 extension TaskGroup<Void>: TaskGroupProtocol {
@@ -637,9 +643,11 @@ extension TaskGroup<Void>: TaskGroupProtocol {
         self.addTask(priority: nil, operation: operation)
     }
 
+    #if compiler(>=6.0)
     @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *)
     @inlinable
     mutating func addTask_(executorPreference: (any TaskExecutor)?, operation: @escaping @Sendable () async -> Void) {
         self.addTask(executorPreference: executorPreference, operation: operation)
     }
+    #endif
 }
