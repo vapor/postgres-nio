@@ -212,14 +212,16 @@ public final class ConnectionPoolManager<
     /* private */ func runEvent(_ event: Actions, in taskGroup: inout some TaskGroupProtocol) {
         switch event {
         case .runPool(let pool):
+            #if compiler(>=6.0)
             if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *), let executor = pool.executor as? TaskExecutor {
                 taskGroup.addTask_(executorPreference: executor) {
                     await pool.run()
                 }
-            } else {
-                taskGroup.addTask_ {
-                    await pool.run()
-                }
+                return
+            }
+            #endif
+            taskGroup.addTask_ {
+                await pool.run()
             }
         }
     }
