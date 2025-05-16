@@ -1,7 +1,7 @@
 import Atomics
 
 public struct ConnectionIDGenerator: ConnectionIDGeneratorProtocol {
-    static let globalGenerator = ConnectionIDGenerator()
+    public static let globalGenerator = ConnectionIDGenerator()
 
     private let atomic: ManagedAtomic<Int>
 
