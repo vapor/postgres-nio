@@ -7,6 +7,8 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
 
     typealias TestConnectionState = TestPoolStateMachine.ConnectionState
 
+    let executor = NothingConnectionPoolExecutor()
+
     func testStartupLeaseReleaseParkLease() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
@@ -15,7 +17,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         XCTAssertEqual(state.isAvailable, false)
         XCTAssertEqual(state.isConnected, false)
         XCTAssertEqual(state.isLeased, false)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(state.isIdle, true)
         XCTAssertEqual(state.isAvailable, true)
@@ -58,7 +60,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
     func testStartupParkLeaseBeforeTimersRegistered() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         XCTAssertEqual(
@@ -84,7 +86,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
     func testStartupParkLeasePark() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         XCTAssert(
@@ -145,14 +147,14 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         )
         XCTAssertEqual(state.retryConnect(), forthBackoffTimerCancellationToken)
 
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
     }
 
     func testLeaseMultipleStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 100), .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else { return XCTFail("Expected to get a keepAliveTimer") }
@@ -185,7 +187,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
     func testRunningKeepAliveReducesAvailableStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 100), .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else { return XCTFail("Expected to get a keepAliveTimer") }
@@ -217,7 +219,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
     func testRunningKeepAliveDoesNotReduceAvailableStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 100), .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else { return XCTFail("Expected to get a keepAliveTimer") }
@@ -242,7 +244,7 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
     func testRunKeepAliveRacesAgainstIdleClose() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {

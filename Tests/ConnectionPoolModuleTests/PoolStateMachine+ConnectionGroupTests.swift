@@ -6,6 +6,8 @@ import XCTest
 final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
     var idGenerator: ConnectionIDGenerator!
 
+    let executor = NothingConnectionPoolExecutor()
+
     override func setUp() {
         self.idGenerator = ConnectionIDGenerator()
         super.setUp()
@@ -41,7 +43,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
 
         var connected: UInt16 = 0
         for request in requests {
-            let newConnection = MockConnection(id: request.connectionID)
+            let newConnection = MockConnection(id: request.connectionID, executor: self.executor)
             let (_, context) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
             XCTAssertEqual(context.info, .idle(availableStreams: 1, newIdle: true))
             XCTAssertEqual(context.use, .persisted)
@@ -76,7 +78,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(connections.soonAvailableConnections, 1)
         XCTAssertEqual(connections.stats, .init(connecting: 1))
 
-        let newConnection = MockConnection(id: request.connectionID)
+        let newConnection = MockConnection(id: request.connectionID, executor: self.executor)
         let (_, establishedContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         XCTAssertEqual(establishedContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedContext.use, .demand)
@@ -184,14 +186,14 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         }
         XCTAssertEqual(connections.stats, .init(connecting: 3))
 
-        let newSecondConnection = MockConnection(id: secondRequest.connectionID)
+        let newSecondConnection = MockConnection(id: secondRequest.connectionID, executor: self.executor)
         let (_, establishedSecondConnectionContext) = connections.newConnectionEstablished(newSecondConnection, maxStreams: 1)
         XCTAssertEqual(establishedSecondConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedSecondConnectionContext.use, .persisted)
         XCTAssertEqual(connections.stats, .init(connecting: 2, idle: 1, availableStreams: 1))
         XCTAssertEqual(connections.soonAvailableConnections, 2)
 
-        let newThirdConnection = MockConnection(id: thirdRequest.connectionID)
+        let newThirdConnection = MockConnection(id: thirdRequest.connectionID, executor: self.executor)
         let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, maxStreams: 1)
         XCTAssertEqual(establishedThirdConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedThirdConnectionContext.use, .demand)
@@ -238,7 +240,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         }
         XCTAssertEqual(connections.stats, .init(connecting: 2))
 
-        let newFirstConnection = MockConnection(id: firstRequest.connectionID)
+        let newFirstConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (_, establishedFirstConnectionContext) = connections.newConnectionEstablished(newFirstConnection, maxStreams: 1)
         XCTAssertEqual(establishedFirstConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedFirstConnectionContext.use, .demand)
@@ -273,7 +275,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         XCTAssertEqual(requests.count, 1)
         guard let firstRequest = requests.first else { return XCTFail("Expected to have a request here") }
 
-        let newConnection = MockConnection(id: firstRequest.connectionID)
+        let newConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(establishedConnectionContext.use, .persisted)
@@ -307,7 +309,7 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
 
         guard let firstRequest = connections.createNewDemandConnectionIfPossible() else { return XCTFail("Expected to have a request here") }
 
-        let newConnection = MockConnection(id: firstRequest.connectionID)
+        let newConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
         XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))

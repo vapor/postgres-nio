@@ -10,7 +10,7 @@ public final class MockRequest<Connection: PooledConnection>: ConnectionRequestP
         }
     }
 
-    public init() {}
+    public init(connectionType: Connection.Type = Connection.self) {}
 
     public var id: ID { ID(self) }
 

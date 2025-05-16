@@ -1,3 +1,4 @@
+import Atomics
 
 public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequestProtocol {
     public typealias ID = Int
