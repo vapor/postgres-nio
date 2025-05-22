@@ -139,10 +139,10 @@ public final class ConnectionPoolManager<
     public func leaseConnection(_ request: Request) {
         if let executorID = Executor.getExecutorID(), let pool = self.pools[executorID] {
             pool.leaseConnection(request)
+            return
         }
 
         let index = self.roundRobinCounter.loadThenWrappingIncrement(ordering: .relaxed) % self.roundRobinPools.count
-
         self.roundRobinPools[index].leaseConnection(request)
     }
 
