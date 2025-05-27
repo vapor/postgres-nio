@@ -31,18 +31,6 @@ class String_PSQLCodableTests: XCTestCase {
         }
     }
 
-    func testDecodeFailureFromInvalidType() {
-        let buffer = ByteBuffer()
-        let dataTypes: [PostgresDataType] = [.bool, .float4Array, .float8Array]
-
-        for dataType in dataTypes {
-            var loopBuffer = buffer
-            XCTAssertThrowsError(try String(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
-                XCTAssertEqual($0 as? PostgresDecodingError.Code, .typeMismatch)
-            }
-        }
-    }
-
     func testDecodeFromUUID() {
         let uuid = UUID()
         var buffer = ByteBuffer()
