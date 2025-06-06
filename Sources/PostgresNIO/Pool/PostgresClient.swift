@@ -233,16 +233,129 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         }
     }
 
-    typealias Pool = ConnectionPool<
+    typealias ConnectionPoolManager = _ConnectionPoolModule.ConnectionPoolManager<
         PostgresConnection,
         PostgresConnection.ID,
         ConnectionIDGenerator,
-        ConnectionRequest<PostgresConnection>,
-        ConnectionRequest.ID,
+        Foo,
+        PostgresConnectionRequest,
+        PostgresConnectionRequest.ID,
         PostgresKeepAliveBehavor,
+        NothingConnectionPoolExecutor,
         PostgresClientMetrics,
         ContinuousClock
     >
+
+    typealias ConnectionPool = _ConnectionPoolModule.ConnectionPool<
+        PostgresConnection,
+        PostgresConnection.ID,
+        ConnectionIDGenerator,
+        Foo,
+        PostgresConnectionRequest,
+        PostgresConnectionRequest.ID,
+        PostgresKeepAliveBehavor,
+        NothingConnectionPoolExecutor,
+        PostgresClientMetrics,
+        ContinuousClock
+    >
+
+    enum Pool {
+        case manager(ConnectionPoolManager)
+        case pool(ConnectionPool)
+
+        init(
+            configuration: Configuration,
+            factory: ConnectionFactory,
+            eventLoopGroup: any EventLoopGroup,
+            backgroundLogger: Logger
+        ) {
+            let idGenerator = ConnectionIDGenerator.globalGenerator
+
+            if configuration.options.maximumConnections > 50 {
+                // make as many executors as we have NIO else
+                let executorCount = Int(ceil(Double(configuration.options.maximumConnections) / 50.0))
+                let executors = (0..<executorCount).map { _ in NothingConnectionPoolExecutor() }
+                var poolManagerConfiguration = ConnectionPoolManagerConfiguration()
+                poolManagerConfiguration.minimumConnectionPerExecutorCount = configuration.options.minimumConnections / executorCount
+                poolManagerConfiguration.maximumConnectionPerExecutorSoftLimit = configuration.options.maximumConnections / executorCount
+                poolManagerConfiguration.maximumConnectionPerExecutorHardLimit = configuration.options.maximumConnections / executorCount
+
+                self = .manager(
+                    ConnectionPoolManager(
+                        configuration: poolManagerConfiguration,
+                        connectionConfiguration: Foo(),
+                        idGenerator: idGenerator,
+                        requestType: PostgresConnectionRequest.self,
+                        keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
+                        executors: executors,
+                        observabilityDelegate: .init(logger: backgroundLogger),
+                        clock: ContinuousClock()
+                    ) { (connectionID, connectionConfiguration, pool) in
+                        let connection = try await factory.makeConnection(connectionID, pool: pool)
+                        return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
+                    }
+                )
+            } else {
+                self = .pool(
+                    ConnectionPool(
+                        configuration: .init(configuration),
+                        connectionConfiguration: Foo(),
+                        idGenerator: idGenerator,
+                        requestType: PostgresConnectionRequest.self,
+                        keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
+                        executor: NothingConnectionPoolExecutor(),
+                        observabilityDelegate: .init(logger: backgroundLogger),
+                        clock: ContinuousClock()
+                    ) { (connectionID, connectionConfiguration, pool) in
+                        let connection = try await factory.makeConnection(connectionID, pool: pool)
+                        return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
+                    }
+                )
+            }
+        }
+
+        func run() async {
+            switch self {
+            case .manager(let manager):
+                await manager.run()
+            case .pool(let pool):
+                await pool.run()
+            }
+        }
+
+        func cancelRequest(id: PostgresConnectionRequest.ID) {
+            switch self {
+            case .pool(let pool):
+                pool.cancelLeaseConnection(id)
+
+            case .manager(let manager):
+                manager.cancelLeaseConnection(id)
+            }
+        }
+
+        func leaseConnection(_ request: PostgresConnectionRequest) {
+            switch self {
+            case .pool(let pool):
+                pool.leaseConnection(request)
+            case .manager(let manager):
+                manager.leaseConnection(request)
+            }
+        }
+
+        func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
+            let requestID = PostgresConnectionRequest.idGenerator.next()
+
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ConnectionLease<PostgresConnection>, Error>) in
+                    let request = PostgresConnectionRequest(id: requestID, continuation: continuation)
+
+                    self.leaseConnection(request)
+                }
+            } onCancel: {
+                self.cancelRequest(id: requestID)
+            }
+        }
+    }
 
     let pool: Pool
     let factory: ConnectionFactory
@@ -280,18 +393,12 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         self.factory = factory
         self.backgroundLogger = backgroundLogger
 
-        self.pool = ConnectionPool(
-            configuration: .init(configuration),
-            idGenerator: ConnectionIDGenerator(),
-            requestType: ConnectionRequest<PostgresConnection>.self,
-            keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-            observabilityDelegate: .init(logger: backgroundLogger),
-            clock: ContinuousClock()
-        ) { (connectionID, pool) in
-            let connection = try await factory.makeConnection(connectionID, pool: pool)
-
-            return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
-        }
+        self.pool = .init(
+            configuration: configuration,
+            factory: factory,
+            eventLoopGroup: eventLoopGroup,
+            backgroundLogger: backgroundLogger
+        )
     }
     
     /// Lease a connection for the provided `closure`'s lifetime.
@@ -301,11 +408,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Returns: The closure's return value.
     @_disfavoredOverload
     public func withConnection<Result>(_ closure: (PostgresConnection) async throws -> Result) async throws -> Result {
-        let connection = try await self.leaseConnection()
+        let lease = try await self.leaseConnection()
 
-        defer { self.pool.releaseConnection(connection) }
+        defer { lease.release() }
 
-        return try await closure(connection)
+        return try await closure(lease.connection)
     }
 
     #if compiler(>=6.0)
@@ -319,11 +426,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         // DO NOT FIX THE WHITESPACE IN THE NEXT LINE UNTIL 5.10 IS UNSUPPORTED
         // https://github.com/swiftlang/swift/issues/79285
         _ closure: (PostgresConnection) async throws -> sending Result) async throws -> sending Result {
-        let connection = try await self.leaseConnection()
+        let lease = try await self.leaseConnection()
 
-        defer { self.pool.releaseConnection(connection) }
+        defer { lease.release() }
 
-        return try await closure(connection)
+        return try await closure(lease.connection)
     }
 
     /// Lease a connection, which is in an open transaction state, for the provided `closure`'s lifetime.
@@ -404,29 +511,22 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                 throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
             }
 
-            let connection = try await self.leaseConnection()
+            let requestID = PostgresConnectionRequest.idGenerator.next()
 
-            var logger = logger
-            logger[postgresMetadataKey: .connectionID] = "\(connection.id)"
+            return try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<PostgresRowSequence, Error>) in
+                    let request = PostgresConnectionRequest(
+                        id: requestID,
+                        query: query,
+                        continuation: continuation,
+                        logger: logger
+                    )
 
-            let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
-            let context = ExtendedQueryContext(
-                query: query,
-                logger: logger,
-                promise: promise
-            )
-
-            connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
-
-            promise.futureResult.whenFailure { _ in
-                self.pool.releaseConnection(connection)
+                    self.pool.leaseConnection(request)
+                }
+            } onCancel: {
+                self.pool.cancelRequest(id: requestID)
             }
-
-            return try await promise.futureResult.map {
-                $0.asyncSequence(onFinish: {
-                    self.pool.releaseConnection(connection)
-                })
-            }.get()
         } catch var error as PSQLError {
             error.file = file
             error.line = line
@@ -446,7 +546,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let logger = logger ?? Self.loggingDisabled
 
         do {
-            let connection = try await self.leaseConnection()
+            let lease = try await self.leaseConnection()
+            let connection = lease.connection
 
             let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
             let task = HandlerTask.executePreparedStatement(.init(
@@ -460,11 +561,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             connection.channel.write(task, promise: nil)
 
             promise.futureResult.whenFailure { _ in
-                self.pool.releaseConnection(connection)
+                lease.release()
             }
 
             return try await promise.futureResult
-                .map { $0.asyncSequence(onFinish: { self.pool.releaseConnection(connection) }) }
+                .map { $0.asyncSequence(onFinish: { lease.release() }) }
                 .get()
                 .map { try preparedStatement.decodeRow($0) }
         } catch var error as PSQLError {
@@ -504,7 +605,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     // MARK: - Private Methods -
 
-    private func leaseConnection() async throws -> PostgresConnection {
+    private func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
         if !self.runningAtomic.load(ordering: .relaxed) {
             self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }
@@ -518,7 +619,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         PostgresConnection.defaultEventLoopGroup
     }
 
-    static let loggingDisabled = Logger(label: "Postgres-do-not-log", factory: { _ in SwiftLogNoOpLogHandler() })
+    static let loggingDisabled = {
+        var logger = Logger(label: "Postgres-do-not-log", factory: { _ in SwiftLogNoOpLogHandler() })
+        logger.logLevel = .critical
+        return logger
+    }()
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -579,3 +684,5 @@ extension ConnectionPoolError {
         return psqlError
     }
 }
+
+struct Foo: Equatable {}
