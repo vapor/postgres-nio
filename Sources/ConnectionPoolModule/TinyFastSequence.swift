@@ -29,8 +29,10 @@ struct TinyFastSequence<Element>: Sequence {
             self.base = .none(reserveCapacity: 0)
         case 1:
             self.base = .one(collection.first!, reserveCapacity: 0)
+        case 2:
+            self.base = .two(collection.first, collection[collection.endIndex], reserveCapacity: 0)
         default:
-            if let collection = collection as? Array<Element> {
+            if let collection = collection as? [Element] {
                 self.base = .n(collection)
             } else {
                 self.base = .n(Array(collection))
@@ -46,7 +48,7 @@ struct TinyFastSequence<Element>: Sequence {
         case 1:
             self.base = .one(max2Sequence.first!, reserveCapacity: 0)
         case 2:
-            self.base = .n(Array(max2Sequence))
+            self.base = .two(max2Sequence.first!, max2Sequence.second!, reserveCapacity: 0)
         default:
             fatalError()
         }
@@ -169,7 +171,7 @@ struct TinyFastSequence<Element>: Sequence {
 
             case .n(let array):
                 if self.index < array.endIndex {
-                    defer { self.index += 1}
+                    defer { self.index += 1 }
                     return array[self.index]
                 }
                 return nil
