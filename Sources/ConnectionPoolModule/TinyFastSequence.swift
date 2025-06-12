@@ -30,9 +30,13 @@ struct TinyFastSequence<Element>: Sequence {
         case 1:
             self.base = .one(collection.first!, reserveCapacity: 0)
         case 2:
-            self.base = .two(collection.first!, collection[collection.endIndex], reserveCapacity: 0)
+            self.base = .two(
+                collection.first!,
+                collection[collection.index(after: collection.startIndex)],
+                reserveCapacity: 0
+            )
         default:
-            if let collection = collection as? [Element] {
+            if let collection = collection as? Array<Element> {
                 self.base = .n(collection)
             } else {
                 self.base = .n(Array(collection))
