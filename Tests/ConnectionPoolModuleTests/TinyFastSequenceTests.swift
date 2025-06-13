@@ -46,8 +46,8 @@ final class TinyFastSequenceTests: XCTestCase {
         XCTAssertEqual(array.capacity, 8)
 
         var twoElemSequence = TinyFastSequence<Int>([1, 2])
-        twoElemSequence.append(3)
         twoElemSequence.reserveCapacity(8)
+        twoElemSequence.append(3)
         guard case .n(let array) = twoElemSequence.base else {
             return XCTFail("Expected sequence to be backed by an array")
         }
