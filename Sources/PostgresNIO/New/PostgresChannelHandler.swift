@@ -136,6 +136,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             action = self.state.closeCompletedReceived()
         case .commandComplete(let commandTag):
             action = self.state.commandCompletedReceived(commandTag)
+        case .copyInResponse(let copyInResponse):
+            action = self.state.copyInResponseReceived(copyInResponse)
         case .dataRow(let dataRow):
             action = self.state.dataRowReceived(dataRow)
         case .emptyQueryResponse:
@@ -169,9 +171,38 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.run(action, with: context)
     }
 
+    /// Send a `CopyData` message to the backend using the given data.
+    /// 
+    /// `readyForMoreWriteContinuation` is resumed when the channel is able to handle more data to be written to it.
+    func copyData(_ data: ByteBuffer, context: ChannelHandlerContext, readyForMoreWriteContinuation: CheckedContinuation<Void, Never>) {
+        self.encoder.copyData(data: data)
+        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+        if context.channel.isWritable {
+            readyForMoreWriteContinuation.resume()
+        } else {
+            self.state.waitForWritableBuffer(continuation: readyForMoreWriteContinuation)
+        }
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
+    func sendCopyDone(continuation: CheckedContinuation<Void, any Error>, context: ChannelHandlerContext) {
+        let action = self.state.sendCopyDone(continuation: continuation)
+        self.run(action, with: context)
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyFail` message to the backend.
+    func sendCopyFailed(message: String, continuation: CheckedContinuation<Void, any Error>, context: ChannelHandlerContext) {
+        let action = self.state.sendCopyFail(message: message, continuation: continuation)
+        self.run(action, with: context)
+    }
+
     func channelReadComplete(context: ChannelHandlerContext) {
         let action = self.state.channelReadComplete()
         self.run(action, with: context)
+    }
+
+    func channelWritabilityChanged(context: ChannelHandlerContext) {
+        self.state.channelWritabilityChanged(isWritable: context.channel.isWritable)
     }
     
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
@@ -353,12 +384,28 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             self.sendParseDescribeBindExecuteAndSyncMessage(query: query, context: context)
         case .succeedQuery(let promise, with: let result):
             self.succeedQuery(promise, result: result, context: context)
+        case .succeedQueryContinuation(let continuation):
+            continuation.resume()
         case .failQuery(let promise, with: let error, let cleanupContext):
             promise.fail(error)
             if let cleanupContext = cleanupContext {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
-        
+        case .failQueryContinuation(let continuation, with: let error, let cleanupContext):
+            continuation.resume(throwing: error)
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
+            }
+        case .triggerCopyData(let triggerCopy):
+            let writer = PostgresCopyFromWriter(handler: self, context: context, eventLoop: eventLoop)
+            triggerCopy.resume(returning: writer)
+        case .sendCopyDone:
+            self.encoder.copyDone()
+            self.encoder.sync()
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+        case .sendCopyFailed(message: let message):
+            self.encoder.copyFail(message: message)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .forwardRows(let rows):
             self.rowStream!.receive(rows)
             
