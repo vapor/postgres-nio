@@ -176,12 +176,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     /// `readyForMoreWriteContinuation` is resumed when the channel is able to handle more data to be written to it.
     func copyData(_ data: ByteBuffer, context: ChannelHandlerContext, readyForMoreWriteContinuation: CheckedContinuation<Void, Never>) {
         self.encoder.copyData(data: data)
-        context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         if context.channel.isWritable {
             readyForMoreWriteContinuation.resume()
         } else {
             self.state.waitForWritableBuffer(continuation: readyForMoreWriteContinuation)
+            context.flush()
         }
+        context.write(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
     }
 
     /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
