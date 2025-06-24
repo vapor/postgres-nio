@@ -1,4 +1,4 @@
-// swift-tools-version:5.9
+// swift-tools-version:5.10
 import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
@@ -16,6 +16,7 @@ let package = Package(
     products: [
         .library(name: "PostgresNIO", targets: ["PostgresNIO"]),
         .library(name: "_ConnectionPoolModule", targets: ["_ConnectionPoolModule"]),
+        .library(name: "_ConnectionPoolTestUtils", targets: ["_ConnectionPoolTestUtils"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
@@ -23,7 +24,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.25.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "2.0.0" ..< "4.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.9.0" ..< "4.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
@@ -35,6 +36,7 @@ let package = Package(
                 .target(name: "_ConnectionPoolModule"),
                 .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "_CryptoExtras", package: "swift-crypto"),
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Metrics", package: "swift-metrics"),
                 .product(name: "NIO", package: "swift-nio"),
@@ -57,6 +59,15 @@ let package = Package(
             path: "Sources/ConnectionPoolModule",
             swiftSettings: swiftSettings
         ),
+        .target(
+            name: "_ConnectionPoolTestUtils",
+            dependencies: [
+                "_ConnectionPoolModule",
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
+            ],
+            path: "Sources/ConnectionPoolTestUtils",
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "PostgresNIOTests",
             dependencies: [
@@ -70,6 +81,7 @@ let package = Package(
             name: "ConnectionPoolModuleTests",
             dependencies: [
                 .target(name: "_ConnectionPoolModule"),
+                .target(name: "_ConnectionPoolTestUtils"),
                 .product(name: "DequeModule", package: "swift-collections"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),

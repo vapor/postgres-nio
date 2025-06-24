@@ -1,31 +1,32 @@
-@testable import _ConnectionPoolModule
+import _ConnectionPoolModule
 import Atomics
 import DequeModule
+import NIOConcurrencyHelpers
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-final class MockClock: Clock {
-    struct Instant: InstantProtocol, Comparable {
-        typealias Duration = Swift.Duration
+public final class MockClock: Clock {
+    public struct Instant: InstantProtocol, Comparable {
+        public typealias Duration = Swift.Duration
 
-        func advanced(by duration: Self.Duration) -> Self {
+        public func advanced(by duration: Self.Duration) -> Self {
             .init(self.base + duration)
         }
 
-        func duration(to other: Self) -> Self.Duration {
+        public func duration(to other: Self) -> Self.Duration {
             self.base - other.base
         }
 
         private var base: Swift.Duration
 
-        init(_ base: Duration) {
+        public init(_ base: Duration) {
             self.base = base
         }
 
-        static func < (lhs: Self, rhs: Self) -> Bool {
+        public static func < (lhs: Self, rhs: Self) -> Bool {
             lhs.base < rhs.base
         }
 
-        static func == (lhs: Self, rhs: Self) -> Bool {
+        public static func == (lhs: Self, rhs: Self) -> Bool {
             lhs.base == rhs.base
         }
     }
@@ -58,16 +59,18 @@ final class MockClock: Clock {
         var continuation: CheckedContinuation<Void, any Error>
     }
 
-    typealias Duration = Swift.Duration
+    public typealias Duration = Swift.Duration
 
-    var minimumResolution: Duration { .nanoseconds(1) }
+    public var minimumResolution: Duration { .nanoseconds(1) }
 
-    var now: Instant { self.stateBox.withLockedValue { $0.now } }
+    public var now: Instant { self.stateBox.withLockedValue { $0.now } }
 
     private let stateBox = NIOLockedValueBox(State())
     private let waiterIDGenerator = ManagedAtomic(0)
 
-    func sleep(until deadline: Instant, tolerance: Duration?) async throws {
+    public init() {}
+
+    public func sleep(until deadline: Instant, tolerance: Duration?) async throws {
         let waiterID = self.waiterIDGenerator.loadThenWrappingIncrement(ordering: .relaxed)
 
         return try await withTaskCancellationHandler {
@@ -131,7 +134,7 @@ final class MockClock: Clock {
     }
 
     @discardableResult
-    func nextTimerScheduled() async -> Instant {
+    public func nextTimerScheduled() async -> Instant {
         await withCheckedContinuation { (continuation: CheckedContinuation<Instant, Never>) in
             let instant = self.stateBox.withLockedValue { state -> Instant? in
                 if let scheduled = state.nextDeadlines.popFirst() {
@@ -149,7 +152,7 @@ final class MockClock: Clock {
         }
     }
 
-    func advance(to deadline: Instant) {
+    public func advance(to deadline: Instant) {
         let waiters = self.stateBox.withLockedValue { state -> ArraySlice<Sleeper> in
             precondition(deadline > state.now, "Time can only move forward")
             state.now = deadline

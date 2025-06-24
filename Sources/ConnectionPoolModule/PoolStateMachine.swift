@@ -434,6 +434,7 @@ struct PoolStateMachine<
         fatalError("Unimplemented")
     }
 
+    @usableFromInline
     mutating func triggerForceShutdown() -> Action {
         switch self.poolState {
         case .running:

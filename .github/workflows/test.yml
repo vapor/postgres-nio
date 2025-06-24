@@ -18,9 +18,9 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:5.9-jammy
-          - swift:5.10-noble
+          - swift:5.10-jammy
           - swift:6.0-noble
+          - swift:6.1-noble
           - swiftlang/swift:nightly-main-jammy
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -49,16 +49,16 @@ jobs:
         postgres-image:
           - postgres:17
           - postgres:15
-          - postgres:12
+          - postgres:13
         include:
           - postgres-image: postgres:17
             postgres-auth: scram-sha-256
           - postgres-image: postgres:15
             postgres-auth: md5
-          - postgres-image: postgres:12
+          - postgres-image: postgres:13
             postgres-auth: trust
     container:
-      image: swift:5.10-noble
+      image: swift:6.1-noble
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:

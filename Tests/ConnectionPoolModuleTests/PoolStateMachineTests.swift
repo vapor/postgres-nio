@@ -1,5 +1,6 @@
-import XCTest
 @testable import _ConnectionPoolModule
+import _ConnectionPoolTestUtils
+import XCTest
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 typealias TestPoolStateMachine = PoolStateMachine<
