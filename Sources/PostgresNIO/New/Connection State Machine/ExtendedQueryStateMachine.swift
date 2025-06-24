@@ -1,7 +1,16 @@
 import NIOCore
 
 struct ExtendedQueryStateMachine {
-    
+
+    private enum CopyingDataState {
+        /// The write channel is ready to handle more data
+        case readyToSend
+
+        /// The write channel has backpressure. Once that is relieved, we should resume the given continuation to allow more
+        /// data to be sent by the client.
+        case pendingBackpressureRelieve(CheckedContinuation<Void, Never>)
+    }
+
     private enum State {
         case initialized(ExtendedQueryContext)
         case messagesSent(ExtendedQueryContext)
@@ -11,6 +20,15 @@ struct ExtendedQueryStateMachine {
         case rowDescriptionReceived(ExtendedQueryContext, [RowDescription.Column])
         case noDataMessageReceived(ExtendedQueryContext)
         case emptyQueryResponseReceived
+
+        /// We are currently copying data to the backend using `CopyData` messages.
+        case copyingData(CopyingDataState)
+
+        /// We copied data to the backend and are done with that, either by sending a `CopyDone` or `CopyFail` message. 
+        /// We are now expecting a `CommandComplete` or `ErrorResponse`.
+        /// 
+        /// Once that is received the continuation is resumed.
+        case copyingFinished(CheckedContinuation<Void, any Error>)
 
         /// A state that is used if a noData message was received before. If a row description was received `bufferingRows` is
         /// used after receiving a `bindComplete` message
@@ -32,12 +50,28 @@ struct ExtendedQueryStateMachine {
         
         // --- general actions
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError)
+        /// Fail a query's execution by throwing an error on the given continuation.
+        case failQueryContinuation(AnyErrorContinuation, with: PSQLError)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
+        case succeedQueryContinuation(CheckedContinuation<Void, any Error>)
 
         case evaluateErrorAtConnectionLevel(PSQLError)
 
         case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
         case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PSQLError)
+
+        /// Trigger a data transfer returning a `PostgresCopyFromWriter` to the given continuation.
+        /// 
+        /// Once the data transfer is triggered, it will send `CopyData` messages to the backend. After that the state 
+        /// machine needs to be prodded again to send a `CopyDone` or `CopyFail` by calling 
+        /// `PostgresChannelHandler.copyDone` or ``PostgresChannelHandler.copyFailed``.
+        case triggerCopyData(CheckedContinuation<PostgresCopyFromWriter, any Error>)
+
+        /// Send a `CopyDone` message to the backend, followed by a `Sync`.
+        case sendCopyDone
+
+        /// Send a `CopyFail` message to the backend with the given error message.
+        case sendCopyFailed(message: String)
 
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
@@ -63,7 +97,7 @@ struct ExtendedQueryStateMachine {
         }
         
         switch queryContext.query {
-        case .unnamed(let query, _):
+        case .unnamed(let query, _), .copyFrom(let query, _):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .messagesSent(queryContext)
                 return .sendParseDescribeBindExecuteSync(query)
@@ -91,7 +125,7 @@ struct ExtendedQueryStateMachine {
     mutating func cancel() -> Action {
         switch self.state {
         case .initialized:
-            preconditionFailure("Start must be called immediatly after the query was created")
+            preconditionFailure("Start must be called immediately after the query was created")
 
         case .messagesSent(let queryContext),
              .parseCompleteReceived(let queryContext),
@@ -107,10 +141,15 @@ struct ExtendedQueryStateMachine {
             switch queryContext.query {
             case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                 return .failQuery(eventLoopPromise, with: .queryCancelled)
-
+            case .copyFrom(_, let triggerCopy):
+                return .failQueryContinuation(triggerCopy, with: .queryCancelled)
             case .prepareStatement(_, _, _, let eventLoopPromise):
                 return .failPreparedStatementCreation(eventLoopPromise, with: .queryCancelled)
             }
+        case .copyingData:
+            return .sendCopyFailed(message: "Query cancelled")
+        case .copyingFinished(let continuation):
+            return .failQueryContinuation(continuation, with: .queryCancelled)
 
         case .streaming(let columns, var streamStateMachine):
             precondition(!self.isCancelled)
@@ -160,7 +199,7 @@ struct ExtendedQueryStateMachine {
         }
         
         switch queryContext.query {
-        case .unnamed, .executeStatement:
+        case .unnamed, .copyFrom, .executeStatement:
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .noDataMessageReceived(queryContext)
                 return .wait
@@ -198,7 +237,7 @@ struct ExtendedQueryStateMachine {
         }
 
         switch queryContext.query {
-        case .unnamed, .executeStatement:
+        case .unnamed, .copyFrom, .executeStatement:
             return .wait
 
         case .prepareStatement(_, _, _, let eventLoopPromise):
@@ -217,7 +256,7 @@ struct ExtendedQueryStateMachine {
                     return .succeedQuery(eventLoopPromise, with: result)
                 }
 
-            case .prepareStatement:
+            case .prepareStatement, .copyFrom:
                 return .evaluateErrorAtConnectionLevel(.unexpectedBackendMessage(.bindComplete))
             }
 
@@ -235,7 +274,9 @@ struct ExtendedQueryStateMachine {
              .streaming,
              .drain,
              .commandComplete,
-             .error:
+             .error,
+             .copyingData,
+             .copyingFinished:
             return self.setAndFireError(.unexpectedBackendMessage(.bindComplete))
 
         case .modifying:
@@ -274,7 +315,9 @@ struct ExtendedQueryStateMachine {
              .rowDescriptionReceived,
              .bindCompleteReceived,
              .commandComplete,
-             .error:
+             .error,
+             .copyingData,
+             .copyingFinished:
             return self.setAndFireError(.unexpectedBackendMessage(.dataRow(dataRow)))
         case .modifying:
             preconditionFailure("Invalid state")
@@ -291,9 +334,18 @@ struct ExtendedQueryStateMachine {
                     let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
                     return .succeedQuery(eventLoopPromise, with: result)
                 }
-
+            case .copyFrom:
+                // We expect to transition through `copyingData` to `copyingFinished` before receiving a 
+                // `CommandCompleted` message for copy queries.
+                preconditionFailure("Invalid state: \(self.state)")
             case .prepareStatement:
                 preconditionFailure("Invalid state: \(self.state)")
+            }
+        
+        case .copyingFinished(let continuation):
+            return self.avoidingStateMachineCoW { state -> Action in
+                state = .commandComplete(commandTag: commandTag)
+                return .succeedQueryContinuation(continuation)
             }
             
         case .streaming(_, var demandStateMachine):
@@ -315,13 +367,70 @@ struct ExtendedQueryStateMachine {
              .emptyQueryResponseReceived,
              .rowDescriptionReceived,
              .commandComplete,
-             .error:
+             .error,
+             .copyingData:
             return self.setAndFireError(.unexpectedBackendMessage(.commandComplete(commandTag)))
         case .modifying:
             preconditionFailure("Invalid state")
         }
     }
     
+    /// When a `CopyInResponse` message is received from the backend, return a continuation to which a 
+    /// `PostgresCopyFromWriter` can be yielded to trigger a data transfer to the backend.
+    /// 
+    /// If we are not currently in a state to handle the `CopyInResponse`, an error is thrown.
+    mutating func copyInResponseReceived(
+        _ copyInResponse: PostgresBackendMessage.CopyInResponseMessage
+    ) -> Action {
+        guard case .bindCompleteReceived(let queryContext) = self.state,
+            case .copyFrom(_, let triggerCopy) = queryContext.query else {
+            return self.setAndFireError(.unexpectedBackendMessage(.copyInResponse(copyInResponse)))
+        }
+        return avoidingStateMachineCoW { state in
+            state = .copyingData(.readyToSend)
+            return .triggerCopyData(triggerCopy)
+        }
+    }
+
+    /// Assuming that the channel to the backend is not writable, wait for the write buffer to become writable again and 
+    /// then resume `continuation`.
+    mutating func waitForWritableBuffer(continuation: CheckedContinuation<Void, Never>) {
+        guard case .copyingData(let copyingSubstate) = self.state else {
+            preconditionFailure("Must be in copy mode to copy data")
+        }
+        guard case .readyToSend = copyingSubstate else {
+            preconditionFailure("Not ready to send data")
+        }
+        return avoidingStateMachineCoW { state in
+            // Even if the buffer isn't writable, we write the current chunk of data to it. We just don't resume
+            // the continuation. This will prevent more writes from happening to build up more write backpressure.
+            state = .copyingData(.pendingBackpressureRelieve(continuation))
+        }
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
+    mutating func sendCopyDone(continuation: CheckedContinuation<Void, any Error>) -> Action {
+        guard case .copyingData = self.state else {
+            preconditionFailure("Must be in copy mode to send CopyDone")
+        }
+        return avoidingStateMachineCoW { state in
+            state = .copyingFinished(continuation)
+            return .sendCopyDone
+        }
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyFail` message to the backend.
+    mutating func sendCopyFailed(message: String, continuation: CheckedContinuation<Void, any Error>) -> Action {
+        guard case .copyingData = self.state else {
+            preconditionFailure("Must be in copy mode to send CopyFail")
+        }
+        return avoidingStateMachineCoW { state in
+            state = .copyingFinished(continuation)
+            return .sendCopyFailed(message: message)
+        }
+        
+    }
+
     mutating func emptyQueryResponseReceived() -> Action {
         guard case .bindCompleteReceived(let queryContext) = self.state else {
             return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
@@ -336,7 +445,7 @@ struct ExtendedQueryStateMachine {
                 return .succeedQuery(eventLoopPromise, with: result)
             }
 
-        case .prepareStatement(_, _, _, _):
+        case .prepareStatement, .copyFrom:
             return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))
         }
     }
@@ -352,6 +461,8 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived:
             return self.setAndFireError(error)
         case .rowDescriptionReceived, .noDataMessageReceived:
+            return self.setAndFireError(error)
+        case .copyingData, .copyingFinished:
             return self.setAndFireError(error)
         case .streaming, .drain:
             return self.setAndFireError(error)
@@ -403,7 +514,9 @@ struct ExtendedQueryStateMachine {
              .noDataMessageReceived,
              .emptyQueryResponseReceived,
              .rowDescriptionReceived,
-             .bindCompleteReceived:
+             .bindCompleteReceived,
+             .copyingData,
+             .copyingFinished:
             preconditionFailure("Requested to consume next row without anything going on.")
             
         case .commandComplete, .error:
@@ -427,7 +540,9 @@ struct ExtendedQueryStateMachine {
              .noDataMessageReceived,
              .emptyQueryResponseReceived,
              .rowDescriptionReceived,
-             .bindCompleteReceived:
+             .bindCompleteReceived,
+             .copyingData,
+             .copyingFinished:
             return .wait
             
         case .streaming(let columns, var demandStateMachine):
@@ -454,7 +569,9 @@ struct ExtendedQueryStateMachine {
              .parameterDescriptionReceived,
              .noDataMessageReceived,
              .rowDescriptionReceived,
-             .bindCompleteReceived:
+             .bindCompleteReceived,
+             .copyingData,
+             .copyingFinished:
             return .read
         case .streaming(let columns, var demandStateMachine):
             precondition(!self.isCancelled)
@@ -480,6 +597,16 @@ struct ExtendedQueryStateMachine {
             preconditionFailure("Invalid state")
         }
     }
+
+    mutating func channelWritabilityChanged(isWritable: Bool) {
+        guard case .copyingData(.pendingBackpressureRelieve(let continuation)) = state else {
+            return
+        }
+        self.avoidingStateMachineCoW { state in
+            state = .copyingData(.readyToSend)
+            continuation.resume()
+        }
+    }
     
     // MARK: Private Methods
     
@@ -499,11 +626,18 @@ struct ExtendedQueryStateMachine {
                 switch context.query {
                 case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                     return .failQuery(eventLoopPromise, with: error)
+                case .copyFrom(_, let triggerCopy):
+                    return .failQueryContinuation(triggerCopy, with: error)
                 case .prepareStatement(_, _, _, let eventLoopPromise):
                     return .failPreparedStatementCreation(eventLoopPromise, with: error)
                 }
             }
-
+        case .copyingData:
+            self.state = .error(error)
+            return .evaluateErrorAtConnectionLevel(error)
+        case .copyingFinished(let continuation):
+            self.state = .error(error)
+            return .failQueryContinuation(continuation, with: error)
         case .drain:
             self.state = .error(error)
             return .evaluateErrorAtConnectionLevel(error)
@@ -536,11 +670,19 @@ struct ExtendedQueryStateMachine {
             switch context.query {
             case .prepareStatement:
                 return true
-            case .unnamed, .executeStatement:
+            case .unnamed, .copyFrom, .executeStatement:
                 return false
             }
 
-        case .initialized, .messagesSent, .parseCompleteReceived, .parameterDescriptionReceived, .bindCompleteReceived, .streaming, .drain:
+        case .initialized,
+             .messagesSent,
+             .parseCompleteReceived,
+             .parameterDescriptionReceived,
+             .bindCompleteReceived,
+             .streaming,
+             .drain, 
+             .copyingData,
+             .copyingFinished:
             return false
 
         case .modifying:

@@ -283,7 +283,7 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testCloseClosesImmediatly() async throws {
+    func testCloseClosesImmediately() async throws {
         let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
 
         try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in

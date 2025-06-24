@@ -694,6 +694,100 @@ extension PostgresConnection {
     }
 }
 
+// MARK: Copy from
+
+fileprivate extension EventLoop {
+    /// If we are on the given event loop, execute `task` immediately. Otherwise schedule it for execution.
+    func executeImmediatelyOrSchedule(_ task: @Sendable @escaping () -> Void) {
+        if inEventLoop {
+            return task()
+        }
+        return execute(task)
+    }
+}
+
+/// A handle to send 
+public struct PostgresCopyFromWriter: Sendable {
+    private let channelHandler: NIOLoopBound<PostgresChannelHandler>
+    private let context: NIOLoopBound<ChannelHandlerContext>
+    private let eventLoop: any EventLoop
+
+    struct NotWritableError: Error, CustomStringConvertible {
+        var description = "No data must be written to `PostgresCopyFromWriter` after it has sent a CopyDone or CopyFail message, ie. after the closure producing the copy data has finished"
+    }
+
+    init(handler: PostgresChannelHandler, context: ChannelHandlerContext, eventLoop: any EventLoop) {
+        self.channelHandler = NIOLoopBound(handler, eventLoop: eventLoop)
+        self.context = NIOLoopBound(context, eventLoop: eventLoop)
+        self.eventLoop = eventLoop
+    }
+
+    /// Send data for a `COPY ... FROM STDIN` operation to the backend.
+    public func write(_ byteBuffer: ByteBuffer) async throws {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in 
+            eventLoop.executeImmediatelyOrSchedule {
+                self.channelHandler.value.copyData(byteBuffer, context: self.context.value, readyForMoreWriteContinuation: continuation)
+            }
+        }
+    }
+
+    /// Finalize the data transfer, putting the state machine out of the copy mode and sending a `CopyDone` message to 
+    /// the backend.
+    func done() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
+            eventLoop.executeImmediatelyOrSchedule {
+                self.channelHandler.value.sendCopyDone(continuation: continuation, context: self.context.value)
+            }
+        }
+    }
+
+    /// Finalize the data transfer, putting the state machine out of the copy mode and sending a `CopyFail` message to 
+    /// the backend.
+    func failed(error: any Error) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
+            eventLoop.executeImmediatelyOrSchedule {
+                self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation, context: self.context.value)
+            }
+        }
+    }
+}
+
+extension PostgresConnection {
+    // TODO: Instead of an arbitrary query, make this a structured data structure.
+    // TODO: Write doc comment
+    public func copyFrom(
+        _ query: PostgresQuery,
+        writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line
+    )  async throws {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.id)"
+        guard query.binds.count <= Int(UInt16.max) else {
+            throw PSQLError(code: .tooManyParameters, query: query)
+        }
+
+        let writer = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<PostgresCopyFromWriter, any Error>) in
+            let context = ExtendedQueryContext(
+                copyFromQuery: query,
+                triggerCopy: continuation,
+                logger: logger
+            )
+            self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        }
+
+        do {
+            try await writeData(writer)
+        } catch {
+            try await writer.failed(error: error)
+            throw error
+        }
+        try await writer.done()
+    }
+
+}
+
 // MARK: PostgresDatabase conformance
 
 extension PostgresConnection: PostgresDatabase {

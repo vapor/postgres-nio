@@ -19,6 +19,8 @@ enum PSQLTask {
             switch extendedQueryContext.query {
             case .unnamed(_, let eventLoopPromise):
                 eventLoopPromise.fail(error)
+            case .copyFrom(_, let triggerCopy):
+                triggerCopy.resume(throwing: error)
             case .executeStatement(_, let eventLoopPromise):
                 eventLoopPromise.fail(error)
             case .prepareStatement(_, _, _, let eventLoopPromise):
@@ -34,6 +36,14 @@ enum PSQLTask {
 final class ExtendedQueryContext: Sendable {
     enum Query {
         case unnamed(PostgresQuery, EventLoopPromise<PSQLRowStream>)
+        /// A `COPY ... FROM STDIN` query that copies data from the frontend into a table.
+        /// 
+        /// When `triggerCopy` is yielded a `PostgresCopyFromWriter`, the frontend will start sending data to the 
+        /// backend via `CopyData` messages and finalize the data transfer using a `CopyDone` message to the backend or
+        /// using a `CopyFail` message.
+        /// 
+        /// `queryCompleted` is a promise that is finished when the entire query is done.
+        case copyFrom(PostgresQuery, triggerCopy: CheckedContinuation<PostgresCopyFromWriter, any Error>)
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
         case prepareStatement(name: String, query: String, bindingDataTypes: [PostgresDataType], EventLoopPromise<RowDescription?>)
     }
@@ -47,6 +57,15 @@ final class ExtendedQueryContext: Sendable {
         promise: EventLoopPromise<PSQLRowStream>
     ) {
         self.query = .unnamed(query, promise)
+        self.logger = logger
+    }
+    
+   init(
+        copyFromQuery query: PostgresQuery,
+        triggerCopy: CheckedContinuation<PostgresCopyFromWriter, any Error>,
+        logger: Logger
+    ) {
+        self.query = .copyFrom(query, triggerCopy: triggerCopy)
         self.logger = logger
     }
     

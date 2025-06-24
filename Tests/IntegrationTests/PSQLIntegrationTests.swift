@@ -379,4 +379,33 @@ final class IntegrationTests: XCTestCase {
         }
     }
     
+    func testCopyIntoFrom() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let conn = try await PostgresConnection.test(on: eventLoop).get()
+        defer { XCTAssertNoThrow(try conn.close().wait()) }
+
+        _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
+        _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
+        try await conn.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+            let records: [(id: Int, name: String)] = [
+                (1, "Alice"),
+                (42, "Bob")
+            ]
+            for record in records {
+                var buffer = ByteBuffer()
+                buffer.writeString("\(record.id)\t\(record.name)\n")
+                try await writer.write(buffer)
+            }
+        }, logger: .psqlTest)
+        let rows = try await conn.query("SELECT id, name FROM copy_table").get().rows.map { try $0.decode((Int, String).self) }
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0].0, 1)
+        XCTAssertEqual(rows[0].1, "Alice")
+        XCTAssertEqual(rows[1].0, 42)
+        XCTAssertEqual(rows[1].1, "Bob")
+    }
+    
 }
