@@ -698,6 +698,17 @@ extension PostgresConnection {
 
 /// A handle to send 
 public struct PostgresCopyFromWriter: Sendable {
+    /// The backend failed the copy data transfer, which means that no more data sent by the frontend would be processed.
+    /// 
+    /// The `PostgresCopyFromWriter` should cancel the data transfer.
+    public struct CopyCancellationError: Error {
+        /// The error that the backend sent us which cancelled the data transfer.
+        /// 
+        /// Note that this error is related to previous `write` calls since a `CopyCancellationError` is thrown before
+        /// new data is written by `write`.
+        let underlyingError: PSQLError
+    }
+
     private let channelHandler: NIOLoopBound<PostgresChannelHandler>
     private let context: NIOLoopBound<ChannelHandlerContext>
     private let eventLoop: any EventLoop
@@ -709,14 +720,28 @@ public struct PostgresCopyFromWriter: Sendable {
     }
 
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
+    /// 
+    /// If the backend encountered an error during the data transfer and thus cannot process any more data, this throws
+    /// a `CopyFailedError`.
     public func write(_ byteBuffer: ByteBuffer) async throws {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in 
+        // First, wait that we have a writable buffer. This also throws a `CopyFailedError` in case the backend sent an 
+        // error during the data transfer and thus cannot process any more data.
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
             if eventLoop.inEventLoop {
-                self.channelHandler.value.copyData(byteBuffer, context: self.context.value, readyForMoreWriteContinuation: continuation)
+                self.channelHandler.value.waitForWritableBuffer(context: self.context.value, continuation)
             } else {
                 eventLoop.execute {
-                    self.channelHandler.value.copyData(byteBuffer, context: self.context.value, readyForMoreWriteContinuation: continuation)
+                    self.channelHandler.value.waitForWritableBuffer(context: self.context.value, continuation)
                 }
+            }
+        }
+
+        // Run the actual data transfer
+        if eventLoop.inEventLoop {
+            self.channelHandler.value.copyData(byteBuffer, context: self.context.value)
+        } else {
+            eventLoop.execute {
+                self.channelHandler.value.copyData(byteBuffer, context: self.context.value)
             }
         }
     }
@@ -745,6 +770,17 @@ public struct PostgresCopyFromWriter: Sendable {
                 eventLoop.execute {
                     self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation, context: self.context.value)
                 }
+            }
+        }
+    }
+
+    /// Send a `Sync` message to the backend.
+    func sync() {
+        if eventLoop.inEventLoop {
+            self.channelHandler.value.sendSync(context: self.context.value)
+        } else {
+            eventLoop.execute {
+                self.channelHandler.value.sendSync(context: self.context.value)
             }
         }
     }
@@ -777,8 +813,15 @@ extension PostgresConnection {
 
         do {
             try await writeData(writer)
+        } catch let error as PostgresCopyFromWriter.CopyCancellationError {
+            // If the copy was cancelled because the backend sent us an error, we need to send a `Sync` message to put 
+            // the backend out of the copy mode.
+            writer.sync()
+            throw error.underlyingError
         } catch {
-            try await writer.failed(error: error)
+            // Throw the error from the `writeData` closure instead of the one that Postgres gives us upon receiving the 
+            // `CopyFail` message.
+            try? await writer.failed(error: error)
             throw error
         }
         try await writer.done()

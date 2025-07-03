@@ -401,7 +401,10 @@ final class IntegrationTests: XCTestCase {
             }
         }, logger: .psqlTest)
         let rows = try await conn.query("SELECT id, name FROM copy_table").get().rows.map { try $0.decode((Int, String).self) }
-        XCTAssertEqual(rows.count, 2)
+        guard rows.count == 2 else {
+            XCTFail("Expected 2 columns, received \(rows.count)")
+            return
+        }
         XCTAssertEqual(rows[0].0, 1)
         XCTAssertEqual(rows[0].1, "Alice")
         XCTAssertEqual(rows[1].0, 42)

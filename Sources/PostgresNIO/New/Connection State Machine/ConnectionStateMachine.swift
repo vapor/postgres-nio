@@ -88,8 +88,9 @@ struct ConnectionStateMachine {
         case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendBindExecuteSync(PSQLExecuteStatement)
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError, cleanupContext: CleanUpContext?)
-        /// Fail a query's execution by throwing an error on the given continuation.
-        case failQueryContinuation(any AnyErrorContinuation, with: PSQLError, cleanupContext: CleanUpContext?)
+        /// Fail a query's execution by throwing an error on the given continuation. When `sync` is `true`, send a 
+        /// `sync` message to the backend.
+        case failQueryContinuation(any AnyErrorContinuation, with: PSQLError, cleanupContext: CleanUpContext?, sync: Bool)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
         case succeedQueryContinuation(CheckedContinuation<Void, any Error>)
 
@@ -124,8 +125,24 @@ struct ConnectionStateMachine {
     }
 
     enum ChannelWritabilityChangedAction {
+        /// No action needs to be taken based on the writability change.
         case none
-        case resumeContinuation(CheckedContinuation<Void, Never>)
+
+        /// Resume the given continuation successfully.
+        case resumeContinuation(CheckedContinuation<Void, any Error>)
+    }
+
+    enum WaitForWritableBufferAction {
+        /// The channel has backpressure and cannot handle any data right now. We should flush the channel to help  
+        /// relieve backpressure. Once the channel is writable again, this will be communicated via 
+        /// `channelWritabilityChanged`
+        case waitForBackpressureRelieve
+
+        /// Resume the given continuation successfully.
+        case resumeContinuation(CheckedContinuation<Void, any Error>)
+
+        /// Fail the continuation with the given error.
+        case failContinuation(CheckedContinuation<Void, any Error>, error: any Error)
     }
     
     private var state: State
@@ -609,7 +626,7 @@ struct ConnectionStateMachine {
             case .executeStatement(_, let promise), .unnamed(_, let promise):
                 return .failQuery(promise, with: psqlErrror, cleanupContext: nil)
             case .copyFrom(_, let triggerCopy):
-                return .failQueryContinuation(triggerCopy, with: psqlErrror, cleanupContext: nil)
+                return .failQueryContinuation(triggerCopy, with: psqlErrror, cleanupContext: nil, sync: false)
             case .prepareStatement(_, _, _, let promise):
                 return .failPreparedStatementCreation(promise, with: psqlErrror, cleanupContext: nil)
             }
@@ -798,16 +815,20 @@ struct ConnectionStateMachine {
         return self.modify(with: action)
     }
 
-    /// Assuming that the channel to the backend is not writable, wait for the write buffer to become writable again and 
-    /// then resume `continuation`.
-    mutating func waitForWritableBuffer(continuation: CheckedContinuation<Void, Never>) {
+    /// Wait fo `channel` to be writable and be able to handle more `CopyData` messages. Resume the given continuation
+    /// when the channel is able handle more data. 
+    /// 
+    /// This fails the continuation with a `PostgresCopyFromWriter.CopyCancellationError` when the server has cancelled
+    /// the data transfer to indicate that the frontend should not send any more data.
+    mutating func waitForWritableBuffer(channel: any Channel, continuation: CheckedContinuation<Void, any Error>) -> WaitForWritableBufferAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
             preconditionFailure("Copy mode is only supported for extended queries")
         }
         
         self.state = .modifying // avoid CoW
-        queryState.waitForWritableBuffer(continuation: continuation)
+        let action = queryState.waitForWritableBuffer(channel: channel, continuation: continuation)
         self.state = .extendedQuery(queryState, connectionContext)
+        return action
     }
 
     /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
@@ -955,8 +976,8 @@ struct ConnectionStateMachine {
             case .failQuery(let promise, with: let error):
                 return .failQuery(promise, with: error, cleanupContext: cleanupContext)
             
-            case .failQueryContinuation(let continuation, with: let error):
-                return .failQueryContinuation(continuation, with: error, cleanupContext: cleanupContext)
+            case .failQueryContinuation(let continuation, with: let error, let sync):
+                return .failQueryContinuation(continuation, with: error, cleanupContext: cleanupContext, sync: sync)
 
             case .forwardStreamError(let error, let read):
                 return .forwardStreamError(error, read: read, cleanupContext: cleanupContext)
@@ -1127,9 +1148,9 @@ extension ConnectionStateMachine {
         case .failQuery(let requestContext, with: let error):
             let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
             return .failQuery(requestContext, with: error, cleanupContext: cleanupContext)
-        case .failQueryContinuation(let continuation, with: let error):
+        case .failQueryContinuation(let continuation, with: let error, let sync):
             let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
-            return .failQueryContinuation(continuation, with: error, cleanupContext: cleanupContext)
+            return .failQueryContinuation(continuation, with: error, cleanupContext: cleanupContext, sync: sync)
         case .succeedQuery(let requestContext, with: let result):
             return .succeedQuery(requestContext, with: result)
         case .succeedQueryContinuation(let continuation):

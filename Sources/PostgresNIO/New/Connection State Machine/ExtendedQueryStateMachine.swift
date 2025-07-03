@@ -8,7 +8,7 @@ struct ExtendedQueryStateMachine {
 
         /// The write channel has backpressure. Once that is relieved, we should resume the given continuation to allow more
         /// data to be sent by the client.
-        case pendingBackpressureRelieve(CheckedContinuation<Void, Never>)
+        case pendingBackpressureRelieve(CheckedContinuation<Void, any Error>)
     }
 
     private enum State {
@@ -50,8 +50,9 @@ struct ExtendedQueryStateMachine {
         
         // --- general actions
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError)
-        /// Fail a query's execution by throwing an error on the given continuation.
-        case failQueryContinuation(AnyErrorContinuation, with: PSQLError)
+        /// Fail a query's execution by throwing an error on the given continuation. If `sync` is `true`, send a `sync`
+        /// message to the backend to put it out of the copy mode.
+        case failQueryContinuation(AnyErrorContinuation, with: PSQLError, sync: Bool)
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
         case succeedQueryContinuation(CheckedContinuation<Void, any Error>)
 
@@ -142,14 +143,14 @@ struct ExtendedQueryStateMachine {
             case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                 return .failQuery(eventLoopPromise, with: .queryCancelled)
             case .copyFrom(_, let triggerCopy):
-                return .failQueryContinuation(triggerCopy, with: .queryCancelled)
+                return .failQueryContinuation(triggerCopy, with: .queryCancelled, sync: false)
             case .prepareStatement(_, _, _, let eventLoopPromise):
                 return .failPreparedStatementCreation(eventLoopPromise, with: .queryCancelled)
             }
         case .copyingData:
             return .sendCopyFailed(message: "Query cancelled")
         case .copyingFinished(let continuation):
-            return .failQueryContinuation(continuation, with: .queryCancelled)
+            return .failQueryContinuation(continuation, with: .queryCancelled, sync: true)
 
         case .streaming(let columns, var streamStateMachine):
             precondition(!self.isCancelled)
@@ -392,24 +393,40 @@ struct ExtendedQueryStateMachine {
         }
     }
 
-    /// Assuming that the channel to the backend is not writable, wait for the write buffer to become writable again and 
-    /// then resume `continuation`.
-    mutating func waitForWritableBuffer(continuation: CheckedContinuation<Void, Never>) {
+    /// Wait fo `channel` to be writable and be able to handle more `CopyData` messages. Resume the given continuation
+    /// when the channel is able handle more data. 
+    /// 
+    /// This fails the continuation with a `PostgresCopyFromWriter.CopyCancellationError` when the server has cancelled
+    /// the data transfer to indicate that the frontend should not send any more data.
+    mutating func waitForWritableBuffer(
+        channel: any Channel, 
+        continuation: CheckedContinuation<Void, any Error>
+    ) -> ConnectionStateMachine.WaitForWritableBufferAction {
+        if case .error(let error) = self.state {
+            return .failContinuation(continuation, error: PostgresCopyFromWriter.CopyCancellationError(underlyingError: error))
+        }
         guard case .copyingData(let copyingSubstate) = self.state else {
             preconditionFailure("Must be in copy mode to copy data")
         }
         guard case .readyToSend = copyingSubstate else {
             preconditionFailure("Not ready to send data")
         }
+        if channel.isWritable {
+            return .resumeContinuation(continuation)
+        }
         return avoidingStateMachineCoW { state in
             // Even if the buffer isn't writable, we write the current chunk of data to it. We just don't resume
             // the continuation. This will prevent more writes from happening to build up more write backpressure.
             state = .copyingData(.pendingBackpressureRelieve(continuation))
+            return .waitForBackpressureRelieve
         }
     }
 
     /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
     mutating func sendCopyDone(continuation: CheckedContinuation<Void, any Error>) -> Action {
+        if case .error(let error) = self.state {
+            return .failQueryContinuation(continuation, with: error, sync: true)
+        }
         guard case .copyingData = self.state else {
             preconditionFailure("Must be in copy mode to send CopyDone")
         }
@@ -421,6 +438,9 @@ struct ExtendedQueryStateMachine {
 
     /// Put the state machine out of the copying mode and send a `CopyFail` message to the backend.
     mutating func sendCopyFailed(message: String, continuation: CheckedContinuation<Void, any Error>) -> Action {
+        if case .error(let error) = self.state {
+            return .failQueryContinuation(continuation, with: error, sync: true)
+        }
         guard case .copyingData = self.state else {
             preconditionFailure("Must be in copy mode to send CopyFail")
         }
@@ -627,7 +647,7 @@ struct ExtendedQueryStateMachine {
                 case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                     return .failQuery(eventLoopPromise, with: error)
                 case .copyFrom(_, let triggerCopy):
-                    return .failQueryContinuation(triggerCopy, with: error)
+                    return .failQueryContinuation(triggerCopy, with: error, sync: false)
                 case .prepareStatement(_, _, _, let eventLoopPromise):
                     return .failPreparedStatementCreation(eventLoopPromise, with: error)
                 }
@@ -637,7 +657,7 @@ struct ExtendedQueryStateMachine {
             return .evaluateErrorAtConnectionLevel(error)
         case .copyingFinished(let continuation):
             self.state = .error(error)
-            return .failQueryContinuation(continuation, with: error)
+            return .failQueryContinuation(continuation, with: error, sync: true)
         case .drain:
             self.state = .error(error)
             return .evaluateErrorAtConnectionLevel(error)

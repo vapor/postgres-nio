@@ -168,6 +168,18 @@ extension PostgresFrontendMessage {
                 )
             )
 
+        case .copyData:
+            return .copyData(CopyData(data: buffer))
+
+        case .copyDone:
+            return .copyDone
+
+        case .copyFail:
+            guard let message = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            return .copyFail(CopyFail(message: message))
+
         case .close:
             preconditionFailure("TODO: Unimplemented")
 
