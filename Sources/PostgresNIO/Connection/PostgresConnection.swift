@@ -696,25 +696,11 @@ extension PostgresConnection {
 
 // MARK: Copy from
 
-fileprivate extension EventLoop {
-    /// If we are on the given event loop, execute `task` immediately. Otherwise schedule it for execution.
-    func executeImmediatelyOrSchedule(_ task: @Sendable @escaping () -> Void) {
-        if inEventLoop {
-            return task()
-        }
-        return execute(task)
-    }
-}
-
 /// A handle to send 
 public struct PostgresCopyFromWriter: Sendable {
     private let channelHandler: NIOLoopBound<PostgresChannelHandler>
     private let context: NIOLoopBound<ChannelHandlerContext>
     private let eventLoop: any EventLoop
-
-    struct NotWritableError: Error, CustomStringConvertible {
-        var description = "No data must be written to `PostgresCopyFromWriter` after it has sent a CopyDone or CopyFail message, ie. after the closure producing the copy data has finished"
-    }
 
     init(handler: PostgresChannelHandler, context: ChannelHandlerContext, eventLoop: any EventLoop) {
         self.channelHandler = NIOLoopBound(handler, eventLoop: eventLoop)
@@ -725,8 +711,12 @@ public struct PostgresCopyFromWriter: Sendable {
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
     public func write(_ byteBuffer: ByteBuffer) async throws {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in 
-            eventLoop.executeImmediatelyOrSchedule {
+            if eventLoop.inEventLoop {
                 self.channelHandler.value.copyData(byteBuffer, context: self.context.value, readyForMoreWriteContinuation: continuation)
+            } else {
+                eventLoop.execute {
+                    self.channelHandler.value.copyData(byteBuffer, context: self.context.value, readyForMoreWriteContinuation: continuation)
+                }
             }
         }
     }
@@ -735,8 +725,12 @@ public struct PostgresCopyFromWriter: Sendable {
     /// the backend.
     func done() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
-            eventLoop.executeImmediatelyOrSchedule {
+            if eventLoop.inEventLoop {
                 self.channelHandler.value.sendCopyDone(continuation: continuation, context: self.context.value)
+            } else {
+                eventLoop.execute {
+                    self.channelHandler.value.sendCopyDone(continuation: continuation, context: self.context.value)
+                }
             }
         }
     }
@@ -745,8 +739,12 @@ public struct PostgresCopyFromWriter: Sendable {
     /// the backend.
     func failed(error: any Error) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
-            eventLoop.executeImmediatelyOrSchedule {
+            if eventLoop.inEventLoop {
                 self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation, context: self.context.value)
+            } else {
+                eventLoop.execute {
+                    self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation, context: self.context.value)
+                }
             }
         }
     }

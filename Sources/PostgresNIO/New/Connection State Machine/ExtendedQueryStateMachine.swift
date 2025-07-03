@@ -598,13 +598,13 @@ struct ExtendedQueryStateMachine {
         }
     }
 
-    mutating func channelWritabilityChanged(isWritable: Bool) {
+    mutating func channelWritabilityChanged(isWritable: Bool) -> ConnectionStateMachine.ChannelWritabilityChangedAction {
         guard case .copyingData(.pendingBackpressureRelieve(let continuation)) = state else {
-            return
+            return .none
         }
-        self.avoidingStateMachineCoW { state in
+        return self.avoidingStateMachineCoW { state in
             state = .copyingData(.readyToSend)
-            continuation.resume()
+            return .resumeContinuation(continuation)
         }
     }
     

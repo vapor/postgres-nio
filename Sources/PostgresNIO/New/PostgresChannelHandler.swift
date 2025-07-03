@@ -203,7 +203,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     }
 
     func channelWritabilityChanged(context: ChannelHandlerContext) {
-        self.state.channelWritabilityChanged(isWritable: context.channel.isWritable)
+        let action = self.state.channelWritabilityChanged(isWritable: context.channel.isWritable)
+        switch action {
+        case .none: 
+            break
+        case .resumeContinuation(let continuation): 
+            continuation.resume()
+        }
     }
     
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {

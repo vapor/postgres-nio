@@ -122,6 +122,11 @@ struct ConnectionStateMachine {
         case succeedClose(CloseCommandContext)
         case failClose(CloseCommandContext, with: PSQLError, cleanupContext: CleanUpContext?)
     }
+
+    enum ChannelWritabilityChangedAction {
+        case none
+        case resumeContinuation(CheckedContinuation<Void, Never>)
+    }
     
     private var state: State
     private let requireBackendKeyData: Bool
@@ -679,13 +684,14 @@ struct ConnectionStateMachine {
         }
     }
 
-    mutating func channelWritabilityChanged(isWritable: Bool) {
+    mutating func channelWritabilityChanged(isWritable: Bool) -> ChannelWritabilityChangedAction {
         guard case .extendedQuery(var queryState, let connectionContext) = state else {
-            return
+            return .none
         }
         self.state = .modifying // avoid CoW
-        queryState.channelWritabilityChanged(isWritable: isWritable)
+        let action = queryState.channelWritabilityChanged(isWritable: isWritable)
         self.state = .extendedQuery(queryState, connectionContext)
+        return action
     }
     
     // MARK: - Running Queries -
