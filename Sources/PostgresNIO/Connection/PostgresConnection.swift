@@ -694,6 +694,168 @@ extension PostgresConnection {
     }
 }
 
+// MARK: Copy from
+
+/// A handle to send 
+public struct PostgresCopyFromWriter: Sendable {
+    /// The backend failed the copy data transfer, which means that no more data sent by the frontend would be processed.
+    /// 
+    /// The `PostgresCopyFromWriter` should cancel the data transfer.
+    public struct CopyCancellationError: Error {
+        /// The error that the backend sent us which cancelled the data transfer.
+        /// 
+        /// Note that this error is related to previous `write` calls since a `CopyCancellationError` is thrown before
+        /// new data is written by `write`.
+        let underlyingError: PSQLError
+    }
+
+    private let channelHandler: NIOLoopBound<PostgresChannelHandler>
+    private let eventLoop: any EventLoop
+
+    init(handler: PostgresChannelHandler, eventLoop: any EventLoop) {
+        self.channelHandler = NIOLoopBound(handler, eventLoop: eventLoop)
+        self.eventLoop = eventLoop
+    }
+
+    /// Send data for a `COPY ... FROM STDIN` operation to the backend.
+    /// 
+    /// If the backend encountered an error during the data transfer and thus cannot process any more data, this throws
+    /// a `CopyFailedError`.
+    public func write(_ byteBuffer: ByteBuffer) async throws {
+        // First, wait that we have a writable buffer. This also throws a `CopyFailedError` in case the backend sent an 
+        // error during the data transfer and thus cannot process any more data.
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
+            if eventLoop.inEventLoop {
+                self.channelHandler.value.waitForWritableBuffer(continuation)
+            } else {
+                eventLoop.execute {
+                    self.channelHandler.value.waitForWritableBuffer(continuation)
+                }
+            }
+        }
+
+        // Run the actual data transfer
+        if eventLoop.inEventLoop {
+            self.channelHandler.value.copyData(byteBuffer)
+        } else {
+            eventLoop.execute {
+                self.channelHandler.value.copyData(byteBuffer)
+            }
+        }
+    }
+
+    /// Finalize the data transfer, putting the state machine out of the copy mode and sending a `CopyDone` message to 
+    /// the backend.
+    func done() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
+            if eventLoop.inEventLoop {
+                self.channelHandler.value.sendCopyDone(continuation: continuation)
+            } else {
+                eventLoop.execute {
+                    self.channelHandler.value.sendCopyDone(continuation: continuation)
+                }
+            }
+        }
+    }
+
+    /// Finalize the data transfer, putting the state machine out of the copy mode and sending a `CopyFail` message to 
+    /// the backend.
+    func failed(error: any Error) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
+            if eventLoop.inEventLoop {
+                self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation)
+            } else {
+                eventLoop.execute {
+                    self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation)
+                }
+            }
+        }
+    }
+
+    /// Send a `Sync` message to the backend.
+    func sync() {
+        if eventLoop.inEventLoop {
+            self.channelHandler.value.sendSync()
+        } else {
+            eventLoop.execute {
+                self.channelHandler.value.sendSync()
+            }
+        }
+    }
+}
+
+public struct CopyFromOptions {
+    let delimiter: StaticString?
+
+    public init(delimiter: StaticString? = nil) {
+        self.delimiter = delimiter
+    }
+}
+
+private func buildCopyFromQuery(
+    table: String,
+    columns: [StaticString]?,
+    options: CopyFromOptions
+) -> PostgresQuery {
+    var query = "COPY \(table)"
+    if let columns {
+        // TODO: Is using `StaticString` sufficient here to prevent against SQL injection attacks or should we try to 
+        // escape the identifiers, essentially re-implementing `PQescapeIdentifier`?
+        query += "(" + columns.map(\.description).joined(separator: ",") + ")"
+    }
+    query += " FROM STDIN"
+    var queryOptions: [String] = []
+    if let delimiter = options.delimiter {
+        queryOptions.append("DELIMITER '\(delimiter)'")
+    }
+    if !queryOptions.isEmpty {
+        query += " WITH "
+        query += queryOptions.map { "(\($0))" }.joined(separator: ",")
+    }
+    return "\(unescaped: query)"
+}
+
+extension PostgresConnection {
+    // TODO: Instead of an arbitrary query, make this a structured data structure.
+    // TODO: Write doc comment
+    public func copyFrom(
+        table: String,
+        columns: [StaticString]? = nil,
+        options: CopyFromOptions = CopyFromOptions(),
+        logger: Logger,
+        writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
+        file: String = #fileID,
+        line: Int = #line
+    )  async throws {
+        var logger = logger
+        logger[postgresMetadataKey: .connectionID] = "\(self.id)"
+        let writer = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<PostgresCopyFromWriter, any Error>) in
+            let context = ExtendedQueryContext(
+                copyFromQuery: buildCopyFromQuery(table: table, columns: columns, options: options),
+                triggerCopy: continuation,
+                logger: logger
+            )
+            self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        }
+
+        do {
+            try await writeData(writer)
+        } catch let error as PostgresCopyFromWriter.CopyCancellationError {
+            // If the copy was cancelled because the backend sent us an error, we need to send a `Sync` message to put 
+            // the backend out of the copy mode.
+            writer.sync()
+            throw error.underlyingError
+        } catch {
+            // Throw the error from the `writeData` closure instead of the one that Postgres gives us upon receiving the 
+            // `CopyFail` message.
+            try? await writer.failed(error: error)
+            throw error
+        }
+        try await writer.done()
+    }
+
+}
+
 // MARK: PostgresDatabase conformance
 
 extension PostgresConnection: PostgresDatabase {

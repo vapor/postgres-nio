@@ -136,6 +136,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             action = self.state.closeCompletedReceived()
         case .commandComplete(let commandTag):
             action = self.state.commandCompletedReceived(commandTag)
+        case .copyInResponse(let copyInResponse):
+            action = self.state.copyInResponseReceived(copyInResponse)
         case .dataRow(let dataRow):
             action = self.state.dataRowReceived(dataRow)
         case .emptyQueryResponse:
@@ -169,9 +171,60 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.run(action, with: context)
     }
 
+    /// Wait for the channel to be writable and be able to handle more `CopyData` messages. Resume the given 
+    /// continuation when the channel is able handle more data. 
+    /// 
+    /// This fails the continuation with a `PostgresCopyFromWriter.CopyCancellationError` when the server has cancelled
+    /// the data transfer to indicate that the frontend should not send any more data.
+    func waitForWritableBuffer(_ continuation: CheckedContinuation<Void, any Error>) {
+        let action = self.state.waitForWritableBuffer(channel: handlerContext!.channel, continuation: continuation)
+        switch action {
+        case .waitForBackpressureRelieve:
+            self.handlerContext!.channel.flush()
+        case .resumeContinuation(let continuation):
+            continuation.resume()
+        case .failContinuation(_, error: let error):
+            continuation.resume(throwing: error)
+        }
+    }
+
+    /// Send a `CopyData` message to the backend using the given data.
+    func copyData(_ data: ByteBuffer) {
+        self.encoder.copyData(data: data)
+        self.handlerContext!.write(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
+    func sendCopyDone(continuation: CheckedContinuation<Void, any Error>) {
+        let action = self.state.sendCopyDone(continuation: continuation)
+        self.run(action, with: self.handlerContext!)
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyFail` message to the backend.
+    func sendCopyFailed(message: String, continuation: CheckedContinuation<Void, any Error>) {
+        let action = self.state.sendCopyFail(message: message, continuation: continuation)
+        self.run(action, with: self.handlerContext!)
+    }
+
+    /// Send a `Sync` message to the backend.
+    func sendSync() {
+        self.encoder.sync()
+        self.handlerContext!.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+    }
+
     func channelReadComplete(context: ChannelHandlerContext) {
         let action = self.state.channelReadComplete()
         self.run(action, with: context)
+    }
+
+    func channelWritabilityChanged(context: ChannelHandlerContext) {
+        let action = self.state.channelWritabilityChanged(isWritable: context.channel.isWritable)
+        switch action {
+        case .none: 
+            break
+        case .resumeContinuation(let continuation): 
+            continuation.resume()
+        }
     }
     
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
@@ -353,12 +406,32 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             self.sendParseDescribeBindExecuteAndSyncMessage(query: query, context: context)
         case .succeedQuery(let promise, with: let result):
             self.succeedQuery(promise, result: result, context: context)
+        case .succeedQueryContinuation(let continuation):
+            continuation.resume()
         case .failQuery(let promise, with: let error, let cleanupContext):
             promise.fail(error)
             if let cleanupContext = cleanupContext {
                 self.closeConnectionAndCleanup(cleanupContext, context: context)
             }
-        
+        case .failQueryContinuation(let continuation, with: let error, let cleanupContext, let sync):
+            if sync {
+                self.encoder.sync()
+                context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+            }
+            if let cleanupContext = cleanupContext {
+                self.closeConnectionAndCleanup(cleanupContext, context: context)
+            }
+            continuation.resume(throwing: error)
+        case .triggerCopyData(let triggerCopy):
+            let writer = PostgresCopyFromWriter(handler: self, eventLoop: eventLoop)
+            triggerCopy.resume(returning: writer)
+        case .sendCopyDone:
+            self.encoder.copyDone()
+            self.encoder.sync()
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+        case .sendCopyFailed(message: let message):
+            self.encoder.copyFail(message: message)
+            context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
         case .forwardRows(let rows):
             self.rowStream!.receive(rows)
             
