@@ -710,12 +710,10 @@ public struct PostgresCopyFromWriter: Sendable {
     }
 
     private let channelHandler: NIOLoopBound<PostgresChannelHandler>
-    private let context: NIOLoopBound<ChannelHandlerContext>
     private let eventLoop: any EventLoop
 
-    init(handler: PostgresChannelHandler, context: ChannelHandlerContext, eventLoop: any EventLoop) {
+    init(handler: PostgresChannelHandler, eventLoop: any EventLoop) {
         self.channelHandler = NIOLoopBound(handler, eventLoop: eventLoop)
-        self.context = NIOLoopBound(context, eventLoop: eventLoop)
         self.eventLoop = eventLoop
     }
 
@@ -728,20 +726,20 @@ public struct PostgresCopyFromWriter: Sendable {
         // error during the data transfer and thus cannot process any more data.
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
             if eventLoop.inEventLoop {
-                self.channelHandler.value.waitForWritableBuffer(context: self.context.value, continuation)
+                self.channelHandler.value.waitForWritableBuffer(continuation)
             } else {
                 eventLoop.execute {
-                    self.channelHandler.value.waitForWritableBuffer(context: self.context.value, continuation)
+                    self.channelHandler.value.waitForWritableBuffer(continuation)
                 }
             }
         }
 
         // Run the actual data transfer
         if eventLoop.inEventLoop {
-            self.channelHandler.value.copyData(byteBuffer, context: self.context.value)
+            self.channelHandler.value.copyData(byteBuffer)
         } else {
             eventLoop.execute {
-                self.channelHandler.value.copyData(byteBuffer, context: self.context.value)
+                self.channelHandler.value.copyData(byteBuffer)
             }
         }
     }
@@ -751,10 +749,10 @@ public struct PostgresCopyFromWriter: Sendable {
     func done() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
             if eventLoop.inEventLoop {
-                self.channelHandler.value.sendCopyDone(continuation: continuation, context: self.context.value)
+                self.channelHandler.value.sendCopyDone(continuation: continuation)
             } else {
                 eventLoop.execute {
-                    self.channelHandler.value.sendCopyDone(continuation: continuation, context: self.context.value)
+                    self.channelHandler.value.sendCopyDone(continuation: continuation)
                 }
             }
         }
@@ -765,10 +763,10 @@ public struct PostgresCopyFromWriter: Sendable {
     func failed(error: any Error) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in 
             if eventLoop.inEventLoop {
-                self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation, context: self.context.value)
+                self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation)
             } else {
                 eventLoop.execute {
-                    self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation, context: self.context.value)
+                    self.channelHandler.value.sendCopyFailed(message: "\(error)", continuation: continuation)
                 }
             }
         }
@@ -777,10 +775,10 @@ public struct PostgresCopyFromWriter: Sendable {
     /// Send a `Sync` message to the backend.
     func sync() {
         if eventLoop.inEventLoop {
-            self.channelHandler.value.sendSync(context: self.context.value)
+            self.channelHandler.value.sendSync()
         } else {
             eventLoop.execute {
-                self.channelHandler.value.sendSync(context: self.context.value)
+                self.channelHandler.value.sendSync()
             }
         }
     }
