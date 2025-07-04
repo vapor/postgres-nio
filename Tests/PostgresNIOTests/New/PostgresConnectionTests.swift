@@ -628,9 +628,9 @@ class PostgresConnectionTests: XCTestCase {
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             taskGroup.addTask {
-                try await connection.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+                try await connection.copyFrom(table: "copy_table", logger: .psqlTest) { writer in
                     try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
-                }, logger: .psqlTest)
+                }
             }
 
             let copyMessage = try await channel.waitForUnpreparedRequest()
@@ -656,9 +656,9 @@ class PostgresConnectionTests: XCTestCase {
         try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             taskGroup.addTask {
                 await assertThrowsError(
-                    try await connection.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+                    try await connection.copyFrom(table: "copy_table", logger: .psqlTest) { writer in
                         throw MyError()
-                    }, logger: .psqlTest)
+                    }
                 ) { error in 
                     XCTAssert(error is MyError, "Expected error of type MyError, got \(error)")
                 }
@@ -691,9 +691,9 @@ class PostgresConnectionTests: XCTestCase {
         try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             taskGroup.addTask {
                 await assertThrowsError(
-                    try await connection.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+                    try await connection.copyFrom(table: "copy_table", logger: .psqlTest) { writer in
                         try await writer.write(ByteBuffer(staticString: "1Alice\n"))
-                    }, logger: .psqlTest)
+                    }
                 ) { error in
                     XCTAssertEqual((error as? PSQLError)?.serverInfo?.underlying.fields[.sqlState], "22P02")
                 }
@@ -724,11 +724,11 @@ class PostgresConnectionTests: XCTestCase {
         try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             taskGroup.addTask {
                 await assertThrowsError(
-                    try await connection.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+                    try await connection.copyFrom(table: "copy_table", logger: .psqlTest) { writer in
                         try await writer.write(ByteBuffer(staticString: "1Alice\n"))
                         channel.flush()
                         _ = await XCTWaiter.fulfillment(of: [backendDidSendErrorExpectation])
-                    }, logger: .psqlTest)
+                    }
                 ) { error in
                     XCTAssertEqual((error as? PSQLError)?.serverInfo?.underlying.fields[.sqlState], "22P02")
                 }
@@ -764,7 +764,7 @@ class PostgresConnectionTests: XCTestCase {
         try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
             taskGroup.addTask {
                 await assertThrowsError(
-                    try await connection.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+                    try await connection.copyFrom(table: "copy_table", logger: .psqlTest) { writer in
                         try await writer.write(ByteBuffer(staticString: "1Alice\n"))
                         channel.flush()
                         _ = await XCTWaiter.fulfillment(of: [expectation])
@@ -775,7 +775,7 @@ class PostgresConnectionTests: XCTestCase {
                             XCTAssert(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
                             throw error
                         }
-                    }, logger: .psqlTest)
+                    }
                 ) { error in
                     XCTAssertEqual((error as? PSQLError)?.serverInfo?.underlying.fields[.sqlState], "22P02")
                 }
@@ -799,6 +799,29 @@ class PostgresConnectionTests: XCTestCase {
             // Ensure we get a `sync` message so that the backend transitions out of copy mode.
             let syncMessage = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
             XCTAssertEqual(syncMessage, .sync)
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+        }
+    }
+
+    func testCopyDataWithOptions() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            taskGroup.addTask {
+                try await connection.copyFrom(table: "copy_table", columns: ["id", "name"], options: CopyFromOptions(delimiter: ","), logger: .psqlTest) { writer in
+                    try await writer.write(ByteBuffer(staticString: "1,Alice\n"))
+                }
+            }
+
+            let copyMessage = try await channel.waitForUnpreparedRequest()
+            XCTAssertEqual(copyMessage.parse.query, "COPY copy_table(id,name) FROM STDIN WITH (DELIMITER ',')")
+            XCTAssertEqual(copyMessage.bind.parameters, [])
+            try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+            try await channel.sendCopyInResponseForTwoTextualColumns()
+            let data = try await channel.waitForCopyData()
+            XCTAssertEqual(String(buffer: data.data), "1,Alice\n")
+            XCTAssertEqual(data.result, .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
             try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
         }
     }

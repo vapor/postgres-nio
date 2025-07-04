@@ -389,17 +389,17 @@ final class IntegrationTests: XCTestCase {
 
         _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
         _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
-        try await conn.copyFrom("COPY copy_table FROM STDIN", writeData: { writer in
+        try await conn.copyFrom(table: "copy_table", columns: ["id", "name"], options: CopyFromOptions(delimiter: ","), logger: .psqlTest) { writer in
             let records: [(id: Int, name: String)] = [
                 (1, "Alice"),
                 (42, "Bob")
             ]
             for record in records {
                 var buffer = ByteBuffer()
-                buffer.writeString("\(record.id)\t\(record.name)\n")
+                buffer.writeString("\(record.id),\(record.name)\n")
                 try await writer.write(buffer)
             }
-        }, logger: .psqlTest)
+        }
         let rows = try await conn.query("SELECT id, name FROM copy_table").get().rows.map { try $0.decode((Int, String).self) }
         guard rows.count == 2 else {
             XCTFail("Expected 2 columns, received \(rows.count)")

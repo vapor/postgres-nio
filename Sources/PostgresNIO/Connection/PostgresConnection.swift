@@ -786,25 +786,54 @@ public struct PostgresCopyFromWriter: Sendable {
     }
 }
 
+public struct CopyFromOptions {
+    let delimiter: StaticString?
+
+    public init(delimiter: StaticString? = nil) {
+        self.delimiter = delimiter
+    }
+}
+
+private func buildCopyFromQuery(
+    table: String,
+    columns: [StaticString]?,
+    options: CopyFromOptions
+) -> PostgresQuery {
+    var query = "COPY \(table)"
+    if let columns {
+        // TODO: Is using `StaticString` sufficient here to prevent against SQL injection attacks or should we try to 
+        // escape the identifiers, essentially re-implementing `PQescapeIdentifier`?
+        query += "(" + columns.map(\.description).joined(separator: ",") + ")"
+    }
+    query += " FROM STDIN"
+    var queryOptions: [String] = []
+    if let delimiter = options.delimiter {
+        queryOptions.append("DELIMITER '\(delimiter)'")
+    }
+    if !queryOptions.isEmpty {
+        query += " WITH "
+        query += queryOptions.map { "(\($0))" }.joined(separator: ",")
+    }
+    return "\(unescaped: query)"
+}
+
 extension PostgresConnection {
     // TODO: Instead of an arbitrary query, make this a structured data structure.
     // TODO: Write doc comment
     public func copyFrom(
-        _ query: PostgresQuery,
-        writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
+        table: String,
+        columns: [StaticString]? = nil,
+        options: CopyFromOptions = CopyFromOptions(),
         logger: Logger,
+        writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
         file: String = #fileID,
         line: Int = #line
     )  async throws {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
-        guard query.binds.count <= Int(UInt16.max) else {
-            throw PSQLError(code: .tooManyParameters, query: query)
-        }
-
         let writer = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<PostgresCopyFromWriter, any Error>) in
             let context = ExtendedQueryContext(
-                copyFromQuery: query,
+                copyFromQuery: buildCopyFromQuery(table: table, columns: columns, options: options),
                 triggerCopy: continuation,
                 logger: logger
             )
