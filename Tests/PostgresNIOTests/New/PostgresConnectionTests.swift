@@ -4,6 +4,9 @@ import NIOEmbedded
 import Testing
 import Logging
 @testable import PostgresNIO
+#if canImport(Synchronization)
+import Synchronization
+#endif
 
 @Suite struct PostgresConnectionTests {
 
@@ -25,16 +28,16 @@ import Logging
             Issue.record("Could not get port number from temp started server")
             return
         }
-        
+
         let config = PostgresConnection.Configuration(
             host: "127.0.0.1", port: port,
             username: "postgres", password: "abc123", database: "postgres",
             tls: .disable
         )
-        
+
         var logger = Logger.psqlTest
         logger.logLevel = .trace
-        
+
         #expect(throws: PSQLError.self) {
             try PostgresConnection
                 .connect(on: eventLoopGroup.next(), configuration: config, id: 1, logger: logger)
@@ -290,7 +293,7 @@ import Logging
         }
     }
 
-    @Test func testCloseClosesImmediatly() async throws {
+    @Test func testCloseClosesImmediately() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
             try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
@@ -653,6 +656,241 @@ import Logging
         }
     }
 
+    @Test func testCopyFromSucceeds() async throws {
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == "COPY copy_table(id,name) FROM STDIN WITH (FORMAT text)")
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "1\tAlice\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
+
+    @Test func testCopyFromWithOptions() async throws {
+        var options = PostgresCopyFromFormat.TextOptions()
+        options.delimiter = ","
+        try await expectCopyFrom(format: .text(options)) { writer in
+            try await writer.write(ByteBuffer(staticString: "1,Alice\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY copy_table(id,name) FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "1,Alice\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
+    @Test func testCopyFromWriterFails() async throws {
+        struct MyError: Error, CustomStringConvertible {
+            var description: String { "My error" }
+        }
+
+        try await expectCopyFrom { writer in
+            throw MyError()
+        } validateCopyFromError: { error in
+            #expect(error is MyError, "Expected error of type MyError, got \(error)")
+        } mockBackend: { channel in
+            let data = try await channel.waitForCopyData()
+            #expect(data.result == .failed(message: "My error"))
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: "COPY from stdin failed: My error",
+                .sqlState : "57014" // query_canceled
+            ])))
+        }
+    }
+
+    @Test func testCopyFromBackendSendsErrorBeforeCopyDone() async throws {
+        // Stream to indicate that the backend did send an error
+        let (signalStream, signalContinuation) = AsyncStream.makeStream(of: Void.self)
+
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1Alice\n"))
+            var iterator = signalStream.makeAsyncIterator()
+            await iterator.next()
+        } validateCopyFromError: { error in
+            #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "22P02")
+        } mockBackend: { channel in
+            let copyDataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
+            #expect(copyDataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
+
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: #"invalid input syntax for type integer: "1Alice""#,
+                .sqlState : "22P02" // invalid_text_representation
+            ])))
+            signalContinuation.yield()
+        }
+    }
+
+    @Test func testCopyFromBackendSendsErrorAfterCopyDone() async throws {
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1Alice\n"))
+        } validateCopyFromError: { error in
+            #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "22P02")
+        } mockBackend: { channel in
+            _ = try await channel.waitForCopyData()
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: #"invalid input syntax for type integer: "1Alice""#,
+                .sqlState : "22P02" // invalid_text_representation
+            ])))
+        }
+    }
+
+    @Test func testCopyFromBackendSendsErrorBeforeUserThrowsUnrelatedErrorFromClosure() async throws {
+        struct MyError: Error, CustomStringConvertible {
+            var description: String { "My error" }
+        }
+
+        // Stream to indicate that the backend did send an error
+        let (signalStream, signalContinuation) = AsyncStream.makeStream(of: Void.self)
+
+        // If the user throws an error and we receive an error from the server, we should prefer throwing the user error
+        // from `copyFrom` since it's likely the more actionable for the user.
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1Alice\n"))
+            var iterator = signalStream.makeAsyncIterator()
+            await iterator.next()
+            throw MyError()
+        } validateCopyFromError: { error in
+            #expect(error is MyError, "Expected MyError, got \(error)")
+        } mockBackend: { channel in
+            let copyDataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
+            #expect(copyDataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
+
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: #"invalid input syntax for type integer: "1Alice""#,
+                .sqlState : "22P02" // invalid_text_representation
+            ])))
+            signalContinuation.yield()
+        }
+    }
+
+    @Test func testCopyFromWriterThrowsErrorAfterBackendSentError() async throws {
+        // Stream to indicate that the backend did send an error
+        let (signalStream, signalContinuation) = AsyncStream.makeStream(of: Void.self)
+
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1Alice\n"))
+            var iterator = signalStream.makeAsyncIterator()
+            await iterator.next()
+            do {
+                try await writer.write(ByteBuffer(staticString: "2\tBob\n"))
+                Issue.record("Expected error to be thrown")
+            } catch {
+                #expect(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
+                throw error
+            }
+        } validateCopyFromError: { error in
+            #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "22P02")
+        } mockBackend: { channel in
+            let dataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
+            #expect(dataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
+
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: #"invalid input syntax for type integer: "1Alice""#,
+                .sqlState : "22P02" // invalid_text_representation
+            ])))
+            signalContinuation.yield()
+        }
+    }
+
+    @Test func testCopyFromCallerDoesNotRethrowCopyCancellationError() async throws {
+        struct MyError: Error, CustomStringConvertible {
+            var description: String { "My error" }
+        }
+
+        // Stream to indicate that the backend did send an error
+        let (signalStream, signalContinuation) = AsyncStream.makeStream(of: Void.self)
+
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1Alice\n"))
+            var iterator = signalStream.makeAsyncIterator()
+            await iterator.next()
+            do {
+                try await writer.write(ByteBuffer(staticString: "2\tBob\n"))
+                Issue.record("Expected error to be thrown")
+            } catch {
+                #expect(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
+                throw MyError()
+            }
+        } validateCopyFromError: { error in
+            #expect(error is MyError, "Expected MyError, got \(error)")
+        } mockBackend: { channel in
+            let dataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
+            #expect(dataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
+
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: #"invalid input syntax for type integer: "1Alice""#,
+                .sqlState : "22P02" // invalid_text_representation
+            ])))
+            signalContinuation.yield()
+        }
+    }
+
+    @Test func testCopyFromQueryHasSyntaxError() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+                taskGroup.addTask {
+                    do {
+                        try await connection.copyFrom(table: "", logger: .psqlTest) { _ in
+                            Issue.record("Did not expect to call writeData")
+                        }
+
+                    } catch {
+                        #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "42601")
+                    }
+                    // Send another query to ensure that the state machine is back in the idle state afterwards and can
+                    // handle new queries. We don't wait for this to finish, just to receive the initiation on the other
+                    // side of the
+                    _ = connection.simpleQuery("DUMMY")
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                    .message: #"syntax error"#,
+                    .sqlState : "42601" // scanner_yyerror
+                ])))
+
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
+            }
+        }
+    }
+
+    #if canImport(Synchronization)
+    @available(macOS 15, *)
+    @Test func testCopyFromHasWriteBackpressure() async throws {
+        // `true` while the `writeData` closure is executing the `PostgresCopyFromWriter.write` function, ie. while it
+        // is blocked for backpressure to be relieved.
+        let isWriting = Atomic<Bool>(false)
+
+        try await expectCopyFrom { writer in
+            isWriting.store(true, ordering: .sequentiallyConsistent)
+            try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
+            isWriting.store(false, ordering: .sequentiallyConsistent)
+        } preCopyInResponse: { channel in
+            channel.isWritable = false
+        } mockBackend: { channel in
+            let isWriting = isWriting.load(ordering: .sequentiallyConsistent)
+            #expect(isWriting)
+
+            channel.isWritable = true
+            channel.pipeline.fireChannelWritabilityChanged()
+
+            let data = try await channel.waitForCopyData()
+            #expect(data.data == ByteBuffer(staticString: "1\tAlice\n"))
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+    #endif
+
     func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
@@ -686,40 +924,113 @@ import Logging
 
         try await connection.close()
     }
+
+    /// Validate the behavior of a `COPY FROM` query.
+    ///
+    /// Also checks that the connection returns to an idle state after performing the copy and is capable
+    /// of handling another query.
+    ///
+    /// - Parameters:
+    ///   - table: Forwarded to the `copyFrom` call in `PostgresConnection`.
+    ///   - columns: Forwarded to the `copyFrom` call in `PostgresConnection`.
+    ///   - format: Forwarded to the `copyFrom` call in `PostgresConnection`.
+    ///   - writeData: Forwarded to the `copyFrom` call in `PostgresConnection`.
+    ///   - validateCopyFromError: When not `nil`, we expect the `copyFrom` call to throw. This closure can be used to
+    ///     inspect the thrown error and assert that it has the correct shape.
+    ///   - preCopyInResponse: Called before the `CopyInResponse` is sent to the frontend.
+    ///   - validateCopyRequest: Can be used to verify the shape of the `COPY` query that is received by the backend.
+    ///   - mockBackend: determines how the backend behaves, starting after the point where the backend has sent the
+    ///    `CopyInResponse` and ending in the state where the backend has sent a `CommandComplete` or `ErrorResponse`
+    ///     and is now expecting a `Sync` to return back to the idle state.
+    private func expectCopyFrom(
+        table: StaticString = "copy_table",
+        columns: [StaticString] = ["id", "name"],
+        format: PostgresCopyFromFormat = .text(.init()),
+        writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
+        validateCopyFromError: (@Sendable (any Error) -> Void)? = nil,
+        preCopyInResponse: (_ channel: NIOAsyncTestingChannel) -> Void = { _ in },
+        validateCopyRequest: (UnpreparedRequest) -> Void = { _ in },
+        mockBackend: (_ channel: NIOAsyncTestingChannel) async throws -> Void,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+                taskGroup.addTask {
+                    do {
+                        try await connection.copyFrom(table: table, columns: columns, format: format, logger: logger, writeData: writeData)
+                        if validateCopyFromError != nil {
+                            Issue.record("Expected `copyFrom` to throw but it did not", sourceLocation: sourceLocation)
+                        }
+                    } catch {
+                        if let validateCopyFromError {
+                            validateCopyFromError(error)
+                        } else {
+                            throw error
+                        }
+                    }
+                    // Send another query to ensure that the state machine is back in the idle state afterwards and can
+                    // handle new queries. We don't wait for this to finish, just to receive the initiation on the other
+                    // side of the
+                    _ = connection.simpleQuery("DUMMY")
+                }
+
+                let copyRequest = try await channel.waitForUnpreparedRequest()
+                validateCopyRequest(copyRequest)
+
+                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                preCopyInResponse(channel)
+                try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: columns.count))))
+
+                try await mockBackend(channel)
+
+                try await channel.waitForPostgresFrontendMessage(\.sync)
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
+            }
+        }
+    }
 }
 
 extension NIOAsyncTestingChannel {
+    /// Wait for a `PostgresFrontendMessage` such that `transform` returns a non-nil value.
+    ///
+    /// The intention of this is to be used with the convenience accessors on `PostgresFrontendMessage` for the
+    /// different cases, eg. to wait for a `parse` message
+    ///
+    /// ```swift
+    /// try await self.waitForPostgresFrontendMessage(\.parse)
+    /// ```
+    func waitForPostgresFrontendMessage<T>(
+        _ transform: (PostgresFrontendMessage) -> T?,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) async throws -> T {
+        let message = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        return try #require(transform(message), "Received unexpected payload: \(message)", sourceLocation: sourceLocation)
+    }
 
     func waitForUnpreparedRequest() async throws -> UnpreparedRequest {
-        let parse = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let describe = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let bind = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let execute = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let sync = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-
-        guard case .parse(let parse) = parse,
-              case .describe(let describe) = describe,
-              case .bind(let bind) = bind,
-              case .execute(let execute) = execute,
-              case .sync = sync
-        else {
-            fatalError()
-        }
+        let parse = try await self.waitForPostgresFrontendMessage(\.parse)
+        let describe = try await self.waitForPostgresFrontendMessage(\.describe)
+        let bind = try await self.waitForPostgresFrontendMessage(\.bind)
+        let execute = try await self.waitForPostgresFrontendMessage(\.execute)
+        try await self.waitForPostgresFrontendMessage(\.sync)
 
         return UnpreparedRequest(parse: parse, describe: describe, bind: bind, execute: execute)
     }
 
-    func waitForPrepareRequest() async throws -> PrepareRequest {
-        let parse = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let describe = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let sync = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+    /// Send the messages up to `BindComplete` for an unnamed query that does not bind any parameters.
+    func sendUnpreparedRequestWithNoParametersBindResponse() async throws {
+        try await writeInbound(PostgresBackendMessage.parseComplete)
+        try await writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+        try await writeInbound(PostgresBackendMessage.noData)
+        try await writeInbound(PostgresBackendMessage.bindComplete)
+    }
 
-        guard case .parse(let parse) = parse,
-              case .describe(let describe) = describe,
-              case .sync = sync
-        else {
-            fatalError("Unexpected message")
-        }
+    func waitForPrepareRequest() async throws -> PrepareRequest {
+        let parse = try await self.waitForPostgresFrontendMessage(\.parse)
+        let describe = try await self.waitForPostgresFrontendMessage(\.describe)
+        try await self.waitForPostgresFrontendMessage(\.sync)
 
         return PrepareRequest(parse: parse, describe: describe)
     }
@@ -739,16 +1050,9 @@ extension NIOAsyncTestingChannel {
     }
 
     func waitForPreparedRequest() async throws -> PreparedRequest {
-        let bind = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let execute = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        let sync = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-
-        guard case .bind(let bind) = bind,
-              case .execute(let execute) = execute,
-              case .sync = sync
-        else {
-            fatalError()
-        }
+        let bind = try await self.waitForPostgresFrontendMessage(\.bind)
+        let execute = try await self.waitForPostgresFrontendMessage(\.execute)
+        try await self.waitForPostgresFrontendMessage(\.sync)
 
         return PreparedRequest(bind: bind, execute: execute)
     }
@@ -767,6 +1071,38 @@ extension NIOAsyncTestingChannel {
         try await self.testingEventLoop.executeInContext { self.read() }
         try await self.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
         try await self.testingEventLoop.executeInContext { self.read() }
+    }
+
+    struct CopyDataRequest {
+        enum Result: Equatable {
+            /// The data copy finished successfully with a `CopyDone` message.
+            case done
+            /// The data copy finished with a `CopyFail` message containing the following error message.
+            case failed(message: String)
+        }
+
+        /// The data that was transferred.
+        var data: ByteBuffer
+
+        /// The `CopyDone` or `CopyFail` message that finalized the data transfer.
+        var result: Result
+    }
+
+    func waitForCopyData() async throws -> CopyDataRequest {
+        var copiedData = ByteBuffer()
+        while true {
+            let message = try await self.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+            switch message {
+            case .copyData(let data):
+                copiedData.writeImmutableBuffer(data.data)
+            case .copyDone:
+                return CopyDataRequest(data: copiedData, result: .done)
+            case .copyFail(let message):
+                return CopyDataRequest(data: copiedData, result: .failed(message: message.message))
+            default:
+                fatalError("Unexpected message")
+            }
+        }
     }
 }
 
