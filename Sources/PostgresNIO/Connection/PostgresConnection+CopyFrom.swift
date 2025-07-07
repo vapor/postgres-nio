@@ -23,13 +23,17 @@ public struct PostgresCopyFromWriter: Sendable {
         precondition(eventLoop.inEventLoop)
         let promise = eventLoop.makePromise(of: Void.self)
         self.channelHandler.value.checkBackendCanReceiveCopyData(promise: promise)
-        promise.futureResult.map {
+        promise.futureResult.flatMap {
             if eventLoop.inEventLoop {
-                self.channelHandler.value.sendCopyData(byteBuffer)
+                return eventLoop.makeCompletedFuture(withResultOf: {
+                    try self.channelHandler.value.sendCopyData(byteBuffer)
+                })
             } else {
+                let promise = eventLoop.makePromise(of: Void.self)
                 eventLoop.execute {
-                    self.channelHandler.value.sendCopyData(byteBuffer)
+                    promise.completeWith(Result(catching: { try self.channelHandler.value.sendCopyData(byteBuffer) }))
                 }
+                return promise.futureResult
             }
         }.whenComplete { result in
             continuation.resume(with: result)
@@ -45,13 +49,32 @@ public struct PostgresCopyFromWriter: Sendable {
         // `writeData` closure. It is likely that the user would forget to do so.
         try Task.checkCancellation()
 
-        // TODO: Listen for task cancellation while we are waiting for backpressure to clear.
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+        try await withTaskCancellationHandler {
+            do {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                    if eventLoop.inEventLoop {
+                        writeAssumingInEventLoop(byteBuffer, continuation)
+                    } else {
+                        eventLoop.execute {
+                            writeAssumingInEventLoop(byteBuffer, continuation)
+                        }
+                    }
+                }
+            } catch {
+                if Task.isCancelled {
+                    // If the task was cancelled, we might receive a postgres error which is an artifact about how we
+                    // communicate the cancellation to the state machine. Throw a `CancellationError` to the user
+                    // instead, which looks more like native Swift Concurrency code.
+                    throw CancellationError()
+                }
+                throw error
+            }
+        } onCancel: {
             if eventLoop.inEventLoop {
-                writeAssumingInEventLoop(byteBuffer, continuation)
+                self.channelHandler.value.cancel()
             } else {
                 eventLoop.execute {
-                    writeAssumingInEventLoop(byteBuffer, continuation)
+                    self.channelHandler.value.cancel()
                 }
             }
         }

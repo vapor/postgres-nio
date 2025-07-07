@@ -79,6 +79,12 @@ struct ExtendedQueryStateMachine {
         /// Send a `CopyFail` message to the backend with the given error message.
         case sendCopyFail(message: String)
 
+        /// Fail the promise with the given error and close the connection.
+        ///
+        /// This is used when we want to cancel a COPY operation while waiting for backpressure relieve. In that case we
+        /// can't recover the connection because we can't send any messages to the backend, so we need to close it.
+        case failPromiseAndCloseConnection(EventLoopPromise<Void>, error: PSQLError)
+
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
         case forwardRows([DataRow])
@@ -155,8 +161,16 @@ struct ExtendedQueryStateMachine {
                 return .failPreparedStatementCreation(eventLoopPromise, with: .queryCancelled)
             }
 
-        case .copyingData:
-            return .sendCopyFail(message: "Copy cancelled")
+        case .copyingData(.readyToSend):
+            // We can't initiate an exit from the copy state here because `copyingFinished`, which is the state that is
+            // reached after sending a `CopyFail` requires a continuation that waits for the `CommandComplete` or
+            // `ErrorResponse`. Instead, we assume that the next call to `CopyFromWriter.write` checks cancellation and
+            // initiates the `CopyFail` with the cancellation.
+            return .wait
+
+        case .copyingData(.pendingBackpressureRelieve(let promise)):
+            self.state = .error(.queryCancelled)
+            return .failPromiseAndCloseConnection(promise, error: .queryCancelled)
 
         case .copyingFinished:
             // We already finished the copy and are awaiting the `CommandComplete` or `ErrorResponse` from it. There's

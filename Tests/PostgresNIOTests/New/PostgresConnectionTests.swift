@@ -631,7 +631,7 @@ class PostgresConnectionTests: XCTestCase {
         } validateCopyRequest: { copyRequest in
             XCTAssertEqual(copyRequest.parse.query, "COPY copy_table(id,name) FROM STDIN WITH (FORMAT text)")
             XCTAssertEqual(copyRequest.bind.parameters, [])
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
             XCTAssertEqual(String(buffer: data.data), "1\tAlice\n")
             XCTAssertEqual(data.result, .done)
@@ -648,7 +648,7 @@ class PostgresConnectionTests: XCTestCase {
         } validateCopyRequest: { copyRequest in
             XCTAssertEqual(copyRequest.parse.query, #"COPY copy_table(id,name) FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
             XCTAssertEqual(copyRequest.bind.parameters, [])
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
             XCTAssertEqual(String(buffer: data.data), "1,Alice\n")
             XCTAssertEqual(data.result, .done)
@@ -665,7 +665,7 @@ class PostgresConnectionTests: XCTestCase {
             throw MyError()
         } validateCopyFromError: { error in
             XCTAssert(error is MyError, "Expected error of type MyError, got \(error)")
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
             XCTAssertEqual(data.result, .failed(message: "My error"))
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
@@ -685,7 +685,7 @@ class PostgresConnectionTests: XCTestCase {
             await iterator.next()
         } validateCopyFromError: { error in
             XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "22P02")
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let copyDataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             XCTAssertEqual(copyDataMessage, PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
@@ -702,7 +702,7 @@ class PostgresConnectionTests: XCTestCase {
             try await writer.write(ByteBuffer(staticString: "1Alice\n"))
         } validateCopyFromError: { error in
             XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "22P02")
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             _ = try await channel.waitForCopyData()
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
                 .message: #"invalid input syntax for type integer: "1Alice""#,
@@ -728,7 +728,7 @@ class PostgresConnectionTests: XCTestCase {
             throw MyError()
         } validateCopyFromError: { error in
             XCTAssert(error is MyError, "Expected MyError, got \(error)")
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let copyDataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             XCTAssertEqual(copyDataMessage, PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
@@ -757,7 +757,7 @@ class PostgresConnectionTests: XCTestCase {
             }
         } validateCopyFromError: { error in
             XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "22P02")
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let dataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             XCTAssertEqual(dataMessage, PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
@@ -790,7 +790,7 @@ class PostgresConnectionTests: XCTestCase {
             }
         } validateCopyFromError: { error in
             XCTAssert(error is MyError, "Expected MyError, got \(error)")
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             let dataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             XCTAssertEqual(dataMessage, PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
@@ -850,7 +850,7 @@ class PostgresConnectionTests: XCTestCase {
             isWriting.store(false, ordering: .sequentiallyConsistent)
         } preCopyInResponse: { channel in
             channel.isWritable = false
-        } mockBackend: { channel in
+        } mockBackend: { channel, _ in
             XCTAssert(isWriting.load(ordering: .sequentiallyConsistent))
 
             channel.isWritable = true
@@ -861,6 +861,57 @@ class PostgresConnectionTests: XCTestCase {
             try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
         }
         #endif
+    }
+
+    func testCopyFromCancelled() async throws {
+        try await assertCopyFrom { writer in
+            while true {
+                try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
+                try await Task.sleep(for: .milliseconds(10))
+            }
+        } validateCopyFromError: { error in
+            XCTAssert(error is CancellationError, "Expected CancellationError, got \(error)")
+        } mockBackend: { channel, cancelCopy in
+            cancelCopy()
+
+            let data = try await channel.waitForCopyData()
+            XCTAssertEqual(data.result, .failed(message: "CancellationError()"))
+
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: "COPY from stdin failed: CancellationError()",
+                .sqlState : "57014" // query_canceled
+            ])))
+        }
+    }
+
+    func testCopyFromCancelledWhileWaitingForBackpressureRelieve() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            taskGroup.addTask {
+                do {
+                    try await connection.copyFrom(table: "test", logger: .psqlTest) { writer in
+                        try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
+                    }
+                    XCTFail("Expected `copyFrom` to throw but it did not")
+                } catch {
+                    XCTAssert(error is CancellationError, "Expected CancellationError, got \(error)")
+                }
+            }
+
+            _ = try await channel.waitForUnpreparedRequest()
+
+            try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+            channel.isWritable = false
+            try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: 2))))
+
+            // Wait for the `PostgresCopyFromWriter.write` call to execute and hit the write backpressure before we cancel the task.
+            try await Task.sleep(for: .milliseconds(200))
+            taskGroup.cancelAll()
+
+            // Check that the connection got closed because of the cancellation.
+            try await connection.closeFuture.get()
+        }
     }
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
@@ -911,7 +962,8 @@ class PostgresConnectionTests: XCTestCase {
     ///   - validateCopyRequest: Can be used to verify the shape of the `COPY` query that is received by the backend.
     ///   - mockBackend: determines how the backend behaves, starting after the point where the backend has sent the
     ///    `CopyInResponse` and ending in the state where the backend has sent a `CommandComplete` or `ErrorResponse`
-    ///     and is now expecting a `Sync` to return back to the idle state.
+    ///     and is now expecting a `Sync` to return back to the idle state. The closure may call the `cancelCopyFrom`
+    ///     closure that is passed to it to cancel the COPY operation.
     private func assertCopyFrom(
         table: StaticString = "copy_table",
         columns: [StaticString] = ["id", "name"],
@@ -920,7 +972,7 @@ class PostgresConnectionTests: XCTestCase {
         validateCopyFromError: (@Sendable (any Error) -> Void)? = nil,
         preCopyInResponse: (_ channel: NIOAsyncTestingChannel) -> Void = { _ in },
         validateCopyRequest: (UnpreparedRequest) -> Void = { _ in },
-        mockBackend: (_ channel: NIOAsyncTestingChannel) async throws -> Void,
+        mockBackend: (_ channel: NIOAsyncTestingChannel, _ cancelCopy: () -> Void) async throws -> Void,
         file: StaticString = #file,
         line: UInt = #line
     ) async throws {
@@ -953,7 +1005,7 @@ class PostgresConnectionTests: XCTestCase {
             preCopyInResponse(channel)
             try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: columns.count))))
 
-            try await mockBackend(channel)
+            try await mockBackend(channel, { taskGroup.cancelAll() })
 
             try await channel.waitForPostgresFrontendMessage(\.sync)
             try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
