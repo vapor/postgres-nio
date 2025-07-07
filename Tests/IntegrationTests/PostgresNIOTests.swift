@@ -930,6 +930,22 @@ final class PostgresNIOTests: XCTestCase {
         }
     }
 
+    func testJSONBDecodeString() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
+        do {
+            var rows: PostgresQueryResult?
+            XCTAssertNoThrow(rows = try conn?.query("select '{\"hello\": \"world\"}'::jsonb as data").wait())
+            
+            var resultString: String?
+            XCTAssertNoThrow(resultString = try rows?.first?.decode(String.self, context: .default))
+
+            XCTAssertEqual(resultString, "{\"hello\": \"world\"}")
+        }
+    }
+
     func testInt4RangeSerialize() async throws {
         let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
         self.addTeardownBlock {
