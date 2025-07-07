@@ -177,26 +177,50 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     /// `ErrorResponse`. This is mostly the case when malformed data is sent to it. In that case, the data transfer
     /// should be aborted to avoid unnecessary work.
     func checkBackendCanReceiveCopyData(promise: EventLoopPromise<Void>) {
-        self.state.checkBackendCanReceiveCopyData(channelIsWritable: handlerContext!.channel.isWritable, promise: promise)
+        guard let handlerContext else {
+            promise.fail(PostgresError.connectionClosed)
+            return
+        }
+        self.state.checkBackendCanReceiveCopyData(channelIsWritable: handlerContext.channel.isWritable, promise: promise)
+    }
+
+    /// Cancel the currently executing operation, if it is cancellable.
+    func cancel() {
+        guard let handlerContext else {
+            return
+        }
+        let action = self.state.cancel()
+        self.run(action, with: handlerContext)
     }
 
     /// Send a `CopyData` message to the backend using the given data.
-    func sendCopyData(_ data: ByteBuffer) {
+    func sendCopyData(_ data: ByteBuffer) throws {
+        guard let handlerContext else {
+            throw PostgresError.connectionClosed
+        }
         self.encoder.copyDataHeader(dataLength: UInt32(data.readableBytes))
-        self.handlerContext!.write(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
-        self.handlerContext!.writeAndFlush(self.wrapOutboundOut(data), promise: nil)
+        handlerContext.write(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+        handlerContext.writeAndFlush(self.wrapOutboundOut(data), promise: nil)
     }
 
     /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
     func sendCopyDone(continuation: CheckedContinuation<Void, any Error>) {
+        guard let handlerContext else {
+            continuation.resume(throwing: PostgresError.connectionClosed)
+            return
+        }
         let action = self.state.sendCopyDone(continuation: continuation)
-        self.run(action, with: self.handlerContext!)
+        self.run(action, with: handlerContext)
     }
 
     /// Put the state machine out of the copying mode and send a `CopyFail` message to the backend.
     func sendCopyFail(message: String, continuation: CheckedContinuation<Void, any Error>) {
+        guard let handlerContext else {
+            continuation.resume(throwing: PostgresError.connectionClosed)
+            return
+        }
         let action = self.state.sendCopyFail(message: message, continuation: continuation)
-        self.run(action, with: self.handlerContext!)
+        self.run(action, with: handlerContext)
     }
 
     func channelReadComplete(context: ChannelHandlerContext) {
@@ -489,6 +513,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             }
         case .forwardNotificationToListeners(let notification):
             self.forwardNotificationToListeners(notification, context: context)
+        case .failPromiseAndCloseConnection(let promise, let error, let cleanupContext):
+            promise.fail(error)
+            self.closeConnectionAndCleanup(cleanupContext, context: context)
         }
     }
     
@@ -865,11 +892,10 @@ extension PostgresChannelHandler: PSQLRowsDataSource {
     }
     
     func cancel(for stream: PSQLRowStream) {
-        guard self.rowStream === stream, let handlerContext = self.handlerContext else {
+        guard self.rowStream === stream else {
             return
         }
-        let action = self.state.cancelQueryStream()
-        self.run(action, with: handlerContext)
+        self.cancel()
     }
 }
 

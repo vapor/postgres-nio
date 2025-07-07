@@ -110,6 +110,12 @@ struct ConnectionStateMachine {
         /// Send a `CopyFail` message to the backend with the given error message.
         case sendCopyFail(message: String)
 
+        /// Fail the promise with the given error and close the connection.
+        ///
+        /// This is used when we want to cancel a COPY operation while waiting for backpressure relieve. In that case we
+        /// can't recover the connection because we can't send any messages to the backend, so we need to close it.
+        case failPromiseAndCloseConnection(EventLoopPromise<Void>, error: PSQLError, cleanupContext: CleanUpContext)
+
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
         case forwardRows([DataRow])
@@ -867,9 +873,10 @@ struct ConnectionStateMachine {
     
     // MARK: Consumer
     
-    mutating func cancelQueryStream() -> ConnectionAction {
+    mutating func cancel() -> ConnectionAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
-            preconditionFailure("Tried to cancel stream without active query")
+            // We are not in a state in which we can cancel. Do nothing.
+            return .wait
         }
 
         self.state = .modifying // avoid CoW
@@ -955,7 +962,8 @@ struct ConnectionStateMachine {
                  .triggerCopyData,
                  .sendCopyDoneAndSync,
                  .sendCopyFail,
-                 .succeedQueryContinuation:
+                 .succeedQueryContinuation,
+                 .failPromiseAndCloseConnection:
                 preconditionFailure("Invalid query state machine action in state: \(self.state), action: \(action)")
 
             case .evaluateErrorAtConnectionLevel:
@@ -1149,6 +1157,9 @@ extension ConnectionStateMachine {
             return .sendCopyDoneAndSync
         case .sendCopyFail(message: let message):
             return .sendCopyFail(message: message)
+        case .failPromiseAndCloseConnection(let promise, error: let error):
+            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
+            return .failPromiseAndCloseConnection(promise, error: error, cleanupContext: cleanupContext)
         case .forwardRows(let buffer):
             return .forwardRows(buffer)
         case .forwardStreamComplete(let buffer, let commandTag):
