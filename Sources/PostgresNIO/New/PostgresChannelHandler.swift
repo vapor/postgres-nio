@@ -136,6 +136,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             action = self.state.closeCompletedReceived()
         case .commandComplete(let commandTag):
             action = self.state.commandCompletedReceived(commandTag)
+        case .copyInResponse(let copyInResponse):
+            action = self.state.copyInResponseReceived(copyInResponse)
         case .dataRow(let dataRow):
             action = self.state.dataRowReceived(dataRow)
         case .emptyQueryResponse:

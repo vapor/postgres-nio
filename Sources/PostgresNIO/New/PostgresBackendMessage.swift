@@ -29,6 +29,7 @@ enum PostgresBackendMessage: Hashable {
     case bindComplete
     case closeComplete
     case commandComplete(String)
+    case copyInResponse(CopyInResponse)
     case dataRow(DataRow)
     case emptyQueryResponse
     case error(ErrorResponse)
@@ -96,6 +97,9 @@ extension PostgresBackendMessage {
             }
             return .commandComplete(commandTag)
             
+        case .copyInResponse:
+            return try .copyInResponse(.decode(from: &buffer))
+        
         case .dataRow:
             return try .dataRow(.decode(from: &buffer))
             
@@ -131,9 +135,9 @@ extension PostgresBackendMessage {
             
         case .rowDescription:
             return try .rowDescription(.decode(from: &buffer))
-            
-        case .copyData, .copyDone, .copyInResponse, .copyOutResponse, .copyBothResponse, .functionCallResponse, .negotiateProtocolVersion:
-            preconditionFailure()
+
+        case .copyData, .copyDone, .copyOutResponse, .copyBothResponse, .functionCallResponse, .negotiateProtocolVersion:
+            throw PSQLPartialDecodingError.unknownMessageKind(messageID)
         }
     }
 }
@@ -151,6 +155,8 @@ extension PostgresBackendMessage: CustomDebugStringConvertible {
             return ".closeComplete"
         case .commandComplete(let commandTag):
             return ".commandComplete(\(String(reflecting: commandTag)))"
+        case .copyInResponse(let copyInResponse):
+            return ".copyInResponse(\(String(reflecting: copyInResponse)))"
         case .dataRow(let dataRow):
             return ".dataRow(\(String(reflecting: dataRow)))"
         case .emptyQueryResponse:
