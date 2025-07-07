@@ -52,4 +52,15 @@ class String_PSQLCodableTests: XCTestCase {
             XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
     }
+
+    func testDecodeFromJSONB() {
+        let json = #"{"hello": "world"}"#
+        var buffer = ByteBuffer()
+        buffer.writeInteger(UInt8(1))
+        buffer.writeString(json)
+
+        var decoded: String?
+        XCTAssertNoThrow(decoded = try String(from: &buffer, type: .jsonb, format: .binary, context: .default))
+        XCTAssertEqual(decoded, json)
+    }
 }
