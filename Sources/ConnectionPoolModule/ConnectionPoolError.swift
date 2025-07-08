@@ -1,16 +1,25 @@
 
 public struct ConnectionPoolError: Error, Hashable {
-    enum Base: Error, Hashable {
+    @usableFromInline
+    enum Base: Error, Hashable, Sendable {
         case requestCancelled
         case poolShutdown
     }
 
-    private let base: Base
+    @usableFromInline
+    let base: Base
 
+    @inlinable
     init(_ base: Base) { self.base = base }
 
     /// The connection requests got cancelled
-    public static let requestCancelled = ConnectionPoolError(.requestCancelled)
+    @inlinable
+    public static var requestCancelled: Self {
+        ConnectionPoolError(.requestCancelled)
+    }
     /// The connection requests can't be fulfilled as the pool has already been shutdown
-    public static let poolShutdown = ConnectionPoolError(.poolShutdown)
+    @inlinable
+    public static var poolShutdown: Self {
+        ConnectionPoolError(.poolShutdown)
+    }
 }
