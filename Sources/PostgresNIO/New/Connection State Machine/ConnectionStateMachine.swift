@@ -141,6 +141,17 @@ struct ConnectionStateMachine {
         case succeedPromise(EventLoopPromise<Void>)
     }
 
+    enum CheckBackendCanReceiveCopyDataAction {
+        /// Don't perform any action.
+        case none
+
+        /// Succeed the promise with a Void result.
+        case succeedPromise(EventLoopPromise<Void>)
+
+        /// Fail the promise with the given error.
+        case failPromise(EventLoopPromise<Void>, error: any Error)
+    }
+
     private var state: State
     private let requireBackendKeyData: Bool
     private var taskQueue = CircularBuffer<PSQLTask>()
@@ -815,14 +826,15 @@ struct ConnectionStateMachine {
     /// The promise may be failed if the backend indicated that it can't handle any more data by sending an
     /// `ErrorResponse`. This is mostly the case when malformed data is sent to it. In that case, the data transfer
     /// should be aborted to avoid unnecessary work.
-    mutating func checkBackendCanReceiveCopyData(channelIsWritable: Bool, promise: EventLoopPromise<Void>) {
+    mutating func checkBackendCanReceiveCopyData(channelIsWritable: Bool, promise: EventLoopPromise<Void>) -> CheckBackendCanReceiveCopyDataAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
             preconditionFailure("Copy mode is only supported for extended queries")
         }
 
         self.state = .modifying // avoid CoW
-        queryState.checkBackendCanReceiveCopyData(channelIsWritable: channelIsWritable, promise: promise)
+        let action = queryState.checkBackendCanReceiveCopyData(channelIsWritable: channelIsWritable, promise: promise)
         self.state = .extendedQuery(queryState, connectionContext)
+        return action
     }
 
     /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
