@@ -427,7 +427,7 @@ struct ExtendedQueryStateMachine {
         if case .error(let error) = self.state {
             // The backend sent us an ErrorResponse during the copy operation. Indicate to the client that it should
             // abort the data transfer.
-            promise.fail(PostgresCopyFromWriter.CopyCancellationError(underlyingError: error))
+            promise.fail(error)
             return
         }
         guard case .copyingData(.readyToSend) = self.state else {

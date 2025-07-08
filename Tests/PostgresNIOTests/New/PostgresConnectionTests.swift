@@ -660,7 +660,7 @@ import Synchronization
         try await expectCopyFrom { writer in
             try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
         } validateCopyRequest: { copyRequest in
-            #expect(copyRequest.parse.query == "COPY copy_table(id,name) FROM STDIN WITH (FORMAT text)")
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT text)"#)
             #expect(copyRequest.bind.parameters == [])
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
@@ -677,7 +677,7 @@ import Synchronization
         try await expectCopyFrom(format: .text(options)) { writer in
             try await writer.write(ByteBuffer(staticString: "1,Alice\n"))
         } validateCopyRequest: { copyRequest in
-            #expect(copyRequest.parse.query == #"COPY copy_table(id,name) FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
             #expect(copyRequest.bind.parameters == [])
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
@@ -688,9 +688,7 @@ import Synchronization
     }
 
     @Test func testCopyFromWriterFails() async throws {
-        struct MyError: Error, CustomStringConvertible {
-            var description: String { "My error" }
-        }
+        struct MyError: Error {}
 
         try await expectCopyFrom { writer in
             throw MyError()
@@ -698,9 +696,9 @@ import Synchronization
             #expect(error is MyError, "Expected error of type MyError, got \(error)")
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
-            #expect(data.result == .failed(message: "My error"))
+            #expect(data.result == .failed(message: "Client failed copy"))
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: "COPY from stdin failed: My error",
+                .message: "COPY from stdin failed: Client failed copy",
                 .sqlState : "57014" // query_canceled
             ])))
         }
@@ -783,7 +781,7 @@ import Synchronization
                 try await writer.write(ByteBuffer(staticString: "2\tBob\n"))
                 Issue.record("Expected error to be thrown")
             } catch {
-                #expect(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
+                #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "22P02")
                 throw error
             }
         } validateCopyFromError: { error in
@@ -800,7 +798,7 @@ import Synchronization
         }
     }
 
-    @Test func testCopyFromCallerDoesNotRethrowCopyCancellationError() async throws {
+    @Test func testCopyFromCallerDoesNotRethrowFromWriteCall() async throws {
         struct MyError: Error, CustomStringConvertible {
             var description: String { "My error" }
         }
@@ -816,7 +814,7 @@ import Synchronization
                 try await writer.write(ByteBuffer(staticString: "2\tBob\n"))
                 Issue.record("Expected error to be thrown")
             } catch {
-                #expect(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
+                #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "22P02")
                 throw MyError()
             }
         } validateCopyFromError: { error in
@@ -903,10 +901,10 @@ import Synchronization
             cancelCopy()
 
             let data = try await channel.waitForCopyData()
-            #expect(data.result == .failed(message: "CancellationError()"))
+            #expect(data.result == .failed(message: "Client failed copy"))
 
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: "COPY from stdin failed: CancellationError()",
+                .message: "COPY from stdin failed: Client failed copy",
                 .sqlState : "57014" // query_canceled
             ])))
         }
