@@ -29,6 +29,7 @@ public struct PostgresCopyFromWriter: Sendable {
         }
     }
 
+    #if compiler(>=6.0)
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
     ///
     /// - Throws: If an error occurs during the write of if the backend sent an `ErrorResponse` during the copy 
@@ -96,6 +97,7 @@ public struct PostgresCopyFromWriter: Sendable {
             }
         }
     }
+    #endif
 }
 
 /// Specifies the format in which data is transferred to the backend in a COPY operation.
@@ -124,6 +126,7 @@ public struct PostgresCopyFromFormat: Sendable {
     }
 }
 
+#if compiler(>=6.0)
 /// Create a `COPY ... FROM STDIN` query based on the given parameters.
 ///
 /// An empty `columns` array signifies that no columns should be specified in the query and that all columns will be
@@ -221,3 +224,4 @@ extension PostgresConnection {
         try await writer.done()
     }
 }
+#endif

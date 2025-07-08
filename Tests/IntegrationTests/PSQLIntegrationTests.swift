@@ -379,6 +379,7 @@ final class IntegrationTests: XCTestCase {
         }
     }
     
+    #if compiler(>=6.0)
     func testCopyIntoFrom() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -487,4 +488,5 @@ final class IntegrationTests: XCTestCase {
             XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "42601") // scanner_yyerror
         }
     }
+    #endif
 }

@@ -625,6 +625,7 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
+    #if compiler(>=6.0)
     func testCopyFromSucceeds() async throws {
         try await assertCopyFrom { writer in
             try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
@@ -911,6 +912,7 @@ class PostgresConnectionTests: XCTestCase {
             try await connection.closeFuture.get()
         }
     }
+    #endif
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
         let eventLoop = NIOAsyncTestingEventLoop()
@@ -944,6 +946,7 @@ class PostgresConnectionTests: XCTestCase {
         return (connection, channel)
     }
 
+    #if compiler(>=6.0)
     /// Validate the behavior of a `COPY FROM` query.
     ///
     /// Also checks that the connection returns to an idle state after performing the copy and is capable
@@ -1011,6 +1014,7 @@ class PostgresConnectionTests: XCTestCase {
             _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
         }
     }
+    #endif
 }
 
 extension NIOAsyncTestingChannel {
