@@ -29,6 +29,12 @@ extension String: PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws {
         switch (format, type) {
+        case (.binary, .jsonb):
+            // Discard the version byte
+            guard let version = buffer.readInteger(as: UInt8.self), version == 1 else {
+                throw PostgresDecodingError.Code.failure
+            }
+            self = buffer.readString(length: buffer.readableBytes)!
         case (_, .varchar),
              (_, .bpchar),
              (_, .text),
