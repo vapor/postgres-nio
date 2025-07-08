@@ -13,10 +13,12 @@ public struct ConnectionPoolError: Error, Hashable {
     init(_ base: Base) { self.base = base }
 
     /// The connection requests got cancelled
+    @inlinable
     public static var requestCancelled: Self {
         ConnectionPoolError(.requestCancelled)
     }
     /// The connection requests can't be fulfilled as the pool has already been shutdown
+    @inlinable
     public static var poolShutdown: Self {
         ConnectionPoolError(.poolShutdown)
     }
