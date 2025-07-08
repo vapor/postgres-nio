@@ -181,7 +181,15 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             promise.fail(PostgresError.connectionClosed)
             return
         }
-        self.state.checkBackendCanReceiveCopyData(channelIsWritable: handlerContext.channel.isWritable, promise: promise)
+        let action = self.state.checkBackendCanReceiveCopyData(channelIsWritable: handlerContext.channel.isWritable, promise: promise)
+        switch action {
+        case .none:
+            break
+        case .succeedPromise(let promise):
+            promise.succeed()
+        case .failPromise(let promise, error: let error):
+            promise.fail(error)
+}
     }
 
     /// Cancel the currently executing operation, if it is cancellable.

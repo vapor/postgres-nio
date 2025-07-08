@@ -423,22 +423,22 @@ struct ExtendedQueryStateMachine {
     /// The promise may be failed if the backend indicated that it can't handle any more data by sending an
     /// `ErrorResponse`. This is mostly the case when malformed data is sent to it. In that case, the data transfer
     /// should be aborted to avoid unnecessary work.
-    mutating func checkBackendCanReceiveCopyData(channelIsWritable: Bool, promise: EventLoopPromise<Void>) {
+    mutating func checkBackendCanReceiveCopyData(channelIsWritable: Bool, promise: EventLoopPromise<Void>) -> ConnectionStateMachine.CheckBackendCanReceiveCopyDataAction {
         if case .error(let error) = self.state {
             // The backend sent us an ErrorResponse during the copy operation. Indicate to the client that it should
             // abort the data transfer.
             promise.fail(error)
-            return
+            return . failPromise(promise, error: error)
         }
         guard case .copyingData(.readyToSend) = self.state else {
             preconditionFailure("Not ready to send data")
         }
         if channelIsWritable {
-            promise.succeed()
-            return
+            return .succeedPromise(promise)
         }
         return avoidingStateMachineCoW { state in
             state = .copyingData(.pendingBackpressureRelieve(promise))
+            return .none
         }
     }
 
