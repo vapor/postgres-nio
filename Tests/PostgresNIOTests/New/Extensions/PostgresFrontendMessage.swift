@@ -36,6 +36,14 @@ enum PostgresFrontendMessage: Equatable {
         let secretKey: Int32
     }
 
+    struct CopyData: Hashable {
+        var data: ByteBuffer
+    }
+
+    struct CopyFail: Hashable {
+        var message: String
+    }
+
     enum Close: Hashable {
         case preparedStatement(String)
         case portal(String)
@@ -170,6 +178,9 @@ enum PostgresFrontendMessage: Equatable {
 
     case bind(Bind)
     case cancel(Cancel)
+    case copyData(CopyData)
+    case copyDone
+    case copyFail(CopyFail)
     case close(Close)
     case describe(Describe)
     case execute(Execute)
@@ -186,6 +197,9 @@ enum PostgresFrontendMessage: Equatable {
     enum ID: UInt8, Equatable {
         
         case bind
+        case copyData
+        case copyDone
+        case copyFail
         case close
         case describe
         case execute
@@ -201,12 +215,18 @@ enum PostgresFrontendMessage: Equatable {
             switch rawValue {
             case UInt8(ascii: "B"):
                 self = .bind
+            case UInt8(ascii: "c"):
+                self = .copyDone
             case UInt8(ascii: "C"):
                 self = .close
+            case UInt8(ascii: "d"):
+                self = .copyData
             case UInt8(ascii: "D"):
                 self = .describe
             case UInt8(ascii: "E"):
                 self = .execute
+            case UInt8(ascii: "f"):
+                self = .copyFail
             case UInt8(ascii: "H"):
                 self = .flush
             case UInt8(ascii: "P"):
@@ -230,6 +250,12 @@ enum PostgresFrontendMessage: Equatable {
             switch self {
             case .bind:
                 return UInt8(ascii: "B")
+            case .copyData:
+                return UInt8(ascii: "d")
+            case .copyDone:
+                return UInt8(ascii: "c")
+            case .copyFail:
+                return UInt8(ascii: "f")
             case .close:
                 return UInt8(ascii: "C")
             case .describe:
@@ -263,6 +289,12 @@ extension PostgresFrontendMessage {
             return .bind
         case .cancel:
             preconditionFailure("Cancel messages don't have an identifier")
+        case .copyData:
+            return .copyData
+        case .copyDone:
+            return .copyDone
+        case .copyFail:
+            return .copyFail
         case .close:
             return .close
         case .describe:

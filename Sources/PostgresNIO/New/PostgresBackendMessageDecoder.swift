@@ -189,6 +189,12 @@ struct PSQLPartialDecodingError: Error {
             description: "Expected the integer to be positive or null, but got \(actual).",
             file: file, line: line)
     }
+
+    static func unknownMessageKind(_ messageID: PostgresBackendMessage.ID, file: String = #fileID, line: Int = #line) -> Self {
+        return PSQLPartialDecodingError(
+            description: "Unknown message kind: \(messageID)",
+            file: file, line: line)
+    }
 }
 
 extension ByteBuffer {

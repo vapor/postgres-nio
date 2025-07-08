@@ -28,6 +28,8 @@ struct PSQLBackendMessageEncoder: MessageToByteEncoder {
         case .commandComplete(let string):
             self.encode(messageID: message.id, payload: StringPayload(string), into: &buffer)
             
+        case .copyInResponse(let copyInResponse):
+            self.encode(messageID: message.id, payload: copyInResponse, into: &buffer)
         case .dataRow(let row):
             self.encode(messageID: message.id, payload: row, into: &buffer)
             
@@ -99,6 +101,8 @@ extension PostgresBackendMessage {
             return .closeComplete
         case .commandComplete:
             return .commandComplete
+        case .copyInResponse:
+            return .copyInResponse
         case .dataRow:
             return .dataRow
         case .emptyQueryResponse:
@@ -181,6 +185,16 @@ extension PostgresBackendMessage.BackendKeyData: PSQLMessagePayloadEncodable {
     public func encode(into buffer: inout ByteBuffer) {
         buffer.writeInteger(self.processID)
         buffer.writeInteger(self.secretKey)
+    }
+}
+
+extension PostgresBackendMessage.CopyInResponse: PSQLMessagePayloadEncodable {
+    public func encode(into buffer: inout ByteBuffer) {
+        buffer.writeInteger(Int8(self.format.rawValue))
+        buffer.writeInteger(Int16(self.columnFormats.count))
+        for columnFormat in columnFormats {
+            buffer.writeInteger(Int16(columnFormat.rawValue))
+        }
     }
 }
 

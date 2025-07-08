@@ -91,7 +91,7 @@ struct ExtendedQueryStateMachine {
     mutating func cancel() -> Action {
         switch self.state {
         case .initialized:
-            preconditionFailure("Start must be called immediatly after the query was created")
+            preconditionFailure("Start must be called immediately after the query was created")
 
         case .messagesSent(let queryContext),
              .parseCompleteReceived(let queryContext),
@@ -322,6 +322,12 @@ struct ExtendedQueryStateMachine {
         }
     }
     
+    mutating func copyInResponseReceived(
+        _ copyInResponse: PostgresBackendMessage.CopyInResponse
+    ) -> Action {
+        return self.setAndFireError(.unexpectedBackendMessage(.copyInResponse(copyInResponse)))
+    }
+
     mutating func emptyQueryResponseReceived() -> Action {
         guard case .bindCompleteReceived(let queryContext) = self.state else {
             return self.setAndFireError(.unexpectedBackendMessage(.emptyQueryResponse))

@@ -752,6 +752,12 @@ struct ConnectionStateMachine {
         return self.modify(with: action)
     }
     
+    mutating func copyInResponseReceived(
+        _ copyInResponse: PostgresBackendMessage.CopyInResponse
+    ) -> ConnectionAction {
+        return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.copyInResponse(copyInResponse)))
+    }
+
     mutating func emptyQueryResponseReceived() -> ConnectionAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.emptyQueryResponse))

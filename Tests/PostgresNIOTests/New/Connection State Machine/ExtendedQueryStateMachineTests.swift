@@ -114,7 +114,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
                        .failQuery(promise, with: psqlError, cleanupContext: .init(action: .close, tasks: [], error: psqlError, closePromise: nil)))
     }
 
-    func testExtendedQueryIsCancelledImmediatly() {
+    func testExtendedQueryIsCancelledImmediately() {
         var state = ConnectionStateMachine.readyForQuery()
 
         let logger = Logger.psqlTest
