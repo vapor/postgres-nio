@@ -629,7 +629,7 @@ class PostgresConnectionTests: XCTestCase {
         try await assertCopyFrom { writer in
             try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
         } validateCopyRequest: { copyRequest in
-            XCTAssertEqual(copyRequest.parse.query, "COPY copy_table(id,name) FROM STDIN WITH (FORMAT text)")
+            XCTAssertEqual(copyRequest.parse.query, #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT text)"#)
             XCTAssertEqual(copyRequest.bind.parameters, [])
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
@@ -646,7 +646,7 @@ class PostgresConnectionTests: XCTestCase {
         try await assertCopyFrom(format: .text(options)) { writer in
             try await writer.write(ByteBuffer(staticString: "1,Alice\n"))
         } validateCopyRequest: { copyRequest in
-            XCTAssertEqual(copyRequest.parse.query, #"COPY copy_table(id,name) FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
+            XCTAssertEqual(copyRequest.parse.query, #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
             XCTAssertEqual(copyRequest.bind.parameters, [])
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
@@ -657,9 +657,7 @@ class PostgresConnectionTests: XCTestCase {
     }
 
     func testCopyFromWriterFails() async throws {
-        struct MyError: Error, CustomStringConvertible {
-            var description: String { "My error" }
-        }
+        struct MyError: Error {}
 
         try await assertCopyFrom { writer in
             throw MyError()
@@ -667,9 +665,9 @@ class PostgresConnectionTests: XCTestCase {
             XCTAssert(error is MyError, "Expected error of type MyError, got \(error)")
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
-            XCTAssertEqual(data.result, .failed(message: "My error"))
+            XCTAssertEqual(data.result, .failed(message: "Client failed copy"))
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: "COPY from stdin failed: My error",
+                .message: "COPY from stdin failed: Client failed copy",
                 .sqlState : "57014" // query_canceled
             ])))
         }
@@ -752,7 +750,7 @@ class PostgresConnectionTests: XCTestCase {
                 try await writer.write(ByteBuffer(staticString: "2\tBob\n"))
                 XCTFail("Expected error to be thrown")
             } catch {
-                XCTAssert(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
+                XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "22P02")
                 throw error
             }
         } validateCopyFromError: { error in
@@ -769,7 +767,7 @@ class PostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testCopyFromCallerDoesNotRethrowCopyCancellationError() async throws {
+    func testCopyFromCallerDoesNotRethrowFromWriteCall() async throws {
         struct MyError: Error, CustomStringConvertible {
             var description: String { "My error" }
         }
@@ -785,7 +783,7 @@ class PostgresConnectionTests: XCTestCase {
                 try await writer.write(ByteBuffer(staticString: "2\tBob\n"))
                 XCTFail("Expected error to be thrown")
             } catch {
-                XCTAssert(error is PostgresCopyFromWriter.CopyCancellationError, "Received unexpected error: \(error)")
+                XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "22P02")
                 throw MyError()
             }
         } validateCopyFromError: { error in
@@ -875,10 +873,10 @@ class PostgresConnectionTests: XCTestCase {
             cancelCopy()
 
             let data = try await channel.waitForCopyData()
-            XCTAssertEqual(data.result, .failed(message: "CancellationError()"))
+            XCTAssertEqual(data.result, .failed(message: "Client failed copy"))
 
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: "COPY from stdin failed: CancellationError()",
+                .message: "COPY from stdin failed: Client failed copy",
                 .sqlState : "57014" // query_canceled
             ])))
         }
