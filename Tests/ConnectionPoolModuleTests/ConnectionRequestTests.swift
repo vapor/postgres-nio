@@ -12,9 +12,7 @@ final class ConnectionRequestTests: XCTestCase {
             (continuation: CheckedContinuation<ConnectionLease<MockConnection<NothingConnectionPoolExecutor>>, any Error>) in
             let request = ConnectionRequest(id: 42, continuation: continuation)
             XCTAssertEqual(request.id, 42)
-            let lease = ConnectionLease(connection: mockConnection) {
-
-            }
+            let lease = ConnectionLease(connection: mockConnection) { _ in }
             continuation.resume(with: .success(lease))
         }
 

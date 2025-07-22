@@ -429,7 +429,7 @@ public final class ConnectionPool<
     /*private*/ func runRequestAction(_ action: StateMachine.RequestAction) {
         switch action {
         case .leaseConnection(let requests, let connection):
-            let lease = ConnectionLease(connection: connection) {
+            let lease = ConnectionLease(connection: connection) { connection in
                 self.releaseConnection(connection)
             }
             for request in requests {

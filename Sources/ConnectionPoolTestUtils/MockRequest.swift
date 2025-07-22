@@ -1,7 +1,6 @@
 import _ConnectionPoolModule
 
 public final class MockRequest<Connection: PooledConnection>: ConnectionRequestProtocol, Hashable, Sendable {
-    
     public struct ID: Hashable, Sendable {
         var objectID: ObjectIdentifier
 
