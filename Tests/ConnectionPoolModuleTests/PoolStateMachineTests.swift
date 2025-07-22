@@ -7,8 +7,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
     MockConnection,
     ConnectionIDGenerator,
     MockConnection.ID,
-    MockRequest,
-    MockRequest.ID,
+    MockRequest<MockConnection>,
+    MockRequest<MockConnection>.ID,
     MockTimerCancellationToken
 >
 
@@ -75,7 +75,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(createdAction1.connection, .scheduleTimers([]))
 
         // lease connection 1
-        let request1 = MockRequest()
+        let request1 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         XCTAssertEqual(leaseRequest1.connection, .cancelTimers([]))
         XCTAssertEqual(leaseRequest1.request, .leaseConnection(.init(element: request1), connection1))
@@ -84,13 +84,13 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(stateMachine.releaseConnection(connection1, streams: 1), .none())
 
         // lease connection 1
-        let request2 = MockRequest()
+        let request2 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         XCTAssertEqual(leaseRequest2.connection, .cancelTimers([]))
         XCTAssertEqual(leaseRequest2.request, .leaseConnection(.init(element: request2), connection1))
 
         // request connection while none is available
-        let request3 = MockRequest()
+        let request3 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest3 = stateMachine.leaseConnection(request3)
         XCTAssertEqual(leaseRequest3.connection, .makeConnection(.init(connectionID: 1), []))
         XCTAssertEqual(leaseRequest3.request, .none)
@@ -132,7 +132,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(requests.count, 0)
 
         // request connection while none exists
-        let request1 = MockRequest()
+        let request1 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         XCTAssertEqual(leaseRequest1.connection, .makeConnection(.init(connectionID: 0), []))
         XCTAssertEqual(leaseRequest1.request, .none)
@@ -144,7 +144,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(createdAction1.connection, .none)
 
         // request connection while none is available
-        let request2 = MockRequest()
+        let request2 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         XCTAssertEqual(leaseRequest2.connection, .makeConnection(.init(connectionID: 1), []))
         XCTAssertEqual(leaseRequest2.request, .none)
@@ -195,13 +195,13 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(createdAction1.connection, .scheduleTimers([]))
 
         // lease connection 1
-        let request1 = MockRequest()
+        let request1 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         XCTAssertEqual(leaseRequest1.connection, .cancelTimers([]))
         XCTAssertEqual(leaseRequest1.request, .leaseConnection(.init(element: request1), connection1))
 
         // request connection while none is available
-        let request2 = MockRequest()
+        let request2 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         XCTAssertEqual(leaseRequest2.connection, .makeConnection(.init(connectionID: 1), []))
         XCTAssertEqual(leaseRequest2.request, .none)
@@ -245,7 +245,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(requests.count, 0)
 
         // request connection while none exists
-        let request1 = MockRequest()
+        let request1 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         XCTAssertEqual(leaseRequest1.connection, .makeConnection(.init(connectionID: 0), []))
         XCTAssertEqual(leaseRequest1.request, .none)
@@ -287,7 +287,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(requests.count, 0)
 
         // request connection while none exists
-        let request1 = MockRequest()
+        let request1 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         XCTAssertEqual(leaseRequest1.connection, .makeConnection(.init(connectionID: 0), []))
         XCTAssertEqual(leaseRequest1.request, .none)
@@ -309,7 +309,7 @@ final class PoolStateMachineTests: XCTestCase {
         connection1.closeIfClosing()
 
         // request connection while none exists anymore
-        let request2 = MockRequest()
+        let request2 = MockRequest(connectionType: MockConnection.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         XCTAssertEqual(leaseRequest2.connection, .makeConnection(.init(connectionID: 1), []))
         XCTAssertEqual(leaseRequest2.request, .none)
@@ -354,7 +354,7 @@ final class PoolStateMachineTests: XCTestCase {
         XCTAssertEqual(requests.count, 1)
 
         // one connection should exist
-        let request = MockRequest()
+        let request = MockRequest(connectionType: MockConnection.self)
         let leaseRequest = stateMachine.leaseConnection(request)
         XCTAssertEqual(leaseRequest.connection, .none)
         XCTAssertEqual(leaseRequest.request, .none)
