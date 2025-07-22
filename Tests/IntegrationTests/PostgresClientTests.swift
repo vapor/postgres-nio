@@ -338,7 +338,7 @@ final class PostgresClientTests: XCTestCase {
             )
 
             var count = 0
-            for try await (id, label) in rows.decode((Int, String).self) {
+            for try await _ in rows.decode((Int, String).self) {
                 count += 1
             }
             XCTAssertEqual(count, 1)

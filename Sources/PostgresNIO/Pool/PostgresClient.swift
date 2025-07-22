@@ -301,11 +301,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Returns: The closure's return value.
     @_disfavoredOverload
     public func withConnection<Result>(_ closure: (PostgresConnection) async throws -> Result) async throws -> Result {
-        let connection = try await self.leaseConnection()
+        let lease = try await self.leaseConnection()
 
-        defer { self.pool.releaseConnection(connection) }
+        defer { lease.release() }
 
-        return try await closure(connection)
+        return try await closure(lease.connection)
     }
 
     #if compiler(>=6.0)
@@ -319,11 +319,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         // DO NOT FIX THE WHITESPACE IN THE NEXT LINE UNTIL 5.10 IS UNSUPPORTED
         // https://github.com/swiftlang/swift/issues/79285
         _ closure: (PostgresConnection) async throws -> sending Result) async throws -> sending Result {
-        let connection = try await self.leaseConnection()
+        let lease = try await self.leaseConnection()
 
-        defer { self.pool.releaseConnection(connection) }
+        defer { lease.release() }
 
-        return try await closure(connection)
+        return try await closure(lease.connection)
     }
 
     /// Lease a connection, which is in an open transaction state, for the provided `closure`'s lifetime.
@@ -404,7 +404,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                 throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
             }
 
-            let connection = try await self.leaseConnection()
+            let lease = try await self.leaseConnection()
+            let connection = lease.connection
 
             var logger = logger
             logger[postgresMetadataKey: .connectionID] = "\(connection.id)"
@@ -419,12 +420,12 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
 
             promise.futureResult.whenFailure { _ in
-                self.pool.releaseConnection(connection)
+                lease.release()
             }
 
             return try await promise.futureResult.map {
                 $0.asyncSequence(onFinish: {
-                    self.pool.releaseConnection(connection)
+                    lease.release()
                 })
             }.get()
         } catch var error as PSQLError {
@@ -446,7 +447,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let logger = logger ?? Self.loggingDisabled
 
         do {
-            let connection = try await self.leaseConnection()
+            let lease = try await self.leaseConnection()
+            let connection = lease.connection
 
             let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
             let task = HandlerTask.executePreparedStatement(.init(
@@ -460,11 +462,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             connection.channel.write(task, promise: nil)
 
             promise.futureResult.whenFailure { _ in
-                self.pool.releaseConnection(connection)
+                lease.release()
             }
 
             return try await promise.futureResult
-                .map { $0.asyncSequence(onFinish: { self.pool.releaseConnection(connection) }) }
+                .map { $0.asyncSequence(onFinish: { lease.release() }) }
                 .get()
                 .map { try preparedStatement.decodeRow($0) }
         } catch var error as PSQLError {
@@ -504,7 +506,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     // MARK: - Private Methods -
 
-    private func leaseConnection() async throws -> PostgresConnection {
+    private func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
         if !self.runningAtomic.load(ordering: .relaxed) {
             self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }

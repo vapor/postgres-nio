@@ -11,7 +11,7 @@ final class PoolStateMachine_RequestQueueTests: XCTestCase {
         var queue = TestQueue()
         XCTAssert(queue.isEmpty)
 
-        let request1 = MockRequest()
+        let request1 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request1)
         XCTAssertEqual(queue.count, 1)
         XCTAssertFalse(queue.isEmpty)
@@ -25,11 +25,11 @@ final class PoolStateMachine_RequestQueueTests: XCTestCase {
         var queue = TestQueue()
         XCTAssert(queue.isEmpty)
 
-        var request1 = MockRequest()
+        var request1 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request1)
-        var request2 = MockRequest()
+        var request2 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request2)
-        var request3 = MockRequest()
+        var request3 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request3)
 
         do {
@@ -49,11 +49,11 @@ final class PoolStateMachine_RequestQueueTests: XCTestCase {
         var queue = TestQueue()
         XCTAssert(queue.isEmpty)
 
-        var request1 = MockRequest()
+        var request1 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request1)
-        var request2 = MockRequest()
+        var request2 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request2)
-        var request3 = MockRequest()
+        var request3 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request3)
 
         do {
@@ -76,11 +76,11 @@ final class PoolStateMachine_RequestQueueTests: XCTestCase {
         var queue = TestQueue()
         XCTAssert(queue.isEmpty)
 
-        var request1 = MockRequest()
+        var request1 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request1)
-        var request2 = MockRequest()
+        var request2 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request2)
-        var request3 = MockRequest()
+        var request3 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request3)
 
         do {
@@ -113,11 +113,11 @@ final class PoolStateMachine_RequestQueueTests: XCTestCase {
         var queue = TestQueue()
         XCTAssert(queue.isEmpty)
 
-        var request1 = MockRequest()
+        var request1 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request1)
-        var request2 = MockRequest()
+        var request2 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request2)
-        var request3 = MockRequest()
+        var request3 = MockRequest(connectionType: MockConnection.self)
         queue.queue(request3)
 
         do {
