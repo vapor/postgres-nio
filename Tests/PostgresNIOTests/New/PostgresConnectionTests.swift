@@ -993,8 +993,8 @@ import Synchronization
     ///     and is now expecting a `Sync` to return back to the idle state. The closure may call the `cancelCopyFrom`
     ///     closure that is passed to it to cancel the COPY operation.
     private func expectCopyFrom(
-        table: StaticString = "copy_table",
-        columns: [StaticString] = ["id", "name"],
+        table: String = "copy_table",
+        columns: [String] = ["id", "name"],
         format: PostgresCopyFromFormat = .text(.init()),
         writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
         validateCopyFromError: (@Sendable (any Error) -> Void)? = nil,

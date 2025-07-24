@@ -128,9 +128,12 @@ public struct PostgresCopyFromFormat: Sendable {
 ///
 /// An empty `columns` array signifies that no columns should be specified in the query and that all columns will be
 /// copied by the caller.
+///
+/// - Important: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
+///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
 private func buildCopyFromQuery(
-    table: StaticString,
-    columns: [StaticString] = [],
+    table: String,
+    columns: [String] = [],
     format: PostgresCopyFromFormat
 ) -> PostgresQuery {
     var query = """
@@ -170,11 +173,11 @@ extension PostgresConnection {
     ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown
     ///     by the `copyFrom` function.
     ///
-    /// - Note: The table and column names are inserted into the SQL query verbatim. They are forced to be compile-time
-    ///   specified to avoid runtime SQL injection attacks.
+    /// - Important: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
+    ///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
     public func copyFrom(
-        table: StaticString,
-        columns: [StaticString] = [],
+        table: String,
+        columns: [String] = [],
         format: PostgresCopyFromFormat = .text(.init()),
         logger: Logger,
         isolation: isolated (any Actor)? = #isolation,
