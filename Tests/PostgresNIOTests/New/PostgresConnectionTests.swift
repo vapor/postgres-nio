@@ -912,6 +912,68 @@ class PostgresConnectionTests: XCTestCase {
             try await connection.closeFuture.get()
         }
     }
+
+    func testCopyFromBinary() async throws {
+        let (connection, channel) = try await self.makeTestConnectionWithAsyncTestingChannel()
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            taskGroup.addTask {
+                try await connection.copyFromBinary(table: "copy_table", logger: .psqlTest) { writer in
+                    try await writer.writeRow { columnWriter in
+                        try columnWriter.writeColumn(Int32(1))
+                        try columnWriter.writeColumn("Alice")
+                    }
+                    try await writer.writeRow { columnWriter in
+                        try columnWriter.writeColumn(Int32(2))
+                        try columnWriter.writeColumn("Bob")
+                    }
+                }
+            }
+
+            let copyRequest = try await channel.waitForUnpreparedRequest()
+            XCTAssertEqual(copyRequest.parse.query, #"COPY "copy_table" FROM STDIN WITH (FORMAT binary)"#)
+
+            try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+            try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .binary, columnFormats: [.binary, .binary])))
+
+            let copyData = try await channel.waitForCopyData()
+            XCTAssertEqual(copyData.result, .done)
+            var data = copyData.data
+            // Signature
+            XCTAssertEqual(data.readString(length: 7), "PGCOPY\n")
+            XCTAssertEqual(data.readInteger(as: UInt8.self), 0xff)
+            XCTAssertEqual(data.readString(length: 3), "\r\n\0")
+            // Flags
+            XCTAssertEqual(data.readInteger(as: UInt32.self), 0)
+            // Header extension area length
+            XCTAssertEqual(data.readInteger(as: UInt32.self), 0)
+
+            struct Row: Equatable {
+                let id: Int32
+                let name: String
+            }
+            var rows: [Row] = []
+            while data.readableBytes > 0 {
+                // Number of columns
+                XCTAssertEqual(data.readInteger(as: UInt16.self), 2)
+                // 'id' column
+                XCTAssertEqual(data.readInteger(as: UInt32.self), 4)
+                let id = try XCTUnwrap(data.readInteger(as: Int32.self))
+                // 'name' column length
+                let nameLength = try XCTUnwrap(data.readInteger(as: UInt32.self))
+                let name = try XCTUnwrap(data.readString(length: Int(nameLength)))
+                rows.append(Row(id: id, name: name))
+            }
+            XCTAssertEqual(rows, [
+                Row(id: 1, name: "Alice"),
+                Row(id: 2, name: "Bob")
+            ])
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+
+            try await channel.waitForPostgresFrontendMessage(\.sync)
+            try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+        }
+    }
     #endif
 
     func makeTestConnectionWithAsyncTestingChannel() async throws -> (PostgresConnection, NIOAsyncTestingChannel) {
