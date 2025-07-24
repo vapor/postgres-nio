@@ -130,7 +130,17 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
         @inlinable
         public mutating func writeColumn(_ column: (some PostgresEncodable)?) throws {
             columns += 1
-            try underlying.pointee.writeColumn(column)
+            try invokeWriteColumn(on: underlying, column)
+        }
+
+        // Needed to work around https://github.com/swiftlang/swift/issues/83309, copying the implementation into 
+        // `writeColumn` causes an assertion failure when thread sanitizer is enabled.
+        @inlinable 
+        func invokeWriteColumn(
+            on writer: UnsafeMutablePointer<PostgresBinaryCopyFromWriter>, 
+            _ column: (some PostgresEncodable)?
+        ) throws {
+            try writer.pointee.writeColumn(column)
         }
     }
 
