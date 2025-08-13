@@ -19,7 +19,7 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
     /// A connection attempt failed with the given error. After some period of
     /// time ``startedConnecting(id:)`` may be called again.
     func connectFailed(id: ConnectionID, error: Error) {
-        self.logger.debug("Connection creation failed", metadata: [
+        self.logger.info("Connection creation failed", metadata: [
             .connectionID: "\(id)",
             .error: "\(String(reflecting: error))"
         ])
