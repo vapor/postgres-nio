@@ -26,6 +26,21 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
             columns: self.columns
         )
     }
+
+    /// Get the column information of the query results.
+    public func getColumns() -> [PostgresColumn] {
+        self.columns.map { column in
+            PostgresColumn(
+                name: column.name,
+                tableOID: column.tableOID,
+                columnAttributeNumber: column.columnAttributeNumber,
+                dataType: column.dataType,
+                dataTypeSize: column.dataTypeSize,
+                dataTypeModifier: column.dataTypeModifier,
+                format: column.format
+            )
+        }
+    }
 }
 
 extension PostgresRowSequence {
