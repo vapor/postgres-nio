@@ -433,6 +433,71 @@ final class PostgresRowSequenceTests: XCTestCase {
         let emptyRow = try await rowIterator.next()
         XCTAssertNil(emptyRow)
     }
+
+    func testGetColumnsReturnsCorrectColumnInformation() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        
+        let sourceColumns = [
+            RowDescription.Column(
+                name: "id",
+                tableOID: 12345,
+                columnAttributeNumber: 1,
+                dataType: .int8,
+                dataTypeSize: 8,
+                dataTypeModifier: -1,
+                format: .binary
+            ),
+            RowDescription.Column(
+                name: "name",
+                tableOID: 12345,
+                columnAttributeNumber: 2,
+                dataType: .text,
+                dataTypeSize: -1,
+                dataTypeModifier: -1,
+                format: .text
+            )
+        ]
+        
+        let expectedColumns = sourceColumns.map { column in
+            PostgresColumn(
+                name: column.name,
+                tableOID: column.tableOID,
+                columnAttributeNumber: column.columnAttributeNumber,
+                dataType: column.dataType,
+                dataTypeSize: column.dataTypeSize,
+                dataTypeModifier: column.dataTypeModifier,
+                format: column.format
+            )
+        }
+        
+        let stream = PSQLRowStream(
+            source: .stream(sourceColumns, dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+        
+        let rowSequence = stream.asyncSequence()
+        let actualColumns = rowSequence.getColumns()
+        
+        XCTAssertEqual(actualColumns, expectedColumns)
+    }
+
+    func testGetColumnsWithEmptyColumns() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+        
+        let rowSequence = stream.asyncSequence()
+        let columns = rowSequence.getColumns()
+        
+        XCTAssertTrue(columns.isEmpty)
+    }
 }
 
 final class MockRowDataSource: PSQLRowsDataSource {
