@@ -183,7 +183,7 @@ extension PostgresConnection {
         isolation: isolated (any Actor)? = #isolation,
         file: String = #fileID,
         line: Int = #line,
-        writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void
+        writeData: (PostgresCopyFromWriter) async throws -> Void
     )  async throws {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
