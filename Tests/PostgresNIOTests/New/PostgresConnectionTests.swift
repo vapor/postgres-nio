@@ -949,6 +949,68 @@ import Synchronization
         }
     }
 
+    @Test func testCopyFromBinary() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
+                taskGroup.addTask {
+                    try await connection.copyFromBinary(table: "copy_table", logger: .psqlTest) {
+                        writer in
+                        try await writer.writeRow { columnWriter in
+                            try columnWriter.writeColumn(Int32(1))
+                            try columnWriter.writeColumn("Alice")
+                        }
+                        try await writer.writeRow { columnWriter in
+                            try columnWriter.writeColumn(Int32(2))
+                            try columnWriter.writeColumn("Bob")
+                        }
+                    }
+                }
+
+                let copyRequest = try await channel.waitForUnpreparedRequest()
+                #expect(copyRequest.parse.query == #"COPY "copy_table" FROM STDIN WITH (FORMAT binary)"#)
+
+                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                try await channel.writeInbound(
+                    PostgresBackendMessage.copyInResponse(
+                        .init(format: .binary, columnFormats: [.binary, .binary])))
+
+                let copyData = try await channel.waitForCopyData()
+                #expect(copyData.result == .done)
+                var data = copyData.data
+                // Signature
+                #expect(data.readString(length: 7) == "PGCOPY\n")
+                #expect(data.readInteger(as: UInt8.self) == 0xff)
+                #expect(data.readString(length: 3) == "\r\n\0")
+                // Flags
+                #expect(data.readInteger(as: UInt32.self) == 0)
+                // Header extension area length
+                #expect(data.readInteger(as: UInt32.self) == 0)
+
+                struct Row: Equatable {
+                    let id: Int32
+                    let name: String
+                }
+                var rows: [Row] = []
+                while data.readableBytes > 0 {
+                    // Number of columns
+                    #expect(data.readInteger(as: UInt16.self) == 2)
+                    // 'id' column
+                    #expect(data.readInteger(as: UInt32.self) == 4)
+                    let id = data.readInteger(as: Int32.self)
+                    // 'name' column length
+                    let nameLength = data.readInteger(as: UInt32.self)
+                    let name = data.readString(length: Int(try #require(nameLength)))
+                    rows.append(Row(id: try #require(id), name: try #require(name)))
+                }
+                #expect(rows == [Row(id: 1, name: "Alice"), Row(id: 2, name: "Bob")])
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+
+                try await channel.waitForPostgresFrontendMessage(\.sync)
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            }
+        }
+    }
+
     func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in

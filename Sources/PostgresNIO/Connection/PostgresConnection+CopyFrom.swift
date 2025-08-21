@@ -98,6 +98,111 @@ public struct PostgresCopyFromWriter: Sendable {
     }
 }
 
+
+/// Handle to send binary data for a `COPY ... FROM STDIN` query to the backend.
+///
+/// It takes care of serializing `PostgresEncodable` column types into the binary format that Postgres expects.
+public struct PostgresBinaryCopyFromWriter: ~Copyable {
+    /// Handle to serialize columns into a row that is being written by `PostgresBinaryCopyFromWriter`.
+    public struct ColumnWriter: ~Copyable {
+        /// The `PostgresBinaryCopyFromWriter` that is gathering the serialized data.
+        ///
+        /// We need to model this as `UnsafeMutablePointer` because we can't express in the Swift type system that
+        /// `ColumnWriter` never exceeds the lifetime of `PostgresBinaryCopyFromWriter`.
+        @usableFromInline
+        let underlying: UnsafeMutablePointer<PostgresBinaryCopyFromWriter>
+
+        /// The number of columns that have been written by this `ColumnWriter`.
+        @usableFromInline
+        var columns: UInt16 = 0
+
+        @usableFromInline
+        init(underlying: UnsafeMutablePointer<PostgresBinaryCopyFromWriter>) {
+            self.underlying = underlying
+        }
+
+        /// Serialize a single column to a row.
+        ///
+        /// - Important: It is critical that that data type encoded here exactly matches the data type in the
+        ///   database. For example, if the database stores an a 4-bit integer the corresponding `writeColumn` must
+        ///   be called with an `Int32`. Serializing an integer of a different width will cause a deserialization
+        ///   failure in the backend.
+        @inlinable
+        public mutating func writeColumn(_ column: (some PostgresEncodable)?) throws {
+            columns += 1
+            try underlying.pointee.writeColumn(column)
+        }
+    }
+
+    /// The underlying `PostgresCopyFromWriter` that sends the serialized data to the backend.
+    @usableFromInline let underlying: PostgresCopyFromWriter
+
+    /// The buffer in which we accumulate binary data. Once this buffer exceeds `bufferSize`, we flush it to
+    /// the backend.
+    @usableFromInline var buffer = ByteBuffer()
+
+    /// Once `buffer` exceeds this size, it gets flushed to the backend.
+    @usableFromInline let bufferSize: Int
+
+    init(underlying: PostgresCopyFromWriter, bufferSize: Int) {
+        self.underlying = underlying
+        // Allocate 10% more than the buffer size because we only flush the buffer once it has exceeded `bufferSize`
+        buffer.reserveCapacity(bufferSize + bufferSize / 10)
+        self.bufferSize = bufferSize
+    }
+
+    /// Serialize a single row to the backend. Call `writeColumn` on `columnWriter` for every column that should be
+    /// included in the row.
+    @inlinable
+    public mutating func writeRow(_ body: (_ columnWriter: inout ColumnWriter) throws -> Void) async throws {
+        // Write a placeholder for the number of columns
+        let columnIndex = buffer.writerIndex
+        buffer.writeInteger(UInt16(0))
+
+        let columns = try withUnsafeMutablePointer(to: &self) { pointerToSelf in
+            // Important: We need to ensure that `pointerToSelf` (and thus `ColumnWriter`) does not exceed the lifetime
+            // of `self` because it is holding an unsafe reference to it.
+            //
+            // We achieve this because `ColumnWriter` is non-Copyable and thus the client can't store a copy to it.
+            // Furthermore, `columnWriter` is destroyed before the end of `withUnsafeMutablePointer`, which holds `self`
+            // alive.
+            var columnWriter = ColumnWriter(underlying: pointerToSelf)
+
+            try body(&columnWriter)
+
+            return columnWriter.columns
+        }
+
+        // Fill in the number of columns
+        buffer.setInteger(columns, at: columnIndex)
+
+        if buffer.readableBytes > bufferSize {
+            try await flush()
+        }
+    }
+
+    /// Serialize a single column to the buffer. Should only be called by `ColumnWriter`.
+    @inlinable
+    mutating func writeColumn(_ column: (some PostgresEncodable)?) throws {
+        guard let column else {
+            buffer.writeInteger(Int32(-1))
+            return
+        }
+        try buffer.writeLengthPrefixed(as: Int32.self) { buffer in
+            let startIndex = buffer.writerIndex
+            try column.encode(into: &buffer, context: .default)
+            return buffer.writerIndex - startIndex
+        }
+    }
+
+    /// Flush any pending data in the buffer to the backend.
+    @usableFromInline
+    mutating func flush() async throws {
+        try await underlying.write(buffer)
+        buffer.clear()
+    }
+}
+
 /// Specifies the format in which data is transferred to the backend in a COPY operation.
 ///
 /// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the option's meanings
@@ -113,14 +218,24 @@ public struct PostgresCopyFromFormat: Sendable {
         public init() {}
     }
 
+    /// Options that can be used to modify the `binary` format of a COPY operation.
+    public struct BinaryOptions: Sendable {
+        public init() {}
+    }
+
     enum Format {
         case text(TextOptions)
+        case binary(BinaryOptions)
     }
 
     var format: Format
 
     public static func text(_ options: TextOptions) -> PostgresCopyFromFormat {
         return PostgresCopyFromFormat(format: .text(options))
+    }
+
+    public static func binary(_ options: BinaryOptions) -> PostgresCopyFromFormat {
+        return PostgresCopyFromFormat(format: .binary(options))
     }
 }
 
@@ -153,6 +268,8 @@ private func buildCopyFromQuery(
             // Set the delimiter as a Unicode code point. This avoids the possibility of SQL injection.
             queryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
         }
+    case .binary:
+        queryOptions.append("FORMAT binary")
     }
     precondition(!queryOptions.isEmpty)
     query += " WITH ("
@@ -162,6 +279,49 @@ private func buildCopyFromQuery(
 }
 
 extension PostgresConnection {
+    /// Copy data into a table using a `COPY <table name> FROM STDIN` query, transferring data in a binary format.
+    ///
+    /// - Parameters:
+    ///   - table: The name of the table into which to copy the data.
+    ///   - columns: The name of the columns to copy. If an empty array is passed, all columns are assumed to be copied.
+    ///   - bufferSize: How many bytes to accumulate a local buffer before flushing it to the database. Can affect
+    ///     performance characteristics of the copy operation.
+    ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call `write` on the
+    ///     writer provided by the closure to send data to the backend and return from the closure once all data is sent.
+    ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown
+    ///     by the `copyFromBinary` function.
+    ///
+    /// - Important: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
+    ///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
+    public func copyFromBinary(
+        table: String,
+        columns: [String] = [],
+        options: PostgresCopyFromFormat.BinaryOptions = .init(),
+        bufferSize: Int = 100_000,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        writeData: (inout PostgresBinaryCopyFromWriter) async throws -> Void
+    )  async throws {
+        try await copyFrom(table: table, columns: columns, format: .binary(PostgresCopyFromFormat.BinaryOptions()), logger: logger) { writer in
+            var header = ByteBuffer()
+            header.writeString("PGCOPY\n")
+            header.writeInteger(UInt8(0xff))
+            header.writeString("\r\n\0")
+
+            // Flag fields
+            header.writeInteger(UInt32(0))
+
+            // Header extension area length
+            header.writeInteger(UInt32(0))
+            try await writer.write(header)
+
+            var binaryWriter = PostgresBinaryCopyFromWriter(underlying: writer, bufferSize: bufferSize)
+            try await writeData(&binaryWriter)
+            try await binaryWriter.flush()
+        }
+    }
+
     /// Copy data into a table using a `COPY <table name> FROM STDIN` query.
     ///
     /// - Parameters:

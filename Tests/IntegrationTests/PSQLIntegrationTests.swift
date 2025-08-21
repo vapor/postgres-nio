@@ -487,4 +487,38 @@ final class IntegrationTests: XCTestCase {
             XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "42601") // scanner_yyerror
         }
     }
+
+    func testCopyFromBinary() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let conn = try await PostgresConnection.test(on: eventLoop).get()
+        defer { XCTAssertNoThrow(try conn.close().wait()) }
+
+        _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
+        _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
+
+        try await conn.copyFromBinary(table: "copy_table", columns: ["id", "name"], logger: .psqlTest) { writer in
+            let records: [(id: Int, name: String)] = [
+                (1, "Alice"),
+                (42, "Bob")
+            ]
+            for record in records {
+                try await writer.writeRow { columnWriter in
+                    try columnWriter.writeColumn(Int32(record.id))
+                    try columnWriter.writeColumn(record.name)
+                }
+            }
+        }
+        let rows = try await conn.query("SELECT id, name FROM copy_table").get().rows.map { try $0.decode((Int, String).self) }
+        guard rows.count == 2 else {
+            XCTFail("Expected 2 columns, received \(rows.count)")
+            return
+        }
+        XCTAssertEqual(rows[0].0, 1)
+        XCTAssertEqual(rows[0].1, "Alice")
+        XCTAssertEqual(rows[1].0, 42)
+        XCTAssertEqual(rows[1].1, "Bob")
+    }
 }
