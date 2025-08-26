@@ -1,5 +1,6 @@
 
 public struct PostgresNotification: Sendable {
+    public let channel: String
     public let payload: String
 }
 

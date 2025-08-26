@@ -1,6 +1,6 @@
 import NIOCore
 
-// This object is @unchecked Sendable, since we syncronize state on the EL
+// This object is @unchecked Sendable, since we synchronize state on the EL
 final class NotificationListener: @unchecked Sendable {
     let eventLoop: EventLoop
 
@@ -86,7 +86,7 @@ final class NotificationListener: @unchecked Sendable {
         case .streamInitialized, .done:
             fatalError("Invalid state: \(self.state)")
         case .streamListening(let continuation):
-            continuation.yield(.init(payload: backendMessage.payload))
+            continuation.yield(.init(channel: backendMessage.channel, payload: backendMessage.payload))
 
         case .closure(let postgresListenContext, let closure):
             let message = PostgresMessage.NotificationResponse(
