@@ -7,7 +7,7 @@ import NIOConcurrencyHelpers
 public struct PostgresRowSequence: AsyncSequence, Sendable {
     public typealias Element = PostgresRow
 
-    typealias BackingSequence = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>
+    typealias BackingSequence = NIOThrowingAsyncSequenceProducer<DataRow, any Error, AdaptiveRowBuffer, PSQLRowStream>
 
     let backing: BackingSequence
     let lookupTable: [String: Int]

@@ -9,7 +9,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     typealias OutboundOut = ByteBuffer
 
     private let logger: Logger
-    private let eventLoop: EventLoop
+    private let eventLoop: any EventLoop
     private var state: ConnectionStateMachine
     
     /// A `ChannelHandlerContext` to be used for non channel related events. (for example: More rows needed).
@@ -20,16 +20,16 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private var decoder: NIOSingleStepByteToMessageProcessor<PostgresBackendMessageDecoder>
     private var encoder: PostgresFrontendMessageEncoder!
     private let configuration: PostgresConnection.InternalConfiguration
-    private let configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> Void)?
+    private let configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> Void)?
 
     private var listenState = ListenStateMachine()
     private var preparedStatementState = PreparedStatementStateMachine()
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
-        eventLoop: EventLoop,
+        eventLoop: some EventLoop,
         logger: Logger,
-        configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> Void)?
+        configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> Void)?
     ) {
         self.state = ConnectionStateMachine(requireBackendKeyData: configuration.options.requireBackendKeyData)
         self.eventLoop = eventLoop
@@ -43,10 +43,10 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     /// for testing purposes only
     init(
         configuration: PostgresConnection.InternalConfiguration,
-        eventLoop: EventLoop,
+        eventLoop: some EventLoop,
         state: ConnectionStateMachine = .init(.initialized),
         logger: Logger = .psqlNoOpLogger,
-        configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> Void)?
+        configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> Void)?
     ) {
         self.state = state
         self.eventLoop = eventLoop
@@ -100,7 +100,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.run(action, with: context)
     }
     
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error: any Error) {
         self.logger.debug("Channel error caught.", metadata: [.error: "\(error)"])
         let action = self.state.errorHappened(.connectionError(underlying: error))
         self.run(action, with: context)
@@ -610,7 +610,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         return .extendedQuery(query)
     }
 
-    private func startListenCompleted(_ result: Result<PSQLRowStream, Error>, for channel: String, context: ChannelHandlerContext) {
+    private func startListenCompleted(_ result: Result<PSQLRowStream, some Error>, for channel: String, context: ChannelHandlerContext) {
         switch result {
         case .success:
             switch self.listenState.startListeningSucceeded(channel: channel) {
@@ -659,7 +659,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     }
 
     private func stopListenCompleted(
-        _ result: Result<PSQLRowStream, Error>,
+        _ result: Result<PSQLRowStream, some Error>,
         for channel: String,
         context: ChannelHandlerContext
     ) {

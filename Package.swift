@@ -3,6 +3,7 @@ import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
     .enableUpcomingFeature("StrictConcurrency"),
+    .enableUpcomingFeature("ExistentialAny")
 ]
 
 let package = Package(

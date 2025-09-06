@@ -6,14 +6,14 @@ public struct PostgresNotification: Sendable {
 public struct PostgresNotificationSequence: AsyncSequence, Sendable {
     public typealias Element = PostgresNotification
 
-    let base: AsyncThrowingStream<PostgresNotification, Error>
+    let base: AsyncThrowingStream<PostgresNotification, any Error>
 
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(base: self.base.makeAsyncIterator())
     }
 
     public struct AsyncIterator: AsyncIteratorProtocol {
-        var base: AsyncThrowingStream<PostgresNotification, Error>.AsyncIterator
+        var base: AsyncThrowingStream<PostgresNotification, any Error>.AsyncIterator
 
         public mutating func next() async throws -> Element? {
             try await self.base.next()

@@ -315,7 +315,7 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
+    mutating func connectionEstablishFailed(_ error: some Error, for request: ConnectionRequest) -> Action {
         switch self.poolState {
         case .running, .shuttingDown(graceful: true):
             self.failedConsecutiveConnectionAttempts += 1

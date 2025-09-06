@@ -516,7 +516,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
     ///
     /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
-    public static var defaultEventLoopGroup: EventLoopGroup {
+    public static var defaultEventLoopGroup: any EventLoopGroup {
         PostgresConnection.defaultEventLoopGroup
     }
 
@@ -564,7 +564,7 @@ extension PostgresConnection: PooledConnection {
 }
 
 extension ConnectionPoolError {
-    func mapToPSQLError(lastConnectError: Error?) -> Error {
+    func mapToPSQLError(lastConnectError: (any Error)?) -> any Error {
         var psqlError: PSQLError
         switch self {
         case .poolShutdown:

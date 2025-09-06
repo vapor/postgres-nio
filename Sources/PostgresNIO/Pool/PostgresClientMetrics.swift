@@ -18,7 +18,7 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
 
     /// A connection attempt failed with the given error. After some period of
     /// time ``startedConnecting(id:)`` may be called again.
-    func connectFailed(id: ConnectionID, error: Error) {
+    func connectFailed(id: ConnectionID, error: some Error) {
         self.logger.info("Connection creation failed", metadata: [
             .connectionID: "\(id)",
             .error: "\(String(reflecting: error))"
@@ -53,7 +53,7 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
 
     func keepAliveSucceeded(id: ConnectionID) {}
 
-    func keepAliveFailed(id: PostgresConnection.ID, error: Error) {}
+    func keepAliveFailed(id: PostgresConnection.ID, error: some Error) {}
 
     /// The remote peer is quiescing the connection: no new streams will be created on it. The
     /// connection will eventually be closed and removed from the pool.
@@ -65,7 +65,7 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
 
     /// The connection was closed. The connection may be established again in the future (notified
     /// via ``startedConnecting(id:)``).
-    func connectionClosed(id: ConnectionID, error: Error?) {
+    func connectionClosed(id: ConnectionID, error: (any Error)?) {
         self.logger.debug("Connection closed", metadata: [
             .connectionID: "\(id)"
         ])

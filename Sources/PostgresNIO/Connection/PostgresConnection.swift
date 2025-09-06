@@ -17,10 +17,10 @@ public final class PostgresConnection: @unchecked Sendable {
     /// The connection's underlying channel
     ///
     /// This should be private, but it is needed for `PostgresConnection` compatibility.
-    internal let channel: Channel
+    internal let channel: any Channel
 
     /// The underlying `EventLoop` of both the connection and its channel.
-    public var eventLoop: EventLoop {
+    public var eventLoop: any EventLoop {
         return self.channel.eventLoop
     }
 
@@ -48,7 +48,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     private var _logger: Logger
 
-    init(channel: Channel, connectionID: ID, logger: Logger) {
+    init(channel: some Channel, connectionID: ID, logger: Logger) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
@@ -60,7 +60,7 @@ public final class PostgresConnection: @unchecked Sendable {
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
-        let configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> ())?
+        let configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> ())?
         
         switch configuration.tls.base {
         case .prefer(let context), .require(let context):
@@ -124,7 +124,7 @@ public final class PostgresConnection: @unchecked Sendable {
     /// - Returns: A SwiftNIO `EventLoopFuture` that will provide a ``PostgresConnection``
     ///            at a later point in time.
     public static func connect(
-        on eventLoop: EventLoop,
+        on eventLoop: some EventLoop,
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
@@ -141,7 +141,7 @@ public final class PostgresConnection: @unchecked Sendable {
         connectionID: ID,
         configuration: PostgresConnection.InternalConfiguration,
         logger: Logger,
-        on eventLoop: EventLoop
+        on eventLoop: some EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
 
         var mlogger = logger
@@ -156,7 +156,7 @@ public final class PostgresConnection: @unchecked Sendable {
         // on and the EventLoop. In addition, it eliminates all potential races between the creating
         // thread and the EventLoop.
         return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
-            let connectFuture: EventLoopFuture<Channel>
+            let connectFuture: EventLoopFuture<any Channel>
 
             switch configuration.connection {
             case .resolved(let address):
@@ -190,9 +190,9 @@ public final class PostgresConnection: @unchecked Sendable {
     }
 
     static func makeBootstrap(
-        on eventLoop: EventLoop,
+        on eventLoop: some EventLoop,
         configuration: PostgresConnection.InternalConfiguration
-    ) -> NIOClientTCPBootstrapProtocol {
+    ) -> any NIOClientTCPBootstrapProtocol {
         #if canImport(Network)
         if let tsBootstrap = NIOTSConnectionBootstrap(validatingGroup: eventLoop) {
             return tsBootstrap.connectTimeout(configuration.options.connectTimeout)
@@ -295,7 +295,7 @@ extension PostgresConnection {
         tlsConfiguration: TLSConfiguration? = nil,
         serverHostname: String? = nil,
         logger: Logger = .init(label: "codes.vapor.postgres"),
-        on eventLoop: EventLoop
+        on eventLoop: some EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
         var tlsFuture: EventLoopFuture<PostgresConnection.Configuration.TLS>
 
@@ -368,7 +368,7 @@ extension PostgresConnection {
     ///   - logger: A logger to log background events into
     /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
     public static func connect(
-        on eventLoop: EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
+        on eventLoop: any EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
@@ -698,7 +698,7 @@ extension PostgresConnection {
 
 extension PostgresConnection: PostgresDatabase {
     public func send(
-        _ request: PostgresRequest,
+        _ request: some PostgresRequest,
         logger: Logger
     ) -> EventLoopFuture<Void> {
         guard let command = request as? PostgresCommands else {
@@ -853,7 +853,7 @@ extension PostgresConnection {
     /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
     ///
     /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
-    public static var defaultEventLoopGroup: EventLoopGroup {
+    public static var defaultEventLoopGroup: any EventLoopGroup {
 #if canImport(Network)
         if #available(OSX 10.14, iOS 12.0, tvOS 12.0, watchOS 6.0, *) {
             return NIOTSEventLoopGroup.singleton

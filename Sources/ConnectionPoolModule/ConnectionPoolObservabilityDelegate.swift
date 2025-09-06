@@ -9,7 +9,7 @@ public protocol ConnectionPoolObservabilityDelegate: Sendable {
 
     /// A connection attempt failed with the given error. After some period of
     /// time ``startedConnecting(id:)`` may be called again.
-    func connectFailed(id: ConnectionID, error: Error)
+    func connectFailed(id: ConnectionID, error: some Error)
 
     /// A connection was established on the connection with the given ID. `streamCapacity` streams are
     /// available to use on the connection. The maximum number of available streams may change over
@@ -24,7 +24,7 @@ public protocol ConnectionPoolObservabilityDelegate: Sendable {
 
     func keepAliveSucceeded(id: ConnectionID)
 
-    func keepAliveFailed(id: ConnectionID, error: Error)
+    func keepAliveFailed(id: ConnectionID, error: some Error)
 
     /// The remote peer is quiescing the connection: no new streams will be created on it. The
     /// connection will eventually be closed and removed from the pool.
@@ -32,7 +32,7 @@ public protocol ConnectionPoolObservabilityDelegate: Sendable {
 
     /// The connection was closed. The connection may be established again in the future (notified
     /// via ``startedConnecting(id:)``).
-    func connectionClosed(id: ConnectionID, error: Error?)
+    func connectionClosed(id: ConnectionID, error: (any Error)?)
 
     func requestQueueDepthChanged(_ newDepth: Int)
 }
@@ -42,7 +42,7 @@ public struct NoOpConnectionPoolMetrics<ConnectionID: Hashable & Sendable>: Conn
 
     public func startedConnecting(id: ConnectionID) {}
 
-    public func connectFailed(id: ConnectionID, error: Error) {}
+    public func connectFailed(id: ConnectionID, error: some Error) {}
 
     public func connectSucceeded(id: ConnectionID, streamCapacity: UInt16) {}
 
@@ -52,11 +52,11 @@ public struct NoOpConnectionPoolMetrics<ConnectionID: Hashable & Sendable>: Conn
 
     public func keepAliveSucceeded(id: ConnectionID) {}
 
-    public func keepAliveFailed(id: ConnectionID, error: Error) {}
+    public func keepAliveFailed(id: ConnectionID, error: some Error) {}
 
     public func connectionClosing(id: ConnectionID) {}
 
-    public func connectionClosed(id: ConnectionID, error: Error?) {}
+    public func connectionClosed(id: ConnectionID, error: (any Error)?) {}
 
     public func requestQueueDepthChanged(_ newDepth: Int) {}
 }

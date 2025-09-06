@@ -89,7 +89,7 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         context.fireChannelActive()
     }
     
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error: some Error) {
         switch self.state {
         case .initialized:
             preconditionFailure("Unexpected message for state")
