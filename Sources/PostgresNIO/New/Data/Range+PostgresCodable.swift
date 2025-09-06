@@ -88,6 +88,8 @@ struct PostgresRange<Bound> {
     }
 }
 
+extension PostgresRange: Sendable where Bound: Sendable {}
+
 /// Used by Postgres to represent certain range properties
 @usableFromInline
 struct PostgresRangeFlag {
