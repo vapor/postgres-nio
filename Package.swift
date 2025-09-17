@@ -1,7 +1,13 @@
 // swift-tools-version:6.0
 import PackageDescription
 
+#if compiler(>=6.1)
 let swiftSettings: [SwiftSetting] = []
+#else
+let swiftSettings: [SwiftSetting] = [
+    .swiftLanguageMode(.v5)
+]
+#endif
 
 let package = Package(
     name: "postgres-nio",
