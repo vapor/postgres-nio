@@ -116,7 +116,8 @@ extension PostgresRow {
 extension AsyncSequence where Element == PostgresRow {
     // --- snip TODO: Remove once bug is fixed, that disallows tuples of one
     @inlinable
-    public func decode<Column: PostgresDecodable>(
+    @preconcurrency
+    public func decode<Column: PostgresDecodable & Sendable>(
         _: Column.Type,
         context: PostgresDecodingContext<some PostgresJSONDecoder>,
         file: String = #fileID,
@@ -128,7 +129,8 @@ extension AsyncSequence where Element == PostgresRow {
     }
 
     @inlinable
-    public func decode<Column: PostgresDecodable>(
+    @preconcurrency
+    public func decode<Column: PostgresDecodable & Sendable>(
         _: Column.Type,
         file: String = #fileID,
         line: Int = #line
@@ -137,7 +139,8 @@ extension AsyncSequence where Element == PostgresRow {
     }
     // --- snap TODO: Remove once bug is fixed, that disallows tuples of one
 
-    public func decode<each Column: PostgresDecodable>(
+    @preconcurrency
+    public func decode<each Column: PostgresDecodable & Sendable>(
         _ columnType: (repeat each Column).Type,
         context: PostgresDecodingContext<some PostgresJSONDecoder>,
         file: String = #fileID,
@@ -148,7 +151,8 @@ extension AsyncSequence where Element == PostgresRow {
         }
     }
 
-    public func decode<each Column: PostgresDecodable>(
+    @preconcurrency
+    public func decode<each Column: PostgresDecodable & Sendable>(
         _ columnType: (repeat each Column).Type,
         file: String = #fileID,
         line: Int = #line
