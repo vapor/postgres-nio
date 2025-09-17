@@ -1,9 +1,7 @@
 // swift-tools-version:6.0
 import PackageDescription
 
-let swiftSettings: [SwiftSetting] = [
-    .enableUpcomingFeature("StrictConcurrency"),
-]
+let swiftSettings: [SwiftSetting] = []
 
 let package = Package(
     name: "postgres-nio",
