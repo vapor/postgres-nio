@@ -346,8 +346,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         isolation: isolated (any Actor)? = #isolation,
         _ closure: (PostgresConnection) async throws -> sending Result
     ) async throws -> sending Result {
-        try await self.withConnection { connection in
-            try await connection.withTransaction(logger: logger, file: file, line: line, closure)
+        // for 6.0 to compile we need to explicitly forward the isolation.
+        try await self.withConnection(isolation: isolation) { connection in
+            try await connection.withTransaction(logger: logger, file: file, line: line, isolation: isolation, closure)
         }
     }
 
