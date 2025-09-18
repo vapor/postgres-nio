@@ -1,13 +1,14 @@
 import _ConnectionPoolModule
-import XCTest
+import Testing
 
-final class ConnectionIDGeneratorTests: XCTestCase {
-    func testGenerateConnectionIDs() async {
+@Suite struct ConnectionIDGeneratorTests {
+
+    @Test func testGenerateConnectionIDs() async {
         let idGenerator = ConnectionIDGenerator()
 
-        XCTAssertEqual(idGenerator.next(), 0)
-        XCTAssertEqual(idGenerator.next(), 1)
-        XCTAssertEqual(idGenerator.next(), 2)
+        #expect(idGenerator.next() == 0)
+        #expect(idGenerator.next() == 1)
+        #expect(idGenerator.next() == 2)
 
         await withTaskGroup(of: Void.self) { taskGroup in
             for _ in 0..<1000 {
@@ -17,6 +18,6 @@ final class ConnectionIDGeneratorTests: XCTestCase {
             }
         }
 
-        XCTAssertEqual(idGenerator.next(), 1003)
+        #expect(idGenerator.next() == 1003)
     }
 }

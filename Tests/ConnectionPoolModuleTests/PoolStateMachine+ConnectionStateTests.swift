@@ -1,36 +1,36 @@
 @testable import _ConnectionPoolModule
 import _ConnectionPoolTestUtils
-import XCTest
+import Testing
 
-@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-final class PoolStateMachine_ConnectionStateTests: XCTestCase {
+@Suite struct PoolStateMachine_ConnectionStateTests {
 
     typealias TestConnectionState = TestPoolStateMachine.ConnectionState
 
-    func testStartupLeaseReleaseParkLease() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testStartupLeaseReleaseParkLease() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        XCTAssertEqual(state.id, connectionID)
-        XCTAssertEqual(state.isIdle, false)
-        XCTAssertEqual(state.isAvailable, false)
-        XCTAssertEqual(state.isConnected, false)
-        XCTAssertEqual(state.isLeased, false)
+        #expect(state.id == connectionID)
+        #expect(!state.isIdle)
+        #expect(!state.isAvailable)
+        #expect(!state.isConnected)
+        #expect(!state.isLeased)
         let connection = MockConnection(id: connectionID)
-        XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(state.isIdle, true)
-        XCTAssertEqual(state.isAvailable, true)
-        XCTAssertEqual(state.isConnected, true)
-        XCTAssertEqual(state.isLeased, false)
-        XCTAssertEqual(state.lease(streams: 1), .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.isIdle)
+        #expect(state.isAvailable)
+        #expect(state.isConnected)
+        #expect(state.isLeased == false)
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        XCTAssertEqual(state.isIdle, false)
-        XCTAssertEqual(state.isAvailable, false)
-        XCTAssertEqual(state.isConnected, true)
-        XCTAssertEqual(state.isLeased, true)
+        #expect(!state.isIdle)
+        #expect(!state.isAvailable)
+        #expect(state.isConnected)
+        #expect(state.isLeased)
 
-        XCTAssertEqual(state.release(streams: 1), .idle(availableStreams: 1, newIdle: true))
+        #expect(state.release(streams: 1) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
-        XCTAssert(
+        #expect(
             parkResult.elementsEqual([
                 .init(timerID: 0, connectionID: connectionID, usecase: .keepAlive),
                 .init(timerID: 1, connectionID: connectionID, usecase: .idleTimeout)
@@ -38,31 +38,32 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         )
 
         guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {
-            return XCTFail("Expected to get two timers")
+            Issue.record("Expected to get two timers")
+            return
         }
 
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         let idleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
 
-        XCTAssertNil(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
-        XCTAssertNil(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken))
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+        #expect(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken) == nil)
 
         let expectLeaseAction = TestConnectionState.LeaseAction(
             connection: connection,
             timersToCancel: [idleTimerCancellationToken, keepAliveTimerCancellationToken],
             wasIdle: true
         )
-        XCTAssertEqual(state.lease(streams: 1), expectLeaseAction)
+        #expect(state.lease(streams: 1) == expectLeaseAction)
     }
 
     func testStartupParkLeaseBeforeTimersRegistered() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
-        XCTAssertEqual(
-            parkResult,
+        #expect(
+            parkResult ==
             [
                 .init(timerID: 0, connectionID: connectionID, usecase: .keepAlive),
                 .init(timerID: 1, connectionID: connectionID, usecase: .idleTimeout)
@@ -70,24 +71,25 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         )
 
         guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {
-            return XCTFail("Expected to get two timers")
+            Issue.record("Expected to get two timers")
+            return
         }
 
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         let idleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
-        XCTAssertEqual(state.lease(streams: 1), .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        XCTAssertEqual(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken), keepAliveTimerCancellationToken)
-        XCTAssertEqual(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken), idleTimerCancellationToken)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == keepAliveTimerCancellationToken)
+        #expect(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken) == idleTimerCancellationToken)
     }
 
     func testStartupParkLeasePark() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
-        XCTAssert(
+        #expect(
             parkResult.elementsEqual([
                 .init(timerID: 0, connectionID: connectionID, usecase: .keepAlive),
                 .init(timerID: 1, connectionID: connectionID, usecase: .idleTimeout)
@@ -95,24 +97,25 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         )
 
         guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {
-            return XCTFail("Expected to get two timers")
+            Issue.record("Expected to get two timers")
+            return
         }
 
         let initialKeepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         let initialIdleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
-        XCTAssertEqual(state.lease(streams: 1), .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        XCTAssertEqual(state.release(streams: 1), .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(
-            state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true),
+        #expect(state.release(streams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(
+            state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true) ==
             [
                 .init(timerID: 2, connectionID: connectionID, usecase: .keepAlive),
                 .init(timerID: 3, connectionID: connectionID, usecase: .idleTimeout)
             ]
         )
 
-        XCTAssertEqual(state.timerScheduled(keepAliveTimer, cancelContinuation: initialKeepAliveTimerCancellationToken), initialKeepAliveTimerCancellationToken)
-        XCTAssertEqual(state.timerScheduled(idleTimer, cancelContinuation: initialIdleTimerCancellationToken), initialIdleTimerCancellationToken)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: initialKeepAliveTimerCancellationToken) == initialKeepAliveTimerCancellationToken)
+        #expect(state.timerScheduled(idleTimer, cancelContinuation: initialIdleTimerCancellationToken) == initialIdleTimerCancellationToken)
     }
 
     func testStartupFailed() {
@@ -120,73 +123,73 @@ final class PoolStateMachine_ConnectionStateTests: XCTestCase {
         var state = TestConnectionState(id: connectionID)
         let firstBackoffTimer = state.failedToConnect()
         let firstBackoffTimerCancellationToken = MockTimerCancellationToken(firstBackoffTimer)
-        XCTAssertNil(state.timerScheduled(firstBackoffTimer, cancelContinuation: firstBackoffTimerCancellationToken))
-        XCTAssertEqual(state.retryConnect(), firstBackoffTimerCancellationToken)
+        #expect(state.timerScheduled(firstBackoffTimer, cancelContinuation: firstBackoffTimerCancellationToken) == nil)
+        #expect(state.retryConnect() == firstBackoffTimerCancellationToken)
 
         let secondBackoffTimer = state.failedToConnect()
         let secondBackoffTimerCancellationToken = MockTimerCancellationToken(secondBackoffTimer)
-        XCTAssertNil(state.retryConnect())
-        XCTAssertEqual(
-            state.timerScheduled(secondBackoffTimer, cancelContinuation: secondBackoffTimerCancellationToken),
+        #expect(state.retryConnect() == nil)
+        #expect(
+            state.timerScheduled(secondBackoffTimer, cancelContinuation: secondBackoffTimerCancellationToken) ==
             secondBackoffTimerCancellationToken
         )
 
         let thirdBackoffTimer = state.failedToConnect()
         let thirdBackoffTimerCancellationToken = MockTimerCancellationToken(thirdBackoffTimer)
-        XCTAssertNil(state.retryConnect())
+        #expect(state.retryConnect() == nil)
         let forthBackoffTimer = state.failedToConnect()
         let forthBackoffTimerCancellationToken = MockTimerCancellationToken(forthBackoffTimer)
-        XCTAssertEqual(
-            state.timerScheduled(thirdBackoffTimer, cancelContinuation: thirdBackoffTimerCancellationToken),
+        #expect(
+            state.timerScheduled(thirdBackoffTimer, cancelContinuation: thirdBackoffTimerCancellationToken) ==
             thirdBackoffTimerCancellationToken
         )
-        XCTAssertNil(
-            state.timerScheduled(forthBackoffTimer, cancelContinuation: forthBackoffTimerCancellationToken)
+        #expect(
+            state.timerScheduled(forthBackoffTimer, cancelContinuation: forthBackoffTimerCancellationToken) == nil
         )
-        XCTAssertEqual(state.retryConnect(), forthBackoffTimerCancellationToken)
+        #expect(state.retryConnect() == forthBackoffTimerCancellationToken)
 
         let connection = MockConnection(id: connectionID)
-        XCTAssertEqual(state.connected(connection, maxStreams: 1), .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
     }
 
     func testLeaseMultipleStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        XCTAssertEqual(state.connected(connection, maxStreams: 100), .idle(availableStreams: 100, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else { return XCTFail("Expected to get a keepAliveTimer") }
 
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
-        XCTAssertNil(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
 
-        XCTAssertEqual(
-            state.lease(streams: 30),
+        #expect(
+            state.lease(streams: 30) ==
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [keepAliveTimerCancellationToken], wasIdle: true)
         )
 
-        XCTAssertEqual(state.release(streams: 10), .leased(availableStreams: 80))
+        #expect(state.release(streams: 10) == .leased(availableStreams: 80))
 
-        XCTAssertEqual(
-            state.lease(streams: 40),
+        #expect(
+            state.lease(streams: 40) ==
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: false)
         )
 
-        XCTAssertEqual(
-            state.lease(streams: 40),
+        #expect(
+            state.lease(streams: 40) ==
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: false)
         )
 
-        XCTAssertEqual(state.release(streams: 1), .leased(availableStreams: 1))
-        XCTAssertEqual(state.release(streams: 98), .leased(availableStreams: 99))
-        XCTAssertEqual(state.release(streams: 1), .idle(availableStreams: 100, newIdle: true))
+        #expect(state.release(streams: 1) == .leased(availableStreams: 1))
+        #expect(state.release(streams: 98) == .leased(availableStreams: 99))
+        #expect(state.release(streams: 1) == .idle(availableStreams: 100, newIdle: true))
     }
 
     func testRunningKeepAliveReducesAvailableStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        XCTAssertEqual(state.connected(connection, maxStreams: 100), .idle(availableStreams: 100, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else { return XCTFail("Expected to get a keepAliveTimer") }
 
