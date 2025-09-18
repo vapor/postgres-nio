@@ -67,6 +67,11 @@ enum PostgresFrontendMessage: Equatable {
         }
     }
 
+    struct Query: Hashable {
+        /// The query string.
+        let query: String
+    }
+
     struct Parse: Hashable {
         /// The name of the destination prepared statement (an empty string selects the unnamed prepared statement).
         let preparedStatementName: String
@@ -190,6 +195,7 @@ enum PostgresFrontendMessage: Equatable {
     case saslInitialResponse(SASLInitialResponse)
     case saslResponse(SASLResponse)
     case sslRequest
+    case query(Query)
     case sync
     case startup(Startup)
     case terminate
@@ -208,6 +214,7 @@ enum PostgresFrontendMessage: Equatable {
         case password
         case saslInitialResponse
         case saslResponse
+        case query
         case sync
         case terminate
         
@@ -237,6 +244,8 @@ enum PostgresFrontendMessage: Equatable {
                 self = .saslInitialResponse
             case UInt8(ascii: "p"):
                 self = .saslResponse
+            case UInt8(ascii: "Q"):
+                self = .query
             case UInt8(ascii: "S"):
                 self = .sync
             case UInt8(ascii: "X"):
@@ -272,6 +281,8 @@ enum PostgresFrontendMessage: Equatable {
                 return UInt8(ascii: "p")
             case .saslResponse:
                 return UInt8(ascii: "p")
+            case .query:
+                return UInt8(ascii: "Q")
             case .sync:
                 return UInt8(ascii: "S")
             case .terminate:
@@ -315,6 +326,8 @@ extension PostgresFrontendMessage {
             preconditionFailure("SSL requests don't have an identifier")
         case .startup:
             preconditionFailure("Startup messages don't have an identifier")
+        case .query:
+            return .query
         case .sync:
             return .sync
         case .terminate:
