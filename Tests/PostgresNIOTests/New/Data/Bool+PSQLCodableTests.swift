@@ -1,89 +1,97 @@
-import XCTest
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class Bool_PSQLCodableTests: XCTestCase {
+@Suite struct Bool_PSQLCodableTests {
 
     // MARK: - Binary
 
-    func testBinaryTrueRoundTrip() {
+    @Test func testBinaryTrueRoundTrip() {
         let value = true
 
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(Bool.psqlType, .bool)
-        XCTAssertEqual(Bool.psqlFormat, .binary)
-        XCTAssertEqual(buffer.readableBytes, 1)
-        XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 1)
+        #expect(Bool.psqlType == .bool)
+        #expect(Bool.psqlFormat == .binary)
+        #expect(buffer.readableBytes == 1)
+        #expect(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self) == 1)
 
         var result: Bool?
-        XCTAssertNoThrow(result = try Bool(from: &buffer, type: .bool, format: .binary, context: .default))
-        XCTAssertEqual(value, result)
+        #expect(throws: Never.self) {
+            result = try Bool(from: &buffer, type: .bool, format: .binary, context: .default)
+        }
+        #expect(value == result)
     }
 
-    func testBinaryFalseRoundTrip() {
+    @Test func testBinaryFalseRoundTrip() {
         let value = false
 
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(Bool.psqlType, .bool)
-        XCTAssertEqual(Bool.psqlFormat, .binary)
-        XCTAssertEqual(buffer.readableBytes, 1)
-        XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 0)
+        #expect(Bool.psqlType == .bool)
+        #expect(Bool.psqlFormat == .binary)
+        #expect(buffer.readableBytes == 1)
+        #expect(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self) == 0)
 
         var result: Bool?
-        XCTAssertNoThrow(result = try Bool(from: &buffer, type: .bool, format: .binary, context: .default))
-        XCTAssertEqual(value, result)
+        #expect(throws: Never.self) {
+            result = try Bool(from: &buffer, type: .bool, format: .binary, context: .default)
+        }
+        #expect(value == result)
     }
 
-    func testBinaryDecodeBoolInvalidLength() {
+    @Test func testBinaryDecodeBoolInvalidLength() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(1))
 
-        XCTAssertThrowsError(try Bool(from: &buffer, type: .bool, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try Bool(from: &buffer, type: .bool, format: .binary, context: .default)
         }
     }
 
-    func testBinaryDecodeBoolInvalidValue() {
+    @Test func testBinaryDecodeBoolInvalidValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt8(13))
 
-        XCTAssertThrowsError(try Bool(from: &buffer, type: .bool, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try Bool(from: &buffer, type: .bool, format: .binary, context: .default)
         }
     }
 
     // MARK: - Text
 
-    func testTextTrueDecode() {
+    @Test func testTextTrueDecode() {
         let value = true
 
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt8(ascii: "t"))
 
         var result: Bool?
-        XCTAssertNoThrow(result = try Bool(from: &buffer, type: .bool, format: .text, context: .default))
-        XCTAssertEqual(value, result)
+        #expect(throws: Never.self) {
+            result = try Bool(from: &buffer, type: .bool, format: .text, context: .default)
+        }
+        #expect(value == result)
     }
 
-    func testTextFalseDecode() {
+    @Test func testTextFalseDecode() {
         let value = false
 
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt8(ascii: "f"))
 
         var result: Bool?
-        XCTAssertNoThrow(result = try Bool(from: &buffer, type: .bool, format: .text, context: .default))
-        XCTAssertEqual(value, result)
+        #expect(throws: Never.self) {
+            result = try Bool(from: &buffer, type: .bool, format: .text, context: .default)
+        }
+        #expect(value == result)
     }
 
-    func testTextDecodeBoolInvalidValue() {
+    @Test func testTextDecodeBoolInvalidValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt8(13))
 
-        XCTAssertThrowsError(try Bool(from: &buffer, type: .bool, format: .text, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try Bool(from: &buffer, type: .bool, format: .text, context: .default)
         }
     }
 }
