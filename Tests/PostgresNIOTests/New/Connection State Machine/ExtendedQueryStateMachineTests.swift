@@ -140,7 +140,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
 
         XCTAssertEqual(state.rowDescriptionReceived(.init(columns: input)), .wait)
         XCTAssertEqual(state.bindCompleteReceived(), .succeedQuery(promise, with: .init(value: .rowDescription(expected), logger: logger)))
-        XCTAssertEqual(state.cancelQueryStream(), .forwardStreamError(.queryCancelled, read: false, cleanupContext: nil))
+        XCTAssertEqual(state.cancel(), .forwardStreamError(.queryCancelled, read: false, cleanupContext: nil))
         XCTAssertEqual(state.dataRowReceived([ByteBuffer(string: "test1")]), .wait)
         XCTAssertEqual(state.channelReadComplete(), .wait)
         XCTAssertEqual(state.readEventCaught(), .read)
@@ -188,7 +188,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.dataRowReceived(row1), .wait)
         XCTAssertEqual(state.channelReadComplete(), .forwardRows([row1]))
         XCTAssertEqual(state.readEventCaught(), .wait)
-        XCTAssertEqual(state.cancelQueryStream(), .forwardStreamError(.queryCancelled, read: true, cleanupContext: nil))
+        XCTAssertEqual(state.cancel(), .forwardStreamError(.queryCancelled, read: true, cleanupContext: nil))
 
         XCTAssertEqual(state.dataRowReceived([ByteBuffer(string: "test2")]), .wait)
         XCTAssertEqual(state.dataRowReceived([ByteBuffer(string: "test3")]), .wait)
@@ -287,7 +287,7 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
         XCTAssertEqual(state.parseCompleteReceived(), .wait)
         XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
-        XCTAssertEqual(state.cancelQueryStream(), .failQuery(promise, with: .queryCancelled, cleanupContext: .none))
+        XCTAssertEqual(state.cancel(), .failQuery(promise, with: .queryCancelled, cleanupContext: .none))
 
         let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "Error", .sqlState: "123"])
         XCTAssertEqual(state.errorReceived(serverError), .wait)

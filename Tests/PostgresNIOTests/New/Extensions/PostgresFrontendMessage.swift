@@ -323,3 +323,125 @@ extension PostgresFrontendMessage {
         }
     }
 }
+
+/// Convenience accessors to get a specific case or `nil` if the enum is of a different case.
+extension PostgresFrontendMessage {
+    var bind: Bind? {
+        guard case .bind(let bind) = self else {
+            return nil
+        }
+        return bind
+    }
+
+    var cancel: Cancel? {
+        guard case .cancel(let cancel) = self else {
+            return nil
+        }
+        return cancel
+    }
+
+    var copyData: CopyData? {
+        guard case .copyData(let copyData) = self else {
+            return nil
+        }
+        return copyData
+    }
+
+    var copyDone: Void? {
+        guard case .copyDone = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var copyFail: CopyFail? {
+        guard case .copyFail(let copyFail) = self else {
+            return nil
+        }
+        return copyFail
+    }
+
+    var close: Close? {
+        guard case .close(let close) = self else {
+            return nil
+        }
+        return close
+    }
+
+    var describe: Describe? {
+        guard case .describe(let describe) = self else {
+            return nil
+        }
+        return describe
+    }
+
+    var execute: Execute? {
+        guard case .execute(let execute) = self else {
+            return nil
+        }
+        return execute
+    }
+
+    var flush: Void? {
+        guard case .flush = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var parse: Parse? {
+        guard case .parse(let parse) = self else {
+            return nil
+        }
+        return parse
+    }
+
+    var password: Password? {
+        guard case .password(let password) = self else {
+            return nil
+        }
+        return password
+    }
+
+    var saslInitialResponse: SASLInitialResponse? {
+        guard case .saslInitialResponse(let saslInitialResponse) = self else {
+            return nil
+        }
+        return saslInitialResponse
+    }
+
+    var saslResponse: SASLResponse? {
+        guard case .saslResponse(let saslResponse) = self else {
+            return nil
+        }
+        return saslResponse
+    }
+
+    var sslRequest: Void? {
+        guard case .sslRequest = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var sync: Void? {
+        guard case .sync = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var startup: Startup? {
+        guard case .startup(let startup) = self else {
+            return nil
+        }
+        return startup
+    }
+
+    var terminate: Void? {
+        guard case .terminate = self else {
+            return nil
+        }
+        return ()
+    }
+}
