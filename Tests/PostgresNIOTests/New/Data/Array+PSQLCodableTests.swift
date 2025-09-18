@@ -109,10 +109,9 @@ import NIOCore
         buffer.writeInteger(Int32(0))
         buffer.writeInteger(String.psqlType.rawValue)
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 
     @Test func testDecodeFailureSecondValueIsUnexpected() {
@@ -121,10 +120,9 @@ import NIOCore
         buffer.writeInteger(Int32(1)) // invalid value, must always be 0
         buffer.writeInteger(String.psqlType.rawValue)
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 
     @Test func testDecodeFailureTriesDecodeInt8() {
@@ -132,10 +130,9 @@ import NIOCore
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 
     @Test func testDecodeFailureInvalidNumberOfArrayElements() {
@@ -146,10 +143,9 @@ import NIOCore
         buffer.writeInteger(Int32(-123)) // expected element count
         buffer.writeInteger(Int32(1)) // dimensions... must be one
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 
     @Test func testDecodeFailureInvalidNumberOfDimensions() {
@@ -160,10 +156,9 @@ import NIOCore
         buffer.writeInteger(Int32(1)) // expected element count
         buffer.writeInteger(Int32(2)) // dimensions... must be one
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 
     @Test func testDecodeUnexpectedEnd() {
@@ -175,10 +170,9 @@ import NIOCore
         unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // dimensions
         unexpectedEndInElementLengthBuffer.writeInteger(Int16(1)) // length of element, must be Int32
 
-        let error1 = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &unexpectedEndInElementLengthBuffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error1 == .failure)
 
         var unexpectedEndInElementBuffer = ByteBuffer()
         unexpectedEndInElementBuffer.writeInteger(Int32(1)) // invalid value
@@ -189,9 +183,8 @@ import NIOCore
         unexpectedEndInElementBuffer.writeInteger(Int32(12)) // length of element, must be Int32
         unexpectedEndInElementBuffer.writeString("Hello World") // only 11 bytes, 12 needed!
 
-        let error2 = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &unexpectedEndInElementBuffer, type: .textArray, format: .binary, context: .default)
         }
-        #expect(error2 == .failure)
     }
 }

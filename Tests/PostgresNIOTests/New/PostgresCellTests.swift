@@ -44,6 +44,7 @@ import NIOCore
             columnIndex: 1
         )
 
+        #if compiler(>=6.1)
         let error = #expect(throws: PostgresDecodingError.self) {
             try cell.decode(Int?.self, context: .default)
         }
@@ -61,5 +62,26 @@ import NIOCore
         #expect(correctType)
         #expect(error.postgresType == .text)
         #expect(error.postgresFormat == .binary)
+        #else
+        do {
+            _ = try cell.decode(Int?.self, context: .default)
+            Issue.record("Expected to throw")
+        } catch {
+            guard let error = error as? PostgresDecodingError else {
+                Issue.record("Expected error at this point")
+                return
+            }
+
+            #expect(error.file == #fileID)
+            #expect(error.line == #line - 9)
+            #expect(error.code == .typeMismatch)
+            #expect(error.columnName == "hello")
+            #expect(error.columnIndex == 1)
+            let correctType = error.targetType == Int?.self
+            #expect(correctType)
+            #expect(error.postgresType == .text)
+            #expect(error.postgresFormat == .binary)
+        }
+        #endif
     }
 }
