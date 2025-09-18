@@ -1,10 +1,11 @@
-import XCTest
+import Foundation
+import Testing
 import NIOCore
 import NIOTestUtils
 @testable import PostgresNIO
 
-class DataRowTests: XCTestCase {
-    func testDecode() {
+@Suite struct DataRowTests {
+    @Test func testDecode() {
         let buffer = ByteBuffer.backendMessage(id: .dataRow) { buffer in
             // the data row has 3 columns
             buffer.writeInteger(3, as: Int16.self)
@@ -26,23 +27,26 @@ class DataRowTests: XCTestCase {
             (buffer, [PostgresBackendMessage.dataRow(.init(columnCount: 3, bytes: rowSlice))]),
         ]
 
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: expectedInOuts,
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: expectedInOuts,
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
+            )
+        }
     }
     
-    func testIteratingElements() {
+    @Test func testIteratingElements() {
         let dataRow = DataRow.makeTestDataRow(nil, ByteBuffer(), ByteBuffer(repeating: 5, count: 10))
         var iterator = dataRow.makeIterator()
         
-        XCTAssertEqual(dataRow.count, 3)
-        XCTAssertEqual(iterator.next(), .some(.none))
-        XCTAssertEqual(iterator.next(), ByteBuffer())
-        XCTAssertEqual(iterator.next(), ByteBuffer(repeating: 5, count: 10))
-        XCTAssertEqual(iterator.next(), .none)
+        #expect(dataRow.count == 3)
+        #expect(iterator.next() == .some(.none))
+        #expect(iterator.next() == ByteBuffer())
+        #expect(iterator.next() == ByteBuffer(repeating: 5, count: 10))
+        #expect(iterator.next() == .none)
     }
     
-    func testIndexAfterAndSubscript() {
+    @Test func testIndexAfterAndSubscript() {
         let dataRow = DataRow.makeTestDataRow(
             nil,
             ByteBuffer(),
@@ -51,18 +55,18 @@ class DataRowTests: XCTestCase {
         )
         
         var index = dataRow.startIndex
-        XCTAssertEqual(dataRow[index], .none)
+        #expect(dataRow[index] == .none)
         index = dataRow.index(after: index)
-        XCTAssertEqual(dataRow[index], ByteBuffer())
+        #expect(dataRow[index] == ByteBuffer())
         index = dataRow.index(after: index)
-        XCTAssertEqual(dataRow[index], ByteBuffer(repeating: 5, count: 10))
+        #expect(dataRow[index] == ByteBuffer(repeating: 5, count: 10))
         index = dataRow.index(after: index)
-        XCTAssertEqual(dataRow[index], .none)
+        #expect(dataRow[index] == .none)
         index = dataRow.index(after: index)
-        XCTAssertEqual(index, dataRow.endIndex)
+        #expect(index == dataRow.endIndex)
     }
     
-    func testIndexComparison() {
+    @Test func testIndexComparison() {
         let dataRow = DataRow.makeTestDataRow(
             nil,
             ByteBuffer(),
@@ -73,18 +77,18 @@ class DataRowTests: XCTestCase {
         let startIndex = dataRow.startIndex
         let secondIndex = dataRow.index(after: startIndex)
         
-        XCTAssertLessThanOrEqual(startIndex, secondIndex)
-        XCTAssertLessThan(startIndex, secondIndex)
-        
-        XCTAssertGreaterThanOrEqual(secondIndex, startIndex)
-        XCTAssertGreaterThan(secondIndex, startIndex)
-        
-        XCTAssertFalse(secondIndex == startIndex)
-        XCTAssertEqual(secondIndex, secondIndex)
-        XCTAssertEqual(startIndex, startIndex)
+        #expect(startIndex <= secondIndex)
+        #expect(startIndex < secondIndex)
+
+        #expect(secondIndex >= startIndex)
+        #expect(secondIndex > startIndex)
+
+        #expect(secondIndex != startIndex)
+        #expect(secondIndex == secondIndex)
+        #expect(startIndex == startIndex)
     }
     
-    func testColumnSubscript() {
+    @Test func testColumnSubscript() {
         let dataRow = DataRow.makeTestDataRow(
             nil,
             ByteBuffer(),
@@ -92,14 +96,14 @@ class DataRowTests: XCTestCase {
             nil
         )
     
-        XCTAssertEqual(dataRow.count, 4)
-        XCTAssertEqual(dataRow[column: 0], .none)
-        XCTAssertEqual(dataRow[column: 1], ByteBuffer())
-        XCTAssertEqual(dataRow[column: 2], ByteBuffer(repeating: 5, count: 10))
-        XCTAssertEqual(dataRow[column: 3], .none)
+        #expect(dataRow.count == 4)
+        #expect(dataRow[column: 0] == .none)
+        #expect(dataRow[column: 1] == ByteBuffer())
+        #expect(dataRow[column: 2] == ByteBuffer(repeating: 5, count: 10))
+        #expect(dataRow[column: 3] == .none)
     }
     
-    func testWithContiguousStorageIfAvailable() {
+    @Test func testWithContiguousStorageIfAvailable() {
         let dataRow = DataRow.makeTestDataRow(
             nil,
             ByteBuffer(),
@@ -107,9 +111,9 @@ class DataRowTests: XCTestCase {
             nil
         )
         
-        XCTAssertNil(dataRow.withContiguousStorageIfAvailable { _ in
-            return XCTFail("DataRow does not have a contiguous storage")
-        })
+        #expect(dataRow.withContiguousStorageIfAvailable { _ in
+            Issue.record("DataRow does not have a contiguous storage")
+        } == nil)
     }
 }
 

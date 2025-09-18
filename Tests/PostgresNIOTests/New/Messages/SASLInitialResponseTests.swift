@@ -1,10 +1,10 @@
-import XCTest
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class SASLInitialResponseTests: XCTestCase {
+@Suite struct SASLInitialResponseTests {
 
-    func testEncode() {
+    @Test func testEncode() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         let saslMechanism = "hello"
         let initialData: [UInt8] = [0, 1, 2, 3, 4, 5, 6, 7]
@@ -19,16 +19,16 @@ class SASLInitialResponseTests: XCTestCase {
         // + 4 initialData length
         // + 8 initialData
         
-        XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.saslInitialResponse.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), saslMechanism)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(initialData.count))
-        XCTAssertEqual(byteBuffer.readBytes(length: initialData.count), initialData)
-        XCTAssertEqual(byteBuffer.readableBytes, 0)
+        #expect(byteBuffer.readableBytes == length)
+        #expect(byteBuffer.readInteger(as: UInt8.self) == PostgresFrontendMessage.ID.saslInitialResponse.rawValue)
+        #expect(byteBuffer.readInteger(as: Int32.self) == Int32(length - 1))
+        #expect(byteBuffer.readNullTerminatedString() == saslMechanism)
+        #expect(byteBuffer.readInteger(as: Int32.self) == Int32(initialData.count))
+        #expect(byteBuffer.readBytes(length: initialData.count) == initialData)
+        #expect(byteBuffer.readableBytes == 0)
     }
     
-    func testEncodeWithoutData() {
+    @Test func testEncodeWithoutData() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         let saslMechanism = "hello"
         let initialData: [UInt8] = []
@@ -43,12 +43,12 @@ class SASLInitialResponseTests: XCTestCase {
         // + 4 initialData length
         // + 0 initialData
         
-        XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.saslInitialResponse.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), saslMechanism)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(-1))
-        XCTAssertEqual(byteBuffer.readBytes(length: initialData.count), initialData)
-        XCTAssertEqual(byteBuffer.readableBytes, 0)
+        #expect(byteBuffer.readableBytes == length)
+        #expect(byteBuffer.readInteger(as: UInt8.self) == PostgresFrontendMessage.ID.saslInitialResponse.rawValue)
+        #expect(byteBuffer.readInteger(as: Int32.self) == Int32(length - 1))
+        #expect(byteBuffer.readNullTerminatedString() == saslMechanism)
+        #expect(byteBuffer.readInteger(as: Int32.self) == Int32(-1))
+        #expect(byteBuffer.readBytes(length: initialData.count) == initialData)
+        #expect(byteBuffer.readableBytes == 0)
     }
 }
