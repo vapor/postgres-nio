@@ -1,24 +1,13 @@
 @testable import _ConnectionPoolModule
 import _ConnectionPoolTestUtils
-import XCTest
+import Testing
 
-@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
-    var idGenerator: ConnectionIDGenerator!
-
+@Suite struct PoolStateMachine_ConnectionGroupTests {
+    var idGenerator = ConnectionIDGenerator()
     let executor = NothingConnectionPoolExecutor()
 
-    override func setUp() {
-        self.idGenerator = ConnectionIDGenerator()
-        super.setUp()
-    }
-
-    override func tearDown() {
-        self.idGenerator = nil
-        super.tearDown()
-    }
-
-    func testRefillConnections() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testRefillConnections() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 4,
@@ -28,35 +17,36 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
             keepAliveReducesAvailableStreams: true
         )
 
-        XCTAssertTrue(connections.isEmpty)
+        #expect(connections.isEmpty == true)
         let requests = connections.refillConnections()
-        XCTAssertFalse(connections.isEmpty)
+        #expect(connections.isEmpty == false)
 
-        XCTAssertEqual(requests.count, 4)
-        XCTAssertNil(connections.createNewDemandConnectionIfPossible())
-        XCTAssertNil(connections.createNewOverflowConnectionIfPossible())
-        XCTAssertEqual(connections.stats, .init(connecting: 4))
-        XCTAssertEqual(connections.soonAvailableConnections, 4)
+        #expect(requests.count == 4)
+        #expect(connections.createNewDemandConnectionIfPossible() == nil)
+        #expect(connections.createNewOverflowConnectionIfPossible() == nil)
+        #expect(connections.stats == .init(connecting: 4))
+        #expect(connections.soonAvailableConnections == 4)
 
         let requests2 = connections.refillConnections()
-        XCTAssertTrue(requests2.isEmpty)
+        #expect(requests2.isEmpty == true)
 
         var connected: UInt16 = 0
         for request in requests {
             let newConnection = MockConnection(id: request.connectionID, executor: self.executor)
             let (_, context) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
-            XCTAssertEqual(context.info, .idle(availableStreams: 1, newIdle: true))
-            XCTAssertEqual(context.use, .persisted)
+            #expect(context.info == .idle(availableStreams: 1, newIdle: true))
+            #expect(context.use == .persisted)
             connected += 1
-            XCTAssertEqual(connections.stats, .init(connecting: 4 - connected, idle: connected, availableStreams: connected))
-            XCTAssertEqual(connections.soonAvailableConnections, 4 - connected)
+            #expect(connections.stats == .init(connecting: 4 - connected, idle: connected, availableStreams: connected))
+            #expect(connections.soonAvailableConnections == 4 - connected)
         }
 
         let requests3 = connections.refillConnections()
-        XCTAssertTrue(requests3.isEmpty)
+        #expect(requests3.isEmpty == true)
     }
 
-    func testMakeConnectionLeaseItAndDropItHappyPath() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMakeConnectionLeaseItAndDropItHappyPath() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 0,
@@ -67,70 +57,77 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         )
 
         let requests = connections.refillConnections()
-        XCTAssertTrue(connections.isEmpty)
-        XCTAssertTrue(requests.isEmpty)
+        #expect(connections.isEmpty)
+        #expect(requests.isEmpty)
 
         guard let request = connections.createNewDemandConnectionIfPossible() else {
-            return XCTFail("Expected to receive a connection request")
+            Issue.record("Expected to receive a connection request")
+            return
         }
-        XCTAssertEqual(request, .init(connectionID: 0))
-        XCTAssertFalse(connections.isEmpty)
-        XCTAssertEqual(connections.soonAvailableConnections, 1)
-        XCTAssertEqual(connections.stats, .init(connecting: 1))
+        #expect(request == .init(connectionID: 0))
+        #expect(!connections.isEmpty)
+        #expect(connections.soonAvailableConnections == 1)
+        #expect(connections.stats == .init(connecting: 1))
 
         let newConnection = MockConnection(id: request.connectionID, executor: self.executor)
         let (_, establishedContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
-        XCTAssertEqual(establishedContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(establishedContext.use, .demand)
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
-        XCTAssertEqual(connections.soonAvailableConnections, 0)
+        #expect(establishedContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(establishedContext.use == .demand)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+        #expect(connections.soonAvailableConnections == 0)
 
         guard case .leasedConnection(let leaseResult) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
-            return XCTFail("Expected to lease a connection")
+            Issue.record("Expected to lease a connection")
+            return
         }
-        XCTAssert(newConnection === leaseResult.connection)
-        XCTAssertEqual(connections.stats, .init(leased: 1, leasedStreams: 1))
+        #expect(newConnection === leaseResult.connection)
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
 
         guard let (index, releasedContext) = connections.releaseConnection(leaseResult.connection.id, streams: 1) else {
-            return XCTFail("Expected that this connection is still active")
+            Issue.record("Expected that this connection is still active")
+            return
         }
-        XCTAssertEqual(releasedContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(releasedContext.use, .demand)
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        #expect(releasedContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(releasedContext.use == .demand)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
 
         let parkTimers = connections.parkConnection(at: index, hasBecomeIdle: true)
-        XCTAssertEqual(parkTimers, [
+        #expect(parkTimers == [
             .init(timerID: 0, connectionID: newConnection.id, usecase: .keepAlive),
             .init(timerID: 1, connectionID: newConnection.id, usecase: .idleTimeout),
         ])
 
         guard let keepAliveAction = connections.keepAliveIfIdle(newConnection.id) else {
-            return XCTFail("Expected to get a connection for ping pong")
+            Issue.record("Expected to get a connection for ping pong")
+            return
         }
-        XCTAssert(newConnection === keepAliveAction.connection)
-        XCTAssertEqual(connections.stats, .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(newConnection === keepAliveAction.connection)
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
 
         guard let (_, pingPongContext) = connections.keepAliveSucceeded(newConnection.id) else {
-            return XCTFail("Expected to get an AvailableContext")
+            Issue.record("Expected to get an AvailableContext")
+            return
         }
-        XCTAssertEqual(pingPongContext.info, .idle(availableStreams: 1, newIdle: false))
-        XCTAssertEqual(releasedContext.use, .demand)
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        #expect(pingPongContext.info == .idle(availableStreams: 1, newIdle: false))
+        #expect(releasedContext.use == .demand)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
 
         guard let closeAction = connections.closeConnectionIfIdle(newConnection.id) else {
-            return XCTFail("Expected to get a connection for ping pong")
+            Issue.record("Expected to get a connection for ping pong")
+            return
         }
-        XCTAssertEqual(closeAction.timersToCancel, [])
-        XCTAssert(closeAction.connection === newConnection)
-        XCTAssertEqual(connections.stats, .init(closing: 1, availableStreams: 0))
+        #expect(closeAction.timersToCancel == [])
+        #expect(closeAction.connection === newConnection)
+        #expect(connections.stats == .init(closing: 1, availableStreams: 0))
 
         let closeContext = connections.connectionClosed(newConnection.id)
-        XCTAssertEqual(closeContext.connectionsStarting, 0)
-        XCTAssertTrue(connections.isEmpty)
-        XCTAssertEqual(connections.stats, .init())
+        #expect(closeContext.connectionsStarting == 0)
+        #expect(connections.isEmpty)
+        #expect(connections.stats == .init())
     }
 
-    func testBackoffDoneCreatesANewConnectionToReachMinimumConnectionsEvenThoughRetryIsSetToFalse() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testBackoffDoneCreatesANewConnectionToReachMinimumConnectionsEvenThoughRetryIsSetToFalse() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 1,
@@ -141,26 +138,30 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         )
 
         let requests = connections.refillConnections()
-        XCTAssertEqual(connections.stats, .init(connecting: 1))
-        XCTAssertEqual(connections.soonAvailableConnections, 1)
-        XCTAssertFalse(connections.isEmpty)
-        XCTAssertEqual(requests.count, 1)
+        #expect(connections.stats == .init(connecting: 1))
+        #expect(connections.soonAvailableConnections == 1)
+        #expect(!connections.isEmpty)
+        #expect(requests.count == 1)
 
-        guard let request = requests.first else { return XCTFail("Expected to receive a connection request") }
-        XCTAssertEqual(request, .init(connectionID: 0))
+        guard let request = requests.first else {
+            Issue.record("Expected to receive a connection request")
+            return
+        }
+        #expect(request == .init(connectionID: 0))
 
         let backoffTimer = connections.backoffNextConnectionAttempt(request.connectionID)
-        XCTAssertEqual(connections.stats, .init(backingOff: 1))
+        #expect(connections.stats == .init(backingOff: 1))
         let backoffTimerCancellationToken = MockTimerCancellationToken(backoffTimer)
-        XCTAssertNil(connections.timerScheduled(backoffTimer, cancelContinuation: backoffTimerCancellationToken))
+        #expect(connections.timerScheduled(backoffTimer, cancelContinuation: backoffTimerCancellationToken) == nil)
 
         let backoffDoneAction = connections.backoffDone(request.connectionID, retry: false)
-        XCTAssertEqual(backoffDoneAction, .createConnection(.init(connectionID: 0), backoffTimerCancellationToken))
+        #expect(backoffDoneAction == .createConnection(.init(connectionID: 0), backoffTimerCancellationToken))
 
-        XCTAssertEqual(connections.stats, .init(connecting: 1))
+        #expect(connections.stats == .init(connecting: 1))
     }
 
-    func testBackoffDoneCancelsIdleTimerIfAPersistedConnectionIsNotRetried() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testBackoffDoneCancelsIdleTimerIfAPersistedConnectionIsNotRetried() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 2,
@@ -171,57 +172,60 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         )
 
         let requests = connections.refillConnections()
-        XCTAssertEqual(connections.stats, .init(connecting: 2))
-        XCTAssertEqual(connections.soonAvailableConnections, 2)
-        XCTAssertFalse(connections.isEmpty)
-        XCTAssertEqual(requests.count, 2)
+        #expect(connections.stats == .init(connecting: 2))
+        #expect(connections.soonAvailableConnections == 2)
+        #expect(!connections.isEmpty)
+        #expect(requests.count == 2)
 
         var requestIterator = requests.makeIterator()
         guard let firstRequest = requestIterator.next(), let secondRequest = requestIterator.next() else {
-            return XCTFail("Expected to get two requests")
+            Issue.record("Expected to get two requests")
+            return
         }
 
         guard let thirdRequest = connections.createNewDemandConnectionIfPossible() else {
-            return XCTFail("Expected to get another request")
+            Issue.record("Expected to get another request")
+            return
         }
-        XCTAssertEqual(connections.stats, .init(connecting: 3))
+        #expect(connections.stats == .init(connecting: 3))
 
         let newSecondConnection = MockConnection(id: secondRequest.connectionID, executor: self.executor)
         let (_, establishedSecondConnectionContext) = connections.newConnectionEstablished(newSecondConnection, maxStreams: 1)
-        XCTAssertEqual(establishedSecondConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(establishedSecondConnectionContext.use, .persisted)
-        XCTAssertEqual(connections.stats, .init(connecting: 2, idle: 1, availableStreams: 1))
-        XCTAssertEqual(connections.soonAvailableConnections, 2)
+        #expect(establishedSecondConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(establishedSecondConnectionContext.use == .persisted)
+        #expect(connections.stats == .init(connecting: 2, idle: 1, availableStreams: 1))
+        #expect(connections.soonAvailableConnections == 2)
 
         let newThirdConnection = MockConnection(id: thirdRequest.connectionID, executor: self.executor)
         let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, maxStreams: 1)
-        XCTAssertEqual(establishedThirdConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(establishedThirdConnectionContext.use, .demand)
-        XCTAssertEqual(connections.stats, .init(connecting: 1, idle: 2, availableStreams: 2))
-        XCTAssertEqual(connections.soonAvailableConnections, 1)
+        #expect(establishedThirdConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(establishedThirdConnectionContext.use == .demand)
+        #expect(connections.stats == .init(connecting: 1, idle: 2, availableStreams: 2))
+        #expect(connections.soonAvailableConnections == 1)
         let thirdConnKeepTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: thirdRequest.connectionID, usecase: .keepAlive)
         let thirdConnIdleTimer = TestPoolStateMachine.ConnectionTimer(timerID: 1, connectionID: thirdRequest.connectionID, usecase: .idleTimeout)
         let thirdConnIdleTimerCancellationToken = MockTimerCancellationToken(thirdConnIdleTimer)
-        XCTAssertEqual(connections.parkConnection(at: thirdConnectionIndex, hasBecomeIdle: true), [thirdConnKeepTimer, thirdConnIdleTimer])
+        #expect(connections.parkConnection(at: thirdConnectionIndex, hasBecomeIdle: true) == [thirdConnKeepTimer, thirdConnIdleTimer])
 
-        XCTAssertNil(connections.timerScheduled(thirdConnKeepTimer, cancelContinuation: .init(thirdConnKeepTimer)))
-        XCTAssertNil(connections.timerScheduled(thirdConnIdleTimer, cancelContinuation: thirdConnIdleTimerCancellationToken))
+        #expect(connections.timerScheduled(thirdConnKeepTimer, cancelContinuation: .init(thirdConnKeepTimer)) == nil)
+        #expect(connections.timerScheduled(thirdConnIdleTimer, cancelContinuation: thirdConnIdleTimerCancellationToken) == nil)
 
         let backoffTimer = connections.backoffNextConnectionAttempt(firstRequest.connectionID)
-        XCTAssertEqual(connections.stats, .init(backingOff: 1, idle: 2, availableStreams: 2))
+        #expect(connections.stats == .init(backingOff: 1, idle: 2, availableStreams: 2))
         let backoffTimerCancellationToken = MockTimerCancellationToken(backoffTimer)
-        XCTAssertNil(connections.timerScheduled(backoffTimer, cancelContinuation: backoffTimerCancellationToken))
-        XCTAssertEqual(connections.stats, .init(backingOff: 1, idle: 2, availableStreams: 2))
+        #expect(connections.timerScheduled(backoffTimer, cancelContinuation: backoffTimerCancellationToken) == nil)
+        #expect(connections.stats == .init(backingOff: 1, idle: 2, availableStreams: 2))
 
         // connection three should be moved to connection one and for this reason become permanent
 
-        XCTAssertEqual(connections.backoffDone(firstRequest.connectionID, retry: false), .cancelTimers([backoffTimerCancellationToken, thirdConnIdleTimerCancellationToken]))
-        XCTAssertEqual(connections.stats, .init(idle: 2, availableStreams: 2))
+        #expect(connections.backoffDone(firstRequest.connectionID, retry: false) == .cancelTimers([backoffTimerCancellationToken, thirdConnIdleTimerCancellationToken]))
+        #expect(connections.stats == .init(idle: 2, availableStreams: 2))
 
-        XCTAssertNil(connections.closeConnectionIfIdle(newThirdConnection.id))
+        #expect(connections.closeConnectionIfIdle(newThirdConnection.id) == nil)
     }
 
-    func testBackoffDoneReturnsNilIfOverflowConnection() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testBackoffDoneReturnsNilIfOverflowConnection() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 0,
@@ -232,33 +236,36 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         )
 
         guard let firstRequest = connections.createNewDemandConnectionIfPossible() else {
-            return XCTFail("Expected to get two requests")
+            Issue.record("Expected to get two requests")
+            return
         }
 
         guard let secondRequest = connections.createNewDemandConnectionIfPossible() else {
-            return XCTFail("Expected to get another request")
+            Issue.record("Expected to get another request")
+            return
         }
-        XCTAssertEqual(connections.stats, .init(connecting: 2))
+        #expect(connections.stats == .init(connecting: 2))
 
         let newFirstConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (_, establishedFirstConnectionContext) = connections.newConnectionEstablished(newFirstConnection, maxStreams: 1)
-        XCTAssertEqual(establishedFirstConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(establishedFirstConnectionContext.use, .demand)
-        XCTAssertEqual(connections.stats, .init(connecting: 1, idle: 1, availableStreams: 1))
-        XCTAssertEqual(connections.soonAvailableConnections, 1)
+        #expect(establishedFirstConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(establishedFirstConnectionContext.use == .demand)
+        #expect(connections.stats == .init(connecting: 1, idle: 1, availableStreams: 1))
+        #expect(connections.soonAvailableConnections == 1)
 
         let backoffTimer = connections.backoffNextConnectionAttempt(secondRequest.connectionID)
         let backoffTimerCancellationToken = MockTimerCancellationToken(backoffTimer)
-        XCTAssertEqual(connections.stats, .init(backingOff: 1, idle: 1, availableStreams: 1))
-        XCTAssertNil(connections.timerScheduled(backoffTimer, cancelContinuation: backoffTimerCancellationToken))
+        #expect(connections.stats == .init(backingOff: 1, idle: 1, availableStreams: 1))
+        #expect(connections.timerScheduled(backoffTimer, cancelContinuation: backoffTimerCancellationToken) == nil)
 
-        XCTAssertEqual(connections.backoffDone(secondRequest.connectionID, retry: false), .cancelTimers([backoffTimerCancellationToken]))
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        #expect(connections.backoffDone(secondRequest.connectionID, retry: false) == .cancelTimers([backoffTimerCancellationToken]))
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
 
-        XCTAssertNotNil(connections.closeConnectionIfIdle(newFirstConnection.id))
+        #expect(connections.closeConnectionIfIdle(newFirstConnection.id) != nil)
     }
 
-    func testPingPong() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testPingPong() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 1,
@@ -269,35 +276,40 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
         )
 
         let requests = connections.refillConnections()
-        XCTAssertFalse(connections.isEmpty)
-        XCTAssertEqual(connections.stats, .init(connecting: 1))
+        #expect(!connections.isEmpty)
+        #expect(connections.stats == .init(connecting: 1))
 
-        XCTAssertEqual(requests.count, 1)
-        guard let firstRequest = requests.first else { return XCTFail("Expected to have a request here") }
+        #expect(requests.count == 1)
+        guard let firstRequest = requests.first else {
+            Issue.record("Expected to have a request here")
+            return
+        }
 
         let newConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
-        XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(establishedConnectionContext.use, .persisted)
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        #expect(establishedConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(establishedConnectionContext.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
         let timers = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
         let keepAliveTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: firstRequest.connectionID, usecase: .keepAlive)
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
-        XCTAssertEqual(timers, [keepAliveTimer])
-        XCTAssertNil(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
+        #expect(timers == [keepAliveTimer])
+        #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
-        XCTAssertEqual(keepAliveAction, .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
-        XCTAssertEqual(connections.stats, .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
 
         guard let (_, afterPingIdleContext) = connections.keepAliveSucceeded(newConnection.id) else {
-            return XCTFail("Expected to receive an AvailableContext")
+            Issue.record("Expected to receive an AvailableContext")
+            return
         }
-        XCTAssertEqual(afterPingIdleContext.info, .idle(availableStreams: 1, newIdle: false))
-        XCTAssertEqual(afterPingIdleContext.use, .persisted)
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        #expect(afterPingIdleContext.info == .idle(availableStreams: 1, newIdle: false))
+        #expect(afterPingIdleContext.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
     }
 
-    func testKeepAliveShouldNotIndicateCloseConnectionAfterClosed() {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveShouldNotIndicateCloseConnectionAfterClosed() {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 0,
@@ -307,24 +319,28 @@ final class PoolStateMachine_ConnectionGroupTests: XCTestCase {
             keepAliveReducesAvailableStreams: true
         )
 
-        guard let firstRequest = connections.createNewDemandConnectionIfPossible() else { return XCTFail("Expected to have a request here") }
+        guard let firstRequest = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected to have a request here")
+            return
+        }
 
         let newConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
-        XCTAssertEqual(establishedConnectionContext.info, .idle(availableStreams: 1, newIdle: true))
-        XCTAssertEqual(connections.stats, .init(idle: 1, availableStreams: 1))
+        #expect(establishedConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
         _ = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
         let keepAliveTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: firstRequest.connectionID, usecase: .keepAlive)
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
-        XCTAssertNil(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken))
+        #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
-        XCTAssertEqual(keepAliveAction, .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
-        XCTAssertEqual(connections.stats, .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
 
         _ = connections.closeConnectionIfIdle(newConnection.id)
         guard connections.keepAliveFailed(newConnection.id) == nil else {
-            return XCTFail("Expected keepAliveFailed not to cause close again")
+            Issue.record("Expected keepAliveFailed not to cause close again")
+            return
         }
-        XCTAssertEqual(connections.stats, .init(closing: 1))
+        #expect(connections.stats == .init(closing: 1))
     }
 }

@@ -15,7 +15,7 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock, Executor: Co
     let stateBox = NIOLockedValueBox(State())
 
     @usableFromInline
-    struct State {
+    struct State: Sendable {
         @usableFromInline
         var attempts = Deque<(ConnectionID, Executor, CheckedContinuation<(MockConnection<Executor>, UInt16), any Error>)>()
 
