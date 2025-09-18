@@ -567,8 +567,13 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         _ cleanup: ConnectionStateMachine.ConnectionAction.CleanUpContext,
         context: ChannelHandlerContext
     ) {
-        self.logger.debug("Cleaning up and closing connection.", metadata: [.error: "\(cleanup.error)"])
-        
+        // Don't log a misleading error if the client closed the connection.
+        if cleanup.error.code == .clientClosedConnection {
+            self.logger.debug("Cleaning up and closing connection.")
+        } else {
+            self.logger.debug("Cleaning up and closing connection.", metadata: [.error: "\(cleanup.error)"])
+        }
+
         // 1. fail all tasks
         cleanup.tasks.forEach { task in
             task.failWithError(cleanup.error)

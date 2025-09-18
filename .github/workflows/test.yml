@@ -18,10 +18,10 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:5.10-jammy
-          - swift:6.0-noble
+          - swift:6.0-jammy
           - swift:6.1-noble
-          - swiftlang/swift:nightly-main-jammy
+          - swift:6.2-noble
+          - swiftlang/swift:nightly-main-noble
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
     steps:
@@ -32,11 +32,16 @@ jobs:
           [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}"
           swift --version
+      - name: Install curl for Codecov
+        run: apt-get update -y -q && apt-get install -y curl
       - name: Check out package
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Run unit tests with Thread Sanitizer
+        shell: bash
         run: |
-          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
+          # https://github.com/swiftlang/swift/issues/74042 was never fixed in 5.10 and swift-crypto hits it in 6.0 as well
+          SANITIZE="$([[ "${SWIFT_VERSION}" =~ ^swift-(5|6\.0) ]] || echo '--sanitize=thread')"
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' ${SANITIZE} --enable-code-coverage
       - name: Submit code coverage
         uses: vapor/swift-codecov-action@v0.3
         with:
@@ -58,7 +63,7 @@ jobs:
           - postgres-image: postgres:13
             postgres-auth: trust
     container:
-      image: swift:6.1-noble
+      image: swift:6.2-noble
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
@@ -103,15 +108,15 @@ jobs:
           [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with: { path: 'postgres-nio' }
       - name: Run integration tests
         run: swift test --package-path postgres-nio --filter=^IntegrationTests
       - name: Check out postgres-kit dependent
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
       - name: Check out fluent-postgres-driver dependent
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with: { repository: 'vapor/fluent-postgres-driver', path: 'fluent-postgres-driver' }
       - name: Use local package in dependents
         run: |
@@ -132,11 +137,14 @@ jobs:
         postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
-        xcode-version:
-          - '~15'
+        macos-version:
+          - 'macos-14'
+          - 'macos-15'
         include:
-          - xcode-version: '~15'
-            macos-version: 'macos-14'
+          - macos-version: 'macos-14'
+            xcode-version: 'latest-stable'
+          - macos-version: 'macos-15'
+            xcode-version: 'latest-stable'
     runs-on: ${{ matrix.macos-version }}
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
@@ -154,18 +162,13 @@ jobs:
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
           export PATH="$(brew --prefix)/opt/${POSTGRES_FORMULA}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          # ** BEGIN ** Work around bug in both Homebrew and GHA
-          (brew upgrade python@3.11 || true) && (brew link --force --overwrite python@3.11 || true)
-          (brew upgrade python@3.12 || true) && (brew link --force --overwrite python@3.12 || true)
-          (brew upgrade || true)
-          # ** END ** Work around bug in both Homebrew and GHA
           brew install --overwrite "${POSTGRES_FORMULA}"
           brew link --overwrite --force "${POSTGRES_FORMULA}"
           initdb --locale=C --auth-host "${POSTGRES_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
         timeout-minutes: 15
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Run all tests
         run: swift test
           
@@ -175,7 +178,7 @@ jobs:
     container: swift:noble
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
       # https://github.com/actions/checkout/issues/766
@@ -183,22 +186,3 @@ jobs:
         run: |
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
           swift package diagnose-api-breaking-changes origin/main
-
-#  gh-codeql:
-#    if: ${{ false }}
-#    runs-on: ubuntu-latest
-#    container: swift:noble
-#    permissions: { actions: write, contents: read, security-events: write }
-#    steps:
-#      - name: Check out code
-#        uses: actions/checkout@v4
-#      - name: Mark repo safe in non-fake global config
-#        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-#      - name: Initialize CodeQL
-#        uses: github/codeql-action/init@v3
-#        with:
-#          languages: swift
-#      - name: Perform build
-#        run: swift build
-#      - name: Run CodeQL analyze
-#        uses: github/codeql-action/analyze@v3
