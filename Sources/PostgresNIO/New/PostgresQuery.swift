@@ -1,6 +1,191 @@
 import NIOCore
 
 /// A Postgres SQL query, that can be executed on a Postgres server. Contains the raw sql string and bindings.
+///
+/// `PostgresQuery` supports safe string interpolation to automatically bind parameters and prevent SQL injection.
+///
+/// ## Basic Usage
+///
+/// Create a query using string interpolation with automatic parameter binding:
+///
+/// ```swift
+/// let userID = 42
+/// let query: PostgresQuery = "SELECT * FROM users WHERE id = \(userID)"
+/// // Generates: "SELECT * FROM users WHERE id = $1" with bindings: [42]
+/// ```
+///
+/// ## String Interpolation with Various Types
+///
+/// String interpolation works with any type conforming to `PostgresEncodable`:
+///
+/// ```swift
+/// let name = "Alice"
+/// let age = 30
+/// let isActive = true
+/// let query: PostgresQuery = """
+///     INSERT INTO users (name, age, active)
+///     VALUES (\(name), \(age), \(isActive))
+///     """
+/// ```
+///
+/// ## Optional Values
+///
+/// Optional values are automatically handled and encoded as NULL when nil:
+///
+/// ```swift
+/// let email: String? = nil
+/// let query: PostgresQuery = "UPDATE users SET email = \(email) WHERE id = \(userID)"
+/// // email will be encoded as NULL in the database
+/// ```
+///
+/// ## Unsafe Raw SQL
+///
+/// For dynamic table/column names or SQL keywords, use `unescaped` interpolation (use with caution):
+///
+/// ```swift
+/// let tableName = "users"
+/// let columnName = "created_at"
+/// let query: PostgresQuery = "SELECT * FROM \(unescaped: tableName) ORDER BY \(unescaped: columnName) DESC"
+/// ```
+///
+/// ## Manual Construction with PostgresBindings
+///
+/// You can also create queries manually using `PostgresBindings` without string interpolation.
+/// This is useful when building dynamic queries programmatically:
+///
+/// ```swift
+/// var bindings = PostgresBindings()
+/// bindings.append("Alice")
+/// bindings.append(30)
+/// let query = PostgresQuery(unsafeSQL: "INSERT INTO users (name, age) VALUES ($1, $2)", binds: bindings)
+/// ```
+///
+/// ## Building Dynamic Queries
+///
+/// For complex scenarios where you need to build queries dynamically:
+///
+/// ```swift
+/// func buildSearchQuery(filters: [String: Any]) -> PostgresQuery {
+///     var bindings = PostgresBindings()
+///     var sql = "SELECT * FROM products WHERE 1=1"
+///
+///     if let name = filters["name"] as? String {
+///         bindings.append(name)
+///         sql += " AND name = $\(bindings.count)"
+///     }
+///
+///     if let minPrice = filters["minPrice"] as? Double {
+///         bindings.append(minPrice)
+///         sql += " AND price >= $\(bindings.count)"
+///     }
+///
+///     if let category = filters["category"] as? String {
+///         bindings.append(category)
+///         sql += " AND category = $\(bindings.count)"
+///     }
+///
+///     return PostgresQuery(unsafeSQL: sql, binds: bindings)
+/// }
+///
+/// let filters = ["name": "Widget", "minPrice": 9.99]
+/// let query = buildSearchQuery(filters: filters)
+/// // Generates: "SELECT * FROM products WHERE 1=1 AND name = $1 AND price >= $2"
+/// // With bindings: ["Widget", 9.99]
+/// ```
+///
+/// ## Executing Queries
+///
+/// Once you've created a query, execute it using various methods on `PostgresClient`:
+///
+/// ### Basic Query Execution
+///
+/// Execute a query and iterate over results:
+///
+/// ```swift
+/// let client = PostgresClient(configuration: config)
+/// let query: PostgresQuery = "SELECT * FROM users WHERE age > \(minAge)"
+///
+/// let rows = try await client.query(query, logger: logger)
+/// for try await row in rows {
+///     let id: Int = try row.decode(column: "id", as: Int.self)
+///     let name: String = try row.decode(column: "name", as: String.self)
+///     print("User: \(name) (ID: \(id))")
+/// }
+/// ```
+///
+/// ### Using withConnection
+///
+/// Execute multiple queries on the same connection:
+///
+/// ```swift
+/// try await client.withConnection { connection in
+///     // First query
+///     let userID = 42
+///     let userRows = try await connection.query(
+///         "SELECT * FROM users WHERE id = \(userID)",
+///         logger: logger
+///     )
+///
+///     // Second query on the same connection
+///     let orderRows = try await connection.query(
+///         "SELECT * FROM orders WHERE user_id = \(userID)",
+///         logger: logger
+///     )
+///
+///     // Process results...
+/// }
+/// ```
+///
+/// ### Using withTransaction
+///
+/// Execute queries within a transaction for atomicity:
+///
+/// ```swift
+/// try await client.withTransaction { connection in
+///     // All queries execute in a transaction
+///     let fromAccount = "account123"
+///     let toAccount = "account456"
+///     let amount = 100.0
+///
+///     // Debit from account
+///     try await connection.query(
+///         "UPDATE accounts SET balance = balance - \(amount) WHERE id = \(fromAccount)",
+///         logger: logger
+///     )
+///
+///     // Credit to account
+///     try await connection.query(
+///         "UPDATE accounts SET balance = balance + \(amount) WHERE id = \(toAccount)",
+///         logger: logger
+///     )
+///
+///     // If any query fails or throws, the entire transaction is rolled back
+///     // If this closure completes successfully, the transaction is committed
+/// }
+/// ```
+///
+/// ### Insert and Return Generated IDs
+///
+/// Insert data and retrieve auto-generated values:
+///
+/// ```swift
+/// let name = "Alice"
+/// let email = "alice@example.com"
+/// let rows = try await client.query(
+///     "INSERT INTO users (name, email) VALUES (\(name), \(email)) RETURNING id",
+///     logger: logger
+/// )
+///
+/// for try await row in rows {
+///     let newID: Int = try row.decode(column: "id", as: Int.self)
+///     print("Created user with ID: \(newID)")
+/// }
+/// ```
+///
+/// - Note: String interpolation is the recommended approach for simple queries as it automatically handles parameter counting and binding.
+/// - Warning: Always use parameter binding for user input. Never concatenate user input directly into SQL strings.
+/// - SeeAlso: `PostgresBindings` for more details on manual binding construction.
+/// - SeeAlso: `PostgresClient` for connection pool management and query execution.
 public struct PostgresQuery: Sendable, Hashable {
     /// The query string
     public var sql: String
@@ -118,6 +303,180 @@ struct PSQLExecuteStatement {
     var rowDescription: RowDescription?
 }
 
+/// A collection of parameter bindings for a Postgres query.
+///
+/// `PostgresBindings` manages the parameters that are safely bound to a SQL query, preventing SQL injection
+/// and handling type conversions to the Postgres wire format.
+///
+/// ## Basic Usage
+///
+/// Typically, you don't need to create `PostgresBindings` directly when using `PostgresQuery` with string interpolation.
+/// However, you can manually construct bindings when needed:
+///
+/// ```swift
+/// var bindings = PostgresBindings()
+/// bindings.append("Alice")
+/// bindings.append(30)
+/// bindings.append(true)
+/// // bindings now contains 3 parameters
+/// ```
+///
+/// ## Appending Different Types
+///
+/// `PostgresBindings` can store any type conforming to `PostgresEncodable`:
+///
+/// ```swift
+/// var bindings = PostgresBindings()
+/// bindings.append("John Doe")        // String
+/// bindings.append(42)                // Int
+/// bindings.append(3.14)              // Double
+/// bindings.append(Date())            // Date
+/// bindings.append(true)              // Bool
+/// bindings.append([1, 2, 3])         // Array
+/// ```
+///
+/// ## Handling Optional Values
+///
+/// Optional values can be appended and will be encoded as NULL when nil:
+///
+/// ```swift
+/// var bindings = PostgresBindings()
+/// let email: String? = nil
+/// bindings.append(email)  // Encodes as NULL
+///
+/// let name: String? = "Alice"
+/// bindings.append(name)   // Encodes as "Alice"
+/// ```
+///
+/// ## Manual NULL Values
+///
+/// You can explicitly append NULL values:
+///
+/// ```swift
+/// var bindings = PostgresBindings()
+/// bindings.appendNull()
+/// ```
+///
+/// ## Using with Custom Encoding Context
+///
+/// For custom JSON encoding, use a custom encoding context:
+///
+/// ```swift
+/// var bindings = PostgresBindings()
+/// let jsonEncoder = JSONEncoder()
+/// jsonEncoder.dateEncodingStrategy = .iso8601
+/// let context = PostgresEncodingContext(jsonEncoder: jsonEncoder)
+///
+/// struct User: Codable {
+///     let name: String
+///     let age: Int
+/// }
+/// let user = User(name: "Alice", age: 30)
+/// try bindings.append(user, context: context)
+/// ```
+///
+/// ## Pre-allocating Capacity
+///
+/// For better performance with known parameter counts:
+///
+/// ```swift
+/// var bindings = PostgresBindings(capacity: 10)  // Pre-allocate space for 10 bindings
+/// ```
+///
+/// ## Using with PostgresQuery
+///
+/// Combine `PostgresBindings` with `PostgresQuery` for manual query construction.
+/// This is particularly useful when building dynamic queries:
+///
+/// ```swift
+/// func buildSearchQuery(filters: [String: Any]) -> PostgresQuery {
+///     var bindings = PostgresBindings()
+///     var sql = "SELECT * FROM products WHERE 1=1"
+///
+///     if let name = filters["name"] as? String {
+///         bindings.append(name)
+///         sql += " AND name = $\(bindings.count)"
+///     }
+///
+///     if let minPrice = filters["minPrice"] as? Double {
+///         bindings.append(minPrice)
+///         sql += " AND price >= $\(bindings.count)"
+///     }
+///
+///     if let category = filters["category"] as? String {
+///         bindings.append(category)
+///         sql += " AND category = $\(bindings.count)"
+///     }
+///
+///     return PostgresQuery(unsafeSQL: sql, binds: bindings)
+/// }
+///
+/// // Usage
+/// let filters = ["name": "Widget", "minPrice": 9.99]
+/// let query = buildSearchQuery(filters: filters)
+/// let rows = try await client.query(query, logger: logger)
+/// ```
+///
+/// ## Using with withConnection
+///
+/// Execute multiple dynamically-built queries on the same connection:
+///
+/// ```swift
+/// try await client.withConnection { connection in
+///     // Build and execute first query
+///     var bindings1 = PostgresBindings()
+///     bindings1.append(userID)
+///     let query1 = PostgresQuery(
+///         unsafeSQL: "SELECT * FROM users WHERE id = $\(bindings1.count)",
+///         binds: bindings1
+///     )
+///     let userRows = try await connection.query(query1, logger: logger)
+///
+///     // Build and execute second query on same connection
+///     var bindings2 = PostgresBindings()
+///     bindings2.append(userID)
+///     bindings2.append(startDate)
+///     let query2 = PostgresQuery(
+///         unsafeSQL: "SELECT * FROM orders WHERE user_id = $1 AND created_at >= $2",
+///         binds: bindings2
+///     )
+///     let orderRows = try await connection.query(query2, logger: logger)
+/// }
+/// ```
+///
+/// ## Using with withTransaction
+///
+/// Build and execute transactional queries with manual bindings:
+///
+/// ```swift
+/// try await client.withTransaction { connection in
+///     // Debit query
+///     var debitBindings = PostgresBindings()
+///     debitBindings.append(amount)
+///     debitBindings.append(fromAccountID)
+///     let debitQuery = PostgresQuery(
+///         unsafeSQL: "UPDATE accounts SET balance = balance - $1 WHERE id = $2",
+///         binds: debitBindings
+///     )
+///     try await connection.query(debitQuery, logger: logger)
+///
+///     // Credit query
+///     var creditBindings = PostgresBindings()
+///     creditBindings.append(amount)
+///     creditBindings.append(toAccountID)
+///     let creditQuery = PostgresQuery(
+///         unsafeSQL: "UPDATE accounts SET balance = balance + $1 WHERE id = $2",
+///         binds: creditBindings
+///     )
+///     try await connection.query(creditQuery, logger: logger)
+///
+///     // Both queries commit together, or roll back on error
+/// }
+/// ```
+///
+/// - Note: Bindings are indexed starting from 1 in SQL (e.g., $1, $2, $3).
+/// - Note: The `count` property returns the number of bindings currently stored.
+/// - SeeAlso: `PostgresQuery` for creating complete queries with bindings.
 public struct PostgresBindings: Sendable, Hashable {
     @usableFromInline
     struct Metadata: Sendable, Hashable {

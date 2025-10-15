@@ -347,6 +347,90 @@ final class PostgresClientTests: XCTestCase {
         }
     }
 
+    func testJSONBCodableRoundTrip() async throws {
+        // Test the example from our documentation
+        struct UserProfile: Codable, PostgresCodable, Equatable {
+            let displayName: String
+            let bio: String
+            let interests: [String]
+        }
+
+        let tableName = "test_user_profiles"
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            // Create table
+            try await client.query(
+                """
+                CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
+                    id SERIAL PRIMARY KEY,
+                    profile JSONB NOT NULL
+                );
+                """,
+                logger: logger
+            )
+
+            // Insert with Codable struct (from documentation example)
+            let userID = 1
+            let profile = UserProfile(
+                displayName: "Alice",
+                bio: "Swift developer",
+                interests: ["coding", "hiking"]
+            )
+
+            try await client.query(
+                """
+                INSERT INTO \(unescaped: tableName) (id, profile) VALUES (\(userID), \(profile))
+                """,
+                logger: logger
+            )
+
+            // Decode from results (from documentation example)
+            let rows = try await client.query(
+                """
+                SELECT profile FROM "\(unescaped: tableName)" WHERE id = \(userID)
+                """,
+                logger: logger
+            )
+
+            var decodedProfile: UserProfile?
+            for try await row in rows {
+                decodedProfile = try row.decode(column: "profile", as: UserProfile.self)
+                print("Display name: \(decodedProfile!.displayName)")
+            }
+
+            // Verify the round-trip
+            XCTAssertEqual(decodedProfile, profile)
+            XCTAssertEqual(decodedProfile?.displayName, "Alice")
+            XCTAssertEqual(decodedProfile?.bio, "Swift developer")
+            XCTAssertEqual(decodedProfile?.interests, ["coding", "hiking"])
+
+            // Clean up
+            try await client.query(
+                """
+                DROP TABLE "\(unescaped: tableName)";
+                """,
+                logger: logger
+            )
+
+            taskGroup.cancelAll()
+        }
+    }
+
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)

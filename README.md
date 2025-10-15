@@ -152,6 +152,41 @@ try await client.query("""
 
 While this looks at first glance like a classic case of [SQL injection](https://en.wikipedia.org/wiki/SQL_injection) 😱, PostgresNIO's API ensures that this usage is safe. The first parameter of the [`query(_:logger:)`] method is not a plain `String`, but a [`PostgresQuery`], which implements Swift's `ExpressibleByStringInterpolation` protocol. PostgresNIO uses the literal parts of the provided string as the SQL query and replaces each interpolated value with a parameter binding. Only values which implement the [`PostgresEncodable`] protocol may be interpolated in this way. As with [`PostgresDecodable`], PostgresNIO provides default implementations for most common types.
 
+#### Manual query construction with PostgresBindings
+
+For more complex scenarios where you need to build queries dynamically, you can use `PostgresBindings` together with `PostgresQuery`:
+
+```swift
+func buildSearchQuery(filters: [String: Any]) -> PostgresQuery {
+    var bindings = PostgresBindings()
+    var sql = "SELECT * FROM products WHERE 1=1"
+
+    if let name = filters["name"] as? String {
+        bindings.append(name)
+        sql += " AND name = $\(bindings.count)"
+    }
+
+    if let minPrice = filters["minPrice"] as? Double {
+        bindings.append(minPrice)
+        sql += " AND price >= $\(bindings.count)"
+    }
+
+    if let category = filters["category"] as? String {
+        bindings.append(category)
+        sql += " AND category = $\(bindings.count)"
+    }
+
+    return PostgresQuery(unsafeSQL: sql, binds: bindings)
+}
+
+// Usage
+let filters = ["name": "Widget", "minPrice": 9.99]
+let query = buildSearchQuery(filters: filters)
+let rows = try await client.query(query, logger: logger)
+```
+
+This approach is particularly useful when you need to conditionally add filters or build complex queries programmatically.
+
 Some queries do not receive any rows from the server (most often `INSERT`, `UPDATE`, and `DELETE` queries with no `RETURNING` clause, not to mention most DDL queries). To support this, the [`query(_:logger:)`] method is marked `@discardableResult`, so that the compiler does not issue a warning if the return value is not used. 
 
 ## Security
