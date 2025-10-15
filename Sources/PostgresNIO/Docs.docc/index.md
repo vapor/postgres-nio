@@ -89,8 +89,9 @@ let rows = try await client.query(
 )
 
 for try await row in rows {
-    let id: Int = try row.decode(column: "id", as: Int.self)
-    let name: String = try row.decode(column: "name", as: String.self)
+    let randomAccessRow = row.makeRandomAccess()
+    let id: Int = try randomAccessRow.decode(column: "id", as: Int.self, context: .default)
+    let name: String = try randomAccessRow.decode(column: "name", as: String.self, context: .default)
     print("User: \(name) (ID: \(id))")
 }
 
@@ -209,7 +210,8 @@ let rows = try await client.query(
 )
 
 for try await row in rows {
-    let profile = try row.decode(column: "profile", as: UserProfile.self)
+    let randomAccessRow = row.makeRandomAccess()
+    let profile = try randomAccessRow.decode(column: "profile", as: UserProfile.self, context: .default)
     print("Display name: \(profile.displayName)")
 }
 ```

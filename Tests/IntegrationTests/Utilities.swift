@@ -1,6 +1,7 @@
 import XCTest
 import PostgresNIO
 import NIOCore
+import NIOSSL
 import Logging
 #if canImport(Darwin)
 import Darwin.C
@@ -76,8 +77,30 @@ func env(_ name: String) -> String? {
     getenv(name).flatMap { String(cString: $0) }
 }
 
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension PostgresClient.Configuration {
+    static func makeTestConfiguration() -> PostgresClient.Configuration {
+        var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
+        tlsConfiguration.certificateVerification = .none
+        var clientConfig = PostgresClient.Configuration(
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: env("POSTGRES_PORT").flatMap({ Int($0) }) ?? 5432,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database",
+            tls: .prefer(tlsConfiguration)
+        )
+        clientConfig.options.minimumConnections = 0
+        clientConfig.options.maximumConnections = 12*4
+        clientConfig.options.keepAliveBehavior = .init(frequency: .seconds(5))
+        clientConfig.options.connectionIdleTimeout = .seconds(15)
+
+        return clientConfig
+    }
+}
+
 extension XCTestCase {
-    
+
     public static var shouldRunLongRunningTests: Bool {
         // The env var must be set and have the value `"true"`, `"1"`, or `"yes"` (case-insensitive).
         // For the sake of sheer annoying pedantry, values like `"2"` are treated as false.
