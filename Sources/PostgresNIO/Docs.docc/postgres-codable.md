@@ -10,6 +10,18 @@ Encode and decode custom Swift types to and from PostgreSQL wire format.
 
 Many standard Swift and Foundation types already conform to ``PostgresCodable``:
 
+Note: Schema used in this example
+```sql
+-- Minimal table to match the example below
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    age INT NOT NULL,
+    active BOOLEAN NOT NULL,
+    created TIMESTAMPTZ NOT NULL
+);
+```
+
 ```swift
 // Numeric types
 let age: Int = 30
@@ -36,6 +48,15 @@ let rows = try await client.query(
 ## Using Codable Structs with JSONB
 
 For custom Swift structs that you want to store as JSONB in PostgreSQL, simply conform to `Codable`. PostgresNIO automatically handles the encoding and decoding:
+
+Note: Schema used in this example
+```sql
+-- Users table with a JSONB profile column
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY,
+    profile JSONB NOT NULL
+);
+```
 
 ```swift
 // Define a Codable struct
@@ -95,6 +116,14 @@ let company = Company(
     employees: 50
 )
 
+// Example schema for the `companies` table
+// (a single JSONB column storing your Codable payload)
+//
+// CREATE TABLE IF NOT EXISTS companies (
+//     id SERIAL PRIMARY KEY,
+//     data JSONB NOT NULL
+// );
+
 try await client.query(
     "INSERT INTO companies (data) VALUES (\(company))",
     logger: logger
@@ -104,6 +133,15 @@ try await client.query(
 ## Implementing PostgresEncodable
 
 To make a custom type encodable to PostgreSQL, implement the ``PostgresEncodable`` protocol:
+
+Note: Schema used in this example
+```sql
+-- A table with a PostgreSQL point column
+CREATE TABLE IF NOT EXISTS locations (
+    name TEXT PRIMARY KEY,
+    coordinate POINT NOT NULL
+);
+```
 
 ```swift
 import NIOCore
@@ -140,6 +178,8 @@ try await client.execute(
 ## Implementing PostgresDecodable
 
 To decode a custom type from PostgreSQL results, implement the ``PostgresDecodable`` protocol:
+
+Note: Same `locations` schema as above is used.
 
 ```swift
 import NIOCore
@@ -242,6 +282,13 @@ let profile = UserProfile(
     interests: ["coding", "hiking"]
 )
 
+// Example users table with a JSONB profile column
+//
+// CREATE TABLE IF NOT EXISTS users (
+//     id INT PRIMARY KEY,
+//     profile JSONB NOT NULL
+// );
+
 try await client.execute(
     "UPDATE users SET profile = \(profile) WHERE id = \(userID)",
     logger: logger
@@ -273,6 +320,12 @@ let query = PostgresQuery(
 ## RawRepresentable Types
 
 For enums with encodable raw values:
+
+Note: Schema used in this example
+```sql
+-- Add a status column to users as TEXT (enum stored as raw value)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT;
+```
 
 ```swift
 enum UserStatus: String, PostgresCodable {
@@ -315,6 +368,18 @@ try await client.execute(
 ## Decoding Rows with Multiple Columns
 
 Decode multiple values from a single row:
+
+Note: Schema used in this example
+```sql
+-- Users table used for multi-column decoding
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    age INT NOT NULL
+);
+```
 
 ```swift
 struct User: PostgresDecodable {
