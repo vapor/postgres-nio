@@ -213,7 +213,7 @@ extension PostgresRandomAccessRow {
     ///   - type: The type to decode the data into
     /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
-    public func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(
+    func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(
         column: String,
         as type: T.Type,
         context: PostgresDecodingContext<JSONDecoder>,
@@ -233,7 +233,7 @@ extension PostgresRandomAccessRow {
     ///   - type: The type to decode the data into
     /// - Throws: The error of the decoding implementation. See also `PSQLDecodable` protocol for this.
     /// - Returns: The decoded value of Type T.
-    public func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(
+    func decode<T: PostgresDecodable, JSONDecoder: PostgresJSONDecoder>(
         column index: Int,
         as type: T.Type,
         context: PostgresDecodingContext<JSONDecoder>,
