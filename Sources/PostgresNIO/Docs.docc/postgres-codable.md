@@ -33,6 +33,74 @@ let rows = try await client.query(
 )
 ```
 
+## Using Codable Structs with JSONB
+
+For custom Swift structs that you want to store as JSONB in PostgreSQL, simply conform to `Codable`. PostgresNIO automatically handles the encoding and decoding:
+
+```swift
+// Define a Codable struct
+struct UserProfile: Codable {
+    let displayName: String
+    let bio: String
+    let interests: [String]
+}
+
+// Insert into a JSONB column
+let profile = UserProfile(
+    displayName: "Alice",
+    bio: "Swift developer",
+    interests: ["coding", "hiking"]
+)
+
+try await client.query(
+    "INSERT INTO users (id, profile) VALUES (\(userID), \(profile))",
+    logger: logger
+)
+
+// Retrieve from a JSONB column
+let rows = try await client.query(
+    "SELECT profile FROM users WHERE id = \(userID)",
+    logger: logger
+)
+
+for try await row in rows {
+    let randomAccessRow = row.makeRandomAccess()
+    let profile = try randomAccessRow.decode(column: "profile", as: UserProfile.self, context: .default)
+    print("Display name: \(profile.displayName)")
+}
+```
+
+This works for any Swift type that conforms to `Codable`, including nested structs, enums, and arrays. No manual encoding or decoding implementation is needed!
+
+```swift
+// Complex nested structure - just add Codable!
+struct Address: Codable {
+    let street: String
+    let city: String
+    let zipCode: String
+}
+
+struct Company: Codable {
+    let name: String
+    let founded: Date
+    let address: Address
+    let employees: Int
+}
+
+// Works automatically with JSONB columns
+let company = Company(
+    name: "Acme Inc",
+    founded: Date(),
+    address: Address(street: "123 Main St", city: "Springfield", zipCode: "12345"),
+    employees: 50
+)
+
+try await client.query(
+    "INSERT INTO companies (data) VALUES (\(company))",
+    logger: logger
+)
+```
+
 ## Implementing PostgresEncodable
 
 To make a custom type encodable to PostgreSQL, implement the ``PostgresEncodable`` protocol:
@@ -110,14 +178,17 @@ let rows = try await client.query(
 )
 
 for try await row in rows {
-    let point = try row.decode(column: "coordinate", as: Point.self)
+    let randomAccessRow = row.makeRandomAccess()
+    let point = try randomAccessRow.decode(column: "coordinate", as: Point.self, context: .default)
     print("Location: (\(point.x), \(point.y))")
 }
 ```
 
-## Encoding and Decoding JSON
+## Advanced: Manual JSON Encoding and Decoding
 
-For complex types, you can encode them as JSONB:
+> Note: For most use cases, simply conforming your struct to `Codable` is sufficient (see <doc:#Using-Codable-Structs-with-JSONB>). Only implement manual encoding/decoding if you need fine-grained control over the JSON representation or need to handle both JSON and JSONB types differently.
+
+For advanced scenarios where you need manual control over JSON encoding:
 
 ```swift
 struct UserProfile: Codable, PostgresCodable {
@@ -271,10 +342,11 @@ let rows = try await client.query(
 )
 
 for try await row in rows {
-    let id: Int = try row.decode(column: "id", as: Int.self)
-    let name: String = try row.decode(column: "name", as: String.self)
-    let email: String = try row.decode(column: "email", as: String.self)
-    let createdAt: Date = try row.decode(column: "created_at", as: Date.self)
+    let randomAccessRow = row.makeRandomAccess()
+    let id: Int = try randomAccessRow.decode(column: "id", as: Int.self, context: .default)
+    let name: String = try randomAccessRow.decode(column: "name", as: String.self, context: .default)
+    let email: String = try randomAccessRow.decode(column: "email", as: String.self, context: .default)
+    let createdAt: Date = try randomAccessRow.decode(column: "created_at", as: Date.self, context: .default)
 
     let user = User(id: id, name: name, email: email, createdAt: createdAt)
     print("User: \(user.name)")
