@@ -135,8 +135,9 @@ public protocol PostgresDynamicTypeEncodable: PostgresThrowingDynamicTypeEncodab
 /// }
 /// ```
 ///
-/// - Note: `PostgresNonThrowingEncodable` is a variant that doesn't throw, allowing usage without `try`.
-/// - SeeAlso: `PostgresDecodable` for decoding values from Postgres.
+/// > Note: ``PostgresNonThrowingEncodable`` is a variant that doesn't throw, allowing usage without `try`.
+///
+/// - SeeAlso: ``PostgresDecodable`` for decoding values from Postgres.
 public protocol PostgresEncodable: PostgresThrowingDynamicTypeEncodable {
     // TODO: Rename to `PostgresThrowingEncodable` with next major release
 
@@ -157,11 +158,11 @@ public protocol PostgresNonThrowingEncodable: PostgresEncodable, PostgresDynamic
 
 /// A type that can decode itself from a postgres wire binary representation.
 ///
-/// Conform your custom types to `PostgresDecodable` to enable them to be decoded from query results.
+/// Conform your custom types to ``PostgresDecodable`` to enable them to be decoded from query results.
 ///
 /// ## Conforming Built-in Types
 ///
-/// Many standard Swift types already conform to `PostgresDecodable`:
+/// Many standard Swift types already conform to ``PostgresDecodable``:
 /// - Numeric types: `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `UInt`, `UInt8`, `UInt16`, `UInt32`, `Float`, `Double`
 /// - Text types: `String`, `Substring`
 /// - Other types: `Bool`, `Date`, `UUID`, `Data`
@@ -277,8 +278,9 @@ public protocol PostgresNonThrowingEncodable: PostgresEncodable, PostgresDynamic
 /// // Returns nil if the database value is NULL
 /// ```
 ///
-/// - Note: The `_DecodableType` associated type is an implementation detail for Optional handling.
-/// - SeeAlso: `PostgresEncodable` for encoding values to Postgres.
+/// > Note: The ``_DecodableType`` associated type is an implementation detail for Optional handling.
+///
+/// - SeeAlso: ``PostgresEncodable`` for encoding values to Postgres.
 public protocol PostgresDecodable {
     /// A type definition of the type that actually implements the PostgresDecodable protocol. This is an escape hatch to
     /// prevent a cycle in the conformace of the Optional type to PostgresDecodable.

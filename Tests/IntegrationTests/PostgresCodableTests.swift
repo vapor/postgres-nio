@@ -175,8 +175,7 @@ final class PostgresCodableTests: XCTestCase {
             var decodedProfile: UserProfile?
             for try await row in rows {
                 let randomAccessRow = row.makeRandomAccess()
-                decodedProfile = try randomAccessRow.decode(
-                    column: "profile", as: UserProfile.self, context: .default)
+                decodedProfile = try randomAccessRow["profile"].decode(UserProfile.self, context: .default)
                 print("Display name: \(decodedProfile!.displayName)")
             }
 
@@ -271,8 +270,7 @@ final class PostgresCodableTests: XCTestCase {
             var decodedCompany: Company?
             for try await row in rows {
                 let randomAccessRow = row.makeRandomAccess()
-                decodedCompany = try randomAccessRow.decode(
-                    column: "data", as: Company.self, context: .default)
+                decodedCompany = try randomAccessRow["data"].decode(Company.self, context: .default)
                 print("Company: \(decodedCompany!.name)")
             }
 

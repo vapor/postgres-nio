@@ -7,4 +7,3 @@ Package.resolved
 .swiftpm
 Tests/LinuxMain.swift
 .vscode/
-.derivedData

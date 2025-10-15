@@ -108,8 +108,8 @@ import NIOCore
 /// let rows = try await client.query(query, logger: logger)
 /// for try await row in rows {
 ///     let randomAccessRow = row.makeRandomAccess()
-///     let id: Int = try randomAccessRow.decode(column: "id", as: Int.self, context: .default)
-///     let name: String = try randomAccessRow.decode(column: "name", as: String.self, context: .default)
+///     let id: Int = try randomAccessRow["id"].decode(Int.self, context: .default)
+///     let name: String = try randomAccessRow["name"].decode(String.self, context: .default)
 ///     print("User: \(name) (ID: \(id))")
 /// }
 /// ```
@@ -179,15 +179,17 @@ import NIOCore
 ///
 /// for try await row in rows {
 ///     let randomAccessRow = row.makeRandomAccess()
-///     let newID: Int = try randomAccessRow.decode(column: "id", as: Int.self, context: .default)
+///     let newID: Int = try randomAccessRow["id"].decode(Int.self, context: .default)
 ///     print("Created user with ID: \(newID)")
 /// }
 /// ```
 ///
-/// - Note: String interpolation is the recommended approach for simple queries as it automatically handles parameter counting and binding.
-/// - Warning: Always use parameter binding for user input. Never concatenate user input directly into SQL strings.
-/// - SeeAlso: `PostgresBindings` for more details on manual binding construction.
-/// - SeeAlso: `PostgresClient` for connection pool management and query execution.
+/// > Note: String interpolation is the recommended approach for simple queries as it automatically handles parameter counting and binding.
+///
+/// > Warning: Always use parameter binding for user input. Never concatenate user input directly into SQL strings.
+///
+/// - SeeAlso: ``PostgresBindings`` for more details on manual binding construction.
+/// - SeeAlso: ``PostgresClient`` for connection pool management and query execution.
 public struct PostgresQuery: Sendable, Hashable {
     /// The query string
     public var sql: String
@@ -476,9 +478,11 @@ struct PSQLExecuteStatement {
 /// }
 /// ```
 ///
-/// - Note: Bindings are indexed starting from 1 in SQL (e.g., $1, $2, $3).
-/// - Note: The `count` property returns the number of bindings currently stored.
-/// - SeeAlso: `PostgresQuery` for creating complete queries with bindings.
+/// > Note: Bindings are indexed starting from 1 in SQL (e.g., $1, $2, $3).
+///
+/// > Note: The ``count`` property returns the number of bindings currently stored.
+///
+/// - SeeAlso: ``PostgresQuery`` for creating complete queries with bindings.
 public struct PostgresBindings: Sendable, Hashable {
     @usableFromInline
     struct Metadata: Sendable, Hashable {
