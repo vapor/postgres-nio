@@ -11,6 +11,8 @@ on:
       - "*"
 env:
   LOG_LEVEL: info
+permissions:
+  contents: read
 
 jobs:
   linux-unit:
@@ -37,11 +39,8 @@ jobs:
       - name: Check out package
         uses: actions/checkout@v5
       - name: Run unit tests with Thread Sanitizer
-        shell: bash
         run: |
-          # https://github.com/swiftlang/swift/issues/74042 was never fixed in 5.10 and swift-crypto hits it in 6.0 as well
-          SANITIZE="$([[ "${SWIFT_VERSION}" =~ ^swift-(5|6\.0) ]] || echo '--sanitize=thread')"
-          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' ${SANITIZE} --enable-code-coverage
+          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
       - name: Submit code coverage
         uses: vapor/swift-codecov-action@v0.3
         with:
@@ -53,17 +52,14 @@ jobs:
       matrix:
         postgres-image:
           - postgres:18
-          - postgres:17
-          - postgres:15
-          - postgres:13
+          - postgres:16
+          - postgres:14
         include:
           - postgres-image: postgres:18
             postgres-auth: scram-sha-256
-          - postgres-image: postgres:17
-            postgres-auth: scram-sha-256
-          - postgres-image: postgres:15
+          - postgres-image: postgres:16
             postgres-auth: md5
-          - postgres-image: postgres:13
+          - postgres-image: postgres:14
             postgres-auth: trust
     container:
       image: swift:6.2-noble
@@ -72,21 +68,14 @@ jobs:
     env:
       # Unfortunately, fluent-postgres-driver details leak through here
       POSTGRES_DB: 'test_database'
-      POSTGRES_DB_A: 'test_database'
-      POSTGRES_DB_B: 'test_database'
       POSTGRES_USER: 'test_username'
-      POSTGRES_USER_A: 'test_username'
-      POSTGRES_USER_B: 'test_username'
       POSTGRES_PASSWORD: 'test_password'
-      POSTGRES_PASSWORD_A: 'test_password'
-      POSTGRES_PASSWORD_B: 'test_password'
       POSTGRES_HOSTNAME: 'psql-a'
-      POSTGRES_HOSTNAME_A: 'psql-a'
       POSTGRES_HOSTNAME_B: 'psql-b'
       POSTGRES_SOCKET: '/var/run/postgresql/.s.PGSQL.5432'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
     services:
-      psql-a:
+      psql-a: &psql_service_spec
         image: ${{ matrix.postgres-image }}
         volumes: [ 'pgrunshare:/var/run/postgresql' ]
         env:
@@ -95,15 +84,7 @@ jobs:
           POSTGRES_PASSWORD: 'test_password'
           POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
           POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.postgres-auth }}
-      psql-b:
-        image: ${{ matrix.postgres-image }}
-        volumes: [ 'pgrunshare:/var/run/postgresql' ]
-        env:
-          POSTGRES_USER: 'test_username'
-          POSTGRES_DB: 'test_database'
-          POSTGRES_PASSWORD: 'test_password'
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
-          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.postgres-auth }}
+      psql-b: *psql_service_spec
     steps:
       - name: Display OS and Swift versions
         run: |
@@ -136,18 +117,18 @@ jobs:
       matrix:
         postgres-formula:
           # Only test one version on macOS, let Linux do the rest
-          - postgresql@16
+          - postgresql@17
         postgres-auth:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         macos-version:
-          - 'macos-14'
-          - 'macos-15'
+          - macos-15
+          - macos-26
         include:
-          - macos-version: 'macos-14'
-            xcode-version: 'latest-stable'
-          - macos-version: 'macos-15'
-            xcode-version: 'latest-stable'
+          - macos-version: macos-15
+            xcode-version: latest-stable
+          - macos-version: macos-26
+            xcode-version: latest-stable
     runs-on: ${{ matrix.macos-version }}
     env:
       POSTGRES_HOSTNAME: 127.0.0.1
@@ -164,16 +145,19 @@ jobs:
           xcode-version: ${{ matrix.xcode-version }}
       - name: Install Postgres, setup DB and auth, and wait for server start
         run: |
-          export PATH="$(brew --prefix)/opt/${POSTGRES_FORMULA}/bin:$PATH" PGDATA=/tmp/vapor-postgres-test
-          brew install --overwrite "${POSTGRES_FORMULA}"
-          brew link --overwrite --force "${POSTGRES_FORMULA}"
+          export PGDATA=/tmp/vapor-postgres-test
+          brew install --overwrite "${POSTGRES_FORMULA}" && brew link --overwrite --force "${POSTGRES_FORMULA}"
           initdb --locale=C --auth-host "${POSTGRES_AUTH_METHOD}" -U "${POSTGRES_USER}" --pwfile=<(echo "${POSTGRES_PASSWORD}")
           pg_ctl start --wait
         timeout-minutes: 15
       - name: Checkout code
         uses: actions/checkout@v5
       - name: Run all tests
-        run: swift test
+        run: swift test --enable-code-coverage
+      - name: Submit code coverage
+        uses: vapor/swift-codecov-action@v0.3
+        with:
+          codecov_token: ${{ secrets.CODECOV_TOKEN }}
           
   api-breakage:
     if: github.event_name == 'pull_request'
