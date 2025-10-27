@@ -52,10 +52,13 @@ jobs:
       fail-fast: false
       matrix:
         postgres-image:
+          - postgres:18
           - postgres:17
           - postgres:15
           - postgres:13
         include:
+          - postgres-image: postgres:18
+            postgres-auth: scram-sha-256
           - postgres-image: postgres:17
             postgres-auth: scram-sha-256
           - postgres-image: postgres:15
