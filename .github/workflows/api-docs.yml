@@ -1,4 +1,7 @@
 name: deploy-api-docs
+
+permissions:
+  contents: read
 on:
   push:
     branches:
