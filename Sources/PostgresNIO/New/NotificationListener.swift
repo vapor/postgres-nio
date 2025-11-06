@@ -17,6 +17,17 @@ final class NotificationListener: @unchecked Sendable {
         case done
     }
 
+    deinit {
+        switch self.state {
+        case .streamInitialized:
+            preconditionFailure("Notification continuation had not been used")
+        case .closure:
+            preconditionFailure("Notification closure had not been used")
+        case .streamListening, .done:
+            break
+        }
+    }
+
     init(
         channel: String,
         id: Int,
