@@ -284,6 +284,101 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testListenTwiceChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            // Concurrently listen on a channel that is initially closed
+            async let stream1later = connection.listen("same-channel")
+            async let stream2later = connection.listen("same-channel")
+            let (stream1, stream2) = try await (stream1later, stream2later)
+
+            try await self.withTestConnection(on: eventLoop) { other in
+                try await other.query(#"NOTIFY "\#(unescaped: "same-channel")";"#, logger: .psqlTest)
+            }
+
+            var stream1EventReceived = false
+            var stream2EventReceived = false
+
+            for try await _ in stream1 {
+                stream1EventReceived = true
+                break
+            }
+
+            for try await _ in stream2 {
+                stream2EventReceived = true
+                break
+            }
+
+            XCTAssertTrue(stream1EventReceived)
+            XCTAssertTrue(stream2EventReceived)
+        }
+    }
+
+    func testListenOnClosedChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            try await connection.close()
+            do {
+                _ = try await connection.listen("futile")
+                XCTFail("Expected not to get any events")
+            } catch let error as PSQLError where error.code == .listenFailed {
+                // Expected
+            }
+        }
+    }
+
+    func testListenThenCloseChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            let stream = try await connection.listen("hopeful")
+            try await connection.close()
+            do {
+                for try await _ in stream {
+                    XCTFail("Expected not to get any events")
+                }
+                XCTFail("Expected not to have reached the end of stream")
+            } catch is PSQLError {
+                // Expected
+            }
+        }
+    }
+
+    func testListenThenClosingChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            _ = try await connection.listen("initial")
+            async let asyncClose: () = connection.close()
+            let stream: PostgresNotificationSequence
+            do {
+                stream = try await connection.listen("hopeful")
+            } catch let error as PSQLError where error.code == .listenFailed {
+                // Expected
+                return
+            }
+            try await asyncClose
+            do {
+                for try await _ in stream {
+                    XCTFail("Expected not to get any events")
+                }
+                XCTFail("Expected not to have reached the end of stream")
+            } catch is PSQLError {
+                // Expected
+            }
+        }
+    }
+
     #if canImport(Network)
     func testSelect10kRowsNetworkFramework() async throws {
         let eventLoopGroup = NIOTSEventLoopGroup()
