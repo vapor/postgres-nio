@@ -4,9 +4,7 @@ import NIOEmbedded
 import Testing
 import Logging
 @testable import PostgresNIO
-#if canImport(Synchronization)
 import Synchronization
-#endif
 
 @Suite struct PostgresConnectionTests {
 
@@ -862,7 +860,6 @@ import Synchronization
         }
     }
 
-    #if canImport(Synchronization)
     @available(macOS 15, *)
     @Test func testCopyFromHasWriteBackpressure() async throws {
         // `true` while the `writeData` closure is executing the `PostgresCopyFromWriter.write` function, ie. while it
@@ -887,7 +884,6 @@ import Synchronization
             try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
         }
     }
-    #endif
 
     @Test func testCopyFromCancelled() async throws {
         try await expectCopyFrom { writer in
