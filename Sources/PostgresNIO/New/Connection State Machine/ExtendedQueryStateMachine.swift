@@ -427,8 +427,7 @@ struct ExtendedQueryStateMachine {
         if case .error(let error) = self.state {
             // The backend sent us an ErrorResponse during the copy operation. Indicate to the client that it should
             // abort the data transfer.
-            promise.fail(error)
-            return . failPromise(promise, error: error)
+            return .failPromise(promise, error: error)
         }
         guard case .copyingData(.readyToSend) = self.state else {
             preconditionFailure("Not ready to send data")

@@ -91,8 +91,7 @@ struct ConnectionStateMachine {
         /// Fail a query's execution by resuming the continuation with the given error. When `sync` is `true`, send a
         /// `Sync` message to the backend.
         case failQueryContinuation(AnyErrorContinuation, with: PSQLError, sync: Bool, cleanupContext: CleanUpContext?)
-        /// Fail a query's execution by resuming the continuation with the given error and send a `Sync` message to the
-        /// backend.
+        /// Succeed the promise with the rows from the given query result.
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
         /// Succeed the continuation with a void result. When `sync` is `true`, send a `Sync` message to the backend.
         case succeedQueryContinuation(CheckedContinuation<Void, any Error>, sync: Bool)

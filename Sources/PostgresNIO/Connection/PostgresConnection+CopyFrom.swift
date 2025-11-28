@@ -13,13 +13,13 @@ public struct PostgresCopyFromWriter: Sendable {
         let promise = eventLoop.makePromise(of: Void.self)
         self.channelHandler.value.checkBackendCanReceiveCopyData(promise: promise)
         promise.futureResult.flatMap {
-            if eventLoop.inEventLoop {
-                return eventLoop.makeCompletedFuture(withResultOf: {
+            if self.eventLoop.inEventLoop {
+                return self.eventLoop.makeCompletedFuture(withResultOf: {
                     try self.channelHandler.value.sendCopyData(byteBuffer)
                 })
             } else {
-                let promise = eventLoop.makePromise(of: Void.self)
-                eventLoop.execute {
+                let promise = self.eventLoop.makePromise(of: Void.self)
+                self.eventLoop.execute {
                     promise.completeWith(Result(catching: { try self.channelHandler.value.sendCopyData(byteBuffer) }))
                 }
                 return promise.futureResult
@@ -31,7 +31,7 @@ public struct PostgresCopyFromWriter: Sendable {
 
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
     ///
-    /// - Throws: If an error occurs during the write of if the backend sent an `ErrorResponse` during the copy 
+    /// - Throws: If an error occurs during the write of if the backend sent an `ErrorResponse` during the copy
     ///   operation, eg. to indicate that a **previous** `write` call had an invalid format.
     public func write(_ byteBuffer: ByteBuffer, isolation: isolated (any Actor)? = #isolation) async throws {
         // Check for cancellation. This is cheap and makes sure that we regularly check for cancellation in the
@@ -41,10 +41,10 @@ public struct PostgresCopyFromWriter: Sendable {
         try await withTaskCancellationHandler {
             do {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-                    if eventLoop.inEventLoop {
+                    if self.eventLoop.inEventLoop {
                         writeAssumingInEventLoop(byteBuffer, continuation)
                     } else {
-                        eventLoop.execute {
+                        self.eventLoop.execute {
                             writeAssumingInEventLoop(byteBuffer, continuation)
                         }
                     }
@@ -59,10 +59,10 @@ public struct PostgresCopyFromWriter: Sendable {
                 throw error
             }
         } onCancel: {
-            if eventLoop.inEventLoop {
+            if self.eventLoop.inEventLoop {
                 self.channelHandler.value.cancel()
             } else {
-                eventLoop.execute {
+                self.eventLoop.execute {
                     self.channelHandler.value.cancel()
                 }
             }
@@ -73,10 +73,10 @@ public struct PostgresCopyFromWriter: Sendable {
     /// the backend.
     func done(isolation: isolated (any Actor)? = #isolation) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            if eventLoop.inEventLoop {
+            if self.eventLoop.inEventLoop {
                 self.channelHandler.value.sendCopyDone(continuation: continuation)
             } else {
-                eventLoop.execute {
+                self.eventLoop.execute {
                     self.channelHandler.value.sendCopyDone(continuation: continuation)
                 }
             }
@@ -87,10 +87,10 @@ public struct PostgresCopyFromWriter: Sendable {
     /// the backend.
     func failed(error: any Error, isolation: isolated (any Actor)? = #isolation) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
-            if eventLoop.inEventLoop {
+            if self.eventLoop.inEventLoop {
                 self.channelHandler.value.sendCopyFail(message: "Client failed copy", continuation: continuation)
             } else {
-                eventLoop.execute {
+                self.eventLoop.execute {
                     self.channelHandler.value.sendCopyFail(message: "Client failed copy", continuation: continuation)
                 }
             }
@@ -99,7 +99,7 @@ public struct PostgresCopyFromWriter: Sendable {
 }
 
 /// Specifies the format in which data is transferred to the backend in a COPY operation.
-/// 
+///
 /// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the option's meanings
 /// and their default values.
 public struct PostgresCopyFromFormat: Sendable {
@@ -129,7 +129,7 @@ public struct PostgresCopyFromFormat: Sendable {
 /// An empty `columns` array signifies that no columns should be specified in the query and that all columns will be
 /// copied by the caller.
 ///
-/// - Important: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
+/// - Warning: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
 ///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
 private func buildCopyFromQuery(
     table: String,
@@ -141,7 +141,7 @@ private func buildCopyFromQuery(
         """
     if !columns.isEmpty {
         query += "("
-        query += columns.map { #"""# + $0.description + #"""# }.joined(separator: ",")
+        query += columns.map { #""\#($0)""# }.joined(separator: ",")
         query += ")"
     }
     query += " FROM STDIN"
@@ -207,9 +207,9 @@ extension PostgresConnection {
             //    threw instead of the one that got relayed back, so it's better to ignore the error here.
             //  - The backend sent us an `ErrorResponse` during the copy, eg. because of an invalid format. This puts
             //    the `ExtendedQueryStateMachine` in the error state. Trying to send a `CopyFail` will throw but trigger
-            //    a `Sync` that takes the backend out of copy mode. If `writeData` threw the error from from the 
-            //    `PostgresCopyFromWriter.write` call, `writer.failed` will throw with the same error, so it doesn't 
-            //    matter that we ignore the error here. If the user threw some other error, it's better to honor the 
+            //    a `Sync` that takes the backend out of copy mode. If `writeData` threw the error from from the
+            //    `PostgresCopyFromWriter.write` call, `writer.failed` will throw with the same error, so it doesn't
+            //    matter that we ignore the error here. If the user threw some other error, it's better to honor the
             //    user's error.
             try? await writer.failed(error: error)
 
