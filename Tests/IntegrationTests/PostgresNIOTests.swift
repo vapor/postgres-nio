@@ -619,24 +619,52 @@ final class PostgresNIOTests: XCTestCase {
         let b = PostgresNumeric(string: "-123456.789123")!
         let c = PostgresNumeric(string: "3.14159265358979")!
         let d = PostgresNumeric(string: "1234567898765")!
+        let e = PostgresNumeric(string: "0.00000080216390553684")!
+        let f = PostgresNumeric(string: "0.0000080216390553684")!
+        let g = PostgresNumeric(string: "0.000080216390553684")!
+        let h = PostgresNumeric(string: "802163905536840000.0")!
+        let i = PostgresNumeric(string: "8021639055368400000.0")!
+        let j = PostgresNumeric(string: "80216390553684000000.0")!
+        let k = PostgresNumeric(string: "802163905536840000.000080216390553684")!
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("""
         select
             $1::numeric as a,
             $2::numeric as b,
             $3::numeric as c,
-            $4::numeric as d
+            $4::numeric as d,
+            $5::numeric as e,
+            $6::numeric as f,
+            $7::numeric as g,
+            $8::numeric as h,
+            $9::numeric as i,
+            $10::numeric as j,
+            $11::numeric as k
         """, [
             .init(numeric: a),
             .init(numeric: b),
             .init(numeric: c),
-            .init(numeric: d)
+            .init(numeric: d),
+            .init(numeric: e),
+            .init(numeric: f),
+            .init(numeric: g),
+            .init(numeric: h),
+            .init(numeric: i),
+            .init(numeric: j),
+            .init(numeric: k)
         ]).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "a"].decimal, Decimal(string: "123456.789123")!)
         XCTAssertEqual(row?[data: "b"].decimal, Decimal(string: "-123456.789123")!)
         XCTAssertEqual(row?[data: "c"].decimal, Decimal(string: "3.14159265358979")!)
         XCTAssertEqual(row?[data: "d"].decimal, Decimal(string: "1234567898765")!)
+        XCTAssertEqual(row?[data: "e"].decimal, Decimal(string: "0.00000080216390553684")!)
+        XCTAssertEqual(row?[data: "f"].decimal, Decimal(string: "0.0000080216390553684")!)
+        XCTAssertEqual(row?[data: "g"].decimal, Decimal(string: "0.000080216390553684")!)
+        XCTAssertEqual(row?[data: "h"].decimal, Decimal(string: "802163905536840000.0")!)
+        XCTAssertEqual(row?[data: "i"].decimal, Decimal(string: "8021639055368400000.0")!)
+        XCTAssertEqual(row?[data: "j"].decimal, Decimal(string: "80216390553684000000.0")!)
+        XCTAssertEqual(row?[data: "k"].decimal, Decimal(string: "802163905536840000.000080216390553684")!)
     }
     
     func testDecimalStringSerialization() {

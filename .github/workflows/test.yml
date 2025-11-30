@@ -37,7 +37,7 @@ jobs:
       - name: Install curl for Codecov
         run: apt-get update -y -q && apt-get install -y curl
       - name: Check out package
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Run unit tests with Thread Sanitizer
         run: |
           swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
@@ -92,15 +92,15 @@ jobs:
           [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with: { path: 'postgres-nio' }
       - name: Run integration tests
         run: swift test --package-path postgres-nio --filter=^IntegrationTests
       - name: Check out postgres-kit dependent
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
       - name: Check out fluent-postgres-driver dependent
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with: { repository: 'vapor/fluent-postgres-driver', path: 'fluent-postgres-driver' }
       - name: Use local package in dependents
         run: |
@@ -136,7 +136,6 @@ jobs:
       POSTGRES_PASSWORD: 'test_password'
       POSTGRES_DB: 'postgres'
       POSTGRES_AUTH_METHOD: ${{ matrix.postgres-auth }}
-      POSTGRES_SOCKET: '/tmp/.s.PGSQL.5432'
       POSTGRES_FORMULA: ${{ matrix.postgres-formula }}
     steps:
       - name: Select latest available Xcode
@@ -151,7 +150,7 @@ jobs:
           pg_ctl start --wait
         timeout-minutes: 15
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Run all tests
         run: swift test --enable-code-coverage
       - name: Submit code coverage
@@ -165,7 +164,7 @@ jobs:
     container: swift:noble
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       # https://github.com/actions/checkout/issues/766
