@@ -160,7 +160,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         if self.weight > 0 {
             offset = (self.weight + 1) - self.ndigits
         } else if self.weight < 0 {
-            offset = self.ndigits - (abs(self.weight) + 1)
+            offset = abs(self.weight + 1)
         } else {
             offset = 0
         }
