@@ -33,7 +33,7 @@ public struct PostgresCopyFromWriter: Sendable {
     ///
     /// - Throws: If an error occurs during the write of if the backend sent an `ErrorResponse` during the copy
     ///   operation, eg. to indicate that a **previous** `write` call had an invalid format.
-    public func write(_ byteBuffer: ByteBuffer, isolation: isolated (any Actor)? = #isolation) async throws {
+    public func write(_ byteBuffer: ByteBuffer) async throws {
         // Check for cancellation. This is cheap and makes sure that we regularly check for cancellation in the
         // `writeData` closure. It is likely that the user would forget to do so.
         try Task.checkCancellation()
@@ -71,7 +71,7 @@ public struct PostgresCopyFromWriter: Sendable {
 
     /// Finalize the data transfer, putting the state machine out of the copy mode and sending a `CopyDone` message to
     /// the backend.
-    func done(isolation: isolated (any Actor)? = #isolation) async throws {
+    func done() async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             if self.eventLoop.inEventLoop {
                 self.channelHandler.value.sendCopyDone(continuation: continuation)
@@ -85,7 +85,7 @@ public struct PostgresCopyFromWriter: Sendable {
 
     /// Finalize the data transfer, putting the state machine out of the copy mode and sending a `CopyFail` message to
     /// the backend.
-    func failed(error: any Error, isolation: isolated (any Actor)? = #isolation) async throws {
+    func failed(error: any Error) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
             if self.eventLoop.inEventLoop {
                 self.channelHandler.value.sendCopyFail(message: "Client failed copy", continuation: continuation)
@@ -180,7 +180,6 @@ extension PostgresConnection {
         columns: [String] = [],
         format: PostgresCopyFromFormat = .text(.init()),
         logger: Logger,
-        isolation: isolated (any Actor)? = #isolation,
         file: String = #fileID,
         line: Int = #line,
         writeData: (PostgresCopyFromWriter) async throws -> Void
