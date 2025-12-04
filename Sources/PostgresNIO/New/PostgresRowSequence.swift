@@ -31,6 +31,7 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
 extension PostgresRowSequence {
     public struct AsyncIterator: AsyncIteratorProtocol {
         public typealias Element = PostgresRow
+        public typealias Failure = any Error
 
         let backing: BackingSequence.AsyncIterator
 
@@ -43,8 +44,27 @@ extension PostgresRowSequence {
             self.columns = columns
         }
 
+        @concurrent
         public mutating func next() async throws -> PostgresRow? {
             if let dataRow = try await self.backing.next() {
+                return PostgresRow(
+                    data: dataRow,
+                    lookupTable: self.lookupTable,
+                    columns: self.columns
+                )
+            }
+            return nil
+        }
+
+        @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+        public mutating func next(isolation actor: isolated (any Actor)?) async throws(Self.Failure) -> PostgresRow? {
+            // Since the underlying NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.AsyncIterator
+            // does not supported the next(isolation:) call yet, we will hop here back and forth.
+            struct UnsafeTransfer: @unchecked Sendable {
+                var backing: BackingSequence.AsyncIterator
+            }
+            let unsafeTransfer = UnsafeTransfer(backing: self.backing)
+            if let dataRow = try await unsafeTransfer.backing.next() {
                 return PostgresRow(
                     data: dataRow,
                     lookupTable: self.lookupTable,

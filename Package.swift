@@ -2,7 +2,9 @@
 import PackageDescription
 
 #if compiler(>=6.1)
-let swiftSettings: [SwiftSetting] = []
+let swiftSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault")
+]
 #else
 let swiftSettings: [SwiftSetting] = [
     // Sadly the 6.0 compiler concurrency checker finds false positives.
