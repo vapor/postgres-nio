@@ -56,7 +56,7 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
-            swiftSettings: swiftSettings
+            swiftSettings: swiftSettings + [.enableExperimentalFeature("Lifetimes")]
         ),
         .target(
             name: "_ConnectionPoolModule",

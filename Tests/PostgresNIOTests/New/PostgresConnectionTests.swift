@@ -949,6 +949,7 @@ import Synchronization
         }
     }
 
+    #if compiler(>=6.2) // copyFromBinary is only available in Swift 6.2+
     @Test func testCopyFromBinary() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
@@ -1010,6 +1011,7 @@ import Synchronization
             }
         }
     }
+    #endif
 
     func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
