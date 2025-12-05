@@ -279,6 +279,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             psqlTask = .extendedQuery(query)
 
         case .startListening(let listener):
+            defer { promise?.succeed(()) }
             switch self.listenState.startListening(listener) {
             case .startListening(let channel):
                 psqlTask = self.makeStartListeningQuery(channel: channel, context: context)
