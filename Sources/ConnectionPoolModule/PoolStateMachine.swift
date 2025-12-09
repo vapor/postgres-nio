@@ -239,7 +239,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context)
+        return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: false)
     }
 
     mutating func cancelRequest(id: RequestID) -> Action {
@@ -256,30 +256,16 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionEstablished(_ connection: Connection, maxStreams: UInt16) -> Action {
         switch self.poolState {
-        case .running, .shuttingDown(graceful: true):
+        case .running:
             let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            return self.handleAvailableConnection(index: index, availableContext: context)
+            return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: false)
 
-        case .shuttingDown(graceful: false):
-            let (index, _) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            switch self.connections.closeConnection(at: index) {
-            case .close(let closeAction):
-                return .init(
-                    request: .none,
-                    connection: .closeConnection(closeAction.connection, closeAction.timersToCancel)
-                )
-            case .cancelTimers(let timers):
-                return .init(
-                    request: .none,
-                    connection: .cancelTimers(.init(timers))
-                )
-            case .doNothing:
-                return .none()
-            }
+        case .shuttingDown:
+            let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
+            return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: true)
 
         case .shutDown:
             fatalError("Connection pool is not running")
-//            return .init(request: .none, connection: .closeConnection(connection, []))
         }
     }
 
@@ -392,7 +378,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.keepAliveSucceeded(connection.id) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context)
+        return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: false)
     }
 
     @inlinable
@@ -497,7 +483,8 @@ struct PoolStateMachine<
     @inlinable
     /*private*/ mutating func handleAvailableConnection(
         index: Int,
-        availableContext: ConnectionGroup.AvailableConnectionContext
+        availableContext: ConnectionGroup.AvailableConnectionContext,
+        shuttingDown: Bool
     ) -> Action {
         // this connection was busy before
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
@@ -516,6 +503,22 @@ struct PoolStateMachine<
                 return .none()
 
             case .idle(_, let newIdle):
+                if shuttingDown {
+                    switch self.connections.closeConnection(at: index) {
+                    case .close(let closeAction):
+                        return .init(
+                            request: .none,
+                            connection: .closeConnection(closeAction.connection, closeAction.timersToCancel)
+                        )
+                    case .cancelTimers(let timers):
+                        return .init(
+                            request: .none,
+                            connection: .cancelTimers(.init(timers))
+                        )
+                    case .doNothing:
+                        return .none()
+                    }
+                }
                 let timers = self.connections.parkConnection(at: index, hasBecomeIdle: newIdle).map(self.mapTimers)
 
                 return .init(
