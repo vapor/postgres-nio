@@ -89,7 +89,7 @@ struct PoolStateMachine<
         case cancelTimers(TinyFastSequence<TimerCancellationToken>)
         case closeConnection(Connection, Max2Sequence<TimerCancellationToken>)
         case initiateShutdown(Shutdown)
-        case shutdown(TinyFastSequence<TimerCancellationToken>)
+        case shutdown([TimerCancellationToken])
         case none
     }
 
@@ -439,7 +439,7 @@ struct PoolStateMachine<
             let connectionAction: ConnectionAction
             if self.connections.isEmpty {
                 self.poolState = .shutDown
-                connectionAction = .shutdown(closedConnectionAction.timersToCancel)
+                connectionAction = .shutdown(.init(closedConnectionAction.timersToCancel))
             } else {
                 connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
             }
@@ -473,8 +473,12 @@ struct PoolStateMachine<
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerForceShutdown(&shutdown)
 
-            if self.connections.isEmpty {
+            if self.connections.isEmpty, shutdown.connections.isEmpty {
                 self.poolState = .shutDown
+                return .init(
+                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                    connection: .shutdown(shutdown.timersToCancel)
+                )
             }
 
             return .init(
