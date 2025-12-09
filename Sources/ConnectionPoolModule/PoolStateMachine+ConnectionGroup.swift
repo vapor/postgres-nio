@@ -98,6 +98,7 @@ extension PoolStateMachine {
             self.keepAliveReducesAvailableStreams = keepAliveReducesAvailableStreams
         }
 
+        @usableFromInline
         var isEmpty: Bool {
             self.connections.isEmpty
         }
@@ -514,6 +515,48 @@ extension PoolStateMachine {
             )
         }
 
+        @usableFromInline
+        enum CloseConnectionAction {
+            case close(CloseAction)
+            case cancelTimers(Max2Sequence<TimerCancellationToken>)
+            case doNothing
+        }
+        /// Closes the connection at the given index.
+        @inlinable
+        mutating func closeConnection(at index: Int) -> CloseConnectionAction {
+            guard let closeAction = self.connections[index].close() else {
+                return .doNothing // no action to take
+            }
+
+            self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
+            self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
+
+            switch closeAction.previousConnectionState {
+            case .idle:
+                self.stats.idle -= 1
+                self.stats.closing += 1
+
+            case .leased:
+                self.stats.leased -= 1
+                self.stats.closing += 1
+
+            case .closing:
+                break
+
+            case .backingOff:
+                break
+            }
+
+            if let connection = closeAction.connection {
+                return .close(CloseAction(
+                    connection: connection,
+                    timersToCancel: closeAction.cancelTimers
+                ))
+            } else {
+                return .cancelTimers(closeAction.cancelTimers)
+            }
+        }
+
         @inlinable
         mutating func closeConnectionIfIdle(_ connectionID: Connection.ID) -> CloseAction? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
@@ -567,7 +610,7 @@ extension PoolStateMachine {
         ///            supplied index after this. If nil is returned the connection was closed by the state machine and was
         ///            therefore already removed.
         @inlinable
-        mutating func connectionClosed(_ connectionID: Connection.ID) -> ClosedAction {
+        mutating func connectionClosed(_ connectionID: Connection.ID, shuttingDown: Bool) -> ClosedAction {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("All connections that have been created should say goodbye exactly once!")
             }
@@ -597,7 +640,7 @@ extension PoolStateMachine {
             }
 
             let newConnectionRequest: ConnectionRequest?
-            if self.connections.count < self.minimumConcurrentConnections {
+            if !shuttingDown, self.connections.count < self.minimumConcurrentConnections {
                 newConnectionRequest = self.createNewConnection()
             } else {
                 newConnectionRequest = .none
@@ -613,18 +656,19 @@ extension PoolStateMachine {
         // MARK: Shutdown
 
         mutating func triggerForceShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
-            for var connectionState in self.connections {
-                guard let closeAction = connectionState.close() else {
-                    continue
-                }
+            for index in self.connections.indices {
+                switch closeConnection(at: index) {
+                case .close(let closeAction):
+                    cleanup.connections.append(closeAction.connection)
+                    cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
 
-                if let connection = closeAction.connection {
-                    cleanup.connections.append(connection)
+                case .cancelTimers(let timers):
+                    cleanup.timersToCancel.append(contentsOf: timers)
+
+                case .doNothing:
+                    break
                 }
-                cleanup.timersToCancel.append(contentsOf: closeAction.cancelTimers)
             }
-
-            self.connections = []
         }
 
         // MARK: - Private functions -

@@ -390,11 +390,15 @@ public final class ConnectionPool<
             self.closeConnection(connection)
             self.cancelTimers(timers)
 
-        case .shutdown(let cleanup):
+        case .initiateShutdown(let cleanup):
             for connection in cleanup.connections {
                 self.closeConnection(connection)
             }
             self.cancelTimers(cleanup.timersToCancel)
+
+        case .shutdown(let timersToCancel):
+            self.cancelTimers(timersToCancel)
+            self.eventContinuation.finish()
 
         case .none:
             break

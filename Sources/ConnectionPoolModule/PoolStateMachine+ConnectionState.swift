@@ -587,10 +587,10 @@ extension PoolStateMachine {
                     runningKeepAlive: keepAlive.isRunning
                 )
 
-            case .leased, .closed:
+            case .leased, .closed, .closing:
                 return nil
 
-            case .backingOff, .starting, .closing:
+            case .backingOff, .starting:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
