@@ -923,9 +923,11 @@ import Testing
             await factory.nextConnectAttempt { connectionID in
                 return 1
             }
-            _ = try await pool.leaseConnection()
+            let lease = try await pool.leaseConnection()
 
             pool.triggerForceShutdown()
+
+            pool.releaseConnection(lease.connection)
 
             for connection in factory.runningConnections {
                 try await connection.signalToClose

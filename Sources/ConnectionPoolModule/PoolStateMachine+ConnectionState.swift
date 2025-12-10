@@ -396,7 +396,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func release(streams returnedStreams: UInt16) -> ConnectionAvailableInfo {
+        mutating func release(streams returnedStreams: UInt16) -> ConnectionAvailableInfo? {
             switch self.state {
             case .leased(let connection, let usedStreams, let maxStreams, let keepAlive):
                 precondition(usedStreams >= returnedStreams)
@@ -409,7 +409,11 @@ extension PoolStateMachine {
                     self.state = .leased(connection, usedStreams: newUsedStreams, maxStreams: maxStreams, keepAlive: keepAlive)
                     return .leased(availableStreams: availableStreams)
                 }
-            case .backingOff, .starting, .idle, .closing, .closed:
+
+            case .closing:
+                return nil
+
+            case .backingOff, .starting, .idle, .closed:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }

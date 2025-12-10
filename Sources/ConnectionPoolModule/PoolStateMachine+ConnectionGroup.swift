@@ -398,7 +398,9 @@ extension PoolStateMachine {
                 return nil
             }
 
-            let connectionInfo = self.connections[index].release(streams: streams)
+            guard let connectionInfo = self.connections[index].release(streams: streams) else { 
+                return nil
+            }
             self.stats.availableStreams += streams
             self.stats.leasedStreams -= streams
             switch connectionInfo {
