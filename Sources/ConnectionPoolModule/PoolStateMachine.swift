@@ -91,7 +91,7 @@ struct PoolStateMachine<
         /// Start process of shutting down the connection pool. Close connections, cancel timers.
         case initiateShutdown(Shutdown)
         /// All connections have been closed, the pool event stream can be ended. 
-        case shutdown([TimerCancellationToken])
+        case cancelEventStreamAndFinalCleanup([TimerCancellationToken])
         case none
     }
 
@@ -427,7 +427,7 @@ struct PoolStateMachine<
             let connectionAction: ConnectionAction
             if self.connections.isEmpty {
                 self.poolState = .shutDown
-                connectionAction = .shutdown(.init(closedConnectionAction.timersToCancel))
+                connectionAction = .cancelEventStreamAndFinalCleanup(.init(closedConnectionAction.timersToCancel))
             } else {
                 connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
             }
@@ -465,7 +465,7 @@ struct PoolStateMachine<
                 self.poolState = .shutDown
                 return .init(
                     request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-                    connection: .shutdown(shutdown.timersToCancel)
+                    connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
                 )
             }
 
@@ -626,7 +626,7 @@ extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationTo
             return lhsConn === rhsConn && lhsTimers == rhsTimers
         case (.initiateShutdown(let lhs), .initiateShutdown(let rhs)):
             return lhs == rhs
-        case (.shutdown(let lhs), .shutdown(let rhs)):
+        case (.cancelEventStreamAndFinalCleanup(let lhs), .cancelEventStreamAndFinalCleanup(let rhs)):
             return lhs == rhs
         case (.cancelTimers(let lhs), .cancelTimers(let rhs)):
             return lhs == rhs

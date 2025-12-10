@@ -425,7 +425,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(shutdownAction.connection ==  .initiateShutdown(shutdown))
 
         let closedAction = stateMachine.connectionClosed(connection)
-        #expect(closedAction.connection == .shutdown([]))
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.poolState == .shutDown)
     }
@@ -469,7 +469,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(shutdownAction.connection ==  .initiateShutdown(shutdown))
 
         let closedAction = stateMachine.connectionClosed(connection)
-        #expect(closedAction.connection == .shutdown([]))
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.poolState == .shutDown)
     }
@@ -503,7 +503,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(createdAction.connection == .closeConnection(connection, []))
 
         let closedAction = stateMachine.connectionClosed(connection)
-        #expect(closedAction.connection == .shutdown([]))
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.poolState == .shutDown)
     }

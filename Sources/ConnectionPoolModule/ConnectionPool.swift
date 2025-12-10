@@ -396,7 +396,7 @@ public final class ConnectionPool<
             }
             self.cancelTimers(cleanup.timersToCancel)
 
-        case .shutdown(let timersToCancel):
+        case .cancelEventStreamAndFinalCleanup(let timersToCancel):
             self.cancelTimers(timersToCancel)
             self.eventContinuation.finish()
 
