@@ -88,7 +88,9 @@ struct PoolStateMachine<
         case runKeepAlive(Connection, TimerCancellationToken?)
         case cancelTimers(TinyFastSequence<TimerCancellationToken>)
         case closeConnection(Connection, Max2Sequence<TimerCancellationToken>)
+        /// Start process of shutting down the connection pool. Close connections, cancel timers.
         case initiateShutdown(Shutdown)
+        /// All connections have been closed, the pool event stream can be ended. 
         case shutdown([TimerCancellationToken])
         case none
     }
@@ -239,7 +241,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: false)
+        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     mutating func cancelRequest(id: RequestID) -> Action {
@@ -258,11 +260,11 @@ struct PoolStateMachine<
         switch self.poolState {
         case .running:
             let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: false)
+            return self.handleAvailableConnection(index: index, availableContext: context)
 
         case .shuttingDown:
             let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: true)
+            return self.handleAvailableConnection(index: index, availableContext: context)
 
         case .shutDown:
             fatalError("Connection pool is not running")
@@ -378,7 +380,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.keepAliveSucceeded(connection.id) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context, shuttingDown: false)
+        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     @inlinable
@@ -483,8 +485,7 @@ struct PoolStateMachine<
     @inlinable
     /*private*/ mutating func handleAvailableConnection(
         index: Int,
-        availableContext: ConnectionGroup.AvailableConnectionContext,
-        shuttingDown: Bool
+        availableContext: ConnectionGroup.AvailableConnectionContext
     ) -> Action {
         // this connection was busy before
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
@@ -503,7 +504,7 @@ struct PoolStateMachine<
                 return .none()
 
             case .idle(_, let newIdle):
-                if shuttingDown {
+                if case .shuttingDown = self.poolState {
                     switch self.connections.closeConnection(at: index) {
                     case .close(let closeAction):
                         return .init(
