@@ -997,6 +997,51 @@ import Testing
             }
         }
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testForceShutdownWithConnectionBackingOff() async throws {
+        struct CreateConnectionFailed: Error {}
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 4
+        mutableConfig.maximumConnectionHardLimit = 4
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionRequest<MockConnection>.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            taskGroup.addTask {
+                await #expect(throws: ConnectionPoolError.poolShutdown) {
+                    try await pool.leaseConnection()
+                }
+            }
+
+            _ = try? await factory.nextConnectAttempt { connectionID in
+                throw CreateConnectionFailed()
+            }
+
+            pool.triggerForceShutdown()
+        }
+    }
 }
 
 struct ConnectionFuture: ConnectionRequestProtocol {

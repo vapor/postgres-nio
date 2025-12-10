@@ -333,7 +333,18 @@ struct PoolStateMachine<
             return .init(request: .none, connection: .scheduleTimers(.init(timer)))
 
         case .shuttingDown(graceful: false), .shutDown:
-            return .none()
+            let timerToCancel = self.connections.destroyFailedConnection(request.connectionID)
+            let connectionAction: ConnectionAction
+            if self.connections.isEmpty {
+                self.poolState = .shutDown
+                connectionAction = .cancelEventStreamAndFinalCleanup(timerToCancel.map {[$0]} ?? [])
+            } else {
+                connectionAction = .cancelTimers(timerToCancel.map {[$0]} ?? [])
+            }
+            return .init(
+                request: .none,
+                connection: connectionAction
+            )
         }
     }
 

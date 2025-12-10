@@ -546,7 +546,7 @@ extension PoolStateMachine {
                 break
 
             case .backingOff:
-                break
+                self.stats.backingOff -= 1
             }
 
             if let connection = closeAction.connection {
@@ -555,7 +555,12 @@ extension PoolStateMachine {
                     timersToCancel: closeAction.cancelTimers
                 ))
             } else {
-                return .cancelTimers(closeAction.cancelTimers)
+                // if there is no connection we should delete this now
+                var timersToCancel = closeAction.cancelTimers
+                if let cancellationTimer = self.swapForDeletion(index: index) {
+                    timersToCancel.append(cancellationTimer)
+                }
+                return .cancelTimers(timersToCancel)
             }
         }
 
@@ -575,6 +580,16 @@ extension PoolStateMachine {
             }
 
             return self.closeConnectionIfIdle(at: index)
+        }
+
+        @inlinable
+        mutating func destroyFailedConnection(_ connectionID: Connection.ID) -> TimerCancellationToken? {
+            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
+                preconditionFailure("Failing a connection we don't have a record of.")
+            }
+
+            self.connections[index].destroyFailedConnection()
+            return self.swapForDeletion(index: index)
         }
 
         /// Information around the failed/closed connection.
