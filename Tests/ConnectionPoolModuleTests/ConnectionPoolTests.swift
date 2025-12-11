@@ -1104,9 +1104,11 @@ import Testing
                 establishedConnectionWaiter.yield(value: ())
             }
 
+            // lease fails because of connection failure
             await #expect(throws: ConnectionPoolError.connectionTimeout) {
                 try await pool.leaseConnection()
             }
+            // lease fails because we are in the connectionFailed state
             await #expect(throws: ConnectionPoolError.connectionTimeout) {
                 try await pool.leaseConnection()
             }
@@ -1114,8 +1116,9 @@ import Testing
 
             try await establishedConnectionWaiter.success
 
-            let lease = try await pool.leaseConnection()
-            lease.release()
+            // lease is successful because we are back in running state
+            _ = try await pool.leaseConnection()
+            
             // shutdown
             pool.triggerForceShutdown()
 
