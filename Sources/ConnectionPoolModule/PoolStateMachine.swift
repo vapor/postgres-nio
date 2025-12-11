@@ -28,6 +28,9 @@ struct PoolConfiguration: Sendable {
     var keepAliveDuration: Duration?
 
     @usableFromInline
+    var connectionTimeout: Duration = .seconds(15)
+
+    @usableFromInline
     var idleTimeoutDuration: Duration = .seconds(30)
 }
 
@@ -39,8 +42,9 @@ struct PoolStateMachine<
     ConnectionID: Hashable & Sendable,
     Request: ConnectionRequestProtocol,
     RequestID,
-    TimerCancellationToken: Sendable
->: Sendable where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID {
+    TimerCancellationToken: Sendable,
+    Clock: _Concurrency.Clock
+>: Sendable where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID, Clock.Duration == Duration {
 
     @usableFromInline
     struct ConnectionRequest: Hashable, Sendable {
@@ -108,6 +112,7 @@ struct PoolStateMachine<
     @usableFromInline
     enum PoolState: Sendable {
         case running
+        case failedConnection
         case shuttingDown(graceful: Bool)
         case shutDown
     }
@@ -142,16 +147,22 @@ struct PoolStateMachine<
     @usableFromInline
     private(set) var poolState: PoolState = .running
     @usableFromInline
+    let clock: Clock
+    @usableFromInline
     private(set) var cacheNoMoreConnectionsAllowed: Bool = false
 
     @usableFromInline
     private(set) var failedConsecutiveConnectionAttempts: Int = 0
     
+    @usableFromInline
+    private(set) var timeOfFirstFailedAttempt: Clock.Instant? = nil
+    
     @inlinable
     init(
         configuration: PoolConfiguration,
         generator: ConnectionIDGenerator,
-        timerCancellationTokenType: TimerCancellationToken.Type
+        timerCancellationTokenType: TimerCancellationToken.Type,
+        clock: Clock
     ) {
         self.configuration = configuration
         self.generator = generator
@@ -163,6 +174,7 @@ struct PoolStateMachine<
             keepAlive: configuration.keepAliveDuration != nil,
             keepAliveReducesAvailableStreams: true
         )
+        self.clock = clock
         self.requestQueue = RequestQueue()
     }
 
@@ -175,6 +187,12 @@ struct PoolStateMachine<
         switch self.poolState {
         case .running:
             break
+
+        case .failedConnection:
+            return .init(
+                request: .failRequest(request, ConnectionPoolError.connectionTimeout),
+                connection: .none
+            )
 
         case .shuttingDown, .shutDown:
             return .init(
@@ -257,12 +275,19 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionEstablished(_ connection: Connection, maxStreams: UInt16) -> Action {
+        self.failedConsecutiveConnectionAttempts = 0
+        self.timeOfFirstFailedAttempt = nil
         switch self.poolState {
         case .running:
             let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
             return self.handleAvailableConnection(index: index, availableContext: context)
 
         case .shuttingDown:
+            let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
+            return self.handleAvailableConnection(index: index, availableContext: context)
+
+        case .failedConnection:
+            self.poolState = .running
             let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
             return self.handleAvailableConnection(index: index, availableContext: context)
 
@@ -324,9 +349,25 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
         switch self.poolState {
-        case .running, .shuttingDown(graceful: true):
+        case .running, .failedConnection:
             self.failedConsecutiveConnectionAttempts += 1
+            var requestAction: RequestAction = .none
+            if let timeOfFirstFailedAttempt = self.timeOfFirstFailedAttempt {
+                if timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.connectionTimeout {
+                    self.poolState = .failedConnection
+                    requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionTimeout)
+                }
+            } else {
+                self.timeOfFirstFailedAttempt = clock.now
+            }
+            
+            let connectionTimer = self.connections.backoffNextConnectionAttempt(request.connectionID)
+            let backoff = Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
+            let timer = Timer(connectionTimer, duration: backoff)
+            return .init(request: requestAction, connection: .scheduleTimers(.init(timer)))
 
+        case .shuttingDown(graceful: true):
+            self.failedConsecutiveConnectionAttempts += 1
             let connectionTimer = self.connections.backoffNextConnectionAttempt(request.connectionID)
             let backoff = Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
             let timer = Timer(connectionTimer, duration: backoff)
@@ -351,9 +392,13 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionCreationBackoffDone(_ connectionID: ConnectionID) -> Action {
         switch self.poolState {
-        case .running, .shuttingDown(graceful: true):
+        case .running, .shuttingDown(graceful: true), .failedConnection:
             let soonAvailable = self.connections.soonAvailableConnections
-            let retry = (soonAvailable - 1) < self.requestQueue.count
+            let retry = if case .failedConnection = self.poolState {
+                true
+            } else {
+                (soonAvailable - 1) < self.requestQueue.count
+            }
 
             switch self.connections.backoffDone(connectionID, retry: retry) {
             case .createConnection(let request, let continuation):
@@ -428,7 +473,7 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionClosed(_ connection: Connection) -> Action {
         switch self.poolState {
-        case .running, .shuttingDown(graceful: true):
+        case .running, .shuttingDown(graceful: true), .failedConnection:
             self.cacheNoMoreConnectionsAllowed = false
 
             let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: false)
@@ -477,7 +522,7 @@ struct PoolStateMachine<
     @usableFromInline
     mutating func triggerForceShutdown() -> Action {
         switch self.poolState {
-        case .running:
+        case .running, .failedConnection:
             self.poolState = .shuttingDown(graceful: false)
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerForceShutdown(&shutdown)

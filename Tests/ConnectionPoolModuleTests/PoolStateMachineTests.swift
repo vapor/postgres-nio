@@ -9,7 +9,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
     MockConnection.ID,
     MockRequest<MockConnection>,
     MockRequest<MockConnection>.ID,
-    MockTimerCancellationToken
+    MockTimerCancellationToken,
+    MockClock
 >
 
 @Suite struct PoolStateMachineTests {
@@ -25,7 +26,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         let connection1 = MockConnection(id: 0)
@@ -63,7 +65,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         let connection1 = MockConnection(id: 0)
@@ -126,7 +129,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // don't refill pool
@@ -185,7 +189,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         let connection1 = MockConnection(id: 0)
@@ -241,7 +246,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // don't refill pool
@@ -283,7 +289,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // don't refill pool
@@ -351,7 +358,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // refill pool
@@ -403,7 +411,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // refill pool
@@ -443,7 +452,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // refill pool
@@ -486,7 +496,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // refill pool

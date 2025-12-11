@@ -1042,6 +1042,89 @@ import Testing
             pool.triggerForceShutdown()
         }
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionTimeout() async throws {
+        struct ConnectionFailedError: Error {}
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 1
+        mutableConfig.idleTimeout = .seconds(10)
+        mutableConfig.connectionTimeout = .seconds(5)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionRequest<MockConnection>.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            let failSecondLeaseWaiter = Future(of: Void.self)
+            let establishedConnectionWaiter = Future(of: Void.self)
+
+            taskGroup.addTask {
+                // fail connection attempt
+                _ = try? await factory.nextConnectAttempt { connectionID in
+                    throw ConnectionFailedError()
+                }
+
+                // fail second attempt. This will trigger connectionTimeout error
+                _ = await clock.nextTimerScheduled()
+                clock.advance(to: clock.now.advanced(by: .seconds(30)))
+                _ = try? await factory.nextConnectAttempt { connectionID in
+                    throw ConnectionFailedError()
+                }
+
+                // wait until second lease has failed
+                try await failSecondLeaseWaiter.success
+
+                // succeed next connection attempt
+                _ = await clock.nextTimerScheduled()
+                clock.advance(to: clock.now.advanced(by: .seconds(30)))
+                _ = await factory.nextConnectAttempt { connectionID in
+                    return 1
+                }
+
+                establishedConnectionWaiter.yield(value: ())
+            }
+
+            await #expect(throws: ConnectionPoolError.connectionTimeout) {
+                try await pool.leaseConnection()
+            }
+            await #expect(throws: ConnectionPoolError.connectionTimeout) {
+                try await pool.leaseConnection()
+            }
+            failSecondLeaseWaiter.yield(value: ())
+
+            try await establishedConnectionWaiter.success
+
+            let lease = try await pool.leaseConnection()
+            lease.release()
+            // shutdown
+            pool.triggerForceShutdown()
+
+            for connection in factory.runningConnections {
+                try await connection.signalToClose
+                connection.closeIfClosing()
+            }
+        }
+    }
 }
 
 struct ConnectionFuture: ConnectionRequestProtocol {
