@@ -526,7 +526,7 @@ struct PoolStateMachine<
 
             case .idle(_, let newIdle):
                 if case .shuttingDown = self.poolState {
-                    switch self.connections.closeConnection(at: index) {
+                    switch self.connections.closeConnection(at: index, deleteConnection: true) {
                     case .close(let closeAction):
                         return .init(
                             request: .none,

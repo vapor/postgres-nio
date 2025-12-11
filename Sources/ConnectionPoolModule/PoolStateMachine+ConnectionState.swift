@@ -185,6 +185,16 @@ extension PoolStateMachine {
         }
 
         @inlinable
+        var isClosed: Bool {
+            switch self.state {
+            case .closed:
+                return true
+            case .idle, .leased, .backingOff, .starting, .closing:
+                return false
+            }
+        }
+
+        @inlinable
         mutating func connected(_ connection: Connection, maxStreams: UInt16) -> ConnectionAvailableInfo {
             switch self.state {
             case .starting:
