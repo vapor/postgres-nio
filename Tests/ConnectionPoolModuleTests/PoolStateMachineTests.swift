@@ -170,7 +170,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         let shutdownAction = stateMachine.triggerForceShutdown()
         #expect(shutdownAction.request == .failRequests(.init(), .poolShutdown))
-        #expect(shutdownAction.connection == .shutdown(.init()))
+        #expect(shutdownAction.connection == .initiateShutdown(.init()))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -390,4 +390,121 @@ typealias TestPoolStateMachine = PoolStateMachine<
         }
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerForceShutdownWithIdleConnections() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.connection == .scheduleTimers([connection1KeepAliveTimer]))
+        #expect(stateMachine.timerScheduled(connection1KeepAliveTimer, cancelContinuation: MockTimerCancellationToken(connection1KeepAliveTimer)) == .none)
+
+        let shutdownAction = stateMachine.triggerForceShutdown()
+        var shutdown = TestPoolStateMachine.ConnectionAction.Shutdown()
+        shutdown.connections = [connection]
+        shutdown.timersToCancel = [MockTimerCancellationToken(connection1KeepAliveTimer)]
+        #expect(shutdownAction.connection ==  .initiateShutdown(shutdown))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.poolState == .shutDown)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerForceShutdownWithLeasedConnections() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.connection == .scheduleTimers([connection1KeepAliveTimer]))
+        #expect(stateMachine.timerScheduled(connection1KeepAliveTimer, cancelContinuation: MockTimerCancellationToken(connection1KeepAliveTimer)) == .none)
+
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseAction = stateMachine.leaseConnection(request)
+        #expect(leaseAction.request == .leaseConnection(.init(element: request), connection))
+        #expect(leaseAction.connection == .cancelTimers([MockTimerCancellationToken(connection1KeepAliveTimer)]))
+
+        let shutdownAction = stateMachine.triggerForceShutdown()
+        var shutdown = TestPoolStateMachine.ConnectionAction.Shutdown()
+        shutdown.connections = [connection]
+        #expect(shutdownAction.connection ==  .initiateShutdown(shutdown))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.poolState == .shutDown)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerForceShutdownWithInProgessRequest() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        let shutdownAction = stateMachine.triggerForceShutdown()
+        #expect(shutdownAction.connection ==  .initiateShutdown(.init()))
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        #expect(createdAction.connection == .closeConnection(connection, []))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.poolState == .shutDown)
+    }
 }
