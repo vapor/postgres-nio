@@ -507,4 +507,61 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         #expect(stateMachine.poolState == .shutDown)
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerForceShutdownWithBackingOffRequest() {
+        struct ConnectionFailed: Error {}
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 2
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 2)
+
+        // Add two connections to verify we don't use an out of bounds index when iterating the 
+        // connection array on triggerForceShutdown. The first connection will be deleted as it
+        // never connected. Need to be sure when we access the second connection it is with the
+        // correct index
+
+        // fail connection 1
+        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
+        print(failedAction)
+        #expect(failedAction.request == .none)
+        switch failedAction.connection {
+        case .scheduleTimers(let timers):
+            #expect(timers.count == 1)
+            #expect(timers.first?.underlying.usecase == .backoff)
+        default:
+            Issue.record()
+        }
+
+        // make connection 2
+        let connection2 = MockConnection(id: 1)
+        let createdAction = stateMachine.connectionEstablished(connection2, maxStreams: 1)
+        print(createdAction)
+        let connection2KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.request == .none)
+        #expect(createdAction.connection == .scheduleTimers([connection2KeepAliveTimer]))
+
+        let shutdownAction = stateMachine.triggerForceShutdown()
+        print(shutdownAction)
+        var shutdown = TestPoolStateMachine.ConnectionAction.Shutdown()
+        shutdown.connections = [connection2]
+        #expect(shutdownAction.connection ==  .initiateShutdown(shutdown))
+
+        let closedAction = stateMachine.connectionClosed(connection2)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.poolState == .shutDown)
+    }
 }

@@ -525,7 +525,7 @@ extension PoolStateMachine {
         }
         /// Closes the connection at the given index.
         @inlinable
-        mutating func closeConnection(at index: Int) -> CloseConnectionAction {
+        mutating func closeConnection(at index: Int, deleteConnection: Bool) -> CloseConnectionAction {
             guard let closeAction = self.connections[index].close() else {
                 return .doNothing // no action to take
             }
@@ -557,7 +557,7 @@ extension PoolStateMachine {
             } else {
                 // if there is no connection we should delete this now
                 var timersToCancel = closeAction.cancelTimers
-                if let cancellationTimer = self.swapForDeletion(index: index) {
+                if deleteConnection, let cancellationTimer = self.swapForDeletion(index: index) {
                     timersToCancel.append(cancellationTimer)
                 }
                 return .cancelTimers(timersToCancel)
@@ -674,7 +674,7 @@ extension PoolStateMachine {
 
         mutating func triggerForceShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
             for index in self.connections.indices {
-                switch closeConnection(at: index) {
+                switch closeConnection(at: index, deleteConnection: false) {
                 case .close(let closeAction):
                     cleanup.connections.append(closeAction.connection)
                     cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
@@ -686,6 +686,7 @@ extension PoolStateMachine {
                     break
                 }
             }
+            self.connections = self.connections.filter { !$0.isClosed }
         }
 
         // MARK: - Private functions -
