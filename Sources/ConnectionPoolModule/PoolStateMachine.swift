@@ -111,8 +111,65 @@ struct PoolStateMachine<
 
     @usableFromInline
     enum PoolState: Sendable {
+        @usableFromInline
+        struct ConnectionCreationFailingContext: Sendable {
+            var timeOfFirstFailedAttempt: Clock.Instant
+            var firstError: Error
+            var lastError: Error
+            var numberOfFailedAttempts: Int
+            var timerCancellationToken: TimerCancellationToken
+
+            var connectionIDToRetry: ConnectionID?
+        }
+
+        @usableFromInline
+        struct CircuitBreakerOpenContext: Sendable {
+            var timeOfFirstFailedAttempt: Clock.Instant
+            var firstError: Error
+            var lastError: Error
+            var numberOfFailedAttempts: Int
+
+            var connectionIDToRetry: ConnectionID?
+        }
+
+        @usableFromInline
+        struct RecoveringContext: Sendable {
+        }
+
+        /// Everything is awesome. Connections are created as they are needed.
+        /// Can transition to:
+        ///   - `shuttingDown` if the pool is shutdown,
+        ///   - `connectionCreationFailing` if a connection creation failed.
         case running
-        case failedConnection
+        /// The last connection creation attempt failed. Creates a timer when entering this state.
+        /// In this state we will have only one connection that we try to establish to the server. We do not
+        /// create new connection attempts based on incomming requests. We also do not stop retrying
+        /// to establish a connection if all requests have finished.
+        /// Can transition to:
+        ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed
+        ///   - `recovering` if a new connection can be established
+        ///   - `shuttingDown` if the pool is shutdown
+        case connectionCreationFailing
+        /// The last connection creation attempt failed. Creates a timer when entering this state.
+        /// In this state we will have only one connection that we try to establish to the server. We do not
+        /// create new connection attempts based on incomming requests. We also do not stop retrying
+        /// to establish a connection if all requests have finished.
+        /// Can transition to:
+        ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed
+        ///   - `recovering` if a new connection can be established
+        ///   - `shuttingDown` if the pool is shutdown
+        case circuitBreakOpen(CircuitBreakerOpenContext)
+        /// We were in `connectionCreationFailing` or `circuitBreakOpen` but were able to create
+        /// one connection. We now expand to min connections sequentially to not overwhelm the machine that
+        /// has just come up. We serve requests with the connections that we have, but we don't create new
+        /// connections based on new requests, as long as we do not have reached min connections. Once we
+        /// have established min connections we transition to `running`.
+        /// Can transition to:
+        ///   - `connectionCreationFailing` if a connection creation failed.
+        ///   - `running` if min connections have been established
+        ///   - `shuttingDown` if the pool is shutdown
+        case recovering(RecoveringContext)
+
         case shuttingDown(graceful: Bool)
         case shutDown
     }
@@ -186,9 +243,16 @@ struct PoolStateMachine<
     mutating func leaseConnection(_ request: Request) -> Action {
         switch self.poolState {
         case .running:
-            break
+            if !self.requestQueue.isEmpty && self.cacheNoMoreConnectionsAllowed {
+                self.requestQueue.queue(request)
+                return .none()
+            }
 
-        case .failedConnection:
+        case .connectionCreationFailing, .recovering:
+            self.requestQueue.queue(request)
+            return .none()
+
+        case .circuitBreakOpen:
             return .init(
                 request: .failRequest(request, ConnectionPoolError.connectionTimeout),
                 connection: .none
@@ -199,11 +263,6 @@ struct PoolStateMachine<
                 request: .failRequest(request, ConnectionPoolError.poolShutdown),
                 connection: .none
             )
-        }
-
-        if !self.requestQueue.isEmpty && self.cacheNoMoreConnectionsAllowed {
-            self.requestQueue.queue(request)
-            return .none()
         }
 
         var soonAvailable: UInt16 = 0
