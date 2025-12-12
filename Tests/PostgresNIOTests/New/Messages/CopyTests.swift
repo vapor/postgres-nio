@@ -1,10 +1,10 @@
-import XCTest
+import Testing
 import NIOCore
 import NIOTestUtils
 @testable import PostgresNIO
 
-class CopyTests: XCTestCase {
-    func testDecodeCopyInResponseMessage() throws {
+@Suite struct CopyTests {
+    @Test func testDecodeCopyInResponseMessage() throws {
         let expected: [PostgresBackendMessage] = [
             .copyInResponse(.init(format: .textual, columnFormats: [.textual, .textual])),
             .copyInResponse(.init(format: .binary, columnFormats: [.binary, .binary])),
@@ -15,7 +15,8 @@ class CopyTests: XCTestCase {
 
         for message in expected {
             guard case .copyInResponse(let message) = message else {
-                return XCTFail("Expected only to get copyInResponse here!")
+                Issue.record("Expected only to get copyInResponse here!")
+                return
             }
             buffer.writeBackendMessage(id: .copyInResponse ) { buffer in
                 buffer.writeInteger(Int8(message.format.rawValue))
@@ -31,72 +32,63 @@ class CopyTests: XCTestCase {
         )
     }
 
-    func testDecodeFailureBecauseOfEmptyMessage() {
+    @Test func testDecodeFailureBecauseOfEmptyMessage() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .copyInResponse) { _ in}
         
-        XCTAssertThrowsError(
+        #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
             )
-        ) {
-            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 
 
-    func testDecodeFailureBecauseOfInvalidFormat() {
+    @Test func testDecodeFailureBecauseOfInvalidFormat() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .copyInResponse) { buffer in
             buffer.writeInteger(Int8(20))  // Only 0 and 1 are valid formats
         }
-        
-        XCTAssertThrowsError(
+
+        #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
             )
-        ) {
-            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 
-    func testDecodeFailureBecauseOfMissingColumnNumber() {
+    @Test func testDecodeFailureBecauseOfMissingColumnNumber() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .copyInResponse) { buffer in
             buffer.writeInteger(Int8(0))
         }
-        
-        XCTAssertThrowsError(
+
+        #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
             )
-        ) {
-            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 
-
-    func testDecodeFailureBecauseOfMissingColumns() {
+    @Test func testDecodeFailureBecauseOfMissingColumns() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .copyInResponse) { buffer in
             buffer.writeInteger(Int8(0))
             buffer.writeInteger(Int16(20))  // 20 columns promised, none given
         }
         
-        XCTAssertThrowsError(
+        #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
             )
-        ) {
-            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 
-    func testDecodeFailureBecauseOfInvalidColumnFormat() {
+    @Test func testDecodeFailureBecauseOfInvalidColumnFormat() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .copyInResponse) { buffer in
             buffer.writeInteger(Int8(0))
@@ -104,44 +96,42 @@ class CopyTests: XCTestCase {
             buffer.writeInteger(Int8(20))  // Only 0 and 1 are valid formats
         }
         
-        XCTAssertThrowsError(
+        #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
                 decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
             )
-        ) {
-            XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
 
-    func testEncodeCopyDataHeader() {
+    @Test func testEncodeCopyDataHeader() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.copyDataHeader(dataLength: 3)
         var byteBuffer = encoder.flushBuffer()
 
-        XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PostgresFrontendMessage.ID.copyData.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 7)
+        #expect(byteBuffer.readableBytes == 5)
+        #expect(PostgresFrontendMessage.ID.copyData.rawValue == byteBuffer.readInteger(as: UInt8.self))
+        #expect(byteBuffer.readInteger(as: Int32.self) == 7)
     }
 
-    func testEncodeCopyDone() {
+    @Test func testEncodeCopyDone() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.copyDone()
         var byteBuffer = encoder.flushBuffer()
 
-        XCTAssertEqual(byteBuffer.readableBytes, 5)
-        XCTAssertEqual(PostgresFrontendMessage.ID.copyDone.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 4)
+        #expect(byteBuffer.readableBytes == 5)
+        #expect(PostgresFrontendMessage.ID.copyDone.rawValue == byteBuffer.readInteger(as: UInt8.self))
+        #expect(byteBuffer.readInteger(as: Int32.self) == 4)
     }
 
-    func testEncodeCopyFail() {
+    @Test func testEncodeCopyFail() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.copyFail(message: "Oh, no :(")
         var byteBuffer = encoder.flushBuffer()
 
-        XCTAssertEqual(byteBuffer.readableBytes, 15)
-        XCTAssertEqual(PostgresFrontendMessage.ID.copyFail.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 14)
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "Oh, no :(")
+        #expect(byteBuffer.readableBytes == 15)
+        #expect(PostgresFrontendMessage.ID.copyFail.rawValue == byteBuffer.readInteger(as: UInt8.self))
+        #expect(byteBuffer.readInteger(as: Int32.self) == 14)
+        #expect(byteBuffer.readNullTerminatedString() == "Oh, no :(")
     }
 }

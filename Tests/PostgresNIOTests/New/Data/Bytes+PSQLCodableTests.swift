@@ -1,34 +1,35 @@
-import XCTest
+import struct Foundation.Data
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class Bytes_PSQLCodableTests: XCTestCase {
-    
-    func testDataRoundTrip() {
+@Suite struct Bytes_PSQLCodableTests {
+
+    @Test func testDataRoundTrip() {
         let data = Data((0...UInt8.max))
         
         var buffer = ByteBuffer()
         data.encode(into: &buffer, context: .default)
-        XCTAssertEqual(ByteBuffer.psqlType, .bytea)
-        
+        #expect(ByteBuffer.psqlType == .bytea)
+
         var result: Data?
         result = Data(from: &buffer, type: .bytea, format: .binary, context: .default)
-        XCTAssertEqual(data, result)
+        #expect(data == result)
     }
     
-    func testByteBufferRoundTrip() {
+    @Test func testByteBufferRoundTrip() {
         let bytes = ByteBuffer(bytes: (0...UInt8.max))
         
         var buffer = ByteBuffer()
         bytes.encode(into: &buffer, context: .default)
-        XCTAssertEqual(ByteBuffer.psqlType, .bytea)
-        
+        #expect(ByteBuffer.psqlType == .bytea)
+
         var result: ByteBuffer?
         result = ByteBuffer(from: &buffer, type: .bytea, format: .binary, context: .default)
-        XCTAssertEqual(bytes, result)
+        #expect(bytes == result)
     }
     
-    func testEncodeSequenceWhereElementUInt8() {
+    @Test func testEncodeSequenceWhereElementUInt8() {
         struct ByteSequence: Sequence, PostgresEncodable {
             typealias Element = UInt8
             typealias Iterator = Array<UInt8>.Iterator
@@ -47,7 +48,7 @@ class Bytes_PSQLCodableTests: XCTestCase {
         let sequence = ByteSequence()
         var buffer = ByteBuffer()
         sequence.encode(into: &buffer, context: .default)
-        XCTAssertEqual(ByteSequence.psqlType, .bytea)
-        XCTAssertEqual(buffer.readableBytes, 256)
+        #expect(ByteSequence.psqlType == .bytea)
+        #expect(buffer.readableBytes == 256)
     }
 }

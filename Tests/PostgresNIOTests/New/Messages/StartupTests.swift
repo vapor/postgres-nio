@@ -1,10 +1,9 @@
-import XCTest
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class StartupTests: XCTestCase {
-    
-    func testStartupMessageWithDatabase() {
+@Suite struct StartupTests {
+    @Test func testStartupMessageWithDatabase() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         var byteBuffer = ByteBuffer()
 
@@ -15,18 +14,18 @@ class StartupTests: XCTestCase {
         byteBuffer = encoder.flushBuffer()
 
         let byteBufferLength = Int32(byteBuffer.readableBytes)
-        XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())
-        XCTAssertEqual(PostgresFrontendMessage.Startup.versionThree, byteBuffer.readInteger())
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "user")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "test")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "database")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "abc123")
-        XCTAssertEqual(byteBuffer.readInteger(), UInt8(0))
+        #expect(byteBufferLength == byteBuffer.readInteger())
+        #expect(PostgresFrontendMessage.Startup.versionThree == byteBuffer.readInteger())
+        #expect(byteBuffer.readNullTerminatedString() == "user")
+        #expect(byteBuffer.readNullTerminatedString() == "test")
+        #expect(byteBuffer.readNullTerminatedString() == "database")
+        #expect(byteBuffer.readNullTerminatedString() == "abc123")
+        #expect(byteBuffer.readInteger() == UInt8(0))
 
-        XCTAssertEqual(byteBuffer.readableBytes, 0)
+        #expect(byteBuffer.readableBytes == 0)
     }
 
-    func testStartupMessageWithoutDatabase() {
+    @Test func testStartupMessageWithoutDatabase() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         var byteBuffer = ByteBuffer()
 
@@ -36,16 +35,16 @@ class StartupTests: XCTestCase {
         byteBuffer = encoder.flushBuffer()
 
         let byteBufferLength = Int32(byteBuffer.readableBytes)
-        XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())
-        XCTAssertEqual(PostgresFrontendMessage.Startup.versionThree, byteBuffer.readInteger())
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "user")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "test")
-        XCTAssertEqual(byteBuffer.readInteger(), UInt8(0))
+        #expect(byteBufferLength == byteBuffer.readInteger())
+        #expect(PostgresFrontendMessage.Startup.versionThree == byteBuffer.readInteger())
+        #expect(byteBuffer.readNullTerminatedString() == "user")
+        #expect(byteBuffer.readNullTerminatedString() == "test")
+        #expect(byteBuffer.readInteger() == UInt8(0))
 
-        XCTAssertEqual(byteBuffer.readableBytes, 0)
+        #expect(byteBuffer.readableBytes == 0)
     }
 
-    func testStartupMessageWithAdditionalOptions() {
+    @Test func testStartupMessageWithAdditionalOptions() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         var byteBuffer = ByteBuffer()
         
@@ -56,17 +55,17 @@ class StartupTests: XCTestCase {
         byteBuffer = encoder.flushBuffer()
         
         let byteBufferLength = Int32(byteBuffer.readableBytes)
-        XCTAssertEqual(byteBufferLength, byteBuffer.readInteger())
-        XCTAssertEqual(PostgresFrontendMessage.Startup.versionThree, byteBuffer.readInteger())
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "user")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "test")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "database")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "abc123")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "some")
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), "options")
-        XCTAssertEqual(byteBuffer.readInteger(), UInt8(0))
-        
-        XCTAssertEqual(byteBuffer.readableBytes, 0)
+        #expect(byteBufferLength == byteBuffer.readInteger())
+        #expect(PostgresFrontendMessage.Startup.versionThree == byteBuffer.readInteger())
+        #expect(byteBuffer.readNullTerminatedString() == "user")
+        #expect(byteBuffer.readNullTerminatedString() == "test")
+        #expect(byteBuffer.readNullTerminatedString() == "database")
+        #expect(byteBuffer.readNullTerminatedString() == "abc123")
+        #expect(byteBuffer.readNullTerminatedString() == "some")
+        #expect(byteBuffer.readNullTerminatedString() == "options")
+        #expect(byteBuffer.readInteger() == UInt8(0))
+
+        #expect(byteBuffer.readableBytes == 0)
     }
 }
 

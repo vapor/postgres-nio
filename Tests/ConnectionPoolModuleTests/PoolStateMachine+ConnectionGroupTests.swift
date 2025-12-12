@@ -120,7 +120,7 @@ import Testing
         #expect(closeAction.connection === newConnection)
         #expect(connections.stats == .init(closing: 1, availableStreams: 0))
 
-        let closeContext = connections.connectionClosed(newConnection.id)
+        let closeContext = connections.connectionClosed(newConnection.id, shuttingDown: false)
         #expect(closeContext.connectionsStarting == 0)
         #expect(connections.isEmpty)
         #expect(connections.stats == .init())

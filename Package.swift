@@ -2,7 +2,9 @@
 import PackageDescription
 
 #if compiler(>=6.1)
-let swiftSettings: [SwiftSetting] = []
+let swiftSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault")
+]
 #else
 let swiftSettings: [SwiftSetting] = [
     // Sadly the 6.0 compiler concurrency checker finds false positives.
@@ -30,7 +32,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.25.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "3.9.0" ..< "4.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.9.0" ..< "5.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
