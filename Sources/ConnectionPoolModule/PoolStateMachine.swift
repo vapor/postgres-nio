@@ -138,39 +138,46 @@ struct PoolStateMachine<
 
         /// Everything is awesome. Connections are created as they are needed.
         /// Can transition to:
-        ///   - `shuttingDown` if the pool is shutdown,
+        ///   - `shuttingDown` if the pool is being shut down (graceful shutdown behavior is managed by an external flag),
         ///   - `connectionCreationFailing` if a connection creation failed.
         case running
-        /// The last connection creation attempt failed. Creates a timer when entering this state.
-        /// In this state we will have only one connection that we try to establish to the server. We do not
-        /// create new connection attempts based on incomming requests. We also do not stop retrying
-        /// to establish a connection if all requests have finished.
+        /// The last connection creation attempt failed. A timer is started upon entering this state.
+        /// In this state, the pool attempts to establish only one connection to the server at a time.
+        /// New connection attempts are not initiated based on incoming requests. Retries to establish
+        /// a connection continue even if all requests have finished. Existing connections continue to serve requests.
         /// Can transition to:
-        ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed
-        ///   - `recovering` if a new connection can be established
-        ///   - `shuttingDown` if the pool is shutdown
-        case connectionCreationFailing
-        /// The last connection creation attempt failed. Creates a timer when entering this state.
-        /// In this state we will have only one connection that we try to establish to the server. We do not
-        /// create new connection attempts based on incomming requests. We also do not stop retrying
-        /// to establish a connection if all requests have finished.
+        ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed AND there are zero open connections.
+        ///     If the timer elapses but connections are still open, the pool remains in `connectionCreationFailing`
+        ///     until the last open connection is closed, at which point it immediately transitions to `circuitBreakOpen`.
+        ///   - `recovering` if a new connection can be successfully established.
+        ///   - `shuttingDown` if the pool is shut down.
+        case connectionCreationFailing(ConnectionCreationFailingContext)
+        /// The circuit breaker has tripped. This state is entered from `connectionCreationFailing`
+        /// when the circuit breaker timer has elapsed AND there are zero open connections.
+        /// Upon entering this state, all currently queued requests are failed, and any new incoming
+        /// requests are immediately rejected. The pool will periodically attempt to establish a new
+        /// connection after a backoff period.
         /// Can transition to:
-        ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed
-        ///   - `recovering` if a new connection can be established
-        ///   - `shuttingDown` if the pool is shutdown
+        ///   - `recovering` if a new connection can be successfully established.
+        ///   - `shuttingDown` if the pool is shut down.
         case circuitBreakOpen(CircuitBreakerOpenContext)
-        /// We were in `connectionCreationFailing` or `circuitBreakOpen` but were able to create
-        /// one connection. We now expand to min connections sequentially to not overwhelm the machine that
-        /// has just come up. We serve requests with the connections that we have, but we don't create new
-        /// connections based on new requests, as long as we do not have reached min connections. Once we
-        /// have established min connections we transition to `running`.
+        /// The pool was previously in `connectionCreationFailing` or `circuitBreakOpen` but has
+        /// successfully created one connection. The pool now sequentially expands to `minConnections`
+        /// to avoid overwhelming the newly available server. Requests are served by available connections.
+        /// New connections are not created based on new requests until `minConnections` has been reached.
         /// Can transition to:
-        ///   - `connectionCreationFailing` if a connection creation failed.
-        ///   - `running` if min connections have been established
-        ///   - `shuttingDown` if the pool is shutdown
+        ///   - `connectionCreationFailing` if a connection creation fails during recovery.
+        ///   - `running` if `minConnections` have been established.
+        ///   - `shuttingDown` if the pool is shut down.
         case recovering(RecoveringContext)
 
-        case shuttingDown(graceful: Bool)
+        /// The pool is in the process of shutting down. Graceful shutdown behavior (e.g., waiting for
+        /// in-flight requests to complete) is managed by an external `gracefulShutdownTriggered` flag,
+        /// rather than being part of the state itself.
+        /// Can transition to:
+        ///   - `shutDown` once all resources are released and outstanding requests are handled (if graceful shutdown was triggered).
+        case shuttingDown
+        /// The pool has fully shut down and released all its resources. No further operations are possible.
         case shutDown
     }
 
