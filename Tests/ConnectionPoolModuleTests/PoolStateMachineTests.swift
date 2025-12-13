@@ -532,7 +532,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
             generator: .init(),
-            timerCancellationTokenType: MockTimerCancellationToken.self
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
         )
 
         // refill pool
@@ -573,6 +574,6 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection2)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        #expect(stateMachine.poolState == .shutDown)
+        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
     }
 }

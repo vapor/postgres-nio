@@ -176,7 +176,7 @@ struct PoolStateMachine<
         ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed AND there are zero open connections.
         ///     If the timer elapses but connections are still open, the pool remains in `connectionCreationFailing`
         ///     until the last open connection is closed, at which point it immediately transitions to `circuitBreakOpen`.
-        ///   - `recovering` if a new connection can be successfully established.
+        ///   - `running` if a new connection can be successfully established.
         ///   - `shuttingDown` if the pool is shut down.
         case connectionCreationFailing(ConnectionCreationFailingContext)
         /// The circuit breaker has tripped. This state is entered from `connectionCreationFailing`
@@ -185,18 +185,9 @@ struct PoolStateMachine<
         /// requests are immediately rejected. The pool will periodically attempt to establish a new
         /// connection after a backoff period.
         /// Can transition to:
-        ///   - `recovering` if a new connection can be successfully established.
+        ///   - `running` if a new connection can be successfully established.
         ///   - `shuttingDown` if the pool is shut down.
         case circuitBreakOpen(CircuitBreakerOpenContext)
-        /// The pool was previously in `connectionCreationFailing` or `circuitBreakOpen` but has
-        /// successfully created one connection. The pool now sequentially expands to `minConnections`
-        /// to avoid overwhelming the newly available server. Requests are served by available connections.
-        /// New connections are not created based on new requests until `minConnections` has been reached.
-        /// Can transition to:
-        ///   - `connectionCreationFailing` if a connection creation fails during recovery.
-        ///   - `running` if `minConnections` have been established.
-        ///   - `shuttingDown` if the pool is shut down.
-        case recovering
 
         /// The pool is in the process of shutting down. Graceful shutdown behavior (e.g., waiting for
         /// in-flight requests to complete) is managed by an external `gracefulShutdownTriggered` flag,
@@ -272,7 +263,7 @@ struct PoolStateMachine<
     @inlinable
     mutating func leaseConnection(_ request: Request) -> Action {
         switch self.poolState {
-        case .running, .recovering:
+        case .running:
             if !self.requestQueue.isEmpty && self.cacheNoMoreConnectionsAllowed {
                 self.requestQueue.queue(request)
                 return .none()
@@ -371,15 +362,8 @@ struct PoolStateMachine<
         case .shuttingDown:
             break
 
-        case .connectionCreationFailing, .recovering:
-            if self.connections.stats.idle + self.connections.stats.leased >= self.configuration.minimumConnectionCount {
-                self.poolState = .running
-            } else {
-                self.poolState = .recovering
-            }
-
-        case .circuitBreakOpen:
-            self.poolState = .recovering
+        case .connectionCreationFailing, .circuitBreakOpen:
+            self.poolState = .running
 
         case .shutDown:
             fatalError("Connection pool is not running")
@@ -442,7 +426,7 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
         switch self.poolState {
-        case .running, .recovering:
+        case .running:
             self.poolState = .connectionCreationFailing(
                 .init(timeOfFirstFailedAttempt: clock.now, error: error, connectionIDToRetry: request.connectionID)
             )
@@ -548,7 +532,7 @@ struct PoolStateMachine<
                 )
             }
 
-        case .running, .recovering:
+        case .running:
             preconditionFailure("Invalid state")
 
         case .shuttingDown, .shutDown:
@@ -600,7 +584,7 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionClosed(_ connection: Connection) -> Action {
         switch self.poolState {
-        case .running, .connectionCreationFailing, .circuitBreakOpen, .recovering:
+        case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.cacheNoMoreConnectionsAllowed = false
 
             let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: self.gracefulShutdownTriggered)
@@ -649,7 +633,7 @@ struct PoolStateMachine<
     @usableFromInline
     mutating func triggerForceShutdown() -> Action {
         switch self.poolState {
-        case .running, .connectionCreationFailing, .circuitBreakOpen, .recovering:
+        case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.poolState = .shuttingDown
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerForceShutdown(&shutdown)
