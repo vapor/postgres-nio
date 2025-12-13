@@ -436,7 +436,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        #expect(stateMachine.poolState == .shutDown)
+        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -481,7 +481,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        #expect(stateMachine.poolState == .shutDown)
+        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -516,7 +516,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        #expect(stateMachine.poolState == .shutDown)
+        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)

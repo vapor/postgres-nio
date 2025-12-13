@@ -113,27 +113,54 @@ struct PoolStateMachine<
     enum PoolState: Sendable {
         @usableFromInline
         struct ConnectionCreationFailingContext: Sendable {
-            var timeOfFirstFailedAttempt: Clock.Instant
-            var firstError: Error
-            var lastError: Error
-            var numberOfFailedAttempts: Int
-            var timerCancellationToken: TimerCancellationToken
+            @usableFromInline
+            init(
+                timeOfFirstFailedAttempt: Clock.Instant, 
+                error: any Error, 
+                connectionIDToRetry: ConnectionID
+            ) {
+                self.timeOfFirstFailedAttempt = timeOfFirstFailedAttempt
+                self.firstError = error
+                self.lastError = error
+                self.numberOfFailedAttempts = 1
+                self.connectionIDToRetry = connectionIDToRetry
+            }
 
-            var connectionIDToRetry: ConnectionID?
+            @usableFromInline
+            var timeOfFirstFailedAttempt: Clock.Instant
+            @usableFromInline
+            var firstError: Error
+            @usableFromInline
+            var lastError: Error
+            @usableFromInline
+            var numberOfFailedAttempts: Int
+            @usableFromInline
+            var connectionIDToRetry: ConnectionID
         }
 
         @usableFromInline
         struct CircuitBreakerOpenContext: Sendable {
-            var timeOfFirstFailedAttempt: Clock.Instant
+            @usableFromInline
+            init(
+                firstError: any Error, 
+                lastError: any Error, 
+                numberOfFailedAttempts: Int, 
+                connectionIDToRetry: ConnectionID
+            ) {
+                self.firstError = firstError
+                self.lastError = lastError
+                self.numberOfFailedAttempts = numberOfFailedAttempts
+                self.connectionIDToRetry = connectionIDToRetry
+            }
+
+            @usableFromInline
             var firstError: Error
+            @usableFromInline
             var lastError: Error
+            @usableFromInline
             var numberOfFailedAttempts: Int
-
-            var connectionIDToRetry: ConnectionID?
-        }
-
-        @usableFromInline
-        struct RecoveringContext: Sendable {
+            @usableFromInline
+            var connectionIDToRetry: ConnectionID
         }
 
         /// Everything is awesome. Connections are created as they are needed.
@@ -169,7 +196,7 @@ struct PoolStateMachine<
         ///   - `connectionCreationFailing` if a connection creation fails during recovery.
         ///   - `running` if `minConnections` have been established.
         ///   - `shuttingDown` if the pool is shut down.
-        case recovering(RecoveringContext)
+        case recovering
 
         /// The pool is in the process of shutting down. Graceful shutdown behavior (e.g., waiting for
         /// in-flight requests to complete) is managed by an external `gracefulShutdownTriggered` flag,
@@ -211,16 +238,12 @@ struct PoolStateMachine<
     @usableFromInline
     private(set) var poolState: PoolState = .running
     @usableFromInline
+    private(set) var gracefulShutdownTriggered: Bool = false
+    @usableFromInline
     let clock: Clock
     @usableFromInline
     private(set) var cacheNoMoreConnectionsAllowed: Bool = false
 
-    @usableFromInline
-    private(set) var failedConsecutiveConnectionAttempts: Int = 0
-    
-    @usableFromInline
-    private(set) var timeOfFirstFailedAttempt: Clock.Instant? = nil
-    
     @inlinable
     init(
         configuration: PoolConfiguration,
@@ -249,13 +272,13 @@ struct PoolStateMachine<
     @inlinable
     mutating func leaseConnection(_ request: Request) -> Action {
         switch self.poolState {
-        case .running:
+        case .running, .recovering:
             if !self.requestQueue.isEmpty && self.cacheNoMoreConnectionsAllowed {
                 self.requestQueue.queue(request)
                 return .none()
             }
 
-        case .connectionCreationFailing, .recovering:
+        case .connectionCreationFailing:
             self.requestQueue.queue(request)
             return .none()
 
@@ -341,25 +364,29 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionEstablished(_ connection: Connection, maxStreams: UInt16) -> Action {
-        self.failedConsecutiveConnectionAttempts = 0
-        self.timeOfFirstFailedAttempt = nil
         switch self.poolState {
         case .running:
-            let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            return self.handleAvailableConnection(index: index, availableContext: context)
+            break
 
         case .shuttingDown:
-            let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            return self.handleAvailableConnection(index: index, availableContext: context)
+            break
 
-        case .failedConnection:
-            self.poolState = .running
-            let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-            return self.handleAvailableConnection(index: index, availableContext: context)
+        case .connectionCreationFailing, .recovering:
+            if self.connections.stats.idle + self.connections.stats.leased >= self.configuration.minimumConnectionCount {
+                self.poolState = .running
+            } else {
+                self.poolState = .recovering
+            }
+
+        case .circuitBreakOpen:
+            self.poolState = .recovering
 
         case .shutDown:
             fatalError("Connection pool is not running")
         }
+
+        let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
+        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     @inlinable
@@ -415,31 +442,56 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
         switch self.poolState {
-        case .running, .failedConnection:
-            self.failedConsecutiveConnectionAttempts += 1
-            var requestAction: RequestAction = .none
-            if let timeOfFirstFailedAttempt = self.timeOfFirstFailedAttempt {
-                if timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.connectionTimeout {
-                    self.poolState = .failedConnection
-                    requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionTimeout)
-                }
-            } else {
-                self.timeOfFirstFailedAttempt = clock.now
-            }
-            
-            let connectionTimer = self.connections.backoffNextConnectionAttempt(request.connectionID)
-            let backoff = Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
-            let timer = Timer(connectionTimer, duration: backoff)
-            return .init(request: requestAction, connection: .scheduleTimers(.init(timer)))
-
-        case .shuttingDown(graceful: true):
-            self.failedConsecutiveConnectionAttempts += 1
-            let connectionTimer = self.connections.backoffNextConnectionAttempt(request.connectionID)
-            let backoff = Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
-            let timer = Timer(connectionTimer, duration: backoff)
+        case .running, .recovering:
+            self.poolState = .connectionCreationFailing(
+                .init(timeOfFirstFailedAttempt: clock.now, error: error, connectionIDToRetry: request.connectionID)
+            )
+            let timer = self.backoffNextConnectionAttempt(connectionID: request.connectionID, numberOfFailedAttempts: 1)
             return .init(request: .none, connection: .scheduleTimers(.init(timer)))
 
-        case .shuttingDown(graceful: false), .shutDown:
+        case .connectionCreationFailing(var creationFailingContext):
+            guard request.connectionID == creationFailingContext.connectionIDToRetry else {
+                let timers = self.connections.destroyFailedConnection(request.connectionID)
+                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+            }
+            creationFailingContext.lastError = error
+            creationFailingContext.numberOfFailedAttempts += 1
+            var requestAction: RequestAction = .none
+            if creationFailingContext.timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.connectionTimeout, 
+                self.connections.stats.idle + self.connections.stats.leased == 0 {
+                self.poolState = .circuitBreakOpen(
+                    .init(
+                        firstError: creationFailingContext.firstError, 
+                        lastError: creationFailingContext.lastError, 
+                        numberOfFailedAttempts: creationFailingContext.numberOfFailedAttempts,
+                        connectionIDToRetry: creationFailingContext.connectionIDToRetry
+                    )
+                )
+                requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionTimeout)
+            } else {
+                self.poolState = .connectionCreationFailing(creationFailingContext)
+            }
+            let timer = self.backoffNextConnectionAttempt(
+                connectionID: request.connectionID, 
+                numberOfFailedAttempts: creationFailingContext.numberOfFailedAttempts
+            )
+            return .init(request: requestAction, connection: .scheduleTimers(.init(timer)))
+            
+        case .circuitBreakOpen(var circuitBreakOpenContext):
+            guard request.connectionID == circuitBreakOpenContext.connectionIDToRetry else {
+                let timers = self.connections.destroyFailedConnection(request.connectionID)
+                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+            }
+            circuitBreakOpenContext.lastError = error
+            circuitBreakOpenContext.numberOfFailedAttempts += 1
+            self.poolState = .circuitBreakOpen(circuitBreakOpenContext)
+            let timer = self.backoffNextConnectionAttempt(
+                connectionID: request.connectionID, 
+                numberOfFailedAttempts: circuitBreakOpenContext.numberOfFailedAttempts
+            )
+            return .init(request: .none, connection: .scheduleTimers(.init(timer)))
+            
+        case .shuttingDown, .shutDown:
             let timerToCancel = self.connections.destroyFailedConnection(request.connectionID)
             let connectionAction: ConnectionAction
             if self.connections.isEmpty {
@@ -456,14 +508,20 @@ struct PoolStateMachine<
     }
 
     @inlinable
+    mutating func backoffNextConnectionAttempt(connectionID: ConnectionID, numberOfFailedAttempts: Int) -> Timer {
+        let connectionTimer = self.connections.backoffNextConnectionAttempt(connectionID)
+        let backoff = Self.calculateBackoff(failedAttempt: numberOfFailedAttempts)
+        return Timer(connectionTimer, duration: backoff)
+    }
+
+    @inlinable
     mutating func connectionCreationBackoffDone(_ connectionID: ConnectionID) -> Action {
         switch self.poolState {
-        case .running, .shuttingDown(graceful: true), .failedConnection:
-            let soonAvailable = self.connections.soonAvailableConnections
-            let retry = if case .failedConnection = self.poolState {
-                true
+        case .connectionCreationFailing, .circuitBreakOpen:
+            let retry = if case .running = self.poolState {
+                (self.connections.soonAvailableConnections - 1) < self.requestQueue.count
             } else {
-                (soonAvailable - 1) < self.requestQueue.count
+                true
             }
 
             switch self.connections.backoffDone(connectionID, retry: retry) {
@@ -490,7 +548,10 @@ struct PoolStateMachine<
                 )
             }
 
-        case .shuttingDown(graceful: false), .shutDown:
+        case .running, .recovering:
+            preconditionFailure("Invalid state")
+
+        case .shuttingDown, .shutDown:
             return .none()
         }
     }
@@ -539,10 +600,10 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionClosed(_ connection: Connection) -> Action {
         switch self.poolState {
-        case .running, .shuttingDown(graceful: true), .failedConnection:
+        case .running, .connectionCreationFailing, .circuitBreakOpen, .recovering:
             self.cacheNoMoreConnectionsAllowed = false
 
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: false)
+            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: self.gracefulShutdownTriggered)
 
             let connectionAction: ConnectionAction
             if let newRequest = closedConnectionAction.newConnectionRequest {
@@ -553,7 +614,7 @@ struct PoolStateMachine<
 
             return .init(request: .none, connection: connectionAction)
 
-        case .shuttingDown(graceful: false):
+        case .shuttingDown:
             let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: true)
 
             let connectionAction: ConnectionAction
@@ -563,8 +624,8 @@ struct PoolStateMachine<
             } else {
                 connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
             }
-
             return .init(request: .none, connection: connectionAction)
+
         case .shutDown:
             return .none()
         }
@@ -588,8 +649,8 @@ struct PoolStateMachine<
     @usableFromInline
     mutating func triggerForceShutdown() -> Action {
         switch self.poolState {
-        case .running, .failedConnection:
-            self.poolState = .shuttingDown(graceful: false)
+        case .running, .connectionCreationFailing, .circuitBreakOpen, .recovering:
+            self.poolState = .shuttingDown
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerForceShutdown(&shutdown)
 
@@ -679,7 +740,7 @@ struct PoolStateMachine<
         case .backoff:
             return Timer(
                 connectionTimer,
-                duration: Self.calculateBackoff(failedAttempt: self.failedConsecutiveConnectionAttempts)
+                duration: Self.calculateBackoff(failedAttempt: 1)
             )
 
         case .keepAlive:
@@ -741,7 +802,7 @@ extension PoolStateMachine {
 extension PoolStateMachine.Action: Equatable where TimerCancellationToken: Equatable, Request: Equatable {}
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-extension PoolStateMachine.PoolState: Equatable {}
+//extension PoolStateMachine.PoolState: Equatable {}
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationToken: Equatable {
