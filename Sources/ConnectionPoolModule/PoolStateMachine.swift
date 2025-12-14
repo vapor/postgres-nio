@@ -168,14 +168,14 @@ struct PoolStateMachine<
         ///   - `shuttingDown` if the pool is being shut down (graceful shutdown behavior is managed by an external flag),
         ///   - `connectionCreationFailing` if a connection creation failed.
         case running
-        /// The last connection creation attempt failed. A timer is started upon entering this state.
-        /// In this state, the pool attempts to establish only one connection to the server at a time.
-        /// New connection attempts are not initiated based on incoming requests. Retries to establish
-        /// a connection continue even if all requests have finished. Existing connections continue to serve requests.
+        /// The last connection creation attempt failed. In this state, the pool attempts to establish 
+        /// only one connection to the server at a time. New connection attempts are not initiated based 
+        /// on incoming requests. Retries to establish a connection continue even if all requests have 
+        /// finished. Existing connections continue to serve requests.
         /// Can transition to:
-        ///   - `circuitBreakOpen` if the circuit breaker timer has elapsed AND there are zero open connections.
-        ///     If the timer elapses but connections are still open, the pool remains in `connectionCreationFailing`
-        ///     until the last open connection is closed, at which point it immediately transitions to `circuitBreakOpen`.
+        ///   - `circuitBreakOpen` on failed connection if the timer passed since entering this state has passed
+        ///     connectionTimeout AND there are zero open connections. The pool remains in `connectionCreationFailing`
+        ///     until the last open connection is closed.
         ///   - `running` if a new connection can be successfully established.
         ///   - `shuttingDown` if the pool is shut down.
         case connectionCreationFailing(ConnectionCreationFailingContext)
@@ -445,6 +445,7 @@ struct PoolStateMachine<
             creationFailingContext.lastError = error
             creationFailingContext.numberOfFailedAttempts += 1
             var requestAction: RequestAction = .none
+            // if failing for longer than connection timeout and there are no open connections move to circuit break state
             if creationFailingContext.timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.connectionTimeout, 
                 self.connections.stats.idle + self.connections.stats.leased == 0 {
                 self.poolState = .circuitBreakOpen(
