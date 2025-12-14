@@ -507,13 +507,7 @@ struct PoolStateMachine<
     mutating func connectionCreationBackoffDone(_ connectionID: ConnectionID) -> Action {
         switch self.poolState {
         case .connectionCreationFailing, .circuitBreakOpen:
-            let retry = if case .running = self.poolState {
-                (self.connections.soonAvailableConnections - 1) < self.requestQueue.count
-            } else {
-                true
-            }
-
-            switch self.connections.backoffDone(connectionID, retry: retry) {
+            switch self.connections.backoffDone(connectionID, retry: true) {
             case .createConnection(let request, let continuation):
                 let timers: TinyFastSequence<TimerCancellationToken>
                 if let continuation {
