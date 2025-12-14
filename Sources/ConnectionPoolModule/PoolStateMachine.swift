@@ -428,7 +428,11 @@ struct PoolStateMachine<
         switch self.poolState {
         case .running:
             self.poolState = .connectionCreationFailing(
-                .init(timeOfFirstFailedAttempt: clock.now, error: error, connectionIDToRetry: request.connectionID)
+                .init(
+                    timeOfFirstFailedAttempt: clock.now, 
+                    error: error, 
+                    connectionIDToRetry: request.connectionID
+                )
             )
             let timer = self.backoffNextConnectionAttempt(connectionID: request.connectionID, numberOfFailedAttempts: 1)
             return .init(request: .none, connection: .scheduleTimers(.init(timer)))
