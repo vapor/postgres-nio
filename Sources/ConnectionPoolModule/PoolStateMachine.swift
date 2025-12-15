@@ -40,12 +40,20 @@ struct PoolStateMachine<
     Connection: PooledConnection,
     ConnectionIDGenerator: ConnectionIDGeneratorProtocol,
     ConnectionID: Hashable & Sendable,
+    ConnectionFactoryError: Error,
     Request: ConnectionRequestProtocol,
     RequestID,
     TimerCancellationToken: Sendable,
     Clock: _Concurrency.Clock,
     Instant: InstantProtocol
->: Sendable where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID, Clock.Duration == Duration, Clock.Instant == Instant {
+>: Sendable where
+    Connection.ID == ConnectionID,
+    ConnectionIDGenerator.ID == ConnectionID,
+    RequestID == Request.ID,
+    Clock.Duration == Duration,
+    Clock.Instant == Instant,
+    ConnectionFactoryError == Request.ConnectionFactoryError
+{
 
     @usableFromInline
     struct ConnectionRequest: Hashable, Sendable {
@@ -104,8 +112,8 @@ struct PoolStateMachine<
     enum RequestAction {
         case leaseConnection(TinyFastSequence<Request>, Connection)
 
-        case failRequest(Request, ConnectionPoolError)
-        case failRequests(TinyFastSequence<Request>, ConnectionPoolError)
+        case failRequest(Request, ConnectionPoolError<ConnectionFactoryError>)
+        case failRequests(TinyFastSequence<Request>, ConnectionPoolError<ConnectionFactoryError>)
 
         case none
     }
@@ -116,8 +124,8 @@ struct PoolStateMachine<
         struct ConnectionCreationFailingContext: Sendable {
             @usableFromInline
             init(
-                timeOfFirstFailedAttempt: Clock.Instant, 
-                error: any Error, 
+                timeOfFirstFailedAttempt: Instant,
+                error: ConnectionFactoryError,
                 connectionIDToRetry: ConnectionID
             ) {
                 self.timeOfFirstFailedAttempt = timeOfFirstFailedAttempt
@@ -128,11 +136,11 @@ struct PoolStateMachine<
             }
 
             @usableFromInline
-            var timeOfFirstFailedAttempt: Clock.Instant
+            var timeOfFirstFailedAttempt: Instant
             @usableFromInline
-            var firstError: any Error
+            var firstError: ConnectionFactoryError
             @usableFromInline
-            var lastError: any Error
+            var lastError: ConnectionFactoryError
             @usableFromInline
             var numberOfFailedAttempts: Int
             @usableFromInline
@@ -143,7 +151,6 @@ struct PoolStateMachine<
         struct CircuitBreakerOpenContext: Sendable {
             @usableFromInline
             init(_ creationFailingContext: ConnectionCreationFailingContext) {
-
                 self.firstError = creationFailingContext.firstError
                 self.lastError = creationFailingContext.lastError
                 self.numberOfFailedAttempts = creationFailingContext.numberOfFailedAttempts
@@ -151,9 +158,9 @@ struct PoolStateMachine<
             }
 
             @usableFromInline
-            var firstError: any Error
+            var firstError: ConnectionFactoryError
             @usableFromInline
-            var lastError: any Error
+            var lastError: ConnectionFactoryError
             @usableFromInline
             var numberOfFailedAttempts: Int
             @usableFromInline
@@ -273,13 +280,13 @@ struct PoolStateMachine<
 
         case .circuitBreakOpen:
             return .init(
-                request: .failRequest(request, ConnectionPoolError.connectionCreationCircuitBreakerTripped),
+                request: .failRequest(request, .init(.connectionCreationCircuitBreakerTripped)),
                 connection: .none
             )
 
         case .shuttingDown, .shutDown:
             return .init(
-                request: .failRequest(request, ConnectionPoolError.poolShutdown),
+                request: .failRequest(request, .init(.poolShutdown)),
                 connection: .none
             )
         }
@@ -346,7 +353,7 @@ struct PoolStateMachine<
         }
 
         return .init(
-            request: .failRequest(request, ConnectionPoolError.requestCancelled),
+            request: .failRequest(request, .init(.requestCancelled)),
             connection: .none
         )
     }
@@ -422,7 +429,7 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
+    mutating func connectionEstablishFailed(_ error: ConnectionFactoryError, for request: ConnectionRequest) -> Action {
         switch self.poolState {
         case .running:
             self.poolState = .connectionCreationFailing(
@@ -447,7 +454,7 @@ struct PoolStateMachine<
             if creationFailingContext.timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.circuitBreakerTripAfter, 
                 self.connections.stats.idle + self.connections.stats.leased == 0 {
                 self.poolState = .circuitBreakOpen(.init(creationFailingContext))
-                requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionCreationCircuitBreakerTripped)
+                requestAction = .failRequests(self.requestQueue.removeAll(), .init(.connectionCreationCircuitBreakerTripped))
             } else {
                 self.poolState = .connectionCreationFailing(creationFailingContext)
             }
@@ -646,13 +653,13 @@ struct PoolStateMachine<
             if self.connections.isEmpty, shutdown.connections.isEmpty {
                 self.poolState = .shutDown
                 return .init(
-                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                    request: .failRequests(self.requestQueue.removeAll(), .init(.poolShutdown)),
                     connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
                 )
             }
 
             return .init(
-                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                request: .failRequests(self.requestQueue.removeAll(), .init(.poolShutdown)),
                 connection: .initiateShutdown(shutdown)
             )
 
@@ -794,10 +801,16 @@ extension PoolStateMachine {
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-extension PoolStateMachine.Action: Equatable where TimerCancellationToken: Equatable, Request: Equatable {}
+extension PoolStateMachine.Action: Equatable where TimerCancellationToken: Equatable, Request: Equatable, Request.ConnectionFactoryError: Equatable {}
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-//extension PoolStateMachine.PoolState: Equatable {}
+extension PoolStateMachine.PoolState.CircuitBreakerOpenContext: Equatable where ConnectionFactoryError: Equatable {}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension PoolStateMachine.PoolState.ConnectionCreationFailingContext: Equatable where ConnectionFactoryError: Equatable {}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension PoolStateMachine.PoolState: Equatable where ConnectionFactoryError: Equatable {}
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationToken: Equatable {
@@ -838,7 +851,7 @@ extension PoolStateMachine.ConnectionAction.Shutdown: Equatable where TimerCance
 
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-extension PoolStateMachine.RequestAction: Equatable where Request: Equatable {
+extension PoolStateMachine.RequestAction: Equatable where Request: Equatable, ConnectionFactoryError: Equatable {
     
     @usableFromInline
     static func ==(lhs: Self, rhs: Self) -> Bool {
