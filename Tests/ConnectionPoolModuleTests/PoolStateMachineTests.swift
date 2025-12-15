@@ -52,6 +52,9 @@ typealias TestPoolStateMachine = PoolStateMachine<
             #expect(createdAction2.connection == .scheduleTimers([connection2KeepAliveTimer]))
             #expect(stateMachine.timerScheduled(connection2KeepAliveTimer, cancelContinuation: connection2KeepAliveTimerCancellationToken) == .none)
         }
+
+        #expect(stateMachine.connections.stats.active == 2)
+        #expect(stateMachine.connections.stats.idle == 2)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -116,6 +119,9 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         #expect(stateMachine.timerScheduled(connection2IdleTimer, cancelContinuation: connection2IdleTimerCancellationToken) == .none)
         #expect(stateMachine.timerTriggered(connection2IdleTimer) == .init(request: .none, connection: .closeConnection(connection2, [connection2IdleTimerCancellationToken])))
+
+        #expect(stateMachine.connections.stats.active == 1)
+        #expect(stateMachine.connections.stats.leased == 1)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -176,6 +182,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let shutdownAction = stateMachine.triggerForceShutdown()
         #expect(shutdownAction.request == .failRequests(.init(), .poolShutdown))
         #expect(shutdownAction.connection == .initiateShutdown(.init()))
+
+        #expect(stateMachine.connections.stats.active == 0)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -233,6 +241,9 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         // connection 1 is dropped
         #expect(stateMachine.connectionClosed(connection1) == .init(request: .none, connection: .cancelTimers([connection2IdleTimerCancellationToken])))
+
+        #expect(stateMachine.connections.stats.active == 1)
+        #expect(stateMachine.connections.stats.idle == 1)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -276,6 +287,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let releaseRequest1 = stateMachine.releaseConnection(connection1, streams: 1)
         #expect(releaseRequest1.request == .none)
         #expect(releaseRequest1.connection == .none)
+
+        #expect(stateMachine.connections.stats.active == 0)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -344,6 +357,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         // fail keep alive and cause closed
         let keepAliveFailed2 = stateMachine.connectionKeepAliveFailed(connection2.id)
         #expect(keepAliveFailed2.connection == .closeConnection(connection2, []))
+
+        #expect(stateMachine.connections.stats.active == 0)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -397,6 +412,9 @@ typealias TestPoolStateMachine = PoolStateMachine<
         } else {
             Issue.record("Unexpected connection action")
         }
+
+        #expect(stateMachine.connections.stats.active == 1)
+        #expect(stateMachine.connections.stats.idle == 1)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -438,6 +456,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -483,6 +502,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -518,6 +538,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -530,6 +551,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         configuration.maximumConnectionHardLimit = 2
         configuration.keepAliveDuration = .seconds(2)
         configuration.idleTimeoutDuration = .seconds(4)
+        configuration.circuitBreakerTripAfter = .seconds(30)
 
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
@@ -568,7 +590,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(leaseAction.request == .none)
         #expect(leaseAction.connection == .none)
 
-        clock.advance(to: clock.now.advanced(by: .seconds(30)))
+        clock.advance(to: clock.now.advanced(by: .seconds(31)))
 
         // fail connection 2. Connection request is removed as we already have a failing connection
         let failedAction2 = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: request2)
@@ -622,6 +644,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(leaseAction4.request == .leaseConnection(.init(element: request4), connection))
         #expect(leaseAction4.connection == .none)
 
+        #expect(stateMachine.connections.stats.leased == 1)
+        #expect(stateMachine.connections.stats.active == 1)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -674,6 +698,10 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(createdAction2.connection == .makeConnectionsCancelAndScheduleTimers(
             .init(element: TestPoolStateMachine.ConnectionRequest(connectionID: 8)), [], .init(connectionKeepAliveTimer2))
         )
+
+        #expect(stateMachine.connections.stats.active == 5)
+        #expect(stateMachine.connections.stats.idle == 2)
+        #expect(stateMachine.connections.stats.connecting == 3)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -729,5 +757,6 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
         #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
     }
 }
