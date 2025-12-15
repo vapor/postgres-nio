@@ -380,6 +380,15 @@ public final class ConnectionPool<
             self.cancelTimers(timers)
             self.eventContinuation.yield(.makeConnection(request))
 
+        case .makeConnectionsCancelAndScheduleTimers(let requests, let cancelledTimers, let scheduledTimers):
+            self.cancelTimers(cancelledTimers)
+            for request in requests {
+                self.eventContinuation.yield(.makeConnection(request))
+            }
+            for timer in scheduledTimers {
+                self.eventContinuation.yield(.scheduleTimer(timer))
+            }
+
         case .runKeepAlive(let connection, let cancelContinuation):
             cancelContinuation?.resume(returning: ())
             self.eventContinuation.yield(.runKeepAlive(connection))

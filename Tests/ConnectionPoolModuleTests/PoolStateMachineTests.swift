@@ -607,6 +607,58 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testRefillConnectionPoolAfterConnectionFail() {
+
+        struct ConnectionFailed: Error, Equatable {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 5
+        configuration.maximumConnectionSoftLimit = 10
+        configuration.maximumConnectionHardLimit = 10
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+        configuration.maximumConnectionRequestsAtOneTime = 3
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 5)
+
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[1])
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[2])
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[3])
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[4])
+
+        let backOffDone2 = stateMachine.connectionCreationBackoffDone(requests[0].connectionID)
+        #expect(backOffDone2.request == .none)
+        #expect(backOffDone2.connection == .makeConnection(requests[0], []))
+
+        // make connection. Should return request to create 3 new connections
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        let newRequests = (5..<8).map { TestPoolStateMachine.ConnectionRequest(connectionID: $0) }
+        let connectionKeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 1, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.request == .none)
+        #expect(createdAction.connection == .makeConnectionsCancelAndScheduleTimers(.init(newRequests), [], .init(connectionKeepAliveTimer)))
+
+        // make connection. Return 
+        let connection2 = MockConnection(id: 5)
+        let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
+        let connectionKeepAliveTimer2 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 5, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction2.request == .none)
+        #expect(createdAction2.connection == .makeConnectionsCancelAndScheduleTimers(
+            .init(element: TestPoolStateMachine.ConnectionRequest(connectionID: 8)), [], .init(connectionKeepAliveTimer2))
+        )
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testTriggerForceShutdownWithBackingOffRequest() {
         struct ConnectionFailed: Error {}
         var configuration = PoolConfiguration()

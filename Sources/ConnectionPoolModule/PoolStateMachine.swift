@@ -32,6 +32,9 @@ struct PoolConfiguration: Sendable {
 
     @usableFromInline
     var idleTimeoutDuration: Duration = .seconds(30)
+
+    @usableFromInline
+    var maximumConnectionRequestsAtOneTime: Int = 20
 }
 
 @usableFromInline
@@ -90,6 +93,7 @@ struct PoolStateMachine<
 
         case scheduleTimers(Max2Sequence<Timer>)
         case makeConnection(ConnectionRequest, TinyFastSequence<TimerCancellationToken>)
+        case makeConnectionsCancelAndScheduleTimers(TinyFastSequence<ConnectionRequest>, TinyFastSequence<TimerCancellationToken>, Max2Sequence<Timer>)
         case runKeepAlive(Connection, TimerCancellationToken?)
         case cancelTimers(TinyFastSequence<TimerCancellationToken>)
         case closeConnection(Connection, Max2Sequence<TimerCancellationToken>)
@@ -337,7 +341,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context)
+        return self.handleAvailableConnection(index: index, availableContext: context, minimumConnectionCount: self.configuration.minimumConnectionCount)
     }
 
     mutating func cancelRequest(id: RequestID) -> Action {
@@ -368,7 +372,7 @@ struct PoolStateMachine<
         }
 
         let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-        return self.handleAvailableConnection(index: index, availableContext: context)
+        return self.handleAvailableConnection(index: index, availableContext: context, minimumConnectionCount: self.configuration.minimumConnectionCount)
     }
 
     @inlinable
@@ -562,7 +566,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.keepAliveSucceeded(connection.id) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context)
+        return self.handleAvailableConnection(index: index, availableContext: context, minimumConnectionCount: self.configuration.minimumConnectionCount)
     }
 
     @inlinable
@@ -667,15 +671,22 @@ struct PoolStateMachine<
     @inlinable
     /*private*/ mutating func handleAvailableConnection(
         index: Int,
-        availableContext: ConnectionGroup.AvailableConnectionContext
+        availableContext: ConnectionGroup.AvailableConnectionContext,
+        minimumConnectionCount: Int
     ) -> Action {
         // this connection was busy before
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
+            let connectionsRequired = minimumConnectionCount - Int(self.connections.stats.active)
+            let connectionAction = self.createMultipleConnectionsAction(
+                connectionsRequired, 
+                cancelledTimers: .init(leaseResult.timersToCancel), 
+                scheduledTimers: []
+            ) ?? .cancelTimers(.init(leaseResult.timersToCancel))
             return .init(
                 request: .leaseConnection(requests, leaseResult.connection),
-                connection: .cancelTimers(.init(leaseResult.timersToCancel))
+                connection: connectionAction
             )
         }
 
@@ -704,10 +715,13 @@ struct PoolStateMachine<
                 }
                 let timers = self.connections.parkConnection(at: index, hasBecomeIdle: newIdle).map(self.mapTimers)
 
-                return .init(
-                    request: .none,
-                    connection: .scheduleTimers(timers)
-                )
+                let connectionsRequired = minimumConnectionCount - Int(self.connections.stats.active)
+                let connectionAction = self.createMultipleConnectionsAction(
+                    connectionsRequired, 
+                    cancelledTimers: [], 
+                    scheduledTimers: timers
+                ) ?? .scheduleTimers(timers)
+                return .init(request: .none, connection: connectionAction)
             }
 
         case .overflow:
@@ -721,6 +735,28 @@ struct PoolStateMachine<
             }
         }
 
+    }
+
+    @inlinable 
+    /* private */ mutating func createMultipleConnectionsAction(
+        _ connectionCount: Int, 
+        cancelledTimers: TinyFastSequence<TimerCancellationToken>, 
+        scheduledTimers: Max2Sequence<Timer>
+    ) -> ConnectionAction? {
+        if connectionCount > 0, 
+            self.connections.stats.connecting < self.configuration.maximumConnectionRequestsAtOneTime {
+            let connectionCount = min(
+                connectionCount, 
+                self.configuration.maximumConnectionRequestsAtOneTime - Int(self.connections.stats.connecting)
+            )
+            var connectionRequests = TinyFastSequence<ConnectionRequest>()
+            connectionRequests.reserveCapacity(connectionCount)
+            for _ in 0..<connectionCount {
+                connectionRequests.append(self.connections.createNewConnection())
+            }
+            return .makeConnectionsCancelAndScheduleTimers(connectionRequests, cancelledTimers, scheduledTimers)
+        }
+        return nil
     }
 
     @inlinable
@@ -808,6 +844,9 @@ extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationTo
             return lhs == rhs
         case (.makeConnection(let lhsRequest, let lhsToken), .makeConnection(let rhsRequest, let rhsToken)):
             return lhsRequest == rhsRequest && lhsToken == rhsToken
+        case (.makeConnectionsCancelAndScheduleTimers(let lhsRequests, let lhsTokens, let lhsTimers),
+            .makeConnectionsCancelAndScheduleTimers(let rhsRequests, let rhsTokens, let rhsTimers)):
+            return lhsRequests == rhsRequests && lhsTokens == rhsTokens && lhsTimers == rhsTimers
         case (.runKeepAlive(let lhsConn, let lhsToken), .runKeepAlive(let rhsConn, let rhsToken)):
             return lhsConn === rhsConn && lhsToken == rhsToken
         case (.closeConnection(let lhsConn, let lhsTimers), .closeConnection(let rhsConn, let rhsTimers)):
