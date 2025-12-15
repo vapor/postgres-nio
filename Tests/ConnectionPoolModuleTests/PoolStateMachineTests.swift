@@ -525,7 +525,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         struct ConnectionFailed: Error, Equatable {}
         let clock = MockClock()
         var configuration = PoolConfiguration()
-        configuration.minimumConnectionCount = 2
+        configuration.minimumConnectionCount = 0
         configuration.maximumConnectionSoftLimit = 2
         configuration.maximumConnectionHardLimit = 2
         configuration.keepAliveDuration = .seconds(2)
@@ -538,12 +538,22 @@ typealias TestPoolStateMachine = PoolStateMachine<
             clock: clock
         )
 
-        // refill pool
-        let requests = stateMachine.refillConnections()
-        #expect(requests.count == 2)
+        // request two connections
+        let mockRequest1 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction1 = stateMachine.leaseConnection(mockRequest1)
+        guard case .makeConnection(let request1, _) = leaseAction1.connection else {
+            Issue.record()
+            return
+        }
+        let mockRequest2 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction2 = stateMachine.leaseConnection(mockRequest2)
+        guard case .makeConnection(let request2, _) = leaseAction2.connection else {
+            Issue.record()
+            return
+        }
 
         // fail connection 1
-        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
+        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: request1)
         #expect(failedAction.request == .none)
         switch failedAction.connection {
         case .scheduleTimers(let timers):
@@ -553,26 +563,33 @@ typealias TestPoolStateMachine = PoolStateMachine<
             Issue.record()
         }
 
-        let request = MockRequest(connectionType: MockConnection.self)
-        let leaseAction = stateMachine.leaseConnection(request)
+        let mockRequest3 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction = stateMachine.leaseConnection(mockRequest3)
         #expect(leaseAction.request == .none)
         #expect(leaseAction.connection == .none)
 
         clock.advance(to: clock.now.advanced(by: .seconds(30)))
 
         // fail connection 2. Connection request is removed as we already have a failing connection
-        let failedAction2 = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[1])
+        let failedAction2 = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: request2)
         #expect(failedAction2.request == .none)
         #expect(failedAction2.connection == .cancelTimers(.init()))
         #expect(stateMachine.connections.connections.count == 1)
 
-        let backOffDone = stateMachine.connectionCreationBackoffDone(requests[0].connectionID)
+        let backOffDone = stateMachine.connectionCreationBackoffDone(request1.connectionID)
         #expect(backOffDone.request == .none)
-        #expect(backOffDone.connection == .makeConnection(requests[0], []))
+        #expect(backOffDone.connection == .makeConnection(request1, []))
 
         // fail connection 1 again
-        let failedAction3 = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
-        #expect(failedAction3.request == .failRequests([request], ConnectionPoolError.connectionCreationCircuitBreakerTripped))
+        let failedAction3 = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: request1)
+        print(failedAction3)
+        switch failedAction3.request {
+        case .failRequests(let requests, let error):
+            #expect(Set(requests) == Set([mockRequest1, mockRequest2, mockRequest3]))
+            #expect(error == ConnectionPoolError.connectionCreationCircuitBreakerTripped)
+        default:
+            Issue.record()
+        }
         switch failedAction3.connection {
         case .scheduleTimers(let timers):
             #expect(timers.count == 1)
@@ -582,27 +599,28 @@ typealias TestPoolStateMachine = PoolStateMachine<
         }
 
         // lease fails immediately as we are in circuitBreak state
-        let request2 = MockRequest(connectionType: MockConnection.self)
-        let leaseAction2 = stateMachine.leaseConnection(request2)
-        #expect(leaseAction2.request == .failRequest(request2, ConnectionPoolError.connectionCreationCircuitBreakerTripped))
-        #expect(leaseAction2.connection == .none)
+        let request3 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction3 = stateMachine.leaseConnection(request3)
+        #expect(leaseAction3.request == .failRequest(request3, ConnectionPoolError.connectionCreationCircuitBreakerTripped))
+        #expect(leaseAction3.connection == .none)
 
-        let backOffDone2 = stateMachine.connectionCreationBackoffDone(requests[0].connectionID)
+        let backOffDone2 = stateMachine.connectionCreationBackoffDone(request1.connectionID)
         #expect(backOffDone2.request == .none)
-        #expect(backOffDone2.connection == .makeConnection(requests[0], []))
+        #expect(backOffDone2.connection == .makeConnection(request1, []))
 
         // make connection
         let connection = MockConnection(id: 0)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
-        let connection2KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 2, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        let connectionKeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 2, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        let connectionIdleTimer = TestPoolStateMachine.Timer(.init(timerID: 3, connectionID: 0, usecase: .idleTimeout), duration: .seconds(4))
         #expect(createdAction.request == .none)
-        #expect(createdAction.connection == .scheduleTimers([connection2KeepAliveTimer]))
+        #expect(createdAction.connection == .scheduleTimers([connectionKeepAliveTimer, connectionIdleTimer]))
 
         // lease connection (successful)
-        let request3 = MockRequest(connectionType: MockConnection.self)
-        let leaseAction3 = stateMachine.leaseConnection(request3)
-        #expect(leaseAction3.request == .leaseConnection(.init(element: request3), connection))
-        #expect(leaseAction3.connection == .none)
+        let request4 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction4 = stateMachine.leaseConnection(request4)
+        #expect(leaseAction4.request == .leaseConnection(.init(element: request4), connection))
+        #expect(leaseAction4.connection == .none)
 
     }
 
