@@ -1,3 +1,13 @@
+/// Error thrown when `PostgresCopyFromWriter.write` is called while the backend is not expecting `CopyData` messages.
+/// 
+/// This should only happen if the user explicitly escapes the `PostgresCopyFromWriter` from the `copyFrom` closure and
+/// tries to write data to it when tries to write data after the `copyFrom` call has terminated.
+struct NotInCopyFromModeError: Error, CustomStringConvertible {
+    var description: String {
+        "Writing COPY FROM data when backend is not in COPY mode"
+    }
+}
+
 /// Handle to send data for a `COPY ... FROM STDIN` query to the backend.
 public struct PostgresCopyFromWriter: Sendable {
     private let channelHandler: NIOLoopBound<PostgresChannelHandler>

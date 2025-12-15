@@ -430,7 +430,7 @@ struct ExtendedQueryStateMachine {
             return .failPromise(promise, error: error)
         }
         guard case .copyingData(.readyToSend) = self.state else {
-            preconditionFailure("Not ready to send data")
+            return .failPromise(promise, error: NotInCopyFromModeError())
         }
         if channelIsWritable {
             return .succeedPromise(promise)
