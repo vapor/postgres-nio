@@ -237,11 +237,13 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         PostgresConnection,
         PostgresConnection.ID,
         ConnectionIDGenerator,
+        any Error,
         ConnectionRequest<PostgresConnection>,
         ConnectionRequest.ID,
         PostgresKeepAliveBehavor,
         PostgresClientMetrics,
-        ContinuousClock
+        ContinuousClock,
+        ContinuousClock.Instant
     >
 
     let pool: Pool
@@ -536,7 +538,7 @@ extension PostgresConnection: PooledConnection {
 extension ConnectionPoolError {
     func mapToPSQLError(lastConnectError: Error?) -> Error {
         var psqlError: PSQLError
-        switch self {
+        switch self.code {
         case .poolShutdown:
             psqlError = PSQLError.poolClosed
             psqlError.underlying = self

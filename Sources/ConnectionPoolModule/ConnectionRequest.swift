@@ -1,5 +1,6 @@
 
 public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequestProtocol {
+    public typealias ConnectionError = any Error
     public typealias ID = Int
 
     public var id: ID
@@ -16,7 +17,7 @@ public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequest
         self.continuation = continuation
     }
 
-    public func complete(with result: Result<ConnectionLease<Connection>, ConnectionPoolError>) {
+    public func complete(with result: Result<ConnectionLease<Connection>, ConnectionPoolError<any Error>>) {
         self.continuation.resume(with: result)
     }
 }
@@ -25,7 +26,7 @@ public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequest
 let requestIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator()
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-extension ConnectionPool where Request == ConnectionRequest<Connection> {
+extension ConnectionPool where Request == ConnectionRequest<Connection>, Clock == ContinuousClock, ConnectionIDGenerator == _ConnectionPoolModule.ConnectionIDGenerator {
     public convenience init(
         configuration: ConnectionPoolConfiguration,
         idGenerator: ConnectionIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator(),

@@ -16,6 +16,7 @@ public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
 public protocol PooledConnection: AnyObject, Sendable {
     /// The connections identifier type.
     associatedtype ID: Hashable & Sendable
+    associatedtype ConnectionError: Error = any Error
 
     /// The connections identifier. The identifier is passed to
     /// the connection factory method and must stay attached to
@@ -37,7 +38,7 @@ public protocol PooledConnection: AnyObject, Sendable {
     ///     }
     ///   }
     /// ```
-    func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ())
+    func onClose(_ closure: @escaping @Sendable ((ConnectionError)?) -> ())
 
     /// Close the running connection. Once the close has completed
     /// closures that were registered in `onClose` must be
@@ -78,6 +79,8 @@ public protocol ConnectionRequestProtocol: Sendable {
     /// The leased connection type
     associatedtype Connection: PooledConnection
 
+    associatedtype ConnectionFactoryError: Error = any Error
+
     /// A connection lease request ID. This ID must be generated
     /// by users of the `ConnectionPool` outside the
     /// `ConnectionPool`. It is not generated inside the pool like
@@ -88,7 +91,7 @@ public protocol ConnectionRequestProtocol: Sendable {
 
     /// A function that is called with a connection or a
     /// `PoolError`.
-    func complete(with: Result<ConnectionLease<Connection>, ConnectionPoolError>)
+    func complete(with: Result<ConnectionLease<Connection>, ConnectionPoolError<ConnectionFactoryError>>)
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -139,24 +142,28 @@ public final class ConnectionPool<
     Connection: PooledConnection,
     ConnectionID: Hashable & Sendable,
     ConnectionIDGenerator: ConnectionIDGeneratorProtocol,
+    ConnectionFactoryError: Error,
     Request: ConnectionRequestProtocol,
     RequestID: Hashable & Sendable,
     KeepAliveBehavior: ConnectionKeepAliveBehavior,
     ObservabilityDelegate: ConnectionPoolObservabilityDelegate,
-    Clock: _Concurrency.Clock
+    Clock: _Concurrency.Clock,
+    Instant: InstantProtocol
 >: Sendable where
     Connection.ID == ConnectionID,
     ConnectionIDGenerator.ID == ConnectionID,
     Request.Connection == Connection,
     Request.ID == RequestID,
+    Request.ConnectionFactoryError == ConnectionFactoryError,
     KeepAliveBehavior.Connection == Connection,
     ObservabilityDelegate.ConnectionID == ConnectionID,
-    Clock.Duration == Duration
+    Clock.Duration == Duration,
+    Instant == Clock.Instant
 {
-    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
+    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, ConnectionFactoryError, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock, Instant>) async throws(ConnectionFactoryError) -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
-    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
+    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, ConnectionFactoryError, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let factory: ConnectionFactory
@@ -438,7 +445,7 @@ public final class ConnectionPool<
         taskGroup.addTask_ {
             self.observabilityDelegate.startedConnecting(id: request.connectionID)
 
-            do {
+            do throws(ConnectionFactoryError) {
                 let bundle = try await self.factory(request.connectionID, self)
                 self.connectionEstablished(bundle)
 
@@ -471,7 +478,7 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func connectionEstablishFailed(_ error: Error, for request: StateMachine.ConnectionRequest) {
+    /*private*/ func connectionEstablishFailed(_ error: ConnectionFactoryError, for request: StateMachine.ConnectionRequest) {
         self.observabilityDelegate.connectFailed(id: request.connectionID, error: error)
 
         self.modifyStateAndRunActions { state in

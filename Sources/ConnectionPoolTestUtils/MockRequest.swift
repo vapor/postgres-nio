@@ -1,6 +1,8 @@
 import _ConnectionPoolModule
 
 public final class MockRequest<Connection: PooledConnection>: ConnectionRequestProtocol, Hashable, Sendable {
+    public typealias ConnectionFactoryError = MockError
+
     public struct ID: Hashable, Sendable {
         var objectID: ObjectIdentifier
 
@@ -21,7 +23,7 @@ public final class MockRequest<Connection: PooledConnection>: ConnectionRequestP
         hasher.combine(self.id)
     }
 
-    public func complete(with: Result<ConnectionLease<Connection>, ConnectionPoolError>) {
+    public func complete(with: Result<ConnectionLease<Connection>, ConnectionPoolError<MockError>>) {
 
     }
 }
