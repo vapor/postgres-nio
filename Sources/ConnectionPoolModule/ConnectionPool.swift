@@ -129,7 +129,7 @@ public struct ConnectionPoolConfiguration: Sendable {
         self.minimumConnectionCount = 0
         self.maximumConnectionSoftLimit = 16
         self.maximumConnectionHardLimit = 16
-        self.circuitBreakerTripAfter = .seconds(15)
+        self.circuitBreakerTripAfter = .seconds(60)
         self.idleTimeout = .seconds(60)
     }
 }
