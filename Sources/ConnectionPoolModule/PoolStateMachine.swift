@@ -677,7 +677,12 @@ struct PoolStateMachine<
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
-            let connectionsRequired = self.configuration.minimumConnectionCount - Int(self.connections.stats.active)
+            let connectionsRequired: Int
+            if requests.count <= self.connections.stats.availableStreams + self.connections.stats.leasedStreams {
+                connectionsRequired = self.configuration.minimumConnectionCount - Int(self.connections.stats.active)
+            } else {
+                connectionsRequired = 1
+            }
             let connectionAction = self.createMultipleConnectionsAction(
                 connectionsRequired, 
                 cancelledTimers: .init(leaseResult.timersToCancel), 
