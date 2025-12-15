@@ -341,7 +341,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context, minimumConnectionCount: self.configuration.minimumConnectionCount)
+        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     mutating func cancelRequest(id: RequestID) -> Action {
@@ -372,7 +372,7 @@ struct PoolStateMachine<
         }
 
         let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
-        return self.handleAvailableConnection(index: index, availableContext: context, minimumConnectionCount: self.configuration.minimumConnectionCount)
+        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     @inlinable
@@ -566,7 +566,7 @@ struct PoolStateMachine<
         guard let (index, context) = self.connections.keepAliveSucceeded(connection.id) else {
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context, minimumConnectionCount: self.configuration.minimumConnectionCount)
+        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     @inlinable
@@ -671,14 +671,14 @@ struct PoolStateMachine<
     @inlinable
     /*private*/ mutating func handleAvailableConnection(
         index: Int,
-        availableContext: ConnectionGroup.AvailableConnectionContext,
-        minimumConnectionCount: Int
+        availableContext: ConnectionGroup.AvailableConnectionContext
     ) -> Action {
         // this connection was busy before
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
-            let connectionsRequired = minimumConnectionCount - Int(self.connections.stats.active)
+            //var connectionsRequired = (requests.count + self.configuration.
+            let connectionsRequired = self.configuration.minimumConnectionCount - Int(self.connections.stats.active)
             let connectionAction = self.createMultipleConnectionsAction(
                 connectionsRequired, 
                 cancelledTimers: .init(leaseResult.timersToCancel), 
@@ -715,7 +715,7 @@ struct PoolStateMachine<
                 }
                 let timers = self.connections.parkConnection(at: index, hasBecomeIdle: newIdle).map(self.mapTimers)
 
-                let connectionsRequired = minimumConnectionCount - Int(self.connections.stats.active)
+                let connectionsRequired = self.configuration.minimumConnectionCount - Int(self.connections.stats.active)
                 let connectionAction = self.createMultipleConnectionsAction(
                     connectionsRequired, 
                     cancelledTimers: [], 
