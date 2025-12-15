@@ -28,7 +28,7 @@ struct PoolConfiguration: Sendable {
     var keepAliveDuration: Duration?
 
     @usableFromInline
-    var connectionTimeout: Duration = .seconds(15)
+    var circuitBreakerTripAfter: Duration = .seconds(15)
 
     @usableFromInline
     var idleTimeoutDuration: Duration = .seconds(30)
@@ -141,22 +141,18 @@ struct PoolStateMachine<
         @usableFromInline
         struct CircuitBreakerOpenContext: Sendable {
             @usableFromInline
-            init(
-                firstError: any Error, 
-                lastError: any Error, 
-                numberOfFailedAttempts: Int, 
-                connectionIDToRetry: ConnectionID
-            ) {
-                self.firstError = firstError
-                self.lastError = lastError
-                self.numberOfFailedAttempts = numberOfFailedAttempts
-                self.connectionIDToRetry = connectionIDToRetry
+            init(_ creationFailingContext: ConnectionCreationFailingContext) {
+
+                self.firstError = creationFailingContext.firstError
+                self.lastError = creationFailingContext.lastError
+                self.numberOfFailedAttempts = creationFailingContext.numberOfFailedAttempts
+                self.connectionIDToRetry = creationFailingContext.connectionIDToRetry
             }
 
             @usableFromInline
-            var firstError: Error
+            var firstError: any Error
             @usableFromInline
-            var lastError: Error
+            var lastError: any Error
             @usableFromInline
             var numberOfFailedAttempts: Int
             @usableFromInline
@@ -275,7 +271,7 @@ struct PoolStateMachine<
 
         case .circuitBreakOpen:
             return .init(
-                request: .failRequest(request, ConnectionPoolError.connectionTimeout),
+                request: .failRequest(request, ConnectionPoolError.connectionCreationCircuitBreakerTripped),
                 connection: .none
             )
 
@@ -446,17 +442,10 @@ struct PoolStateMachine<
             creationFailingContext.numberOfFailedAttempts += 1
             var requestAction: RequestAction = .none
             // if failing for longer than connection timeout and there are no open connections move to circuit break state
-            if creationFailingContext.timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.connectionTimeout, 
+            if creationFailingContext.timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.circuitBreakerTripAfter, 
                 self.connections.stats.idle + self.connections.stats.leased == 0 {
-                self.poolState = .circuitBreakOpen(
-                    .init(
-                        firstError: creationFailingContext.firstError, 
-                        lastError: creationFailingContext.lastError, 
-                        numberOfFailedAttempts: creationFailingContext.numberOfFailedAttempts,
-                        connectionIDToRetry: creationFailingContext.connectionIDToRetry
-                    )
-                )
-                requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionTimeout)
+                self.poolState = .circuitBreakOpen(.init(creationFailingContext))
+                requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionCreationCircuitBreakerTripped)
             } else {
                 self.poolState = .connectionCreationFailing(creationFailingContext)
             }

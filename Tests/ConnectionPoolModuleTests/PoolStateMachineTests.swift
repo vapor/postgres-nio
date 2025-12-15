@@ -571,7 +571,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         // fail connection 1 again
         let failedAction3 = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
-        #expect(failedAction3.request == .failRequests([request], ConnectionPoolError.connectionTimeout))
+        #expect(failedAction3.request == .failRequests([request], ConnectionPoolError.connectionCreationCircuitBreakerTripped))
         switch failedAction3.connection {
         case .scheduleTimers(let timers):
             #expect(timers.count == 1)
@@ -583,7 +583,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         // lease fails immediately as we are in circuitBreak state
         let request2 = MockRequest(connectionType: MockConnection.self)
         let leaseAction2 = stateMachine.leaseConnection(request2)
-        #expect(leaseAction2.request == .failRequest(request2, ConnectionPoolError.connectionTimeout))
+        #expect(leaseAction2.request == .failRequest(request2, ConnectionPoolError.connectionCreationCircuitBreakerTripped))
         #expect(leaseAction2.connection == .none)
 
         let backOffDone2 = stateMachine.connectionCreationBackoffDone(requests[0].connectionID)

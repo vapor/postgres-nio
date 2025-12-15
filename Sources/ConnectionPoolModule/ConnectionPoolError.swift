@@ -4,7 +4,7 @@ public struct ConnectionPoolError: Error, Hashable {
     enum Base: Error, Hashable, Sendable {
         case requestCancelled
         case poolShutdown
-        case connectionTimeout
+        case connectionCreationCircuitBreakerTripped
     }
 
     @usableFromInline
@@ -25,7 +25,7 @@ public struct ConnectionPoolError: Error, Hashable {
     }
     /// The connection pool has failed to make a connection after a defined time
     @inlinable
-    public static var connectionTimeout: Self {
-        ConnectionPoolError(.connectionTimeout)
+    public static var connectionCreationCircuitBreakerTripped: Self {
+        ConnectionPoolError(.connectionCreationCircuitBreakerTripped)
     }
 }

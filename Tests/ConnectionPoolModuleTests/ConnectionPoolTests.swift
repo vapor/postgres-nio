@@ -1056,7 +1056,7 @@ import Testing
         mutableConfig.maximumConnectionSoftLimit = 1
         mutableConfig.maximumConnectionHardLimit = 1
         mutableConfig.idleTimeout = .seconds(10)
-        mutableConfig.connectionTimeout = .seconds(5)
+        mutableConfig.circuitBreakerTripAfter = .seconds(5)
         let config = mutableConfig
 
         let pool = ConnectionPool(
@@ -1084,7 +1084,7 @@ import Testing
                     throw ConnectionFailedError()
                 }
 
-                // fail second attempt. This will trigger connectionTimeout error
+                // fail second attempt. This will trip the circuit breaker
                 _ = await clock.nextTimerScheduled()
                 clock.advance(to: clock.now.advanced(by: .seconds(30)))
                 _ = try? await factory.nextConnectAttempt { connectionID in
@@ -1105,11 +1105,11 @@ import Testing
             }
 
             // lease fails because of connection failure
-            await #expect(throws: ConnectionPoolError.connectionTimeout) {
+            await #expect(throws: ConnectionPoolError.connectionCreationCircuitBreakerTripped) {
                 try await pool.leaseConnection()
             }
             // lease fails because we are in the connectionFailed state
-            await #expect(throws: ConnectionPoolError.connectionTimeout) {
+            await #expect(throws: ConnectionPoolError.connectionCreationCircuitBreakerTripped) {
                 try await pool.leaseConnection()
             }
             failSecondLeaseWaiter.yield(value: ())

@@ -117,8 +117,8 @@ public struct ConnectionPoolConfiguration: Sendable {
     public var maximumConnectionHardLimit: Int
 
     /// The amount of time to pass between the first failed connection
-    /// before reporting a connection failure.
-    public var connectionTimeout: Duration
+    /// before triggering the circuit breaker.
+    public var circuitBreakerTripAfter: Duration
 
     /// The time that a _preserved_ idle connection stays in the
     /// pool before it is closed.
@@ -129,7 +129,7 @@ public struct ConnectionPoolConfiguration: Sendable {
         self.minimumConnectionCount = 0
         self.maximumConnectionSoftLimit = 16
         self.maximumConnectionHardLimit = 16
-        self.connectionTimeout = .seconds(15)
+        self.circuitBreakerTripAfter = .seconds(15)
         self.idleTimeout = .seconds(60)
     }
 }
@@ -580,7 +580,7 @@ extension PoolConfiguration {
         self.maximumConnectionHardLimit = configuration.maximumConnectionHardLimit
         self.keepAliveDuration = keepAliveBehavior.keepAliveFrequency
         self.idleTimeoutDuration = configuration.idleTimeout
-        self.connectionTimeout = configuration.connectionTimeout
+        self.circuitBreakerTripAfter = configuration.circuitBreakerTripAfter
     }
 }
 
