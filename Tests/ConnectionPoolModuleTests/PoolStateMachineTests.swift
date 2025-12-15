@@ -10,7 +10,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
     MockRequest<MockConnection>,
     MockRequest<MockConnection>.ID,
     MockTimerCancellationToken,
-    MockClock
+    MockClock,
+    MockClock.Instant
 >
 
 @Suite struct PoolStateMachineTests {
@@ -436,7 +437,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
+        #expect(stateMachine.isShutdown)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -481,7 +482,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
+        #expect(stateMachine.isShutdown)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -516,7 +517,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
+        #expect(stateMachine.isShutdown)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -657,6 +658,6 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let closedAction = stateMachine.connectionClosed(connection2)
         #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
 
-        if case .shutDown = stateMachine.poolState {} else { Issue.record() }
+        #expect(stateMachine.isShutdown)
     }
 }

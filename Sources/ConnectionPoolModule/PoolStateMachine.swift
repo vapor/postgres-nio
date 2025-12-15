@@ -43,8 +43,9 @@ struct PoolStateMachine<
     Request: ConnectionRequestProtocol,
     RequestID,
     TimerCancellationToken: Sendable,
-    Clock: _Concurrency.Clock
->: Sendable where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID, Clock.Duration == Duration {
+    Clock: _Concurrency.Clock,
+    Instant: InstantProtocol
+>: Sendable where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID, Clock.Duration == Duration, Clock.Instant == Instant {
 
     @usableFromInline
     struct ConnectionRequest: Hashable, Sendable {
@@ -129,9 +130,9 @@ struct PoolStateMachine<
             @usableFromInline
             var timeOfFirstFailedAttempt: Clock.Instant
             @usableFromInline
-            var firstError: Error
+            var firstError: any Error
             @usableFromInline
-            var lastError: Error
+            var lastError: any Error
             @usableFromInline
             var numberOfFailedAttempts: Int
             @usableFromInline
@@ -260,11 +261,12 @@ struct PoolStateMachine<
     mutating func leaseConnection(_ request: Request) -> Action {
         switch self.poolState {
         case .running:
+            // if requestQueue is non-empty and we cannot create more connections add
+            // to queue and do nothing otherwise fallthrough to the rest of the function
             if !self.requestQueue.isEmpty && self.cacheNoMoreConnectionsAllowed {
                 self.requestQueue.queue(request)
                 return .none()
             }
-
         case .connectionCreationFailing:
             self.requestQueue.queue(request)
             return .none()
@@ -495,29 +497,20 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionCreationBackoffDone(_ connectionID: ConnectionID) -> Action {
         switch self.poolState {
-        case .connectionCreationFailing, .circuitBreakOpen:
-            switch self.connections.backoffDone(connectionID, retry: true) {
-            case .createConnection(let request, let continuation):
-                let timers: TinyFastSequence<TimerCancellationToken>
-                if let continuation {
-                    timers = .init(element: continuation)
-                } else {
-                    timers = .init()
-                }
-                return .init(request: .none, connection: .makeConnection(request, timers))
+        case .connectionCreationFailing(let context):
+            // if connection id is not the same as retrying connection id destroy connection
+            // otherwise fallthrough to backoffDone code
+            guard connectionID == context.connectionIDToRetry else {
+                let timers = self.connections.destroyFailedConnection(connectionID)
+                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+            }
 
-            case .cancelTimers(let timers):
-                let connectionAction: ConnectionAction
-                if self.connections.isEmpty {
-                    self.poolState = .shutDown
-                    connectionAction = .cancelEventStreamAndFinalCleanup(.init(timers))
-                } else {
-                    connectionAction = .cancelTimers(.init(timers))
-                }
-                return .init(
-                    request: .none,
-                    connection: connectionAction
-                )
+        case .circuitBreakOpen(let context):
+            // if connection id is not the same as retrying connection id destroy connection
+            // otherwise fallthrough to backoffDone code
+            guard connectionID == context.connectionIDToRetry else {
+                let timers = self.connections.destroyFailedConnection(connectionID)
+                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
             }
 
         case .running:
@@ -525,6 +518,30 @@ struct PoolStateMachine<
 
         case .shuttingDown, .shutDown:
             return .none()
+        }
+
+        switch self.connections.backoffDone(connectionID, retry: true) {
+        case .createConnection(let request, let continuation):
+            let timers: TinyFastSequence<TimerCancellationToken>
+            if let continuation {
+                timers = .init(element: continuation)
+            } else {
+                timers = .init()
+            }
+            return .init(request: .none, connection: .makeConnection(request, timers))
+
+        case .cancelTimers(let timers):
+            let connectionAction: ConnectionAction
+            if self.connections.isEmpty {
+                self.poolState = .shutDown
+                connectionAction = .cancelEventStreamAndFinalCleanup(.init(timers))
+            } else {
+                connectionAction = .cancelTimers(.init(timers))
+            }
+            return .init(
+                request: .none,
+                connection: connectionAction
+            )
         }
     }
 
@@ -722,6 +739,12 @@ struct PoolStateMachine<
             return Timer(connectionTimer, duration: self.configuration.idleTimeoutDuration)
 
         }
+    }
+
+    // Is connection pool shutdown.
+    public var isShutdown: Bool { 
+        guard case .shutDown = self.poolState else { return false }
+        return true
     }
 }
 
