@@ -743,8 +743,8 @@ struct PoolStateMachine<
 
     // Is connection pool shutdown.
     public var isShutdown: Bool { 
-        guard case .shutDown = self.poolState else { return false }
-        return true
+        if case .shutDown = self.poolState { return true }
+        return false
     }
 }
 
