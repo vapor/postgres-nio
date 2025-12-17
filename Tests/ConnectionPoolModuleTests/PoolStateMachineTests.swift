@@ -648,9 +648,51 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(stateMachine.connections.stats.active == 1)
     }
 
+    /// Test that we limit concurrent connection requests and that when connections are established
+    /// we request new connections
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConcurrentConnectionRequestsLimit() {
+        struct ConnectionFailed: Error, Equatable {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 10
+        configuration.maximumConnectionHardLimit = 10
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+        configuration.maximumConcurrentConnectionRequests = 3
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+        let requests = (0..<5).map { _ in MockRequest(connectionType: MockConnection.self) }
+        let leaseRequests = requests.map { stateMachine.leaseConnection($0) }
+        #expect(leaseRequests[0].connection == .makeConnection(.init(connectionID: 0), []))
+        #expect(leaseRequests[1].connection == .makeConnection(.init(connectionID: 1), []))
+        #expect(leaseRequests[2].connection == .makeConnection(.init(connectionID: 2), []))
+        #expect(leaseRequests[3].connection == .none)
+        #expect(leaseRequests[4].connection == .none)
+        for i in 0..<5 {
+            #expect(leaseRequests[i].request == .none)
+        }
+
+        let connections = (0..<5).map { MockConnection(id: $0) }
+        let connectedActions = (0..<5).map { stateMachine.connectionEstablished(connections[$0], maxStreams: 1) }
+        #expect(connectedActions[0].connection == .makeConnectionsCancelAndScheduleTimers(.init(element: .init(connectionID: 3)), [], []))
+        #expect(connectedActions[1].connection == .makeConnectionsCancelAndScheduleTimers(.init(element: .init(connectionID: 4)), [], []))
+        #expect(connectedActions[2].connection == .cancelTimers([]))
+        #expect(connectedActions[3].connection == .cancelTimers([]))
+        #expect(connectedActions[4].connection == .cancelTimers([]))
+        for i in 0..<5 {
+            #expect(connectedActions[i].request == .leaseConnection([requests[i]], connections[i]))
+        }
+    }
+
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testRefillConnectionPoolAfterConnectionFail() {
-
         struct ConnectionFailed: Error, Equatable {}
         let clock = MockClock()
         var configuration = PoolConfiguration()
@@ -659,7 +701,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         configuration.maximumConnectionHardLimit = 10
         configuration.keepAliveDuration = .seconds(2)
         configuration.idleTimeoutDuration = .seconds(4)
-        configuration.maximumConnectionRequestsAtOneTime = 3
+        configuration.maximumConcurrentConnectionRequests = 3
 
         var stateMachine = TestPoolStateMachine(
             configuration: configuration,
