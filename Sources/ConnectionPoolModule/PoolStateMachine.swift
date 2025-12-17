@@ -34,7 +34,7 @@ struct PoolConfiguration: Sendable {
     var idleTimeoutDuration: Duration = .seconds(30)
 
     @usableFromInline
-    var maximumConnectionRequestsAtOneTime: Int = 20
+    var maximumConcurrentConnectionRequests: Int = 20
 }
 
 @usableFromInline
@@ -312,6 +312,12 @@ struct PoolStateMachine<
         if soonAvailable >= self.requestQueue.count {
             // if more connections will be soon available then we have waiters, we don't need to
             // create further new connections.
+            return .init(
+                request: requestAction,
+                connection: .none
+            )
+        } else if self.connections.stats.connecting >= self.configuration.maximumConcurrentConnectionRequests {
+            // We have too many connection requests, lets delay creating any new connections 
             return .init(
                 request: requestAction,
                 connection: .none
@@ -678,7 +684,7 @@ struct PoolStateMachine<
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
             let connectionsRequired: Int
-            if requests.count <= self.connections.stats.availableStreams + self.connections.stats.leasedStreams {
+            if self.requestQueue.count <= self.connections.stats.availableStreams + self.connections.stats.leasedStreams {
                 connectionsRequired = self.configuration.minimumConnectionCount - Int(self.connections.stats.active)
             } else {
                 connectionsRequired = 1
@@ -748,13 +754,13 @@ struct PoolStateMachine<
         scheduledTimers: Max2Sequence<Timer>
     ) -> ConnectionAction? {
         // only create connections if request connections is greater than zero and the number of already connecting
-        // connections is less than maximumConnectionRequestsAtOneTime
-        guard connectionCount > 0, self.connections.stats.connecting < self.configuration.maximumConnectionRequestsAtOneTime else {
+        // connections is less than maximumConcurrentConnectionRequests
+        guard connectionCount > 0, self.connections.stats.connecting < self.configuration.maximumConcurrentConnectionRequests else {
             return nil 
         }
         let connectionCount = min(
             connectionCount, 
-            self.configuration.maximumConnectionRequestsAtOneTime - Int(self.connections.stats.connecting)
+            self.configuration.maximumConcurrentConnectionRequests - Int(self.connections.stats.connecting)
         )
         var connectionRequests = TinyFastSequence<ConnectionRequest>()
         connectionRequests.reserveCapacity(connectionCount)
@@ -837,9 +843,6 @@ extension PoolStateMachine {
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PoolStateMachine.Action: Equatable where TimerCancellationToken: Equatable, Request: Equatable {}
-
-@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-//extension PoolStateMachine.PoolState: Equatable {}
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationToken: Equatable {

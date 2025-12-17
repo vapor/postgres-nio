@@ -124,6 +124,9 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// pool before it is closed.
     public var idleTimeout: Duration
 
+    /// Maximum number of in-progress new connection requests to run at any one time
+    public var maximumConcurrentConnectionRequests: Int
+
     /// initializer
     public init() {
         self.minimumConnectionCount = 0
@@ -131,6 +134,7 @@ public struct ConnectionPoolConfiguration: Sendable {
         self.maximumConnectionHardLimit = 16
         self.circuitBreakerTripAfter = .seconds(60)
         self.idleTimeout = .seconds(60)
+        self.maximumConcurrentConnectionRequests = 20
     }
 }
 
@@ -590,6 +594,7 @@ extension PoolConfiguration {
         self.keepAliveDuration = keepAliveBehavior.keepAliveFrequency
         self.idleTimeoutDuration = configuration.idleTimeout
         self.circuitBreakerTripAfter = configuration.circuitBreakerTripAfter
+        self.maximumConcurrentConnectionRequests = configuration.maximumConcurrentConnectionRequests
     }
 }
 
