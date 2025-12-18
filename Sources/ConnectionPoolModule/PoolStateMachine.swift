@@ -753,18 +753,19 @@ struct PoolStateMachine<
         cancelledTimers: TinyFastSequence<TimerCancellationToken>, 
         scheduledTimers: Max2Sequence<Timer>
     ) -> ConnectionAction? {
-        // only create connections if request connections is greater than zero and the number of already connecting
-        // connections is less than maximumConcurrentConnectionRequests
-        guard connectionCount > 0, self.connections.stats.connecting < self.configuration.maximumConcurrentConnectionRequests else {
-            return nil 
-        }
-        let connectionCount = min(
-            connectionCount, 
-            self.configuration.maximumConcurrentConnectionRequests - Int(self.connections.stats.connecting)
+        let connectionCountLimitedByNumberOfRequests = min(
+                connectionCount, 
+                self.configuration.maximumConcurrentConnectionRequests - Int(self.connections.stats.connecting)
+            )
+        let connectionCountLimitedByHardLimit = min(
+            connectionCountLimitedByNumberOfRequests,
+            self.configuration.maximumConnectionHardLimit - Int(self.connections.stats.active)
         )
+        guard connectionCountLimitedByHardLimit > 0 else { return nil }
+        
         var connectionRequests = TinyFastSequence<ConnectionRequest>()
-        connectionRequests.reserveCapacity(connectionCount)
-        for _ in 0..<connectionCount {
+        connectionRequests.reserveCapacity(connectionCountLimitedByHardLimit)
+        for _ in 0..<connectionCountLimitedByHardLimit {
             connectionRequests.append(self.connections.createNewConnection())
         }
         return .makeConnectionsCancelAndScheduleTimers(connectionRequests, cancelledTimers, scheduledTimers)
