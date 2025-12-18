@@ -422,7 +422,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
             let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
             let task = HandlerTask.executePreparedStatement(.init(
-                name: String(reflecting: Statement.self),
+                name: Statement.name,
                 sql: Statement.sql,
                 bindings: bindings,
                 bindingDataTypes: Statement.bindingDataTypes,
