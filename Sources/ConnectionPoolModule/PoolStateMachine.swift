@@ -524,7 +524,7 @@ struct PoolStateMachine<
             }
 
         case .running:
-            preconditionFailure("Invalid state")
+            break
 
         case .shuttingDown, .shutDown:
             return .none()

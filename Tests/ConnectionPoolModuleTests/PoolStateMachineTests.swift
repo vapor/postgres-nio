@@ -648,6 +648,61 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(stateMachine.connections.stats.active == 1)
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTwoConnectionsFailAndSucceed() throws {
+        struct ConnectionFailed: Error, Equatable {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 10
+        configuration.maximumConnectionHardLimit = 10
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+        configuration.maximumConcurrentConnectionRequests = 3
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+
+        // request two connections
+        let mockRequest1 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction1 = stateMachine.leaseConnection(mockRequest1)
+        guard case .makeConnection(let request1, _) = leaseAction1.connection else {
+            Issue.record()
+            return
+        }
+        let mockRequest2 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction2 = stateMachine.leaseConnection(mockRequest2)
+        guard case .makeConnection = leaseAction2.connection else {
+            Issue.record()
+            return
+        }
+
+        // fail connection 1
+        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: request1)
+        #expect(failedAction.request == .none)
+        guard case .scheduleTimers(let timers) = failedAction.connection else { 
+            Issue.record()
+            return
+        }
+        #expect(timers.count == 1)
+        let timer = try #require(timers.first)
+        #expect(timer.underlying.usecase == .backoff)
+
+        // make connection
+        let connection = MockConnection(id: 1)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .leaseConnection([mockRequest1], connection))
+        #expect(createdAction.connection == .cancelTimers([]))
+
+        // backoff timer from failed connection triggers
+        let timerAction = stateMachine.timerTriggered(timer)
+        #expect(timerAction.connection == .makeConnection(request1, []))
+    }
+
     /// Test that we limit concurrent connection requests and that when connections are established
     /// we request new connections
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
