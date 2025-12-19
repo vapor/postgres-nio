@@ -588,6 +588,7 @@ extension PoolStateMachine {
                 preconditionFailure("Failing a connection we don't have a record of.")
             }
 
+            self.stats.connecting -= 1
             self.connections[index].destroyFailedConnection()
             return self.swapForDeletion(index: index)
         }
