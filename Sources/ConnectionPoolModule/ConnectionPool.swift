@@ -116,6 +116,10 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// become idle.
     public var maximumConnectionHardLimit: Int
 
+    /// The amount of time to pass between the first failed connection
+    /// before triggering the circuit breaker.
+    public var circuitBreakerTripAfter: Duration
+
     /// The time that a _preserved_ idle connection stays in the
     /// pool before it is closed.
     public var idleTimeout: Duration
@@ -125,6 +129,7 @@ public struct ConnectionPoolConfiguration: Sendable {
         self.minimumConnectionCount = 0
         self.maximumConnectionSoftLimit = 16
         self.maximumConnectionHardLimit = 16
+        self.circuitBreakerTripAfter = .seconds(60)
         self.idleTimeout = .seconds(60)
     }
 }
@@ -151,7 +156,7 @@ public final class ConnectionPool<
     public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
-    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>>
+    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let factory: ConnectionFactory
@@ -203,7 +208,8 @@ public final class ConnectionPool<
         var stateMachine = StateMachine(
             configuration: .init(configuration, keepAliveBehavior: keepAliveBehavior),
             generator: idGenerator,
-            timerCancellationTokenType: CheckedContinuation<Void, Never>.self
+            timerCancellationTokenType: CheckedContinuation<Void, Never>.self,
+            clock: clock
         )
 
         let (stream, continuation) = AsyncStream.makeStream(of: NewPoolActions.self)
@@ -390,11 +396,15 @@ public final class ConnectionPool<
             self.closeConnection(connection)
             self.cancelTimers(timers)
 
-        case .shutdown(let cleanup):
+        case .initiateShutdown(let cleanup):
             for connection in cleanup.connections {
                 self.closeConnection(connection)
             }
             self.cancelTimers(cleanup.timersToCancel)
+
+        case .cancelEventStreamAndFinalCleanup(let timersToCancel):
+            self.cancelTimers(timersToCancel)
+            self.eventContinuation.finish()
 
         case .none:
             break
@@ -570,6 +580,7 @@ extension PoolConfiguration {
         self.maximumConnectionHardLimit = configuration.maximumConnectionHardLimit
         self.keepAliveDuration = keepAliveBehavior.keepAliveFrequency
         self.idleTimeoutDuration = configuration.idleTimeout
+        self.circuitBreakerTripAfter = configuration.circuitBreakerTripAfter
     }
 }
 
@@ -578,20 +589,20 @@ protocol TaskGroupProtocol {
     // We need to call this `addTask_` because some Swift versions define this
     // under exactly this name and others have different attributes. So let's pick
     // a name that doesn't clash anywhere and implement it using the standard `addTask`.
-    mutating func addTask_(operation: @escaping @Sendable () async -> Void)
+    mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void)
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 extension DiscardingTaskGroup: TaskGroupProtocol {
     @inlinable
-    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
+    mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
 }
 
 extension TaskGroup<Void>: TaskGroupProtocol {
     @inlinable
-    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
+    mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
 }
