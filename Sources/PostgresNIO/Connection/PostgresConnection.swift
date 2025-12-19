@@ -455,7 +455,14 @@ extension PostgresConnection {
 
                 let task = HandlerTask.startListening(listener)
 
-                self.channel.write(task, promise: nil)
+                let promise = self.channel.eventLoop.makePromise(of: Void.self)
+                promise.futureResult.whenFailure { error in
+                    self.logger.debug("Channel error in listen()",
+                        metadata: [.error: "\(error)"])
+                    listener.failed(PSQLError(code: .listenFailed))
+                }
+
+                self.channel.write(task, promise: promise)
             }
         } onCancel: {
             let task = HandlerTask.cancelListening(channel, id)
