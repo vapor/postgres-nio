@@ -679,16 +679,22 @@ typealias TestPoolStateMachine = PoolStateMachine<
             #expect(leaseRequests[i].request == .none)
         }
 
-        let connections = (0..<5).map { MockConnection(id: $0) }
-        let connectedActions = (0..<5).map { stateMachine.connectionEstablished(connections[$0], maxStreams: 1) }
+        // only 4 connections are created as once 4 are created we have enough streams and connections available to serve
+        // all requests
+        let connections = (0..<4).map { MockConnection(id: $0) }
+        let connectedActions = (0..<4).map { stateMachine.connectionEstablished(connections[$0], maxStreams: 1) }
         #expect(connectedActions[0].connection == .makeConnectionsCancelAndScheduleTimers(.init(element: .init(connectionID: 3)), [], []))
-        #expect(connectedActions[1].connection == .makeConnectionsCancelAndScheduleTimers(.init(element: .init(connectionID: 4)), [], []))
+        #expect(connectedActions[1].connection == .cancelTimers([]))
         #expect(connectedActions[2].connection == .cancelTimers([]))
         #expect(connectedActions[3].connection == .cancelTimers([]))
-        #expect(connectedActions[4].connection == .cancelTimers([]))
-        for i in 0..<5 {
+        for i in 0..<4 {
             #expect(connectedActions[i].request == .leaseConnection([requests[i]], connections[i]))
         }
+        let releaseActions = (0..<4).map { stateMachine.releaseConnection(connections[$0], streams: 1)}
+        #expect(releaseActions[0].request == .leaseConnection([requests[4]], connections[0]))
+        #expect(releaseActions[1].request == .none)
+        #expect(releaseActions[2].request == .none)
+        #expect(releaseActions[3].request == .none)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
