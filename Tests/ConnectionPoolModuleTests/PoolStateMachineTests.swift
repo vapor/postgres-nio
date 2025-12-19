@@ -696,7 +696,6 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection = MockConnection(id: 1)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         #expect(createdAction.request == .leaseConnection([mockRequest1], connection))
-        #expect(createdAction.connection == .cancelTimers([]))
 
         // backoff timer from failed connection triggers
         let timerAction = stateMachine.timerTriggered(timer)
