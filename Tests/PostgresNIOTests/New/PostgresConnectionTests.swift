@@ -873,9 +873,22 @@ import Synchronization
         } preCopyInResponse: { channel in
             channel.isWritable = false
         } mockBackend: { channel, _ in
+            // The `writeData` closure is executed on a background task. Ensure it started executing before we proceed
+            // with the backend mock. This typically doesn't enter the retry loop at all.
+            var isWritingReloadCounter = 0
+            while !isWriting.load(ordering: .sequentiallyConsistent), isWritingReloadCounter < 100 {
+                try await Task.sleep(for: .milliseconds(10))
+                isWritingReloadCounter += 1
+            }
             let isWriting = isWriting.load(ordering: .sequentiallyConsistent)
             #expect(isWriting)
 
+            // Wait for another 10ms to ensure the `writer.write` call did indeed start and tried to write data, just 
+            // being blocked on the backpressure.
+            try await Task.sleep(for: .milliseconds(10))
+
+            // Now that we know `writeData` is blocked, relieve the write backpressure and check that the copy operation 
+            // finishes.
             channel.isWritable = true
             channel.pipeline.fireChannelWritabilityChanged()
 
