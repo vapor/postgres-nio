@@ -684,7 +684,9 @@ struct PoolStateMachine<
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
             let connectionsRequired: Int
-            if self.requestQueue.count <= self.connections.stats.availableStreams + self.connections.stats.leasedStreams {
+            // if request count is less than available streams and leased streams plus incoming connections then only 
+            // ensure we have minimum connections otherwise grow the number of connections
+            if (self.requestQueue.count + 1) <= self.connections.stats.availableStreams + self.connections.stats.leasedStreams + self.connections.stats.connecting {
                 connectionsRequired = self.configuration.minimumConnectionCount - Int(self.connections.stats.active)
             } else {
                 connectionsRequired = 1
