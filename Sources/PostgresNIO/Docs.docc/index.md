@@ -81,17 +81,14 @@ await withTaskGroup(of: Void.self) { taskGroup in
 Use string interpolation to safely execute queries with parameters:
 
 ```swift
-// Simple SELECT query
+// Simple SELECT query - explicitly request only the columns you need
 let minAge = 21
 let rows = try await client.query(
-    "SELECT * FROM users WHERE age > \(minAge)",
+    "SELECT id, name FROM users WHERE age > \(minAge)",
     logger: logger
 )
 
-for try await row in rows {
-    let randomAccessRow = row.makeRandomAccess()
-    let id: Int = try randomAccessRow.decode(column: "id", as: Int.self, context: .default)
-    let name: String = try randomAccessRow.decode(column: "name", as: String.self, context: .default)
+for try await (id, name) in rows.decode((Int, String).self, context: .default) {
     print("User: \(name) (ID: \(id))")
 }
 
@@ -159,7 +156,7 @@ try await client.withTransaction { connection in
 
 ### 5. Using withConnection for Multiple Queries
 
-Execute multiple queries on the same connection for better performance:
+Execute multiple queries on a single connection when you need to ensure they run on the same connection:
 
 ```swift
 try await client.withConnection { connection in
@@ -184,8 +181,8 @@ For more details, see <doc:running-queries>.
 Many Swift types already work out of the box. For custom types, implement ``PostgresEncodable`` and ``PostgresDecodable``:
 
 ```swift
-// Store complex data as JSONB
-struct UserProfile: Codable {
+// Store complex data as JSONB - conform to PostgresCodable for encoding/decoding
+struct UserProfile: Codable, PostgresCodable {
     let displayName: String
     let bio: String
     let interests: [String]
@@ -209,9 +206,7 @@ let rows = try await client.query(
     logger: logger
 )
 
-for try await row in rows {
-    let randomAccessRow = row.makeRandomAccess()
-    let profile = try randomAccessRow.decode(column: "profile", as: UserProfile.self, context: .default)
+for try await (profile,) in rows.decode(UserProfile.self, context: .default) {
     print("Display name: \(profile.displayName)")
 }
 ```
