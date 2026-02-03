@@ -385,8 +385,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             "default"
         ]
         
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
         let eventLoop = eventLoopGroup.next()
 
         for channelName in channelNames {
