@@ -438,7 +438,7 @@ extension PostgresConnection {
         }
     }
 
-    private func listen(channel: String) async throws -> (id: Int, stream: PostgresNotificationSequence) {
+    private func startListen(channel: String) async throws -> (id: Int, stream: PostgresNotificationSequence) {
         let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
 
         return try await withTaskCancellationHandler {
@@ -476,7 +476,7 @@ extension PostgresConnection {
         renamed: "listen(on:consume:)"
     )
     public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
-        try await self.listen(channel: channel).stream
+        try await self.startListen(channel: channel).stream
     }
 
     /// Listen to a channel and run closure with ``PostgresNotificationSequence``.
@@ -487,7 +487,7 @@ extension PostgresConnection {
     ///   - channel: The channel to listen on.
     ///   - consume: Closure that is called with a ``PostgresNotificationSequence``.
     public func listen<Value>(on channel: String, consume: (PostgresNotificationSequence) async throws -> Value) async throws -> Value {
-        let (id, stream) = try await self.listen(channel: channel)
+        let (id, stream) = try await self.startListen(channel: channel)
         let value: Value
         do {
             value = try await consume(stream)
