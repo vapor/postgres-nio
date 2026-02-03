@@ -409,6 +409,34 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testLeavingTheScopeSecondsAfterCancellationDoesNotCrash() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                let (stream, cont) = AsyncStream.makeStream(of: Void.self)
+
+                taskGroup.addTask {
+                    try await connection.listen(on: "foo") { stream in
+                        cont.yield()
+                        do {
+                            for try await _ in stream {}
+                        } catch {
+                            _ = await Task {
+                                try? await Task.sleep(for: .seconds(1))
+                            }.result
+                        }
+                        // scope is left long after task is cancelled
+                    }
+                }
+                // wait until listen has started by using an AsyncStream.
+                await stream.first { _ in true }
+                taskGroup.cancelAll()
+            }
+        }
+    }
+
     #if canImport(Network)
     func testSelect10kRowsNetworkFramework() async throws {
         let eventLoopGroup = NIOTSEventLoopGroup()
