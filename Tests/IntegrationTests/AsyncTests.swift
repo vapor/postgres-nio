@@ -295,7 +295,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             async let stream2later = connection.listen("same-channel")
             let (stream1, stream2) = try await (stream1later, stream2later)
 
-            try await self.withTestConnection(on: eventLoop) { other in
+            _ = try await self.withTestConnection(on: eventLoop) { other in
                 try await other.query(#"NOTIFY "\#(unescaped: "same-channel")";"#, logger: .psqlTest)
             }
 
@@ -375,6 +375,37 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 XCTFail("Expected not to have reached the end of stream")
             } catch is PSQLError {
                 // Expected
+            }
+        }
+    }
+
+    func testListenOnChannelWithHandler() async throws {        
+        let channelNames = [
+            "foo",
+            "default"
+        ]
+        
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        for channelName in channelNames {
+            try await self.withTestConnection(on: eventLoop) { connection in
+                try await connection.listen(on: channelName) { stream in
+                    var iterator = stream.makeAsyncIterator()
+
+                    try await self.withTestConnection(on: eventLoop) { other in
+                        try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'bar';"#, logger: .psqlTest)
+
+                        try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'foo';"#, logger: .psqlTest)
+                    }
+
+                    let first = try await iterator.next()
+                    XCTAssertEqual(first?.payload, "bar")
+
+                    let second = try await iterator.next()
+                    XCTAssertEqual(second?.payload, "foo")
+                }
             }
         }
     }
