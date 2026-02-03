@@ -471,6 +471,10 @@ extension PostgresConnection {
     }
 
     /// Start listening for a channel
+    @available(*, deprecated,
+        message: "Use the new listen method that takes a closure to handle notifications",
+        renamed: "listen(on:handler:)"
+    )
     public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
         try await self.listen(channel: channel).stream
     }
