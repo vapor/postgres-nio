@@ -12,7 +12,7 @@ PostgreSQL channels are not persisted, for instance if a notification is sent to
 
 ### Listening
 
-Use ``PostgresConnection/listen(on:handler:)`` to listen for notifications on a given channel and receive every notification published to that channel via an `AsyncSequence`.
+Use ``PostgresConnection/listen(on:consume:)`` to listen for notifications on a given channel and receive every notification published to that channel via an `AsyncSequence`.
 When you exit the closure provided, PostgresNIO sends the relevant `UNLISTEN` command.
 
 ```swift
