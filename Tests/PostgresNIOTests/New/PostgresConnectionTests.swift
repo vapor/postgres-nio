@@ -231,7 +231,7 @@ import Synchronization
         }
     }
 
-    @Test func testListenOnChannelWithHandler() async throws {
+    @Test func testUnlistenIsSentAfterScopeIsLeft() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 taskGroup.addTask {
