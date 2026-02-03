@@ -379,7 +379,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
-    func testListenOnChannelWithHandler() async throws {        
+    func testListenOnChannelWithHandler() async throws {
         let channelNames = [
             "foo",
             "default"
