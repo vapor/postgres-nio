@@ -488,24 +488,11 @@ extension PostgresConnection {
     ///   - consume: Closure that is called with a ``PostgresNotificationSequence``.
     public func listen<Value>(on channel: String, consume: (PostgresNotificationSequence) async throws -> Value) async throws -> Value {
         let (id, stream) = try await self.startListen(channel: channel)
-        let value: Value
-        do {
-            value = try await consume(stream)
-            try Task.checkCancellation()
-        } catch {
-            // Call UNLISTEN in unstructured Task to avoid it being cancelled
-            _ = await Task {
-                let task = HandlerTask.cancelListening(channel, id)
-                self.channel.write(task, promise: nil)
-            }.result
-            throw error
-        }
-        // Call UNLISTEN in unstructured Task to avoid it being cancelled
-        _ = await Task {
+        defer {
             let task = HandlerTask.cancelListening(channel, id)
             self.channel.write(task, promise: nil)
-        }.value
-        return value
+        }
+        return try await consume(stream)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
