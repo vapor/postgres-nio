@@ -420,13 +420,10 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 taskGroup.addTask {
                     try await connection.listen(on: "foo") { stream in
                         cont.yield()
-                        do {
-                            for try await _ in stream {}
-                        } catch {
-                            _ = await Task {
-                                try? await Task.sleep(for: .seconds(1))
-                            }.result
-                        }
+                        for try await _ in stream {}
+                        _ = await Task {
+                            try? await Task.sleep(for: .seconds(1))
+                        }.result
                         // scope is left long after task is cancelled
                     }
                 }
