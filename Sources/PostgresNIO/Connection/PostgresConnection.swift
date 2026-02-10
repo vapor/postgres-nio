@@ -438,14 +438,13 @@ extension PostgresConnection {
         }
     }
 
-    /// Start listening for a channel
-    public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
+    private func startListen(channel: String) async throws -> (id: Int, stream: PostgresNotificationSequence) {
         let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
 
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
 
-            return try await withCheckedThrowingContinuation { continuation in
+            let stream = try await withCheckedThrowingContinuation { continuation in
                 let listener = NotificationListener(
                     channel: channel,
                     id: id,
@@ -464,10 +463,36 @@ extension PostgresConnection {
 
                 self.channel.write(task, promise: promise)
             }
+            return (id: id, stream: stream)
         } onCancel: {
             let task = HandlerTask.cancelListening(channel, id)
             self.channel.write(task, promise: nil)
         }
+    }
+
+    /// Start listening for a channel
+    @available(*, deprecated,
+        message: "Use the new listen method that takes a closure to handle notifications",
+        renamed: "listen(on:consume:)"
+    )
+    public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
+        try await self.startListen(channel: channel).stream
+    }
+
+    /// Listen to a channel and run closure with ``PostgresNotificationSequence``.
+    ///
+    /// When the closure is exited the `UNLISTEN` command is automatically sent for the provided channel.
+    ///
+    /// - Parameters:
+    ///   - channel: The channel to listen on.
+    ///   - consume: Closure that is called with a ``PostgresNotificationSequence``.
+    public func listen<Value>(on channel: String, consume: (PostgresNotificationSequence) async throws -> Value) async throws -> Value {
+        let (id, stream) = try await self.startListen(channel: channel)
+        defer {
+            let task = HandlerTask.cancelListening(channel, id)
+            self.channel.write(task, promise: nil)
+        }
+        return try await consume(stream)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary
