@@ -1076,6 +1076,94 @@ import Testing
             pool.triggerForceShutdown()
         }
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testCircuitBreaker() async throws {
+        struct ConnectionFailedError: Error {}
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 1
+        mutableConfig.idleTimeout = .seconds(10)
+        mutableConfig.circuitBreakerTripAfter = .seconds(5)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionRequest<MockConnection>.self,
+            keepAliveBehavior: keepAlive,
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            let failSecondLeaseWaiter = Future(of: Void.self)
+            let establishedConnectionWaiter = Future(of: Void.self)
+
+            taskGroup.addTask {
+                // fail connection attempt
+                _ = try? await factory.nextConnectAttempt { connectionID in
+                    throw ConnectionFailedError()
+                }
+
+                // fail second attempt. This will trip the circuit breaker
+                _ = await clock.nextTimerScheduled()
+                clock.advance(to: clock.now.advanced(by: .seconds(30)))
+                _ = try? await factory.nextConnectAttempt { connectionID in
+                    throw ConnectionFailedError()
+                }
+
+                // wait until second lease has failed
+                try await failSecondLeaseWaiter.success
+
+                // succeed next connection attempt
+                _ = await clock.nextTimerScheduled()
+                clock.advance(to: clock.now.advanced(by: .seconds(30)))
+                _ = await factory.nextConnectAttempt { connectionID in
+                    return 1
+                }
+
+                establishedConnectionWaiter.yield(value: ())
+            }
+
+            // lease fails because of connection failure
+            await #expect(throws: ConnectionPoolError.connectionCreationCircuitBreakerTripped) {
+                try await pool.leaseConnection()
+            }
+            // lease fails because we are in the connectionFailed state
+            await #expect(throws: ConnectionPoolError.connectionCreationCircuitBreakerTripped) {
+                try await pool.leaseConnection()
+            }
+            failSecondLeaseWaiter.yield(value: ())
+
+            try await establishedConnectionWaiter.success
+
+            // lease is successful because we are back in running state
+            _ = try await pool.leaseConnection()
+            
+            // shutdown
+            pool.triggerForceShutdown()
+
+            for connection in factory.runningConnections {
+                try await connection.signalToClose
+                connection.closeIfClosing()
+            }
+        }
+    }
 }
 
 struct ConnectionFuture: ConnectionRequestProtocol {

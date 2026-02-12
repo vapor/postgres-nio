@@ -116,16 +116,25 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// become idle.
     public var maximumConnectionHardLimit: Int
 
+    /// The amount of time to pass between the first failed connection
+    /// before triggering the circuit breaker.
+    public var circuitBreakerTripAfter: Duration
+
     /// The time that a _preserved_ idle connection stays in the
     /// pool before it is closed.
     public var idleTimeout: Duration
+
+    /// Maximum number of in-progress new connection requests to run at any one time
+    public var maximumConcurrentConnectionRequests: Int
 
     /// initializer
     public init() {
         self.minimumConnectionCount = 0
         self.maximumConnectionSoftLimit = 16
         self.maximumConnectionHardLimit = 16
+        self.circuitBreakerTripAfter = .seconds(60)
         self.idleTimeout = .seconds(60)
+        self.maximumConcurrentConnectionRequests = 20
     }
 }
 
@@ -153,7 +162,7 @@ public final class ConnectionPool<
     public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionConfiguration, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, ConnectionConfiguration, Request, RequestID, KeepAliveBehavior, Executor, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
-    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>>
+    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let factory: ConnectionFactory
@@ -214,7 +223,8 @@ public final class ConnectionPool<
         var stateMachine = StateMachine(
             configuration: .init(configuration, keepAliveBehavior: keepAliveBehavior),
             generator: idGenerator,
-            timerCancellationTokenType: CheckedContinuation<Void, Never>.self
+            timerCancellationTokenType: CheckedContinuation<Void, Never>.self,
+            clock: clock
         )
 
         let (stream, continuation) = AsyncStream.makeStream(of: NewPoolActions.self)
@@ -400,6 +410,15 @@ public final class ConnectionPool<
         case .makeConnection(let request, let timers):
             self.cancelTimers(timers)
             self.eventContinuation.yield(.makeConnection(request))
+
+        case .makeConnectionsCancelAndScheduleTimers(let requests, let cancelledTimers, let scheduledTimers):
+            self.cancelTimers(cancelledTimers)
+            for request in requests {
+                self.eventContinuation.yield(.makeConnection(request))
+            }
+            for timer in scheduledTimers {
+                self.eventContinuation.yield(.scheduleTimer(timer))
+            }
 
         case .runKeepAlive(let connection, let cancelContinuation):
             cancelContinuation?.resume(returning: ())
@@ -612,6 +631,8 @@ extension PoolConfiguration {
         self.maximumConnectionHardLimit = configuration.maximumConnectionHardLimit
         self.keepAliveDuration = keepAliveBehavior.keepAliveFrequency
         self.idleTimeoutDuration = configuration.idleTimeout
+        self.circuitBreakerTripAfter = configuration.circuitBreakerTripAfter
+        self.maximumConcurrentConnectionRequests = configuration.maximumConcurrentConnectionRequests
     }
 }
 

@@ -231,6 +231,50 @@ import Synchronization
         }
     }
 
+    @Test func testUnlistenIsSentAfterScopeIsLeft() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    try await connection.listen(on: "foo") { events in
+                        for try await event in events {
+                            #expect(event.payload == "wooohooo")
+                            break
+                        }
+                    }
+                }
+
+                let listenMessage = try await channel.waitForUnpreparedRequest()
+                #expect(listenMessage.parse.query == #"LISTEN "foo";"#)
+
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                try await channel.writeInbound(PostgresBackendMessage.noData)
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+
+                let unlistenMessage = try await channel.waitForUnpreparedRequest()
+                #expect(unlistenMessage.parse.query == #"UNLISTEN "foo";"#)
+
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                try await channel.writeInbound(PostgresBackendMessage.noData)
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("UNLISTEN"))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                switch await taskGroup.nextResult()! {
+                case .success:
+                    break
+                case .failure(let failure):
+                    Issue.record("Unexpected error: \(failure)")
+                }
+            }
+        }
+    }
+
     @Test func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
@@ -873,9 +917,22 @@ import Synchronization
         } preCopyInResponse: { channel in
             channel.isWritable = false
         } mockBackend: { channel, _ in
+            // The `writeData` closure is executed on a background task. Ensure it started executing before we proceed
+            // with the backend mock. This typically doesn't enter the retry loop at all.
+            var isWritingReloadCounter = 0
+            while !isWriting.load(ordering: .sequentiallyConsistent), isWritingReloadCounter < 100 {
+                try await Task.sleep(for: .milliseconds(10))
+                isWritingReloadCounter += 1
+            }
             let isWriting = isWriting.load(ordering: .sequentiallyConsistent)
             #expect(isWriting)
 
+            // Wait for another 10ms to ensure the `writer.write` call did indeed start and tried to write data, just 
+            // being blocked on the backpressure.
+            try await Task.sleep(for: .milliseconds(10))
+
+            // Now that we know `writeData` is blocked, relieve the write backpressure and check that the copy operation 
+            // finishes.
             channel.isWritable = true
             channel.pipeline.fireChannelWritabilityChanged()
 
