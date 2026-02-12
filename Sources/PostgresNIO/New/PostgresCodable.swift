@@ -42,6 +42,102 @@ public protocol PostgresDynamicTypeEncodable: PostgresThrowingDynamicTypeEncodab
 }
 
 /// A type that can encode itself to a postgres wire binary representation.
+///
+/// Conform your custom types to `PostgresEncodable` to enable them to be used as query parameters
+/// with `PostgresQuery` and `PostgresBindings`.
+///
+/// ## Conforming Built-in Types
+///
+/// Many standard Swift types already conform to `PostgresEncodable`:
+/// - Numeric types: `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `UInt`, `UInt8`, `UInt16`, `UInt32`, `Float`, `Double`
+/// - Text types: `String`, `Substring`
+/// - Other types: `Bool`, `Date`, `UUID`, `Data`
+/// - Collections: `Array` (where Element is encodable)
+///
+/// ## Implementing PostgresEncodable
+///
+/// To make a custom type encodable, implement the protocol requirements:
+///
+/// ```swift
+/// import NIOCore
+///
+/// struct Point: PostgresEncodable {
+///     let x: Double
+///     let y: Double
+///
+///     static var psqlType: PostgresDataType { .point }
+///     static var psqlFormat: PostgresFormat { .binary }
+///
+///     func encode<JSONEncoder: PostgresJSONEncoder>(
+///         into buffer: inout ByteBuffer,
+///         context: PostgresEncodingContext<JSONEncoder>
+///     ) throws {
+///         buffer.writeDouble(x)
+///         buffer.writeDouble(y)
+///     }
+/// }
+/// ```
+///
+/// ## Using Custom Encodable Types
+///
+/// Once your type conforms to `PostgresEncodable`, use it in queries:
+///
+/// ```swift
+/// let point = Point(x: 10.5, y: 20.3)
+/// let query: PostgresQuery = "INSERT INTO locations (coordinate) VALUES (\(point))"
+/// ```
+///
+/// ## Encoding as JSON
+///
+/// For complex types, you can encode them as JSONB:
+///
+/// ```swift
+/// struct User: Codable, PostgresEncodable {
+///     let name: String
+///     let email: String
+///     let age: Int
+///
+///     static var psqlType: PostgresDataType { .jsonb }
+///     static var psqlFormat: PostgresFormat { .binary }
+///
+///     func encode<JSONEncoder: PostgresJSONEncoder>(
+///         into buffer: inout ByteBuffer,
+///         context: PostgresEncodingContext<JSONEncoder>
+///     ) throws {
+///         // JSONB format version byte
+///         buffer.writeInteger(1, as: UInt8.self)
+///         // Encode as JSON using the provided encoder
+///         let data = try context.jsonEncoder.encode(self)
+///         buffer.writeBytes(data)
+///     }
+/// }
+/// ```
+///
+/// ## RawRepresentable Types
+///
+/// For enums backed by encodable raw values:
+///
+/// ```swift
+/// enum Status: String, PostgresEncodable {
+///     case active
+///     case inactive
+///     case pending
+///
+///     static var psqlType: PostgresDataType { .text }
+///     static var psqlFormat: PostgresFormat { .binary }
+///
+///     func encode<JSONEncoder: PostgresJSONEncoder>(
+///         into buffer: inout ByteBuffer,
+///         context: PostgresEncodingContext<JSONEncoder>
+///     ) throws {
+///         try rawValue.encode(into: &buffer, context: context)
+///     }
+/// }
+/// ```
+///
+/// > Note: ``PostgresNonThrowingEncodable`` is a variant that doesn't throw, allowing usage without `try`.
+///
+/// - SeeAlso: ``PostgresDecodable`` for decoding values from Postgres.
 public protocol PostgresEncodable: PostgresThrowingDynamicTypeEncodable {
     // TODO: Rename to `PostgresThrowingEncodable` with next major release
 
@@ -62,7 +158,129 @@ public protocol PostgresNonThrowingEncodable: PostgresEncodable, PostgresDynamic
 
 /// A type that can decode itself from a postgres wire binary representation.
 ///
-/// If you want to conform a type to PostgresDecodable you must implement the decode method.
+/// Conform your custom types to ``PostgresDecodable`` to enable them to be decoded from query results.
+///
+/// ## Conforming Built-in Types
+///
+/// Many standard Swift types already conform to ``PostgresDecodable``:
+/// - Numeric types: `Int`, `Int8`, `Int16`, `Int32`, `Int64`, `UInt`, `UInt8`, `UInt16`, `UInt32`, `Float`, `Double`
+/// - Text types: `String`, `Substring`
+/// - Other types: `Bool`, `Date`, `UUID`, `Data`
+/// - Collections: `Array` (where Element is decodable)
+///
+/// ## Implementing PostgresDecodable
+///
+/// To make a custom type decodable, implement the required initializer:
+///
+/// ```swift
+/// import NIOCore
+///
+/// struct Point: PostgresDecodable {
+///     let x: Double
+///     let y: Double
+///
+///     init<JSONDecoder: PostgresJSONDecoder>(
+///         from buffer: inout ByteBuffer,
+///         type: PostgresDataType,
+///         format: PostgresFormat,
+///         context: PostgresDecodingContext<JSONDecoder>
+///     ) throws {
+///         guard type == .point else {
+///             throw PostgresDecodingError.Code.typeMismatch
+///         }
+///         guard let x = buffer.readDouble(), let y = buffer.readDouble() else {
+///             throw PostgresDecodingError.Code.missingData
+///         }
+///         self.x = x
+///         self.y = y
+///     }
+/// }
+/// ```
+///
+/// ## Using Custom Decodable Types
+///
+/// Once your type conforms to `PostgresDecodable`, decode it from query results:
+///
+/// ```swift
+/// let rows = try await connection.query("SELECT coordinate FROM locations", logger: logger)
+/// for try await row in rows {
+///     let point = try row.decode(Point.self, context: .default)
+///     print("Point: (\(point.x), \(point.y))")
+/// }
+/// ```
+///
+/// ## Decoding from JSON
+///
+/// For complex types stored as JSON or JSONB:
+///
+/// ```swift
+/// struct User: Codable, PostgresDecodable {
+///     let name: String
+///     let email: String
+///     let age: Int
+///
+///     init<JSONDecoder: PostgresJSONDecoder>(
+///         from buffer: inout ByteBuffer,
+///         type: PostgresDataType,
+///         format: PostgresFormat,
+///         context: PostgresDecodingContext<JSONDecoder>
+///     ) throws {
+///         guard type == .jsonb || type == .json else {
+///             throw PostgresDecodingError.Code.typeMismatch
+///         }
+///
+///         var jsonBuffer = buffer
+///         if type == .jsonb {
+///             // Skip JSONB version byte
+///             _ = jsonBuffer.readInteger(as: UInt8.self)
+///         }
+///
+///         guard let data = jsonBuffer.readData(length: jsonBuffer.readableBytes) else {
+///             throw PostgresDecodingError.Code.missingData
+///         }
+///
+///         self = try context.jsonDecoder.decode(User.self, from: data)
+///     }
+/// }
+/// ```
+///
+/// ## Decoding RawRepresentable Types
+///
+/// For enums backed by decodable raw values:
+///
+/// ```swift
+/// enum Status: String, PostgresDecodable {
+///     case active
+///     case inactive
+///     case pending
+///
+///     init<JSONDecoder: PostgresJSONDecoder>(
+///         from buffer: inout ByteBuffer,
+///         type: PostgresDataType,
+///         format: PostgresFormat,
+///         context: PostgresDecodingContext<JSONDecoder>
+///     ) throws {
+///         let rawValue = try String(from: &buffer, type: type, format: format, context: context)
+///         guard let value = Self(rawValue: rawValue) else {
+///             throw PostgresDecodingError.Code.failure
+///         }
+///         self = value
+///     }
+/// }
+/// ```
+///
+/// ## Handling Optional Values
+///
+/// Optional values are automatically handled by the protocol:
+///
+/// ```swift
+/// let email: String? = try row.decode(String?.self, context: .default)
+/// // Returns nil if the database value is NULL
+/// ```
+///
+/// > Note: The ``_DecodableType`` associated type is an implementation detail for Optional handling.
+///
+/// - SeeAlso: ``PostgresEncodable`` for encoding values to Postgres.
 public protocol PostgresDecodable {
     /// A type definition of the type that actually implements the PostgresDecodable protocol. This is an escape hatch to
     /// prevent a cycle in the conformace of the Optional type to PostgresDecodable.
