@@ -594,14 +594,19 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func destroyBackingOffConnection(_ connectionID: Connection.ID) -> TimerCancellationToken? {
+        mutating func destroyBackingOffConnection(_ connectionID: Connection.ID) -> Max2Sequence<TimerCancellationToken> {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("Failing a connection we don't have a record of.")
             }
 
             self.stats.backingOff -= 1
-            self.connections[index].destroyFailedConnection()
-            return self.swapForDeletion(index: index)
+            let timer = self.connections[index].destroyBackingOffConnection()
+            var timerCancellations = Max2Sequence(timer)
+
+            if let timerCancellationToken = self.swapForDeletion(index: index) {
+                timerCancellations.append(timerCancellationToken)
+            }
+            return timerCancellations
         }
 
         /// Information around the failed/closed connection.

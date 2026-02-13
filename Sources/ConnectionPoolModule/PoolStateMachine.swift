@@ -512,7 +512,7 @@ struct PoolStateMachine<
             // otherwise fallthrough to backoffDone code
             guard connectionID == context.connectionIDToRetry else {
                 let timers = self.connections.destroyBackingOffConnection(connectionID)
-                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+                return .init(request: .none, connection: .cancelTimers(.init(timers)))
             }
 
         case .circuitBreakOpen(let context):
@@ -520,7 +520,7 @@ struct PoolStateMachine<
             // otherwise fallthrough to backoffDone code
             guard connectionID == context.connectionIDToRetry else {
                 let timers = self.connections.destroyBackingOffConnection(connectionID)
-                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+                return .init(request: .none, connection: .cancelTimers(.init(timers)))
             }
 
         case .running:
