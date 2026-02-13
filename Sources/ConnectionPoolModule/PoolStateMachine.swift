@@ -511,7 +511,7 @@ struct PoolStateMachine<
             // if connection id is not the same as retrying connection id destroy connection
             // otherwise fallthrough to backoffDone code
             guard connectionID == context.connectionIDToRetry else {
-                let timers = self.connections.destroyFailedConnection(connectionID)
+                let timers = self.connections.destroyBackingOffConnection(connectionID)
                 return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
             }
 
@@ -519,7 +519,7 @@ struct PoolStateMachine<
             // if connection id is not the same as retrying connection id destroy connection
             // otherwise fallthrough to backoffDone code
             guard connectionID == context.connectionIDToRetry else {
-                let timers = self.connections.destroyFailedConnection(connectionID)
+                let timers = self.connections.destroyBackingOffConnection(connectionID)
                 return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
             }
 
