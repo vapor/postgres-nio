@@ -612,10 +612,10 @@ extension PoolStateMachine {
         @inlinable
         mutating func destroyFailedConnection() {
             switch self.state {
-            case .starting:
+            case .starting, .backingOff:
                 self.state = .closed
 
-            case .idle, .leased, .closed, .closing, .backingOff:
+            case .idle, .leased, .closed, .closing:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
