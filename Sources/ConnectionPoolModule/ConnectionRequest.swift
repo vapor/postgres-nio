@@ -26,7 +26,7 @@ public struct ConnectionRequest<Connection: PooledConnection>: ConnectionRequest
 let requestIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator()
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-extension ConnectionPool where Request == ConnectionRequest<Connection> {
+extension ConnectionPool where Request == ConnectionRequest<Connection>, ConnectionIDGenerator == _ConnectionPoolModule.ConnectionIDGenerator, Clock == ContinuousClock {
     public convenience init(
         configuration: ConnectionPoolConfiguration,
         connectionConfiguration: ConnectionConfiguration,
@@ -49,7 +49,10 @@ extension ConnectionPool where Request == ConnectionRequest<Connection> {
             connectionFactory: connectionFactory
         )
     }
+}
 
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension ConnectionPool where Request == ConnectionRequest<Connection> {
     @inlinable
     public func leaseConnection() async throws -> ConnectionLease<Connection> {
         let requestID = requestIDGenerator.next()
