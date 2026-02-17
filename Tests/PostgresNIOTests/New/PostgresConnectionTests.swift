@@ -85,6 +85,7 @@ import Synchronization
         try await connection.close()
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListen() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -128,6 +129,7 @@ import Synchronization
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListenDoesNotUnlistenIfThereIsAnotherSubscriber() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
@@ -190,6 +192,7 @@ import Synchronization
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListenConnectionDrops() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
