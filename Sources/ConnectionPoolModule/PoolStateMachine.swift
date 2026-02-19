@@ -432,7 +432,7 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
+    mutating func connectionEstablishFailed(_ error: any Error, for request: ConnectionRequest) -> Action {
         switch self.poolState {
         case .running:
             self.poolState = .connectionCreationFailing(

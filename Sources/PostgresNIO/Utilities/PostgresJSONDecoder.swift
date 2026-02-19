@@ -25,13 +25,13 @@ extension PostgresJSONDecoder {
 //@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension JSONDecoder: PostgresJSONDecoder {}
 
-private let jsonDecoderLocked: NIOLockedValueBox<PostgresJSONDecoder> = NIOLockedValueBox(JSONDecoder())
+private let jsonDecoderLocked: NIOLockedValueBox<any PostgresJSONDecoder> = NIOLockedValueBox(JSONDecoder())
 
 /// The default JSON decoder used by PostgresNIO when decoding JSON & JSONB values.
 /// As `_defaultJSONDecoder` will be reused for decoding all JSON & JSONB values
 /// from potentially multiple threads at once, you must ensure your custom JSON decoder is
 /// thread safe internally like `Foundation.JSONDecoder`.
-public var _defaultJSONDecoder: PostgresJSONDecoder {
+public var _defaultJSONDecoder: any PostgresJSONDecoder {
     set {
         jsonDecoderLocked.withLockedValue { $0 = newValue }
     }

@@ -120,7 +120,7 @@ import NIOTestUtils
 extension PostgresNIO.DataRow: Swift.ExpressibleByArrayLiteral {
     public typealias ArrayLiteralElement = PostgresEncodable
 
-    public init(arrayLiteral elements: PostgresEncodable...) {
+    public init(arrayLiteral elements: (any PostgresEncodable)...) {
         
         var buffer = ByteBuffer()
         let encodingContext = PostgresEncodingContext(jsonEncoder: JSONEncoder())

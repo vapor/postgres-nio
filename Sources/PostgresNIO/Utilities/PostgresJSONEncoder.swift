@@ -22,13 +22,13 @@ extension PostgresJSONEncoder {
 
 extension JSONEncoder: PostgresJSONEncoder {}
 
-private let jsonEncoderLocked: NIOLockedValueBox<PostgresJSONEncoder> = NIOLockedValueBox(JSONEncoder())
+private let jsonEncoderLocked: NIOLockedValueBox<any PostgresJSONEncoder> = NIOLockedValueBox(JSONEncoder())
 
 /// The default JSON encoder used by PostgresNIO when encoding JSON & JSONB values.
 /// As `_defaultJSONEncoder` will be reused for encoding all JSON & JSONB values
 /// from potentially multiple threads at once, you must ensure your custom JSON encoder is
 /// thread safe internally like `Foundation.JSONEncoder`.
-public var _defaultJSONEncoder: PostgresJSONEncoder {
+public var _defaultJSONEncoder: any PostgresJSONEncoder {
     set {
         jsonEncoderLocked.withLockedValue { $0 = newValue }
     }
