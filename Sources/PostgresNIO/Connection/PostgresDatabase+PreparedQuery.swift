@@ -30,9 +30,9 @@ extension PostgresDatabase {
 
 public struct PreparedQuery: Sendable {
     let underlying: PSQLPreparedStatement
-    let database: PostgresDatabase
+    let database: any PostgresDatabase
 
-    init(underlying: PSQLPreparedStatement, database: PostgresDatabase) {
+    init(underlying: PSQLPreparedStatement, database: any PostgresDatabase) {
         self.underlying = underlying
         self.database = database
     }
