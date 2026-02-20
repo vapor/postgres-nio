@@ -717,7 +717,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 extension XCTestCase {
 
     func withTestConnection<Result>(
-        on eventLoop: EventLoop,
+        on eventLoop: any EventLoop,
         options: PostgresConnection.Configuration.Options? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,

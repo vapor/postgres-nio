@@ -15,7 +15,7 @@ import Synchronization
         // number we try to connect to is not used by any other process.
         let eventLoopGroup = NIOSingletons.posixEventLoopGroup
 
-        var tempChannel: Channel?
+        var tempChannel: (any Channel)?
         #expect(throws: Never.self) {
             tempChannel = try ServerBootstrap(group: eventLoopGroup)
                 .bind(to: .init(ipAddress: "127.0.0.1", port: 0)).wait()

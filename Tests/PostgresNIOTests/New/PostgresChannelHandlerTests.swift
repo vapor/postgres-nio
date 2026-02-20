@@ -261,7 +261,7 @@ class TestEventHandler: ChannelInboundHandler {
     var errors = [PSQLError]()
     var events = [PSQLEvent]()
     
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func errorCaught(context: ChannelHandlerContext, error: any Error) {
         guard let psqlError = error as? PSQLError else {
             return XCTFail("Unexpected error type received: \(error)")
         }
