@@ -1044,7 +1044,7 @@ import Testing
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testConnectionTimeout() async throws {
+    @Test func testCircuitBreaker() async throws {
         struct ConnectionFailedError: Error {}
         let clock = MockClock()
         let factory = MockConnectionFactory<MockClock>()

@@ -124,6 +124,9 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// pool before it is closed.
     public var idleTimeout: Duration
 
+    /// Maximum number of in-progress new connection requests to run at any one time
+    public var maximumConcurrentConnectionRequests: Int
+
     /// initializer
     public init() {
         self.minimumConnectionCount = 0
@@ -131,6 +134,7 @@ public struct ConnectionPoolConfiguration: Sendable {
         self.maximumConnectionHardLimit = 16
         self.circuitBreakerTripAfter = .seconds(60)
         self.idleTimeout = .seconds(60)
+        self.maximumConcurrentConnectionRequests = 20
     }
 }
 
@@ -380,6 +384,15 @@ public final class ConnectionPool<
             self.cancelTimers(timers)
             self.eventContinuation.yield(.makeConnection(request))
 
+        case .makeConnectionsCancelAndScheduleTimers(let requests, let cancelledTimers, let scheduledTimers):
+            self.cancelTimers(cancelledTimers)
+            for request in requests {
+                self.eventContinuation.yield(.makeConnection(request))
+            }
+            for timer in scheduledTimers {
+                self.eventContinuation.yield(.scheduleTimer(timer))
+            }
+
         case .runKeepAlive(let connection, let cancelContinuation):
             cancelContinuation?.resume(returning: ())
             self.eventContinuation.yield(.runKeepAlive(connection))
@@ -471,7 +484,7 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func connectionEstablishFailed(_ error: Error, for request: StateMachine.ConnectionRequest) {
+    /*private*/ func connectionEstablishFailed(_ error: any Error, for request: StateMachine.ConnectionRequest) {
         self.observabilityDelegate.connectFailed(id: request.connectionID, error: error)
 
         self.modifyStateAndRunActions { state in
@@ -581,6 +594,7 @@ extension PoolConfiguration {
         self.keepAliveDuration = keepAliveBehavior.keepAliveFrequency
         self.idleTimeoutDuration = configuration.idleTimeout
         self.circuitBreakerTripAfter = configuration.circuitBreakerTripAfter
+        self.maximumConcurrentConnectionRequests = configuration.maximumConcurrentConnectionRequests
     }
 }
 
