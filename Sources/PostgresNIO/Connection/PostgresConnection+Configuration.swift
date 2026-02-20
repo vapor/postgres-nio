@@ -130,7 +130,7 @@ extension PostgresConnection {
         /// The `Channel` to use in existing-channel configurations.
         ///
         /// Always `nil` for other configurations.
-        public var establishedChannel: Channel? {
+        public var establishedChannel: (any Channel)? {
             if case let .configureChannel(channel) = self.endpointInfo { return channel }
             else { return nil }
         }
@@ -193,7 +193,7 @@ extension PostgresConnection {
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
         ///   - tls: The TLS mode to use.
-        public init(establishedChannel channel: Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?, database: String?) {
+        public init(establishedChannel channel: any Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .configureChannel(channel), tls: tls, username: username, password: password, database: database)
         }
         
@@ -206,14 +206,14 @@ extension PostgresConnection {
         /// - Parameters:
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
-        public init(establishedChannel channel: Channel, username: String, password: String?, database: String?) {
+        public init(establishedChannel channel: any Channel, username: String, password: String?, database: String?) {
             self.init(establishedChannel: channel, tls: .disable, username: username, password: password, database: database)
         }
 
         // MARK: - Implementation details
 
         enum EndpointInfo {
-            case configureChannel(Channel)
+            case configureChannel(any Channel)
             case bindUnixDomainSocket(path: String)
             case connectTCP(host: String, port: Int)
         }
@@ -242,7 +242,7 @@ extension PostgresConnection {
             case unresolvedTCP(host: String, port: Int)
             case unresolvedUDS(path: String)
             case resolved(address: SocketAddress)
-            case bootstrapped(channel: Channel)
+            case bootstrapped(channel: any Channel)
         }
 
         let connection: InternalConfiguration.Connection
