@@ -4,17 +4,20 @@ import Testing
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 typealias TestPoolStateMachine = PoolStateMachine<
-    MockConnection,
+    TestConnection,
     ConnectionIDGenerator,
     MockConnection.ID,
-    MockRequest<MockConnection>,
-    MockRequest<MockConnection>.ID,
+    MockRequest<TestConnection>,
+    MockRequest<TestConnection>.ID,
     MockTimerCancellationToken,
     MockClock,
     MockClock.Instant
 >
 
+typealias TestConnection = MockConnection<NothingConnectionPoolExecutor>
+
 @Suite struct PoolStateMachineTests {
+    let executor = NothingConnectionPoolExecutor()
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testConnectionsAreCreatedAndParkedOnStartup() {
@@ -31,8 +34,8 @@ typealias TestPoolStateMachine = PoolStateMachine<
             clock: MockClock()
         )
 
-        let connection1 = MockConnection(id: 0)
-        let connection2 = MockConnection(id: 1)
+        let connection1 = MockConnection(id: 0, executor: self.executor)
+        let connection2 = MockConnection(id: 1, executor: self.executor)
 
         do {
             let requests = stateMachine.refillConnections()
@@ -73,7 +76,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
             clock: MockClock()
         )
 
-        let connection1 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 0, executor: self.executor)
 
         // refill pool to at least one connection
         let requests = stateMachine.refillConnections()
@@ -83,7 +86,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(createdAction1.connection == .scheduleTimers([]))
 
         // lease connection 1
-        let request1 = MockRequest(connectionType: MockConnection.self)
+        let request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         #expect(leaseRequest1.connection == .cancelTimers([]))
         #expect(leaseRequest1.request == .leaseConnection(.init(element: request1), connection1))
@@ -92,19 +95,19 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(stateMachine.releaseConnection(connection1, streams: 1) == .none())
 
         // lease connection 1
-        let request2 = MockRequest(connectionType: MockConnection.self)
+        let request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         #expect(leaseRequest2.connection == .cancelTimers([]))
         #expect(leaseRequest2.request == .leaseConnection(.init(element: request2), connection1))
 
         // request connection while none is available
-        let request3 = MockRequest(connectionType: MockConnection.self)
+        let request3 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest3 = stateMachine.leaseConnection(request3)
         #expect(leaseRequest3.connection == .makeConnection(.init(connectionID: 1), []))
         #expect(leaseRequest3.request == .none)
 
         // make connection 2 and lease immediately
-        let connection2 = MockConnection(id: 1)
+        let connection2 = MockConnection(id: 1, executor: NothingConnectionPoolExecutor())
         let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
         #expect(createdAction2.request == .leaseConnection(.init(element: request3), connection2))
         #expect(createdAction2.connection == .none)
@@ -145,19 +148,19 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(requests.count == 0)
 
         // request connection while none exists
-        let request1 = MockRequest(connectionType: MockConnection.self)
+        let request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         #expect(leaseRequest1.connection == .makeConnection(.init(connectionID: 0), []))
         #expect(leaseRequest1.request == .none)
 
         // make connection 1 and lease immediately
-        let connection1 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 0, executor: self.executor)
         let createdAction1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
         #expect(createdAction1.request == .leaseConnection(.init(element: request1), connection1))
         #expect(createdAction1.connection == .none)
 
         // request connection while none is available
-        let request2 = MockRequest(connectionType: MockConnection.self)
+        let request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         #expect(leaseRequest2.connection == .makeConnection(.init(connectionID: 1), []))
         #expect(leaseRequest2.request == .none)
@@ -168,7 +171,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(releaseRequest1.connection == .none)
 
         // connection 2 comes up and should be closed right away
-        let connection2 = MockConnection(id: 1)
+        let connection2 = MockConnection(id: 1, executor: self.executor)
         let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
         #expect(createdAction2.request == .none)
         #expect(createdAction2.connection == .closeConnection(connection2, []))
@@ -202,7 +205,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
             clock: MockClock()
         )
 
-        let connection1 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 0, executor: self.executor)
 
         // refill pool to at least one connection
         let requests = stateMachine.refillConnections()
@@ -212,19 +215,19 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(createdAction1.connection == .scheduleTimers([]))
 
         // lease connection 1
-        let request1 = MockRequest(connectionType: MockConnection.self)
+        let request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         #expect(leaseRequest1.connection == .cancelTimers([]))
         #expect(leaseRequest1.request == .leaseConnection(.init(element: request1), connection1))
 
         // request connection while none is available
-        let request2 = MockRequest(connectionType: MockConnection.self)
+        let request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         #expect(leaseRequest2.connection == .makeConnection(.init(connectionID: 1), []))
         #expect(leaseRequest2.request == .none)
 
         // make connection 2 and lease immediately
-        let connection2 = MockConnection(id: 1)
+        let connection2 = MockConnection(id: 1, executor: self.executor)
         let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
         #expect(createdAction2.request == .leaseConnection(.init(element: request2), connection2))
         #expect(createdAction2.connection == .none)
@@ -267,13 +270,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(requests.count == 0)
 
         // request connection while none exists
-        let request1 = MockRequest(connectionType: MockConnection.self)
+        let request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         #expect(leaseRequest1.connection == .makeConnection(.init(connectionID: 0), []))
         #expect(leaseRequest1.request == .none)
 
         // make connection 1 and lease immediately
-        let connection1 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 0, executor: self.executor)
         let createdAction1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
         #expect(createdAction1.request == .leaseConnection(.init(element: request1), connection1))
         #expect(createdAction1.connection == .none)
@@ -312,13 +315,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(requests.count == 0)
 
         // request connection while none exists
-        let request1 = MockRequest(connectionType: MockConnection.self)
+        let request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest1 = stateMachine.leaseConnection(request1)
         #expect(leaseRequest1.connection == .makeConnection(.init(connectionID: 0), []))
         #expect(leaseRequest1.request == .none)
 
         // make connection 1
-        let connection1 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 0, executor: self.executor)
         let createdAction1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
         #expect(createdAction1.request == .leaseConnection(.init(element: request1), connection1))
         #expect(createdAction1.connection == .none)
@@ -334,13 +337,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         connection1.closeIfClosing()
 
         // request connection while none exists anymore
-        let request2 = MockRequest(connectionType: MockConnection.self)
+        let request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest2 = stateMachine.leaseConnection(request2)
         #expect(leaseRequest2.connection == .makeConnection(.init(connectionID: 1), []))
         #expect(leaseRequest2.request == .none)
 
         // make connection 2
-        let connection2 = MockConnection(id: 1)
+        let connection2 = MockConnection(id: 1, executor: self.executor)
         let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
         #expect(createdAction2.request == .leaseConnection(.init(element: request2), connection2))
         #expect(createdAction2.connection == .none)
@@ -383,13 +386,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(requests.count == 1)
 
         // one connection should exist
-        let request = MockRequest(connectionType: MockConnection.self)
+        let request = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseRequest = stateMachine.leaseConnection(request)
         #expect(leaseRequest.connection == .none)
         #expect(leaseRequest.request == .none)
 
         // make connection 1
-        let connection = MockConnection(id: 0)
+        let connection = MockConnection(id: 0, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         #expect(createdAction.request == .leaseConnection(.init(element: request), connection))
         #expect(createdAction.connection == .none)
@@ -405,7 +408,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connectionClosed = stateMachine.connectionClosed(connection)
         #expect(connectionClosed.connection == .makeConnection(.init(connectionID: 1), []))
         connection.closeIfClosing()
-        let establishAction = stateMachine.connectionEstablished(.init(id: 1), maxStreams: 1)
+        let establishAction = stateMachine.connectionEstablished(.init(id: 1, executor: self.executor), maxStreams: 1)
         #expect(establishAction.request == .none)
         if case .scheduleTimers(let timers) = establishAction.connection {
             #expect(timers == [.init(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: configuration.keepAliveDuration!)])
@@ -439,7 +442,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(requests.count == 1)
 
         // make connection 1
-        let connection = MockConnection(id: 0)
+        let connection = MockConnection(id: 0, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         #expect(createdAction.request == .none)
         let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
@@ -481,14 +484,14 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(requests.count == 1)
 
         // make connection 1
-        let connection = MockConnection(id: 0)
+        let connection = MockConnection(id: 0, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         #expect(createdAction.request == .none)
         let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
         #expect(createdAction.connection == .scheduleTimers([connection1KeepAliveTimer]))
         #expect(stateMachine.timerScheduled(connection1KeepAliveTimer, cancelContinuation: MockTimerCancellationToken(connection1KeepAliveTimer)) == .none)
 
-        let request = MockRequest(connectionType: MockConnection.self)
+        let request = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         let leaseAction = stateMachine.leaseConnection(request)
         #expect(leaseAction.request == .leaseConnection(.init(element: request), connection))
         #expect(leaseAction.connection == .cancelTimers([MockTimerCancellationToken(connection1KeepAliveTimer)]))
@@ -529,7 +532,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(shutdownAction.connection ==  .initiateShutdown(.init()))
 
         // make connection 1
-        let connection = MockConnection(id: 0)
+        let connection = MockConnection(id: 0, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         #expect(createdAction.request == .none)
         #expect(createdAction.connection == .closeConnection(connection, []))
@@ -561,13 +564,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         )
 
         // request two connections
-        let mockRequest1 = MockRequest(connectionType: MockConnection.self)
+        let mockRequest1 = MockRequest(connectionType: TestConnection.self)
         let leaseAction1 = stateMachine.leaseConnection(mockRequest1)
         guard case .makeConnection(let request1, _) = leaseAction1.connection else {
             Issue.record()
             return
         }
-        let mockRequest2 = MockRequest(connectionType: MockConnection.self)
+        let mockRequest2 = MockRequest(connectionType: TestConnection.self)
         let leaseAction2 = stateMachine.leaseConnection(mockRequest2)
         guard case .makeConnection(let request2, _) = leaseAction2.connection else {
             Issue.record()
@@ -585,7 +588,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
             Issue.record()
         }
 
-        let mockRequest3 = MockRequest(connectionType: MockConnection.self)
+        let mockRequest3 = MockRequest(connectionType: TestConnection.self)
         let leaseAction = stateMachine.leaseConnection(mockRequest3)
         #expect(leaseAction.request == .none)
         #expect(leaseAction.connection == .none)
@@ -621,7 +624,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         }
 
         // lease fails immediately as we are in circuitBreak state
-        let request3 = MockRequest(connectionType: MockConnection.self)
+        let request3 = MockRequest(connectionType: TestConnection.self)
         let leaseAction3 = stateMachine.leaseConnection(request3)
         #expect(leaseAction3.request == .failRequest(request3, ConnectionPoolError.connectionCreationCircuitBreakerTripped))
         #expect(leaseAction3.connection == .none)
@@ -631,7 +634,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(backOffDone2.connection == .makeConnection(request1, []))
 
         // make connection
-        let connection = MockConnection(id: 0)
+        let connection = TestConnection(id: 0, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         let connectionKeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 2, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
         let connectionIdleTimer = TestPoolStateMachine.Timer(.init(timerID: 3, connectionID: 0, usecase: .idleTimeout), duration: .seconds(4))
@@ -639,7 +642,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(createdAction.connection == .scheduleTimers([connectionKeepAliveTimer, connectionIdleTimer]))
 
         // lease connection (successful)
-        let request4 = MockRequest(connectionType: MockConnection.self)
+        let request4 = MockRequest(connectionType: TestConnection.self)
         let leaseAction4 = stateMachine.leaseConnection(request4)
         #expect(leaseAction4.request == .leaseConnection(.init(element: request4), connection))
         #expect(leaseAction4.connection == .none)
@@ -668,13 +671,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         )
 
         // request two connections
-        let mockRequest1 = MockRequest(connectionType: MockConnection.self)
+        let mockRequest1 = MockRequest(connectionType: TestConnection.self)
         let leaseAction1 = stateMachine.leaseConnection(mockRequest1)
         guard case .makeConnection(let request1, _) = leaseAction1.connection else {
             Issue.record()
             return
         }
-        let mockRequest2 = MockRequest(connectionType: MockConnection.self)
+        let mockRequest2 = MockRequest(connectionType: TestConnection.self)
         let leaseAction2 = stateMachine.leaseConnection(mockRequest2)
         guard case .makeConnection = leaseAction2.connection else {
             Issue.record()
@@ -693,7 +696,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(timer.underlying.usecase == .backoff)
 
         // make connection
-        let connection = MockConnection(id: 1)
+        let connection = TestConnection(id: 1, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         #expect(createdAction.request == .leaseConnection([mockRequest1], connection))
 
@@ -722,7 +725,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
             timerCancellationTokenType: MockTimerCancellationToken.self,
             clock: clock
         )
-        let requests = (0..<5).map { _ in MockRequest(connectionType: MockConnection.self) }
+        let requests = (0..<5).map { _ in MockRequest(connectionType: TestConnection.self) }
         let leaseRequests = requests.map { stateMachine.leaseConnection($0) }
         #expect(leaseRequests[0].connection == .makeConnection(.init(connectionID: 0), []))
         #expect(leaseRequests[1].connection == .makeConnection(.init(connectionID: 1), []))
@@ -735,7 +738,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         // only 4 connections are created as once 4 are created we have enough streams and connections available to serve
         // all requests
-        let connections = (0..<4).map { MockConnection(id: $0) }
+        let connections = (0..<4).map { TestConnection(id: $0, executor: self.executor) }
         let connectedActions = (0..<4).map { stateMachine.connectionEstablished(connections[$0], maxStreams: 1) }
         #expect(connectedActions[0].connection == .makeConnectionsCancelAndScheduleTimers(.init(element: .init(connectionID: 3)), [], []))
         #expect(connectedActions[1].connection == .cancelTimers([]))
@@ -785,7 +788,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(backOffDone2.connection == .makeConnection(requests[0], []))
 
         // make connection. Should return request to create 3 new connections
-        let connection = MockConnection(id: 0)
+        let connection = TestConnection(id: 0, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
         let newRequests = (5..<8).map { TestPoolStateMachine.ConnectionRequest(connectionID: $0) }
         let connectionKeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 1, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
@@ -793,7 +796,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(createdAction.connection == .makeConnectionsCancelAndScheduleTimers(.init(newRequests), [], .init(connectionKeepAliveTimer)))
 
         // make connection. Return 
-        let connection2 = MockConnection(id: 5)
+        let connection2 = TestConnection(id: 5, executor: self.executor)
         let createdAction2 = stateMachine.connectionEstablished(connection2, maxStreams: 1)
         let connectionKeepAliveTimer2 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 5, usecase: .keepAlive), duration: .seconds(2))
         #expect(createdAction2.request == .none)
@@ -888,7 +891,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         }
 
         // make connection 2
-        let connection2 = MockConnection(id: 1)
+        let connection2 = TestConnection(id: 1, executor: self.executor)
         let createdAction = stateMachine.connectionEstablished(connection2, maxStreams: 1)
         let connection2KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: .seconds(2))
         #expect(createdAction.request == .none)

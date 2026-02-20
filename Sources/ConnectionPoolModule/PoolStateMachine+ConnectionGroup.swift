@@ -691,7 +691,7 @@ extension PoolStateMachine {
 
         mutating func triggerForceShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
             for index in self.connections.indices {
-                switch closeConnection(at: index, deleteConnection: false) {
+                switch self.closeConnection(at: index, deleteConnection: false) {
                 case .close(let closeAction):
                     cleanup.connections.append(closeAction.connection)
                     cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)

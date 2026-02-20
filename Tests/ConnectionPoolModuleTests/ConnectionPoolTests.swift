@@ -4,25 +4,28 @@ import Atomics
 import NIOEmbedded
 import Testing
 
-
 @Suite struct ConnectionPoolTests {
+
+    let executor = MockExecutor()
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func test1000ConsecutiveRequestsOnSingleConnection() async {
-        let factory = MockConnectionFactory<ContinuousClock>()
+        let factory = MockConnectionFactory<ContinuousClock, MockExecutor>()
 
         var config = ConnectionPoolConfiguration()
         config.minimumConnectionCount = 1
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: ContinuousClock()
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         // the same connection is reused 1000 times
@@ -38,8 +41,8 @@ import Testing
 
             do {
                 for _ in 0..<1000 {
-                    async let connectionFuture = pool.leaseConnection()
-                    var connectionLease: ConnectionLease<MockConnection>?
+                    async let connectionFuture = try await pool.leaseConnection()
+                    var connectionLease: ConnectionLease<MockConnection<MockExecutor>>?
                     #expect(factory.pendingConnectionAttemptsCount == 0)
                     connectionLease = try await connectionFuture
                     #expect(connectionLease != nil)
@@ -65,20 +68,22 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testShutdownPoolWhileConnectionIsBeingCreated() async {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
 
         var config = ConnectionPoolConfiguration()
         config.minimumConnectionCount = 1
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
@@ -111,20 +116,22 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testShutdownPoolWhileConnectionIsBackingOff() async {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
 
         var config = ConnectionPoolConfiguration()
         config.minimumConnectionCount = 1
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
@@ -146,7 +153,7 @@ import Testing
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testConnectionHardLimitIsRespected() async {
-        let factory = MockConnectionFactory<ContinuousClock>()
+        let factory = MockConnectionFactory<ContinuousClock, MockExecutor>()
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -156,13 +163,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: ContinuousClock()
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         let hasFinished = ManagedAtomic(false)
@@ -226,9 +235,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testKeepAliveWorks() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -238,13 +247,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -306,9 +317,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testKeepAliveOnClose() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(20)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -318,13 +329,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -393,9 +406,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testKeepAliveWorksRacesAgainstShutdown() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -405,13 +418,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -451,7 +466,6 @@ import Testing
             }
 
             taskGroup.cancelAll()
-            print("cancelled")
 
             for connection in factory.runningConnections {
                 connection.closeIfClosing()
@@ -462,9 +476,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testCancelConnectionRequestWorks() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -475,13 +489,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -523,9 +539,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testLeasingMultipleConnectionsAtOnceWorks() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 4
@@ -536,13 +552,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -562,7 +580,7 @@ import Testing
 
             // lease 4 connections at once
             pool.leaseConnections(requests)
-            var connectionLeases = [ConnectionLease<MockConnection>]()
+            var connectionLeases = [ConnectionLease<MockConnection<MockExecutor>>]()
 
             for request in requests {
                 let connection = try await request.future.success
@@ -588,9 +606,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testLeasingConnectionAfterShutdownIsInvokedFails() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 4
@@ -601,13 +619,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -644,9 +664,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testLeasingConnectionsAfterShutdownIsInvokedFails() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 4
@@ -657,13 +677,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -706,9 +728,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testLeasingMultipleStreamsFromOneConnectionWorks() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -719,13 +741,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -736,7 +760,7 @@ import Testing
             // create 4 connection requests
             let requests = (0..<10).map { ConnectionFuture(id: $0) }
             pool.leaseConnections(requests)
-            var connectionLeases = [ConnectionLease<MockConnection>]()
+            var connectionLeases = [ConnectionLease<MockConnection<MockExecutor>>]()
 
             await factory.nextConnectAttempt { connectionID in
                 return 10
@@ -772,9 +796,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testIncreasingAvailableStreamsWorks() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -785,13 +809,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: MockExecutor(),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -802,7 +828,7 @@ import Testing
             // create 4 connection requests
             var requests = (0..<21).map { ConnectionFuture(id: $0) }
             pool.leaseConnections(requests)
-            var connectionLease = [ConnectionLease<MockConnection>]()
+            var connectionLease = [ConnectionLease<MockConnection<MockExecutor>>]()
 
             await factory.nextConnectAttempt { connectionID in
                 return 1
@@ -850,9 +876,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testForceShutdown() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 1
@@ -863,13 +889,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -894,9 +922,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testForceShutdownWithLeasedConnection() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 1
@@ -907,13 +935,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -939,9 +969,9 @@ import Testing
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testForceShutdownWithActiveRequest() async throws {
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -952,13 +982,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -1002,9 +1034,9 @@ import Testing
     @Test func testForceShutdownWithConnectionBackingOff() async throws {
         struct CreateConnectionFailed: Error {}
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -1015,13 +1047,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<NothingConnectionPoolExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -1047,9 +1081,9 @@ import Testing
     @Test func testCircuitBreaker() async throws {
         struct ConnectionFailedError: Error {}
         let clock = MockClock()
-        let factory = MockConnectionFactory<MockClock>()
+        let factory = MockConnectionFactory<MockClock, MockExecutor>()
         let keepAliveDuration = Duration.seconds(30)
-        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection<MockExecutor>.self)
 
         var mutableConfig = ConnectionPoolConfiguration()
         mutableConfig.minimumConnectionCount = 0
@@ -1061,13 +1095,15 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionConfiguration: MockConnectionConfiguration(username: "username", password: "password"),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            executor: self.executor,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection<MockExecutor>.ID.self),
             clock: clock
         ) {
-            try await factory.makeConnection(id: $0, for: $1)
+            try await factory.makeConnection(id: $0, configuration: $1, for: $2)
         }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -1132,14 +1168,14 @@ import Testing
 
 struct ConnectionFuture: ConnectionRequestProtocol {
     let id: Int
-    let future: Future<ConnectionLease<MockConnection>>
+    let future: Future<ConnectionLease<MockConnection<MockExecutor>>>
 
     init(id: Int) {
         self.id = id
         self.future = Future(of: ConnectionLease<MockConnection>.self)
     }
 
-    func complete(with result: Result<ConnectionLease<MockConnection>, ConnectionPoolError>) {
+    func complete(with result: Result<ConnectionLease<MockConnection<MockExecutor>>, ConnectionPoolError>) {
         switch result {
         case .success(let success):
             self.future.yield(value: success)

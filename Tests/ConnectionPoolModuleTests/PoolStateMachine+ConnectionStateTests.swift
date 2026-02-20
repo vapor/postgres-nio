@@ -6,6 +6,8 @@ import Testing
 
     typealias TestConnectionState = TestPoolStateMachine.ConnectionState
 
+    let executor = NothingConnectionPoolExecutor()
+
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testStartupLeaseReleaseParkLease() {
         let connectionID = 1
@@ -15,7 +17,7 @@ import Testing
         #expect(!state.isAvailable)
         #expect(!state.isConnected)
         #expect(!state.isLeased)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         #expect(state.isIdle)
         #expect(state.isAvailable)
@@ -60,7 +62,7 @@ import Testing
     @Test func testStartupParkLeaseBeforeTimersRegistered() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         #expect(
@@ -88,7 +90,7 @@ import Testing
     @Test func testStartupParkLeasePark() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         #expect(
@@ -151,7 +153,7 @@ import Testing
         )
         #expect(state.retryConnect() == forthBackoffTimerCancellationToken)
 
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
     }
 
@@ -159,7 +161,7 @@ import Testing
     @Test func testLeaseMultipleStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else {
@@ -196,7 +198,7 @@ import Testing
     @Test func testRunningKeepAliveReducesAvailableStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else {
@@ -228,11 +230,10 @@ import Testing
         #expect(state.isAvailable)
     }
 
-    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testRunningKeepAliveDoesNotReduceAvailableStreams() {
+    func testRunningKeepAliveDoesNotReduceAvailableStreams() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else {
@@ -261,7 +262,7 @@ import Testing
     @Test func testRunKeepAliveRacesAgainstIdleClose() {
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
-        let connection = MockConnection(id: connectionID)
+        let connection = MockConnection(id: connectionID, executor: self.executor)
         #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {

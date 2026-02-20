@@ -21,6 +21,7 @@ public final class MockRequest<Connection: PooledConnection>: ConnectionRequestP
         hasher.combine(self.id)
     }
 
+    @inlinable
     public func complete(with: Result<ConnectionLease<Connection>, ConnectionPoolError>) {
 
     }

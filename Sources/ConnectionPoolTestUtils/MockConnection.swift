@@ -2,7 +2,17 @@ import _ConnectionPoolModule
 import DequeModule
 import NIOConcurrencyHelpers
 
-public final class MockConnection: PooledConnection, Sendable {
+public struct MockConnectionConfiguration: Sendable, Hashable {
+    public var username: String
+    public var password: String
+
+    public init(username: String, password: String) {
+        self.username = username
+        self.password = password
+    }
+}
+
+public final class MockConnection<Executor: ConnectionPoolExecutor>: PooledConnection, Sendable {
     public typealias ID = Int
 
     public let id: ID
@@ -15,7 +25,7 @@ public final class MockConnection: PooledConnection, Sendable {
 
     private let lock: NIOLockedValueBox<State> = NIOLockedValueBox(.running([], []))
 
-    public init(id: Int) {
+    public init(id: Int, executor: Executor) {
         self.id = id
     }
 
