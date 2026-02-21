@@ -19,6 +19,8 @@ You interact with the Postgres database by running SQL [Queries].
 - ``PostgresBindings``
 - ``PostgresRow``
 - ``PostgresRowSequence``
+- ``PostgresColumns``
+- ``PostgresColumn``
 - ``PostgresRandomAccessRow``
 - ``PostgresCell``
 - ``PostgresQueryMetadata``

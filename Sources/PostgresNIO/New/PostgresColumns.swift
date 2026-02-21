@@ -1,5 +1,10 @@
 extension PostgresRowSequence {
     /// A ``PostgresColumns`` collection containing metadata about the columns in the query result.
+    ///
+    /// This property allows you to access metadata about the columns in a query result, such as their names and data types,
+    /// which can be useful when exploring a database without knowing its schema upfront.
+    ///
+    /// @Snippet(path: "postgres-nio/Snippets/DynamicDatabaseExplorer", slice: explore)
     public var columns: PostgresColumns {
         PostgresColumns(underlying: self._columns)
     }
@@ -8,6 +13,8 @@ extension PostgresRowSequence {
 /// A collection of ``PostgresColumn`` column metadata for a PostgreSQL query result.
 ///
 /// You can access metadata about the columns in a query result from ``PostgresRowSequence/columns``.
+///
+/// @Snippet(path: "postgres-nio/Snippets/DynamicDatabaseExplorer", slice: explore)
 public struct PostgresColumns: Sequence, Sendable {
     public typealias Element = PostgresColumn
 
