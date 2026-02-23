@@ -834,7 +834,7 @@ typealias TestConnection = MockConnection<NothingConnectionPoolExecutor>
 
         // Connection failed go into connectionCreationFailing state
         _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
-        let connection1 = MockConnection(id: 1)
+        let connection1 = MockConnection(id: 1, executor: self.executor)
         // Connection was successful go back to running state
         _ = stateMachine.connectionEstablished(connection1, maxStreams: 1)
         // Connection failed go into connectionCreationFailing state
