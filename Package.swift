@@ -3,13 +3,15 @@ import PackageDescription
 
 #if compiler(>=6.1)
 let swiftSettings: [SwiftSetting] = [
-    .enableUpcomingFeature("NonisolatedNonsendingByDefault")
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
 ]
 #else
 let swiftSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("ExistentialAny"),
     // Sadly the 6.0 compiler concurrency checker finds false positives.
     // To be able to compile, lets reduce the language version down to 5 for 6.0 only.
-    .swiftLanguageMode(.v5)
+    .swiftLanguageMode(.v5),
 ]
 #endif
 

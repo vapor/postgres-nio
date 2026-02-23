@@ -2,7 +2,7 @@ import NIOCore
 
 // This object is @unchecked Sendable, since we syncronize state on the EL
 final class NotificationListener: @unchecked Sendable {
-    let eventLoop: EventLoop
+    let eventLoop: any EventLoop
 
     let channel: String
     let id: Int
@@ -10,8 +10,8 @@ final class NotificationListener: @unchecked Sendable {
     private var state: State
 
     enum State {
-        case streamInitialized(CheckedContinuation<PostgresNotificationSequence, Error>)
-        case streamListening(AsyncThrowingStream<PostgresNotification, Error>.Continuation)
+        case streamInitialized(CheckedContinuation<PostgresNotificationSequence, any Error>)
+        case streamListening(AsyncThrowingStream<PostgresNotification, any Error>.Continuation)
 
         case closure(PostgresListenContext, (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void)
         case done
@@ -31,8 +31,8 @@ final class NotificationListener: @unchecked Sendable {
     init(
         channel: String,
         id: Int,
-        eventLoop: EventLoop,
-        checkedContinuation: CheckedContinuation<PostgresNotificationSequence, Error>
+        eventLoop: any EventLoop,
+        checkedContinuation: CheckedContinuation<PostgresNotificationSequence, any Error>
     ) {
         self.channel = channel
         self.id = id
@@ -43,7 +43,7 @@ final class NotificationListener: @unchecked Sendable {
     init(
         channel: String,
         id: Int,
-        eventLoop: EventLoop,
+        eventLoop: any EventLoop,
         context: PostgresListenContext,
         closure: @Sendable @escaping (PostgresListenContext, PostgresMessage.NotificationResponse) -> Void
     ) {
@@ -109,7 +109,7 @@ final class NotificationListener: @unchecked Sendable {
         }
     }
 
-    func failed(_ error: Error) {
+    func failed(_ error: any Error) {
         self.eventLoop.preconditionInEventLoop()
 
         switch self.state {

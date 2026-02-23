@@ -9,8 +9,8 @@ import NIOSSL
 
 final class PostgresNIOTests: XCTestCase {
     
-    private var group: EventLoopGroup!
-    private var eventLoop: EventLoop { self.group.next() }
+    private var group: (any EventLoopGroup)!
+    private var eventLoop: any EventLoop { self.group.next() }
     
     override class func setUp() {
         XCTAssertTrue(isLoggingConfigured)

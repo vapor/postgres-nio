@@ -1,7 +1,7 @@
 import NIOCore
 
 extension PSQLError {
-    func toPostgresError() -> Error {
+    func toPostgresError() -> any Error {
         switch self.code.base {
         case .queryCancelled:
             return self
@@ -64,7 +64,7 @@ extension PostgresFormat {
 }
 
 extension Error {
-    internal var asAppropriatePostgresError: Error {
+    internal var asAppropriatePostgresError: any Error {
         if let psqlError = self as? PSQLError {
             return psqlError.toPostgresError()
         } else {

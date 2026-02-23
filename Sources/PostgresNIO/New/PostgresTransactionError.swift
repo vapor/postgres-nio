@@ -7,15 +7,15 @@ public struct PostgresTransactionError: Error {
     public var line: Int
 
     /// The error thrown when running the `BEGIN` query
-    public var beginError: Error?
+    public var beginError: (any Error)?
     /// The error thrown in the transaction closure
-    public var closureError: Error?
+    public var closureError: (any Error)?
 
     /// The error thrown while rolling the transaction back. If the ``closureError`` is set,
     /// but the ``rollbackError`` is empty, the rollback was successful. If the ``rollbackError``
     /// is set, the rollback failed.
-    public var rollbackError: Error?
+    public var rollbackError: (any Error)?
 
     /// The error thrown while commiting the transaction.
-    public var commitError: Error?
+    public var commitError: (any Error)?
 }

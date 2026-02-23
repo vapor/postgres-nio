@@ -147,7 +147,7 @@ public enum SASLAuthenticationStepResult {
     /// signifies sending an empty response, which may not be the same action
     /// depending on the underlying protocol. The provided error, if any, is
     /// surfaced. If none is provided, a generic failure is surfaced instead.
-    case fail(response: [UInt8]? = nil, error: Error? = nil)
+    case fail(response: [UInt8]? = nil, error: (any Error)? = nil)
     
 }
 

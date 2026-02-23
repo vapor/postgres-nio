@@ -254,6 +254,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenAndNotify() async throws {
         let channelNames = [
             "foo",
@@ -284,6 +285,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenTwiceChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -317,6 +319,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenOnClosedChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -333,6 +336,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenThenCloseChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -352,6 +356,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenThenClosingChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -712,7 +717,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 extension XCTestCase {
 
     func withTestConnection<Result>(
-        on eventLoop: EventLoop,
+        on eventLoop: any EventLoop,
         options: PostgresConnection.Configuration.Options? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,

@@ -26,7 +26,7 @@ struct ListenStateMachine {
         return self.channels[channel]!.startListeningSucceeded()
     }
 
-    mutating func startListeningFailed(channel: String, error: Error) -> Dictionary<Int, NotificationListener>.Values {
+    mutating func startListeningFailed(channel: String, error: any Error) -> Dictionary<Int, NotificationListener>.Values {
         return self.channels[channel]!.startListeningFailed(error)
     }
 
@@ -56,7 +56,7 @@ struct ListenStateMachine {
         return self.channels[channel]?.cancelListening(id: id) ?? .none
     }
 
-    mutating func fail(_ error: Error) -> [NotificationListener] {
+    mutating func fail(_ error: any Error) -> [NotificationListener] {
         var result = [NotificationListener]()
         while var (_, channel) = self.channels.popFirst() {
             switch channel.fail(error) {
@@ -89,7 +89,7 @@ extension ListenStateMachine {
             case starting([Int: NotificationListener])
             case listening([Int: NotificationListener])
             case stopping([Int: NotificationListener])
-            case failed(Error)
+            case failed(any Error)
         }
         
         private var state: State
@@ -143,7 +143,7 @@ extension ListenStateMachine {
             }
         }
         
-        mutating func startListeningFailed(_ error: Error) -> Dictionary<Int, NotificationListener>.Values {
+        mutating func startListeningFailed(_ error: any Error) -> Dictionary<Int, NotificationListener>.Values {
             switch self.state {
             case .initialized, .listening, .stopping:
                 fatalError("Invalid state: \(self.state)")
@@ -221,7 +221,7 @@ extension ListenStateMachine {
             case none
         }
         
-        mutating func fail(_ error: Error) -> FailAction {
+        mutating func fail(_ error: any Error) -> FailAction {
             switch self.state {
             case .initialized:
                 return .none

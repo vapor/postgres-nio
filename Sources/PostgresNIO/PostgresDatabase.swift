@@ -4,9 +4,9 @@ import Logging
 @preconcurrency
 public protocol PostgresDatabase: Sendable {
     var logger: Logger { get }
-    var eventLoop: EventLoop { get }
+    var eventLoop: any EventLoop { get }
     func send(
-        _ request: PostgresRequest,
+        _ request: any PostgresRequest,
         logger: Logger
     ) -> EventLoopFuture<Void>
 
@@ -14,22 +14,22 @@ public protocol PostgresDatabase: Sendable {
 }
 
 extension PostgresDatabase {
-    public func logging(to logger: Logger) -> PostgresDatabase {
+    public func logging(to logger: Logger) -> any PostgresDatabase {
         _PostgresDatabaseCustomLogger(database: self, logger: logger)
     }
 }
 
 private struct _PostgresDatabaseCustomLogger {
-    let database: PostgresDatabase
+    let database: any PostgresDatabase
     let logger: Logger
 }
 
 extension _PostgresDatabaseCustomLogger: PostgresDatabase {
-    var eventLoop: EventLoop {
+    var eventLoop: any EventLoop {
         self.database.eventLoop
     }
     
-    func send(_ request: PostgresRequest, logger: Logger) -> EventLoopFuture<Void> {
+    func send(_ request: any PostgresRequest, logger: Logger) -> EventLoopFuture<Void> {
         self.database.send(request, logger: logger)
     }
     
