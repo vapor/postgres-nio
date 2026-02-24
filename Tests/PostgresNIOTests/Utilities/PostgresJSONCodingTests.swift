@@ -4,6 +4,13 @@ import NIOCore
 import Testing
 import PostgresNIO
 
+/// The tests must be serialized because the decoding test also uses the `_defaultJSONEncoder`,
+/// increasing the counter in the encoding test.
+///
+/// ```swift
+/// try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self)
+/// ```
+/// Here the `Object` is encoded first and then decoded.
 @Suite(.serialized) struct PostgresJSONCodingTests {
     @Test(.bug("https://github.com/vapor/postgres-nio/issues/126"))
     func testCustomJSONEncoder() {
