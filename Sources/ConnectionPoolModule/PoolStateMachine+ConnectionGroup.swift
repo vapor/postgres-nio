@@ -583,6 +583,22 @@ extension PoolStateMachine {
         }
 
         @inlinable
+        mutating func rescheduleIdleTimer(_ connectionID: Connection.ID) -> ConnectionTimer? {
+            guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
+                // because of a race this connection (connection close runs against trigger of timeout)
+                // was already removed from the state machine.
+                return nil
+            }
+            if index < self.minimumConcurrentConnections {
+                // because of a race a connection might receive a idle timeout after it was moved into
+                // the persisted connections. If a connection is now persisted, we now need to ignore
+                // the trigger
+                return nil
+            }
+            return self.connections[index].rescheduleIdleTimer()
+        }
+
+        @inlinable
         mutating func destroyFailedConnection(_ connectionID: Connection.ID) -> TimerCancellationToken? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("Failing a connection we don't have a record of.")

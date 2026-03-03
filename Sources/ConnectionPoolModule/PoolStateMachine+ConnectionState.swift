@@ -251,7 +251,6 @@ extension PoolStateMachine {
             }
         }
 
-
         @inlinable
         mutating func parkConnection(scheduleKeepAliveTimer: Bool, scheduleIdleTimeoutTimer: Bool) -> Max2Sequence<ConnectionTimer> {
             var keepAliveTimer: ConnectionTimer?
@@ -319,6 +318,26 @@ extension PoolStateMachine {
                 precondition(!scheduleKeepAliveTimer)
                 precondition(!scheduleIdleTimeoutTimer)
                 return Max2Sequence()
+            }
+        }
+
+        @inlinable
+        mutating func rescheduleIdleTimer() -> ConnectionTimer? {
+            switch self.state {
+            case .backingOff, .starting:
+                preconditionFailure("Invalid state: \(self.state)")
+
+            case .idle(let connection, let maxStreams, let keepAlive, .some):
+                let idleTimerState = self._nextTimer()
+                let idleTimer = ConnectionTimer(timerID: idleTimerState.timerID, connectionID: self.id, usecase: .idleTimeout)
+                self.state = .idle(connection, maxStreams: maxStreams, keepAlive: keepAlive, idleTimer: idleTimerState)
+                return idleTimer
+
+            case .idle(_,_,_, .none):
+                return nil
+                
+            case .leased, .closing, .closed:
+                return nil
             }
         }
 
