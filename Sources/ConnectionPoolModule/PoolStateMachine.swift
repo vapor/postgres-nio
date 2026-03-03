@@ -432,7 +432,7 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionEstablishFailed(_ error: Error, for request: ConnectionRequest) -> Action {
+    mutating func connectionEstablishFailed(_ error: any Error, for request: ConnectionRequest) -> Action {
         switch self.poolState {
         case .running:
             self.poolState = .connectionCreationFailing(
@@ -511,16 +511,16 @@ struct PoolStateMachine<
             // if connection id is not the same as retrying connection id destroy connection
             // otherwise fallthrough to backoffDone code
             guard connectionID == context.connectionIDToRetry else {
-                let timers = self.connections.destroyFailedConnection(connectionID)
-                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+                let timers = self.connections.destroyBackingOffConnection(connectionID)
+                return .init(request: .none, connection: .cancelTimers(.init(timers)))
             }
 
         case .circuitBreakOpen(let context):
             // if connection id is not the same as retrying connection id destroy connection
             // otherwise fallthrough to backoffDone code
             guard connectionID == context.connectionIDToRetry else {
-                let timers = self.connections.destroyFailedConnection(connectionID)
-                return .init(request: .none, connection: .cancelTimers(timers.map { [$0] } ?? []))
+                let timers = self.connections.destroyBackingOffConnection(connectionID)
+                return .init(request: .none, connection: .cancelTimers(.init(timers)))
             }
 
         case .running:

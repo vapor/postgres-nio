@@ -807,6 +807,50 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMultipleBackingOffConnections() {
+        struct ConnectionFailed: Error, Equatable {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 3
+        configuration.maximumConnectionSoftLimit = 10
+        configuration.maximumConnectionHardLimit = 10
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+        configuration.maximumConcurrentConnectionRequests = 3
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 3)
+
+        // Connection failed go into connectionCreationFailing state
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[0])
+        let connection1 = MockConnection(id: 1)
+        // Connection was successful go back to running state
+        _ = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        // Connection failed go into connectionCreationFailing state
+        _ = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: requests[2])
+
+        // backoff timer requested by first connectionEstablishFailed is done. It is not the
+        // connection stored in the failing state context so just cancel it related timers
+        let backOffDone = stateMachine.connectionCreationBackoffDone(requests[0].connectionID)
+        #expect(backOffDone.request == .none)
+        #expect(backOffDone.connection == .cancelTimers([]))
+
+        // backoff timer requested by second connectionEstablishFailed is done, try to create a
+        // connection again
+        let backOffDone2 = stateMachine.connectionCreationBackoffDone(requests[2].connectionID)
+        #expect(backOffDone2.request == .none)
+        #expect(backOffDone2.connection == .makeConnection(requests[2], []))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testTriggerForceShutdownWithBackingOffRequest() {
         struct ConnectionFailed: Error {}
         var configuration = PoolConfiguration()

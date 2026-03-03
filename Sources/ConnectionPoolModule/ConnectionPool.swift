@@ -484,7 +484,7 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func connectionEstablishFailed(_ error: Error, for request: StateMachine.ConnectionRequest) {
+    /*private*/ func connectionEstablishFailed(_ error: any Error, for request: StateMachine.ConnectionRequest) {
         self.observabilityDelegate.connectFailed(id: request.connectionID, error: error)
 
         self.modifyStateAndRunActions { state in

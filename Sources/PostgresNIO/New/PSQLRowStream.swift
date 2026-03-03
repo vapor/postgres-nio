@@ -14,7 +14,7 @@ struct QueryResult {
 
 // Thread safety is guaranteed in the RowStream through dispatching onto the NIO EventLoop.
 final class PSQLRowStream: @unchecked Sendable {
-    private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, Error, AdaptiveRowBuffer, PSQLRowStream>.Source
+    private typealias AsyncSequenceSource = NIOThrowingAsyncSequenceProducer<DataRow, any Error, AdaptiveRowBuffer, PSQLRowStream>.Source
 
     enum StatementSummary: Equatable {
         case tag(String)
@@ -22,25 +22,25 @@ final class PSQLRowStream: @unchecked Sendable {
     }
     
     enum Source {
-        case stream([RowDescription.Column], PSQLRowsDataSource)
-        case noRows(Result<StatementSummary, Error>)
+        case stream([RowDescription.Column], any PSQLRowsDataSource)
+        case noRows(Result<StatementSummary, any Error>)
     }
     
-    let eventLoop: EventLoop
+    let eventLoop: any EventLoop
     let logger: Logger
 
     private enum BufferState {
-        case streaming(buffer: CircularBuffer<DataRow>, dataSource: PSQLRowsDataSource)
+        case streaming(buffer: CircularBuffer<DataRow>, dataSource: any PSQLRowsDataSource)
         case finished(buffer: CircularBuffer<DataRow>, summary: StatementSummary)
-        case failure(Error)
+        case failure(any Error)
     }
 
     private enum DownstreamState {
         case waitingForConsumer(BufferState)
-        case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, PSQLRowsDataSource)
-        case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, PSQLRowsDataSource)
-        case consumed(Result<StatementSummary, Error>)
-        case asyncSequence(AsyncSequenceSource, PSQLRowsDataSource, onFinish: @Sendable () -> ())
+        case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, any PSQLRowsDataSource)
+        case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, any PSQLRowsDataSource)
+        case consumed(Result<StatementSummary, any Error>)
+        case asyncSequence(AsyncSequenceSource, any PSQLRowsDataSource, onFinish: @Sendable () -> ())
     }
     
     internal let rowDescription: [RowDescription.Column]
@@ -49,7 +49,7 @@ final class PSQLRowStream: @unchecked Sendable {
     
     init(
         source: Source,
-        eventLoop: EventLoop,
+        eventLoop: any EventLoop,
         logger: Logger
     ) {
         let bufferState: BufferState
@@ -89,7 +89,7 @@ final class PSQLRowStream: @unchecked Sendable {
         
         let producer = NIOThrowingAsyncSequenceProducer.makeSequence(
             elementType: DataRow.self,
-            failureType: Error.self,
+            failureType: (any Error).self,
             backPressureStrategy: AdaptiveRowBuffer(),
             finishOnDeinit: false,
             delegate: self
@@ -338,7 +338,7 @@ final class PSQLRowStream: @unchecked Sendable {
         }
     }
     
-    internal func receive(completion result: Result<String, Error>) {
+    internal func receive(completion result: Result<String, any Error>) {
         self.eventLoop.preconditionInEventLoop()
         
         switch result {
@@ -375,7 +375,7 @@ final class PSQLRowStream: @unchecked Sendable {
         }
     }
         
-    private func receiveError(_ error: Error) {
+    private func receiveError(_ error: any Error) {
         switch self.downstreamState {
         case .waitingForConsumer(.streaming):
             self.downstreamState = .waitingForConsumer(.failure(error))
@@ -401,7 +401,7 @@ final class PSQLRowStream: @unchecked Sendable {
         }
     }
 
-    private func executeActionBasedOnYieldResult(_ yieldResult: AsyncSequenceSource.YieldResult, source: PSQLRowsDataSource) {
+    private func executeActionBasedOnYieldResult(_ yieldResult: AsyncSequenceSource.YieldResult, source: any PSQLRowsDataSource) {
         self.eventLoop.preconditionInEventLoop()
         switch yieldResult {
         case .dropped:

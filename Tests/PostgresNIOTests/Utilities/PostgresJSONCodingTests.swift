@@ -1,10 +1,18 @@
 import Atomics
+import Foundation
 import NIOCore
-import XCTest
+import Testing
 import PostgresNIO
 
-class PostgresJSONCodingTests: XCTestCase {
-    // https://github.com/vapor/postgres-nio/issues/126
+/// The tests must be serialized because the decoding test also uses the `_defaultJSONEncoder`,
+/// increasing the counter in the encoding test.
+///
+/// ```swift
+/// try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self)
+/// ```
+/// Here the `Object` is encoded first and then decoded.
+@Suite(.serialized) struct PostgresJSONCodingTests {
+    @Test(.bug("https://github.com/vapor/postgres-nio/issues/126"))
     func testCustomJSONEncoder() {
         let previousDefaultJSONEncoder = PostgresNIO._defaultJSONEncoder
         defer {
@@ -22,19 +30,19 @@ class PostgresJSONCodingTests: XCTestCase {
             var bar: Int
         }
         let customJSONEncoder = CustomJSONEncoder()
-        XCTAssertEqual(customJSONEncoder.counter.load(ordering: .relaxed), 0)
+        #expect(customJSONEncoder.counter.load(ordering: .relaxed) == 0)
         PostgresNIO._defaultJSONEncoder = customJSONEncoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)))
-        XCTAssertEqual(customJSONEncoder.counter.load(ordering: .relaxed), 1)
+        #expect(throws: Never.self) { try PostgresData(json: Object(foo: 1, bar: 2)) }
+        #expect(customJSONEncoder.counter.load(ordering: .relaxed) == 1)
 
         let customJSONBEncoder = CustomJSONEncoder()
-        XCTAssertEqual(customJSONBEncoder.counter.load(ordering: .relaxed), 0)
+        #expect(customJSONBEncoder.counter.load(ordering: .relaxed) == 0)
         PostgresNIO._defaultJSONEncoder = customJSONBEncoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)))
-        XCTAssertEqual(customJSONBEncoder.counter.load(ordering: .relaxed), 1)
+        #expect(throws: Never.self) { try PostgresData(json: Object(foo: 1, bar: 2)) }
+        #expect(customJSONBEncoder.counter.load(ordering: .relaxed) == 1)
     }
 
-    // https://github.com/vapor/postgres-nio/issues/126
+    @Test(.bug("https://github.com/vapor/postgres-nio/issues/126"))
     func testCustomJSONDecoder() {
         let previousDefaultJSONDecoder = PostgresNIO._defaultJSONDecoder
         defer {
@@ -52,15 +60,15 @@ class PostgresJSONCodingTests: XCTestCase {
             var bar: Int
         }
         let customJSONDecoder = CustomJSONDecoder()
-        XCTAssertEqual(customJSONDecoder.counter.load(ordering: .relaxed), 0)
+        #expect(customJSONDecoder.counter.load(ordering: .relaxed) == 0)
         PostgresNIO._defaultJSONDecoder = customJSONDecoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
-        XCTAssertEqual(customJSONDecoder.counter.load(ordering: .relaxed), 1)
+        #expect(throws: Never.self) { try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self) }
+        #expect(customJSONDecoder.counter.load(ordering: .relaxed) == 1)
 
         let customJSONBDecoder = CustomJSONDecoder()
-        XCTAssertEqual(customJSONBDecoder.counter.load(ordering: .relaxed), 0)
+        #expect(customJSONBDecoder.counter.load(ordering: .relaxed) == 0)
         PostgresNIO._defaultJSONDecoder = customJSONBDecoder
-        XCTAssertNoThrow(try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self))
-        XCTAssertEqual(customJSONBDecoder.counter.load(ordering: .relaxed), 1)
+        #expect(throws: Never.self) { try PostgresData(json: Object(foo: 1, bar: 2)).json(as: Object.self) }
+        #expect(customJSONBDecoder.counter.load(ordering: .relaxed) == 1)
     }
 }
