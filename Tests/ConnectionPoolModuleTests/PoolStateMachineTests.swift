@@ -925,11 +925,10 @@ typealias TestPoolStateMachine = PoolStateMachine<
         }
         // keepalive done
         let keepAliveDone = stateMachine.connectionKeepAliveDone(MockConnection(id: 0))
-        guard case .leaseConnection(let requests, let connection) = keepAliveDone.request else {
+        // would expect a makeConnection as we need a new connection to serve the lease request
+        guard case .makeConnection(_, _) = keepAliveDone.connection else {
             Issue.record()
             return
         }
-        #expect(requests == [.init(connectionType: MockConnection.self)])
-        #expect(connection.id == 0)
     }
 }
