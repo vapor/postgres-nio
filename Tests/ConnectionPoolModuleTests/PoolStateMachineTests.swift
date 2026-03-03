@@ -963,14 +963,16 @@ typealias TestPoolStateMachine = PoolStateMachine<
         }
         // trigger timeout timer
         let idleTimerTriggered = stateMachine.timerTriggered(idleTimeoutTimer)
-        guard case .closeConnection(_, _) = idleTimerTriggered.connection else {
+        guard case .scheduleTimers(let idleTimersRescheduled) = idleTimerTriggered.connection else {
             Issue.record()
             return
         }
+        #expect(idleTimersRescheduled.first?.underlying.usecase == .idleTimeout)
+
         // keepalive done
         let keepAliveDone = stateMachine.connectionKeepAliveDone(MockConnection(id: 0))
         // would expect a makeConnection as we need a new connection to serve the lease request
-        guard case .makeConnection(_, _) = keepAliveDone.connection else {
+        guard case .leaseConnection(_, _) = keepAliveDone.request else {
             Issue.record()
             return
         }
