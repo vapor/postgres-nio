@@ -586,8 +586,6 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionIdleTimerTriggered(_ connectionID: ConnectionID) -> Action {
-        precondition(self.requestQueue.isEmpty)
-
         guard let closeAction = self.connections.closeConnectionIfIdle(connectionID) else {
             return .none()
         }

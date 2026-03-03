@@ -861,4 +861,75 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(stateMachine.isShutdown)
         #expect(stateMachine.connections.stats.active == 0)
     }
+
+    /// Test that keep alive, idle timer triggering and leasing a connection do not race
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveIdleTimerTriggerRaceCondition() throws {
+        struct ConnectionFailed: Error {}
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 1
+        configuration.maximumConnectionHardLimit = 1
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // lease connection
+        let mockRequest1 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction1 = stateMachine.leaseConnection(mockRequest1)
+        guard case .makeConnection(let request1, _) = leaseAction1.connection else {
+            Issue.record()
+            return
+        }
+        // establish connection
+        let establishConnection1 = stateMachine.connectionEstablished(.init(id: request1.connectionID), maxStreams: 1)
+        guard case .cancelTimers(let timers1) = establishConnection1.connection else {
+            Issue.record()
+            return
+        }
+        // release connection
+        #expect(timers1.count == 0)
+        let releaseConnection1 = stateMachine.releaseConnection(.init(id: request1.connectionID), streams: 1)
+        guard case .scheduleTimers(let timers2) = releaseConnection1.connection else {
+            Issue.record()
+            return
+        }
+        let keepAliveTimer = try #require(timers2.first)
+        let idleTimeoutTimer = try #require(timers2.second)
+        #expect(keepAliveTimer.underlying.usecase == .keepAlive) 
+        #expect(idleTimeoutTimer.underlying.usecase == .idleTimeout)
+        // trigger keep alive
+        let timerTriggered = stateMachine.timerTriggered(keepAliveTimer)
+        guard case .runKeepAlive = timerTriggered.connection else {
+            Issue.record()
+            return
+        }
+        // lease connection
+        let mockRequest2 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction2 = stateMachine.leaseConnection(mockRequest2)
+        guard case .none = leaseAction2.connection else {
+            Issue.record()
+            return
+        }
+        // trigger timeout timer
+        let idleTimerTriggered = stateMachine.timerTriggered(idleTimeoutTimer)
+        guard case .closeConnection(_, _) = idleTimerTriggered.connection else {
+            Issue.record()
+            return
+        }
+        // keepalive done
+        let keepAliveDone = stateMachine.connectionKeepAliveDone(MockConnection(id: 0))
+        guard case .leaseConnection(let requests, let connection) = keepAliveDone.request else {
+            Issue.record()
+            return
+        }
+        #expect(requests == [.init(connectionType: MockConnection.self)])
+        #expect(connection.id == 0)
+    }
 }
