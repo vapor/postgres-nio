@@ -586,7 +586,16 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionIdleTimerTriggered(_ connectionID: ConnectionID) -> Action {
-        guard requestQueue.isEmpty else {
+        guard self.requestQueue.isEmpty else {
+            // We run into this case, if the following things happen in order:
+            //   1. this connection is starting a keep alive
+            //   2. a lease request is added to the queue that can not be served immediately
+            //   3. this idle timeout timer triggers, while the connection is still running the keep alive
+            //
+            // If this is the case we just recreate the idle timeout. After the keep alive is done, this connection
+            // might pickup the lease request (which would cancel the idle timeout) or the lease request might
+            // already be handled by another (currently busy connection), in which case the idle timeout can
+            // trigger eventually.
             let timer = self.connections.rescheduleIdleTimer(connectionID)
             return .init(request: .none, connection: .scheduleTimers(timer.map { [self.mapTimers($0)] } ?? []))
         }
