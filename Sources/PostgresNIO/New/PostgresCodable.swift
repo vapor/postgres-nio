@@ -70,17 +70,17 @@ public protocol PostgresDecodable {
     /// String? should be PostgresDecodable, String?? should not be PostgresDecodable
     associatedtype _DecodableType: PostgresDecodable = Self
 
-    /// Create an entity from the `byteBuffer` in Postgres wire format
+    /// Create an entity from the `buffer` in Postgres wire format.
     ///
     /// - Parameters:
-    ///   - byteBuffer: A `ByteBuffer` to decode. The byteBuffer is sliced in such a way that it is expected
-    ///                 that the complete buffer is consumed for decoding
-    ///   - type: The Postgres data type. Depending on this type the `byteBuffer`'s bytes need to be interpreted
+    ///   - buffer: A `ByteBuffer` to decode. The buffer is sliced in such a way that it is expected
+    ///             that the complete buffer is consumed for decoding.
+    ///   - type: The Postgres data type. Depending on this type the buffer's bytes need to be interpreted
     ///           in different ways.
-    ///   - format: The Postgres wire format. Can be `.text` or `.binary`
+    ///   - format: The Postgres wire format. Can be `.text` or `.binary`.
     ///   - context: A `PostgresDecodingContext` providing context for decoding. This includes a `JSONDecoder`
     ///              to use when decoding JSON and metadata to create better errors.
-    /// - Returns: A decoded object
+    /// - Returns: A decoded object.
     init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
@@ -88,7 +88,7 @@ public protocol PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws
 
-    /// Decode an entity from the `byteBuffer` in Postgres wire format. This method has a default implementation and
+    /// Decode an entity from the `buffer` in Postgres wire format. This method has a default implementation and
     /// is only overridden for `Optional`s.
     static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
