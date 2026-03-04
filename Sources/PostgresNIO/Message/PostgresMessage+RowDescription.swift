@@ -3,7 +3,7 @@ import NIOCore
 extension PostgresMessage {
     /// Identifies the message as a row description.
     public struct RowDescription {
-        /// Describes a single field returns in a `RowDescription` message.
+        /// Describes a single field returned in a `RowDescription` message.
         public struct Field: CustomStringConvertible {
             static func parse(from buffer: inout ByteBuffer) throws -> Field {
                 guard let name = buffer.readNullTerminatedString() else {
@@ -73,7 +73,7 @@ extension PostgresMessage {
         /// The fields supplied in the row description.
         public var fields: [Field]
         
-        /// See `CustomStringConverible`.
+        /// See `CustomStringConvertible`.
         public var description: String {
             return "Row(\(self.fields)"
         }

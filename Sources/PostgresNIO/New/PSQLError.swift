@@ -1,7 +1,7 @@
 import NIOCore
 
 /// An error that is thrown from the PostgresClient.
-/// Sendability enforced through Copy on Write semantics
+/// Sendability enforced through copy-on-write semantics.
 public struct PSQLError: Error, @unchecked Sendable {
 
     public struct Code: Sendable, Hashable, CustomStringConvertible {
@@ -567,7 +567,7 @@ public struct PostgresDecodingError: Error, Equatable {
     public let columnName: String
     /// The cell's column index for which the decoding failed
     public let columnIndex: Int
-    /// The swift type the cell should have been decoded into
+    /// The Swift type the cell should have been decoded into.
     public let targetType: Any.Type
     /// The cell's postgres data type for which the decoding failed
     public let postgresType: PostgresDataType
@@ -576,9 +576,9 @@ public struct PostgresDecodingError: Error, Equatable {
     /// A copy of the cell data which was attempted to be decoded
     public let postgresData: ByteBuffer?
 
-    /// The file the decoding was attempted in
+    /// The file the decoding was attempted in.
     public let file: String
-    /// The line the decoding was attempted in
+    /// The line the decoding was attempted in.
     public let line: Int
 
     @usableFromInline

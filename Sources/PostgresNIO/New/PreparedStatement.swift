@@ -1,7 +1,7 @@
 /// A prepared statement.
 ///
 /// Structs conforming to this protocol will need to provide the SQL statement to
-/// send to the server and a way of creating bindings are decoding the result.
+/// send to the server and a way of creating bindings and decoding the result.
 ///
 /// As an example, consider this struct:
 /// ```swift
@@ -26,7 +26,7 @@
 /// Structs conforming to this protocol can then be used with `PostgresConnection.execute(_ preparedStatement:, logger:)`,
 /// which will take care of preparing the statement on the server side and executing it.
 public protocol PostgresPreparedStatement: Sendable {
-    /// The prepared statements name.
+    /// The prepared statement's name.
     ///
     /// > Note: There is a default implementation that returns the implementor's name.
     static var name: String { get }
@@ -37,7 +37,7 @@ public protocol PostgresPreparedStatement: Sendable {
     /// The SQL statement to prepare on the database server.
     static var sql: String { get }
 
-    /// The postgres data types of the values that are bind when this statement is executed.
+    /// The Postgres data types of the values that are bound when this statement is executed.
     ///
     /// If an empty array is returned the datatypes are inferred from the ``PostgresBindings`` returned
     /// from ``PostgresPreparedStatement/makeBindings()``.
@@ -46,7 +46,7 @@ public protocol PostgresPreparedStatement: Sendable {
     /// automatic inference.
     static var bindingDataTypes: [PostgresDataType] { get }
 
-    /// Make the bindings to provided concrete values to use when executing the prepared SQL statement. 
+    /// Make the bindings to provide concrete values to use when executing the prepared SQL statement.
     /// The order must match ``PostgresPreparedStatement/bindingDataTypes-4b6tx``.
     func makeBindings() throws -> PostgresBindings
     

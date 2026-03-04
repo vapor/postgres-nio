@@ -3,7 +3,7 @@ import NIOPosix // inet_pton() et al.
 import NIOSSL
 
 extension PostgresConnection {
-    /// A configuration object for a connection
+    /// A configuration object for a connection.
     public struct Configuration: Sendable {
 
         // MARK: - TLS
@@ -66,7 +66,7 @@ extension PostgresConnection {
         public struct Options: Sendable {
             /// A timeout for connection attempts. Defaults to ten seconds.
             ///
-            /// Ignored when using a preexisting communcation channel. (See
+            /// Ignored when using a preexisting communication channel. (See
             /// ``PostgresConnection/Configuration/init(establishedChannel:username:password:database:)``.)
             public var connectTimeout: TimeAmount
             

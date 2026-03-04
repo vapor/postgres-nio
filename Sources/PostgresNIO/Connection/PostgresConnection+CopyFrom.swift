@@ -32,7 +32,7 @@ public struct PostgresCopyFromWriter: Sendable {
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
     ///
     /// - Throws: If an error occurs during the write or if the backend sent an `ErrorResponse` during the copy
-    ///   operation, eg. to indicate that a **previous** `write` call had an invalid format.
+    ///   operation, e.g. to indicate that a **previous** `write` call had an invalid format.
     public func write(_ byteBuffer: ByteBuffer) async throws {
         // Check for cancellation. This is cheap and makes sure that we regularly check for cancellation in the
         // `writeData` closure. It is likely that the user would forget to do so.
@@ -100,7 +100,7 @@ public struct PostgresCopyFromWriter: Sendable {
 
 /// Specifies the format in which data is transferred to the backend in a COPY operation.
 ///
-/// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the option's meanings
+/// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the options' meanings
 /// and their default values.
 public struct PostgresCopyFromFormat: Sendable {
     /// Options that can be used to modify the `text` format of a COPY operation.

@@ -16,6 +16,6 @@ public struct PostgresTransactionError: Error {
     /// is set, the rollback failed.
     public var rollbackError: (any Error)?
 
-    /// The error thrown while commiting the transaction.
+    /// The error thrown while committing the transaction.
     public var commitError: (any Error)?
 }

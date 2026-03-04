@@ -75,7 +75,7 @@ public protocol ConnectionKeepAliveBehavior: Sendable {
 public protocol ConnectionRequestProtocol: Sendable {
     /// A connection lease request ID type.
     associatedtype ID: Hashable & Sendable
-    /// The leased connection type
+    /// The leased connection type.
     associatedtype Connection: PooledConnection
 
     /// A connection lease request ID. This ID must be generated
@@ -95,7 +95,7 @@ public protocol ConnectionRequestProtocol: Sendable {
 public struct ConnectionPoolConfiguration: Sendable {
     /// The minimum number of connections to preserve in the pool.
     ///
-    /// If the pool is mostly idle and the remote servers closes
+    /// If the pool is mostly idle and the remote server closes
     /// idle connections,
     /// the `ConnectionPool` will initiate new outbound
     /// connections proactively to avoid the number of available
@@ -116,7 +116,7 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// become idle.
     public var maximumConnectionHardLimit: Int
 
-    /// The amount of time to pass between the first failed connection
+    /// The amount of time after the first failed connection attempt
     /// before triggering the circuit breaker.
     public var circuitBreakerTripAfter: Duration
 
@@ -124,7 +124,7 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// pool before it is closed.
     public var idleTimeout: Duration
 
-    /// Maximum number of in-progress new connection requests to run at any one time
+    /// Maximum number of in-progress new connection requests to run at any one time.
     public var maximumConcurrentConnectionRequests: Int
 
     /// Creates a new connection pool configuration.

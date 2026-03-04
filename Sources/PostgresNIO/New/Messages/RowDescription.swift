@@ -10,7 +10,7 @@ import NIOCore
 ///         the Swift compiler.
 @usableFromInline
 struct RowDescription: PostgresBackendMessage.PayloadDecodable, Sendable, Hashable {
-    /// Specifies the object ID of the parameter data type.
+    /// The columns returned in this row description.
     @usableFromInline
     var columns: [Column]
 

@@ -4,8 +4,8 @@ import class Foundation.JSONDecoder
 /// `PostgresRow` represents a single table row that is received from the server for a query or a prepared statement.
 /// Its element type is ``PostgresCell``.
 ///
-/// - Warning: Please note that random access to cells in a ``PostgresRow`` have O(n) time complexity. If you require
-///            random access to cells in O(1) create a new ``PostgresRandomAccessRow`` with the given row and
+/// - Warning: Please note that random access to cells in a ``PostgresRow`` has O(n) time complexity. If you require
+///            random access to cells in O(1), create a new ``PostgresRandomAccessRow`` with the given row and
 ///            access it instead.
 public struct PostgresRow: Sendable {
     @usableFromInline
@@ -124,8 +124,8 @@ extension PostgresRow {
     }
 }
 
-/// A random access row of ``PostgresCell``s. Its initialization is O(n) where n is the number of columns
-/// in the row. All subsequent cell access are O(1).
+/// A random access row of ``PostgresCell``s. Its initialization is O(n), where n is the number of columns
+/// in the row. All subsequent cell accesses are O(1).
 public struct PostgresRandomAccessRow {
     let columns: [RowDescription.Column]
     let cells: [ByteBuffer?]
@@ -176,7 +176,7 @@ extension PostgresRandomAccessRow: Sendable, RandomAccessCollection {
     }
 
     /// Checks if the row contains a cell for the given column name.
-    /// - Parameter column: The column name to check against
+    /// - Parameter column: The column name to check against.
     /// - Returns: `true` if the row contains this column, `false` if it does not.
     public func contains(_ column: String) -> Bool {
         self.lookupTable[column] != nil
