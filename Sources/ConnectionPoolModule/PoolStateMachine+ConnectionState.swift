@@ -44,7 +44,7 @@ extension PoolStateMachine {
     }
 
     @usableFromInline
-    /// An connection state machine about the pool's view on the connection.
+    /// A connection state machine for the pool's view on the connection.
     struct ConnectionState: Sendable {
         @usableFromInline
         enum State: Sendable {
@@ -107,7 +107,7 @@ extension PoolStateMachine {
                 }
             }
 
-            /// The pool is creating a connection. Valid transitions are to: `.backingOff`, `.idle`, and `.closed`
+            /// The pool is creating a connection. Valid transitions are to: `.backingOff`, `.idle`, and `.closed`.
             case starting
             /// The pool is waiting to retry establishing a connection. Valid transitions are to: `.closed`.
             /// This means, the connection can be removed from the connections without cancelling external

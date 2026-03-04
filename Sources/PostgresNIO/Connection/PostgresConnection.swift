@@ -405,7 +405,7 @@ extension PostgresConnection {
     ///   - file: The file, the query was started in. Used for better error reporting.
     ///   - line: The line, the query was started in. Used for better error reporting.
     /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
-    ///            The sequence  be discarded.
+    ///            The sequence can be discarded.
     @discardableResult
     public func query(
         _ query: PostgresQuery,

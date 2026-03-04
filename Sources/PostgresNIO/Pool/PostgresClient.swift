@@ -22,7 +22,7 @@ import _ConnectionPoolModule
 /// ## Running a client
 ///
 /// ``PostgresClient`` relies on structured concurrency. Because of this it needs a task in which it can schedule all the
-/// background work that it needs to do in order to manage connections on the users behave. For this reason, developers
+/// background work that it needs to do in order to manage connections on the user's behalf. For this reason, developers
 /// must provide a task to the client by scheduling the client's run method in a long running task:
 ///
 /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
@@ -114,7 +114,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// demand. Default to `0`.
             ///
             /// If the open connection count becomes less than ``minimumConnections`` new connections
-            /// are created immidiatly. Must be greater or equal to zero and less than ``maximumConnections``.
+            /// are created immediately. Must be greater or equal to zero and less than ``maximumConnections``.
             ///
             /// Idle connections are kept alive using the ``keepAliveBehavior``.
             public var minimumConnections: Int = 0
@@ -360,7 +360,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - file: The file, the query was started in. Used for better error reporting.
     ///   - line: The line, the query was started in. Used for better error reporting.
     /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
-    ///            The sequence  be discarded.
+    ///            The sequence can be discarded.
     @discardableResult
     public func query(
         _ query: PostgresQuery,

@@ -73,7 +73,7 @@ extension PoolStateMachine {
         @usableFromInline
         let generator: ConnectionIDGenerator
 
-        /// The connections states
+        /// The connection states.
         @usableFromInline
         private(set) var connections: [ConnectionState]
 
@@ -319,7 +319,7 @@ extension PoolStateMachine {
             }
 
             guard let index = self.findAvailableConnection() else {
-                preconditionFailure("Stats and actual count are of.")
+                preconditionFailure("Stats and actual count are off.")
             }
 
             return self.leaseConnection(at: index, streams: 1)
@@ -375,7 +375,7 @@ extension PoolStateMachine {
                 preconditionFailure("Overflow connections should never be parked.")
 
             default:
-                preconditionFailure("A connection index must not be equal or larger `self.maximumConcurrentConnectionHardLimit`")
+                preconditionFailure("A connection index must not be equal to or larger than `self.maximumConcurrentConnectionHardLimit`")
             }
 
             return self.connections[index].parkConnection(
@@ -573,7 +573,7 @@ extension PoolStateMachine {
             }
 
             if index < self.minimumConcurrentConnections {
-                // because of a race a connection might receive a idle timeout after it was moved into
+                // because of a race a connection might receive an idle timeout after it was moved into
                 // the persisted connections. If a connection is now persisted, we now need to ignore
                 // the trigger
                 return nil
@@ -590,7 +590,7 @@ extension PoolStateMachine {
                 return nil
             }
             if index < self.minimumConcurrentConnections {
-                // because of a race a connection might receive a idle timeout after it was moved into
+                // because of a race a connection might receive an idle timeout after it was moved into
                 // the persisted connections. If a connection is now persisted, we now need to ignore
                 // the trigger
                 return nil
@@ -784,7 +784,7 @@ extension PoolStateMachine {
                     return nil
 
                 default:
-                    preconditionFailure("A connection index must not be equal or larger `self.maximumConcurrentConnectionHardLimit`")
+                    preconditionFailure("A connection index must not be equal to or larger than `self.maximumConcurrentConnectionHardLimit`")
                 }
 
             case self.minimumConcurrentConnections..<self.maximumConcurrentConnectionSoftLimit:

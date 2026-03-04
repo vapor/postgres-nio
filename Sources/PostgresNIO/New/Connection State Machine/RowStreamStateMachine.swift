@@ -12,14 +12,14 @@ struct RowStreamStateMachine {
     }
     
     private enum State {
-        /// The state machines expects further writes to `channelRead`. The writes are appended to the buffer.
+        /// The state machine expects further writes to `channelRead`. The writes are appended to the buffer.
         case waitingForRows([DataRow])
-        /// The state machines expects a call to `demandMoreResponseBodyParts` or `read`. The buffer is
+        /// The state machine expects a call to `demandMoreResponseBodyParts` or `read`. The buffer is
         /// empty. It is preserved for performance reasons.
         case waitingForReadOrDemand([DataRow])
-        /// The state machines expects a call to `read`. The buffer is empty. It is preserved for performance reasons.
+        /// The state machine expects a call to `read`. The buffer is empty. It is preserved for performance reasons.
         case waitingForRead([DataRow])
-        /// The state machines expects a call to `demandMoreResponseBodyParts`. The buffer is empty. It is
+        /// The state machine expects a call to `demandMoreResponseBodyParts`. The buffer is empty. It is
         /// preserved for performance reasons.
         case waitingForDemand([DataRow])
 

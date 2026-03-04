@@ -17,7 +17,7 @@ struct PoolConfiguration: Sendable {
     @usableFromInline
     var minimumConnectionCount: Int = 0
 
-    /// The maximum number of connections to for this pool, to be preserved.
+    /// The maximum number of connections for this pool to be preserved.
     @usableFromInline
     var maximumConnectionSoftLimit: Int = 10
 
@@ -815,7 +815,7 @@ struct PoolStateMachine<
 extension PoolStateMachine {
     /// Calculates the delay for the next connection attempt after the given number of failed `attempts`.
     ///
-    /// Our backoff formula is: 100ms * 1.25^(attempts - 1) with 3% jitter that is capped of at 1 minute.
+    /// Our backoff formula is: 100ms * 1.25^(attempts - 1) with 3% jitter that is capped off at 1 minute.
     /// This means for:
     ///   -  1 failed attempt :  100ms
     ///   -  5 failed attempts: ~300ms
@@ -829,7 +829,7 @@ extension PoolStateMachine {
     /// - Returns: time to wait until trying to establishing a new connection
     @usableFromInline
     static func calculateBackoff(failedAttempt attempts: Int) -> Duration {
-        // Our backoff formula is: 100ms * 1.25^(attempts - 1) that is capped of at 1minute
+        // Our backoff formula is: 100ms * 1.25^(attempts - 1) that is capped off at 1 minute
         // This means for:
         //   -  1 failed attempt :  100ms
         //   -  5 failed attempts: ~300ms

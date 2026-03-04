@@ -2,7 +2,7 @@ import NIOCore
 //import struct Foundation.Data
 
 
-/// A protocol to implement for all associated value in the `PostgresBackendMessage` enum
+/// A protocol to implement for all associated values in the `PostgresBackendMessage` enum.
 protocol PSQLMessagePayloadDecodable {
     
     /// Decodes the associated value for a `PostgresBackendMessage` from the given `ByteBuffer`.
@@ -16,7 +16,7 @@ protocol PSQLMessagePayloadDecodable {
     static func decode(from buffer: inout ByteBuffer) throws -> Self
 }
 
-/// A wire message that is created by a Postgres server to be consumed by Postgres client.
+/// A wire message that is created by a Postgres server to be consumed by a Postgres client.
 ///
 /// All messages are defined in the official Postgres Documentation in the section
 /// [Frontend/Backend Protocol – Message Formats](https://www.postgresql.org/docs/13/protocol-message-formats.html)

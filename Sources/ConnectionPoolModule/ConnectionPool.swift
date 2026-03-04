@@ -14,13 +14,13 @@ public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
 
 /// A connection that can be pooled in a ``ConnectionPool``
 public protocol PooledConnection: AnyObject, Sendable {
-    /// The connections identifier type.
+    /// The connection's identifier type.
     associatedtype ID: Hashable & Sendable
 
-    /// The connections identifier. The identifier is passed to
+    /// The connection's identifier. The identifier is passed to
     /// the connection factory method and must stay attached to
     /// the connection at all times. It must not change during
-    /// the connections lifetime.
+    /// the connection's lifetime.
     var id: ID { get }
 
     /// A method to register closures that are invoked when the
@@ -45,25 +45,25 @@ public protocol PooledConnection: AnyObject, Sendable {
     func close()
 }
 
-/// A connection id generator. Its returned connection IDs will
-/// be used when creating new ``PooledConnection``s
+/// A connection ID generator. Its returned connection IDs will
+/// be used when creating new ``PooledConnection``s.
 public protocol ConnectionIDGeneratorProtocol: Sendable {
-    /// The connections identifier type.
+    /// The connection's identifier type.
     associatedtype ID: Hashable & Sendable
 
     /// The next connection ID that shall be used.
     func next() -> ID
 }
 
-/// A keep alive behavior for connections maintained by the pool
+/// A keep-alive behavior for connections maintained by the pool.
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public protocol ConnectionKeepAliveBehavior: Sendable {
-    /// the connection type
+    /// The connection type.
     associatedtype Connection: PooledConnection
 
     /// The time after which a keep-alive shall
     /// be triggered.
-    /// If nil is returned, keep-alive is deactivated
+    /// If `nil` is returned, keep-alive is deactivated.
     var keepAliveFrequency: Duration? { get }
 
     /// This method is invoked when the keep-alive shall be
@@ -111,7 +111,7 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// The maximum number of connections for this pool, that can
     /// exist at any point in time. The pool can create _overflow_
     /// connections, if all connections are leased, and the
-    /// `maximumConnectionHardLimit` > `maximumConnectionSoftLimit `
+    /// `maximumConnectionHardLimit` > `maximumConnectionSoftLimit`.
     /// Overflow connections are closed immediately as soon as they
     /// become idle.
     public var maximumConnectionHardLimit: Int
@@ -127,7 +127,7 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// Maximum number of in-progress new connection requests to run at any one time
     public var maximumConcurrentConnectionRequests: Int
 
-    /// initializer
+    /// Creates a new connection pool configuration.
     public init() {
         self.minimumConnectionCount = 0
         self.maximumConnectionSoftLimit = 16
@@ -270,7 +270,7 @@ public final class ConnectionPool<
     }
 
     /// Mark a connection as going away. Connection implementors have to call this method if the connection
-    /// has received a close intent from the server. For example: an HTTP/2 GOWAY frame.
+    /// has received a close intent from the server. For example: an HTTP/2 GOAWAY frame.
     public func connectionWillClose(_ connection: Connection) {
 
     }

@@ -31,7 +31,7 @@ public struct PostgresCopyFromWriter: Sendable {
 
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
     ///
-    /// - Throws: If an error occurs during the write of if the backend sent an `ErrorResponse` during the copy
+    /// - Throws: If an error occurs during the write or if the backend sent an `ErrorResponse` during the copy
     ///   operation, eg. to indicate that a **previous** `write` call had an invalid format.
     public func write(_ byteBuffer: ByteBuffer) async throws {
         // Check for cancellation. This is cheap and makes sure that we regularly check for cancellation in the
