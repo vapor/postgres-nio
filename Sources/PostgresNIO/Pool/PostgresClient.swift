@@ -201,6 +201,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         /// - Parameters:
         ///   - host: The hostname to connect to.
         ///   - port: The TCP port to connect to (defaults to 5432).
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         ///   - tls: The TLS mode to use.
         public init(host: String, port: Int = 5432, username: String, password: String?, database: String?, tls: TLS) {
             self.init(endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
@@ -210,6 +213,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         ///
         /// - Parameters:
         ///   - unixSocketPath: The filesystem path of the socket to connect to.
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
         }
@@ -309,8 +315,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Lease a connection for the provided `closure`'s lifetime.
     ///
-    /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
-    ///                      the provided `PostgresConnection`.
+    /// - Parameters:
+    ///   - isolation: The actor isolation to use for the connection lease.
+    ///   - closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
+    ///              the provided `PostgresConnection`.
     /// - Returns: The closure's return value.
     public func withConnection<Result>(
         isolation: isolated (any Actor)? = #isolation,
@@ -335,6 +343,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - logger: The `Logger` to log into for the transaction.
     ///   - file: The file the transaction was started in. Used for better error reporting.
     ///   - line: The line the transaction was started in. Used for better error reporting.
+    ///   - isolation: The actor isolation to use for the transaction.
     ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
     ///              The connection must stay in the transaction mode. Otherwise this method will throw!
     /// - Returns: The closure's return value.

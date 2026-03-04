@@ -168,6 +168,9 @@ extension PostgresConnection {
     ///   - table: The name of the table into which to copy the data.
     ///   - columns: The name of the columns to copy. If an empty array is passed, all columns are assumed to be copied.
     ///   - format: Options that specify the format of the data that is produced by `writeData`.
+    ///   - logger: The `Logger` to log into for the operation.
+    ///   - file: The file the operation was started in. Used for better error reporting.
+    ///   - line: The line the operation was started in. Used for better error reporting.
     ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call `write` on the
     ///     writer provided by the closure to send data to the backend and return from the closure once all data is sent.
     ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown

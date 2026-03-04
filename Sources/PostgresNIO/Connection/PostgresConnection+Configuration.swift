@@ -169,6 +169,9 @@ extension PostgresConnection {
         /// - Parameters:
         ///   - host: The hostname to connect to.
         ///   - port: The TCP port to connect to (defaults to 5432).
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         ///   - tls: The TLS mode to use.
         public init(host: String, port: Int = 5432, username: String, password: String?, database: String?, tls: TLS) {
             self.init(endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
@@ -178,6 +181,9 @@ extension PostgresConnection {
         ///
         /// - Parameters:
         ///   - unixSocketPath: The filesystem path of the socket to connect to.
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
         }
@@ -192,6 +198,9 @@ extension PostgresConnection {
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
         ///   - tls: The TLS mode to use.
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(establishedChannel channel: any Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .configureChannel(channel), tls: tls, username: username, password: password, database: database)
         }
@@ -205,6 +214,9 @@ extension PostgresConnection {
         /// - Parameters:
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(establishedChannel channel: any Channel, username: String, password: String?, database: String?) {
             self.init(establishedChannel: channel, tls: .disable, username: username, password: password, database: database)
         }
