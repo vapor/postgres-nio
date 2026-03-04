@@ -209,8 +209,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         /// Create a configuration for connecting to a server through a UNIX domain socket.
         ///
         /// - Parameters:
-        ///   - path: The filesystem path of the socket to connect to.
-        ///   - tls: The TLS mode to use. Defaults to ``TLS-swift.struct/disable``.
+        ///   - unixSocketPath: The filesystem path of the socket to connect to.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
         }

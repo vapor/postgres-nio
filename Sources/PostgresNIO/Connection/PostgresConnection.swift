@@ -575,7 +575,7 @@ extension PostgresConnection {
     ///   - logger: The `Logger` to log into for the transaction.
     ///   - file: The file the transaction was started in. Used for better error reporting.
     ///   - line: The line the transaction was started in. Used for better error reporting.
-    ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
+    ///   - process: The user provided code to modify the database. Use the provided connection to run queries.
     ///              The connection must stay in the transaction mode. Otherwise this method will throw!
     /// - Returns: The closure's return value.
     public func withTransaction<Result>(
