@@ -6,7 +6,7 @@ import NIOCore
 ///         though this is where it actually belongs. The reason for this is, that we want
 ///         this type to be @usableFromInline. If a type is made @usableFromInline in an
 ///         enclosing type, the enclosing type must be @usableFromInline as well.
-///         Not putting `DataRow` in ``PSQLBackendMessage`` is our way to trick
+///         Not putting `RowDescription` in ``PSQLBackendMessage`` is our way to trick
 ///         the Swift compiler.
 @usableFromInline
 struct RowDescription: PostgresBackendMessage.PayloadDecodable, Sendable, Hashable {

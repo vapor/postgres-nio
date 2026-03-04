@@ -113,8 +113,8 @@ extension PoolStateMachine {
             /// This means, the connection can be removed from the connections without cancelling external
             /// state. The connection state can then be replaced by a new one.
             case backingOff(Timer)
-            /// The connection is `idle` and ready to execute a new query. Valid transitions to: `.pingpong`, `.leased`,
-            /// `.closing` and `.closed`
+            /// The connection is `idle` and ready to execute a new query. Valid transitions to: `.leased`,
+            /// `.closing`, and `.closed`.
             case idle(Connection, maxStreams: UInt16, keepAlive: KeepAlive, idleTimer: Timer?)
             /// The connection is leased and executing a query. Valid transitions to: `.idle` and `.closed`
             case leased(Connection, usedStreams: UInt16, maxStreams: UInt16, keepAlive: KeepAlive)

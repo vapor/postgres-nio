@@ -126,8 +126,7 @@ extension PoolStateMachine {
         /// Information around an idle connection.
         @usableFromInline
         struct AvailableConnectionContext {
-            /// The connection's use. Either general purpose or for requests with `EventLoop`
-            /// requirements.
+            /// The connection's use: persisted, demand, or overflow.
             @usableFromInline
             var use: ConnectionUse
 
