@@ -1,6 +1,6 @@
 import NIOCore
 
-// This object is @unchecked Sendable, since we syncronize state on the EL
+// This object is @unchecked Sendable, since we synchronize state on the EL
 final class NotificationListener: @unchecked Sendable {
     let eventLoop: any EventLoop
 

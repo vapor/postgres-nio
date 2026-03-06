@@ -4,7 +4,7 @@ import struct Foundation.UUID
 
 // MARK: Protocols
 
-/// A type, of which arrays can be encoded into and decoded from a postgres binary format
+/// A type of which arrays can be encoded into and decoded from a Postgres binary format.
 public protocol PostgresArrayEncodable: PostgresEncodable {
     static var psqlArrayType: PostgresDataType { get }
 }

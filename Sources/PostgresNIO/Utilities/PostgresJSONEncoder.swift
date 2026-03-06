@@ -3,9 +3,9 @@ import NIOFoundationCompat
 import NIOCore
 import NIOConcurrencyHelpers
 
-/// A protocol that mimicks the Foundation `JSONEncoder.encode(_:)` function.
+/// A protocol that mimics the Foundation `JSONEncoder.encode(_:)` function.
 /// Conform a non-Foundation JSON encoder to this protocol if you want PostgresNIO to be
-/// able to use it when encoding JSON & JSONB values (see `PostgresNIO._defaultJSONEncoder`)
+/// able to use it when encoding JSON & JSONB values (see `PostgresNIO._defaultJSONEncoder`).
 @preconcurrency
 public protocol PostgresJSONEncoder: Sendable {
     func encode<T>(_ value: T) throws -> Data where T : Encodable

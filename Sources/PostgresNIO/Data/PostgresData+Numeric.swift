@@ -4,7 +4,7 @@ import struct Foundation.Decimal
 public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible, ExpressibleByStringLiteral {
     /// The number of digits after this metadata
     internal var ndigits: Int16
-    /// How many positions before or after the deicmal point the value is offset by
+    /// How many positions before or after the decimal point the value is offset by
     internal var weight: Int16
     /// If 0x4000, this number is negative. See NUMERIC_NEG in
     /// https://github.com/postgres/postgres/blob/master/src/backend/utils/adt/numeric.c

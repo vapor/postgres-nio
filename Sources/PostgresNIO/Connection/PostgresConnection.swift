@@ -11,7 +11,7 @@ import Logging
 ///
 /// Thread safety is achieved by dispatching all access to shared state onto the underlying EventLoop.
 public final class PostgresConnection: @unchecked Sendable {
-    /// A Postgres connection ID
+    /// A Postgres connection ID.
     public typealias ID = Int
 
     /// The connection's underlying channel
@@ -28,7 +28,7 @@ public final class PostgresConnection: @unchecked Sendable {
         return self.channel.closeFuture
     }
 
-    /// A logger to use in case
+    /// A logger to use for background events.
     public var logger: Logger {
         get {
             self._logger
@@ -118,9 +118,9 @@ public final class PostgresConnection: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - eventLoop: The `EventLoop` the request shall be created on
-    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - configuration: A ``Configuration`` that shall be used for the connection.
     ///   - connectionID: An `Int` id, used for metadata logging
-    ///   - logger: A logger to log background events into
+    ///   - logger: A logger to log background events into.
     /// - Returns: A SwiftNIO `EventLoopFuture` that will provide a ``PostgresConnection``
     ///            at a later point in time.
     public static func connect(
@@ -363,10 +363,10 @@ extension PostgresConnection {
     ///
     /// - Parameters:
     ///   - eventLoop: The `EventLoop` the connection shall be created on.
-    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - configuration: A ``Configuration`` that shall be used for the connection.
     ///   - connectionID: An `Int` id, used for metadata logging
-    ///   - logger: A logger to log background events into
-    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
+    ///   - logger: A logger to log background events into.
+    /// - Returns: An established ``PostgresConnection`` that can be used to run queries.
     public static func connect(
         on eventLoop: any EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
         configuration: PostgresConnection.Configuration,
@@ -402,10 +402,10 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
-    ///            The sequence  be discarded.
+    ///            The sequence can be discarded.
     @discardableResult
     public func query(
         _ query: PostgresQuery,
@@ -470,7 +470,7 @@ extension PostgresConnection {
         }
     }
 
-    /// Start listening for a channel
+    /// Start listening for a channel.
     @available(*, deprecated,
         message: "Use the new listen method that takes a closure to handle notifications",
         renamed: "listen(on:consume:)"
@@ -495,7 +495,7 @@ extension PostgresConnection {
         return try await consume(stream)
     }
 
-    /// Execute a prepared statement, taking care of the preparation when necessary
+    /// Execute a prepared statement, taking care of the preparation when necessary.
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
         logger: Logger,
@@ -529,7 +529,7 @@ extension PostgresConnection {
         }
     }
 
-    /// Execute a prepared statement, taking care of the preparation when necessary
+    /// Execute a prepared statement, taking care of the preparation when necessary.
     @_disfavoredOverload
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
@@ -573,9 +573,10 @@ extension PostgresConnection {
     ///
     /// - Parameters:
     ///   - logger: The `Logger` to log into for the transaction.
-    ///   - file: The file, the transaction was started in. Used for better error reporting.
-    ///   - line: The line, the transaction was started in. Used for better error reporting.
-    ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
+    ///   - file: The file the transaction was started in. Used for better error reporting.
+    ///   - line: The line the transaction was started in. Used for better error reporting.
+    ///   - isolation: The actor isolation to use for the transaction.
+    ///   - process: The user provided code to modify the database. Use the provided connection to run queries.
     ///              The connection must stay in the transaction mode. Otherwise this method will throw!
     /// - Returns: The closure's return value.
     public func withTransaction<Result>(
@@ -624,8 +625,8 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryResult``.
     public func query(
         _ query: PostgresQuery,
@@ -650,8 +651,8 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     ///   - onRow: A closure that is invoked for every row.
     /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryMetadata``.
     @preconcurrency

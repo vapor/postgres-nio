@@ -11,13 +11,13 @@ import Musl
 struct PoolConfiguration: Sendable {
     /// The minimum number of connections to preserve in the pool.
     ///
-    /// If the pool is mostly idle and the remote servers closes idle connections,
+    /// If the pool is mostly idle and the remote server closes idle connections,
     /// the `ConnectionPool` will initiate new outbound connections proactively
     /// to avoid the number of available connections dropping below this number.
     @usableFromInline
     var minimumConnectionCount: Int = 0
 
-    /// The maximum number of connections to for this pool, to be preserved.
+    /// The maximum number of connections for this pool to be preserved.
     @usableFromInline
     var maximumConnectionSoftLimit: Int = 10
 
@@ -815,7 +815,7 @@ struct PoolStateMachine<
 extension PoolStateMachine {
     /// Calculates the delay for the next connection attempt after the given number of failed `attempts`.
     ///
-    /// Our backoff formula is: 100ms * 1.25^(attempts - 1) with 3% jitter that is capped of at 1 minute.
+    /// Our backoff formula is: 100ms * 1.25^(attempts - 1) with 3% jitter that is capped off at 1 minute.
     /// This means for:
     ///   -  1 failed attempt :  100ms
     ///   -  5 failed attempts: ~300ms
@@ -826,10 +826,10 @@ extension PoolStateMachine {
     ///   - 29 failed attempts: ~60s (max out)
     ///
     /// - Parameter attempts: number of failed attempts in a row
-    /// - Returns: time to wait until trying to establishing a new connection
+    /// - Returns: time to wait until trying to establish a new connection
     @usableFromInline
     static func calculateBackoff(failedAttempt attempts: Int) -> Duration {
-        // Our backoff formula is: 100ms * 1.25^(attempts - 1) that is capped of at 1minute
+        // Our backoff formula is: 100ms * 1.25^(attempts - 1) that is capped off at 1 minute
         // This means for:
         //   -  1 failed attempt :  100ms
         //   -  5 failed attempts: ~300ms

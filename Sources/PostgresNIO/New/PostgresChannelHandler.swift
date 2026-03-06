@@ -536,7 +536,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     }
     
     private func establishSSLConnection(context: ChannelHandlerContext) {
-        // This method must only be called, if we signalized the StateMachine before that we are
+        // This method must only be called if we signaled to the StateMachine before that we are
         // able to setup a SSL connection.
         do {
             try self.configureSSLCallback!(context.channel, self)

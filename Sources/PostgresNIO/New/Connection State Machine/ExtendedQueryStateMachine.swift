@@ -531,7 +531,7 @@ struct ExtendedQueryStateMachine {
         return self.setAndFireError(error)
     }
             
-    // MARK: Customer Actions
+    // MARK: Consumer Actions
     
     mutating func requestQueryRows() -> Action {
         switch self.state {

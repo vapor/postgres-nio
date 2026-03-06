@@ -85,7 +85,7 @@ struct PostgresBackendMessageDecoder: NIOSingleStepByteToMessageDecoder {
 /// An error representing a failure to decode [a Postgres wire message](https://www.postgresql.org/docs/13/protocol-message-formats.html)
 /// to the Swift structure `PSQLBackendMessage`.
 ///
-/// If you encounter a `DecodingError` when using a trusted Postgres server please make to file an issue at:
+/// If you encounter a `DecodingError` when using a trusted Postgres server, please make sure to file an issue at:
 /// [https://github.com/vapor/postgres-nio/issues](https://github.com/vapor/postgres-nio/issues)
 struct PostgresMessageDecodingError: Error {
     

@@ -3,7 +3,7 @@ import NIOConcurrencyHelpers
 
 /// An async sequence of ``PostgresRow``s.
 ///
-/// - Note: This is a struct to allow us to move to a move only type easily once they become available.
+/// - Note: This is a struct to allow us to move to a move-only type easily once they become available.
 public struct PostgresRowSequence: AsyncSequence, Sendable {
     public typealias Element = PostgresRow
 

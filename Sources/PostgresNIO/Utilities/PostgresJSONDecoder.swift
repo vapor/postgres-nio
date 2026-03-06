@@ -4,9 +4,9 @@ import NIOFoundationCompat
 import NIOCore
 import NIOConcurrencyHelpers
 
-/// A protocol that mimicks the Foundation `JSONDecoder.decode(_:from:)` function.
+/// A protocol that mimics the Foundation `JSONDecoder.decode(_:from:)` function.
 /// Conform a non-Foundation JSON decoder to this protocol if you want PostgresNIO to be
-/// able to use it when decoding JSON & JSONB values (see `PostgresNIO._defaultJSONDecoder`)
+/// able to use it when decoding JSON & JSONB values (see `PostgresNIO._defaultJSONDecoder`).
 @preconcurrency
 public protocol PostgresJSONDecoder: Sendable {
     func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable

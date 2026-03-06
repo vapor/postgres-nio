@@ -22,12 +22,12 @@ import _ConnectionPoolModule
 /// ## Running a client
 ///
 /// ``PostgresClient`` relies on structured concurrency. Because of this it needs a task in which it can schedule all the
-/// background work that it needs to do in order to manage connections on the users behave. For this reason, developers
+/// background work that it needs to do in order to manage connections on the user's behalf. For this reason, developers
 /// must provide a task to the client by scheduling the client's run method in a long running task:
 ///
 /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
 ///
-/// ``PostgresClient`` can not lease connections, if its ``run()`` method isn't active. Cancelling the ``run()`` method
+/// ``PostgresClient`` cannot lease connections if its ``run()`` method isn't active. Cancelling the ``run()`` method
 /// is equivalent to closing the client. Once a client's ``run()`` method has been cancelled, executing queries or prepared
 /// statements will fail.
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -111,10 +111,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             public var additionalStartupParameters: [(String, String)] = []
 
             /// The minimum number of connections that the client shall keep open at any time, even if there is no
-            /// demand. Default to `0`.
+            /// demand. Defaults to `0`.
             ///
             /// If the open connection count becomes less than ``minimumConnections`` new connections
-            /// are created immidiatly. Must be greater or equal to zero and less than ``maximumConnections``.
+            /// are created immediately. Must be greater or equal to zero and less than ``maximumConnections``.
             ///
             /// Idle connections are kept alive using the ``keepAliveBehavior``.
             public var minimumConnections: Int = 0
@@ -122,11 +122,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// The maximum number of connections that the client may open to the server at any time. Must be greater
             /// than ``minimumConnections``. Defaults to `20` connections.
             ///
-            /// Connections, that are created in response to demand are kept alive for the ``connectionIdleTimeout``
+            /// Connections that are created in response to demand are kept alive for the ``connectionIdleTimeout``
             /// before they are dropped.
             public var maximumConnections: Int = 20
 
-            /// The maximum amount time that a connection that is not part of the ``minimumConnections`` is kept
+            /// The maximum amount of time that a connection that is not part of the ``minimumConnections`` is kept
             /// open without being leased. Defaults to `60` seconds.
             public var connectionIdleTimeout: Duration = .seconds(60)
 
@@ -201,6 +201,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         /// - Parameters:
         ///   - host: The hostname to connect to.
         ///   - port: The TCP port to connect to (defaults to 5432).
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         ///   - tls: The TLS mode to use.
         public init(host: String, port: Int = 5432, username: String, password: String?, database: String?, tls: TLS) {
             self.init(endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
@@ -209,8 +212,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         /// Create a configuration for connecting to a server through a UNIX domain socket.
         ///
         /// - Parameters:
-        ///   - path: The filesystem path of the socket to connect to.
-        ///   - tls: The TLS mode to use. Defaults to ``TLS-swift.struct/disable``.
+        ///   - unixSocketPath: The filesystem path of the socket to connect to.
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
         }
@@ -264,7 +269,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         self.init(configuration: configuration, eventLoopGroup: eventLoopGroup, backgroundLogger: Self.loggingDisabled)
     }
 
-    /// Creates a new ``PostgresClient``. Don't forget to run ``run()`` the client in a long running task.
+    /// Creates a new ``PostgresClient``. Don't forget to ``run()`` the client in a long-running task.
     ///
     /// - Parameters:
     ///   - configuration: The client's configuration. See ``Configuration`` for details.
@@ -310,8 +315,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Lease a connection for the provided `closure`'s lifetime.
     ///
-    /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
-    ///                      the provided `PostgresConnection`.
+    /// - Parameters:
+    ///   - isolation: The actor isolation to use for the connection lease.
+    ///   - closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
+    ///              the provided `PostgresConnection`.
     /// - Returns: The closure's return value.
     public func withConnection<Result>(
         isolation: isolated (any Actor)? = #isolation,
@@ -334,8 +341,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///
     /// - Parameters:
     ///   - logger: The `Logger` to log into for the transaction.
-    ///   - file: The file, the transaction was started in. Used for better error reporting.
-    ///   - line: The line, the transaction was started in. Used for better error reporting.
+    ///   - file: The file the transaction was started in. Used for better error reporting.
+    ///   - line: The line the transaction was started in. Used for better error reporting.
+    ///   - isolation: The actor isolation to use for the transaction.
     ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
     ///              The connection must stay in the transaction mode. Otherwise this method will throw!
     /// - Returns: The closure's return value.
@@ -357,10 +365,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
-    ///            The sequence  be discarded.
+    ///            The sequence can be discarded.
     @discardableResult
     public func query(
         _ query: PostgresQuery,
@@ -406,7 +414,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         }
     }
 
-    /// Execute a prepared statement, taking care of the preparation when necessary
+    /// Execute a prepared statement, taking care of the preparation when necessary.
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
         logger: Logger? = nil,
@@ -457,7 +465,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// prepared statements or leasing connections will hang until the developer executes the client's ``run()``
     /// method.
     ///
-    /// Cancelling the task which executes the ``run()`` method, is equivalent to closing the client. Once the task
+    /// Cancelling the task that executes the ``run()`` method is equivalent to closing the client. Once the task
     /// has been cancelled the client is not able to process any new queries or prepared statements.
     ///
     /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")

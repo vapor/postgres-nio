@@ -16,7 +16,7 @@ public protocol ConnectionPoolObservabilityDelegate: Sendable {
     /// time and is reported via ````. The
     func connectSucceeded(id: ConnectionID, streamCapacity: UInt16)
 
-    /// The utlization of the connection changed; a stream may have been used, returned or the
+    /// The utilization of the connection changed; a stream may have been used, returned, or the
     /// maximum number of concurrent streams available on the connection changed.
     func connectionUtilizationChanged(id:ConnectionID, streamsUsed: UInt16, streamCapacity: UInt16)
 
