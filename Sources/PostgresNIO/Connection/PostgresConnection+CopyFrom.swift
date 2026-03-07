@@ -342,7 +342,7 @@ extension PostgresConnection {
     public func copyFrom(
         table: String,
         columns: [String] = [],
-        format: PostgresCopyFromFormat,
+        format: PostgresCopyFromFormat = .init(format: .text),
         logger: Logger,
         file: String = #fileID,
         line: Int = #line,
