@@ -717,9 +717,7 @@ import Synchronization
 
 
     @Test func testCopyFromWithOptions() async throws {
-        var options = PostgresCopyFromFormat.TextOptions()
-        options.delimiter = ","
-        try await expectCopyFrom(format: .text(options)) { writer in
+        try await expectCopyFrom(options: .init(format: .text, delimiter: ",")) { writer in
             try await writer.write(ByteBuffer(staticString: "1,Alice\n"))
         } validateCopyRequest: { copyRequest in
             #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT text,DELIMITER U&'\002c')"#)
@@ -727,6 +725,48 @@ import Synchronization
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
             #expect(String(buffer: data.data) == "1,Alice\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
+    @Test func testCopyFromWithCSVFormat() async throws {
+        try await expectCopyFrom(options: .init(format: .csv)) { writer in
+            try await writer.write(ByteBuffer(staticString: "1,Alice\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT csv)"#)
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel, _ in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "1,Alice\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
+    @Test func testCopyFromWithCSVHeaderOption() async throws {
+        try await expectCopyFrom(options: .init(format: .csv, header: .boolean(true))) { writer in
+            try await writer.write(ByteBuffer(staticString: "id,name\n1,Alice\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT csv,HEADER true)"#)
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel, _ in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "id,name\n1,Alice\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+    
+    @Test func testCopyFromWithCSVHeaderMatchOption() async throws {
+        try await expectCopyFrom(options: .init(format: .csv, header: .match)) { writer in
+            try await writer.write(ByteBuffer(staticString: "id,name\n1,Alice\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT csv,HEADER match)"#)
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel, _ in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "id,name\n1,Alice\n")
             #expect(data.result == .done)
             try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
         }
@@ -1051,7 +1091,7 @@ import Synchronization
     private func expectCopyFrom(
         table: String = "copy_table",
         columns: [String] = ["id", "name"],
-        format: PostgresCopyFromFormat = .text(.init()),
+        options: PostgresCopyFromOptions = .init(format: .text),
         writeData: @escaping @Sendable (PostgresCopyFromWriter) async throws -> Void,
         validateCopyFromError: (@Sendable (any Error) -> Void)? = nil,
         preCopyInResponse: (_ channel: NIOAsyncTestingChannel) -> Void = { _ in },
@@ -1063,7 +1103,7 @@ import Synchronization
             try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
                 taskGroup.addTask {
                     do {
-                        try await connection.copyFrom(table: table, columns: columns, format: format, logger: logger, writeData: writeData)
+                        try await connection.copyFrom(table: table, columns: columns, options: options, logger: logger, writeData: writeData)
                         if validateCopyFromError != nil {
                             Issue.record("Expected `copyFrom` to throw but it did not", sourceLocation: sourceLocation)
                         }
