@@ -339,6 +339,7 @@ extension PostgresConnection {
     /// - Important: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
     ///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
     @available(*, deprecated, renamed: "copyFrom(table:columns:options:logger:file:line:writeData:)")
+    @_disfavoredOverload
     public func copyFrom(
         table: String,
         columns: [String] = [],
