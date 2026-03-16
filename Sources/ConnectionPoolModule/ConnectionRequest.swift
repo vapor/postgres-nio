@@ -32,7 +32,7 @@ extension ConnectionPool where Request == ConnectionRequest<Connection> {
         keepAliveBehavior: KeepAliveBehavior,
         observabilityDelegate: ObservabilityDelegate,
         clock: Clock = ContinuousClock(),
-        connectionFactory: @escaping ConnectionFactory
+        connectionProvider: ConnectionProvider
     ) {
         self.init(
             configuration: configuration,
@@ -41,7 +41,7 @@ extension ConnectionPool where Request == ConnectionRequest<Connection> {
             keepAliveBehavior: keepAliveBehavior,
             observabilityDelegate: observabilityDelegate,
             clock: clock,
-            connectionFactory: connectionFactory
+            connectionProvider: connectionProvider
         )
     }
 

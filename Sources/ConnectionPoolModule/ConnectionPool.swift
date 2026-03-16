@@ -37,12 +37,58 @@ public protocol PooledConnection: AnyObject, Sendable {
     ///     }
     ///   }
     /// ```
-    func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ())
+//    func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ())
 
     /// Close the running connection. Once the close has completed
     /// closures that were registered in `onClose` must be
     /// invoked.
-    func close()
+//    func close()
+}
+
+public struct EventsCallbacks<ConnectionID: Sendable & Hashable>: Sendable {
+    @usableFromInline
+    var eventsDelegate: any EventsDelegate<ConnectionID>
+    @usableFromInline
+    var connectionID: ConnectionID
+
+    @inlinable
+    init(eventsDelegate: any EventsDelegate<ConnectionID>, connectionID: ConnectionID) {
+        self.eventsDelegate = eventsDelegate
+        self.connectionID = connectionID
+    }
+
+    public func connectionWillGoAway() {
+        self.eventsDelegate.connectionWillClose(self.connectionID)
+    }
+
+    public func connectionClosed(_ error: (any Error)?) {
+        self.eventsDelegate.connectionClosed(self.connectionID, failure: error)
+    }
+
+    public func connectionMaxStreamsChanged(_ newMaxStreams: UInt16) {
+        self.eventsDelegate.connectionMaxStreamsChanged(self.connectionID, newMaxStreams: newMaxStreams)
+    }
+}
+
+@usableFromInline
+protocol EventsDelegate<ConnectionID>: Sendable {
+    associatedtype ConnectionID: Hashable & Sendable
+
+    func connectionWillClose(_ connection: ConnectionID)
+
+    func connectionClosed(_ connectionID: ConnectionID, failure: (any Error)?)
+
+    func connectionMaxStreamsChanged(_ connection: ConnectionID, newMaxStreams: UInt16)
+}
+
+public protocol StructuredConnectionProvider: Sendable {
+    associatedtype Connection // : ~Copyable
+    associatedtype ConnectionID: Hashable
+
+    func withConnection(
+        _ id: ConnectionID,
+        onConnected: (consuming Connection, Int, (EventsCallbacks<ConnectionID>) -> Void) async -> Void
+    ) async throws
 }
 
 /// A connection ID generator. Its returned connection IDs will
@@ -143,6 +189,7 @@ public final class ConnectionPool<
     Connection: PooledConnection,
     ConnectionID: Hashable & Sendable,
     ConnectionIDGenerator: ConnectionIDGeneratorProtocol,
+    ConnectionProvider: StructuredConnectionProvider,
     Request: ConnectionRequestProtocol,
     RequestID: Hashable & Sendable,
     KeepAliveBehavior: ConnectionKeepAliveBehavior,
@@ -151,19 +198,21 @@ public final class ConnectionPool<
 >: Sendable where
     Connection.ID == ConnectionID,
     ConnectionIDGenerator.ID == ConnectionID,
+    ConnectionProvider.ConnectionID == ConnectionID,
+    ConnectionProvider.Connection == Connection,
     Request.Connection == Connection,
     Request.ID == RequestID,
     KeepAliveBehavior.Connection == Connection,
     ObservabilityDelegate.ConnectionID == ConnectionID,
     Clock.Duration == Duration
 {
-    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
+//    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
     typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
-    let factory: ConnectionFactory
+    let connectionProvider: ConnectionProvider
 
     @usableFromInline
     let keepAliveBehavior: KeepAliveBehavior
@@ -202,10 +251,10 @@ public final class ConnectionPool<
         keepAliveBehavior: KeepAliveBehavior,
         observabilityDelegate: ObservabilityDelegate,
         clock: Clock,
-        connectionFactory: @escaping ConnectionFactory
+        connectionProvider: ConnectionProvider
     ) {
         self.clock = clock
-        self.factory = connectionFactory
+        self.connectionProvider = connectionProvider
         self.keepAliveBehavior = keepAliveBehavior
         self.observabilityDelegate = observabilityDelegate
         self.configuration = configuration
@@ -311,7 +360,7 @@ public final class ConnectionPool<
         self.observabilityDelegate.connectionClosed(id: connection.id, error: error)
 
         self.modifyStateAndRunActions { state in
-            state.stateMachine.connectionClosed(connection)
+            state.stateMachine.connectionClosed(connection.id)
         }
     }
 
@@ -446,26 +495,50 @@ public final class ConnectionPool<
         }
     }
 
+    @usableFromInline
+    enum ConnectionState {
+        case connecting
+        case connected
+        case released
+    }
+
     @inlinable
     /*private*/ func makeConnection(for request: StateMachine.ConnectionRequest, in taskGroup: inout some TaskGroupProtocol) {
         taskGroup.addTask_ {
             self.observabilityDelegate.startedConnecting(id: request.connectionID)
 
-            do {
-                let bundle = try await self.factory(request.connectionID, self)
-                self.connectionEstablished(bundle)
+            var connectionState: ConnectionState = .connecting
 
-                // after the connection has been established, we keep the task open. This ensures
-                // that the pools run method can not be exited before all connections have been
-                // closed.
-                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                    bundle.connection.onClose {
-                        self.connectionDidClose(bundle.connection, error: $0)
-                        continuation.resume()
+            do {
+                try await self.connectionProvider.withConnection(request.connectionID) {
+                    connection, maxStreams, closure in
+
+                    connectionState = .connected
+
+                    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                        let bundle = ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: UInt16(maxStreams))
+                        self.connectionEstablished(bundle)
+
+                        let callbacks = EventsCallbacks(eventsDelegate: self, connectionID: request.connectionID)
+                        closure(callbacks)
                     }
+
+                    connectionState = .released
                 }
+
+
             } catch {
-                self.connectionEstablishFailed(error, for: request)
+                switch connectionState {
+                case .connecting:
+                    self.connectionEstablishFailed(error, for: request)
+
+                case .connected:
+                    fatalError("TODO: Implement")
+
+                case .released:
+                    break
+                }
+
             }
         }
     }
@@ -520,7 +593,7 @@ public final class ConnectionPool<
     /*private*/ func closeConnection(_ connection: Connection) {
         self.observabilityDelegate.connectionClosing(id: connection.id)
 
-        connection.close()
+//        connection.close()
     }
 
     @usableFromInline
@@ -582,6 +655,25 @@ public final class ConnectionPool<
         for token in cancellationTokens {
             token.resume()
         }
+    }
+}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension ConnectionPool: EventsDelegate {
+    public func connectionClosed(_ connectionID: ConnectionID, failure: (any Error)?) {
+        self.modifyStateAndRunActions { state in
+            state.stateMachine.connectionClosed(connectionID)
+        }
+    }
+
+    public func connectionMaxStreamsChanged(_ connection: ConnectionID, newMaxStreams: UInt16) {
+        self.modifyStateAndRunActions { state in
+            state.stateMachine.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: newMaxStreams)
+        }
+    }
+
+    public func connectionWillClose(_ connection: ConnectionID) {
+        fatalError()
     }
 }
 

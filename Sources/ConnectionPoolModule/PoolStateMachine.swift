@@ -612,12 +612,12 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionClosed(_ connection: Connection) -> Action {
+    mutating func connectionClosed(_ connectionID: ConnectionID) -> Action {
         switch self.poolState {
         case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.cacheNoMoreConnectionsAllowed = false
 
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: self.gracefulShutdownTriggered)
+            let closedConnectionAction = self.connections.connectionClosed(connectionID, shuttingDown: self.gracefulShutdownTriggered)
 
             let connectionAction: ConnectionAction
             if let newRequest = closedConnectionAction.newConnectionRequest {
@@ -629,7 +629,7 @@ struct PoolStateMachine<
             return .init(request: .none, connection: connectionAction)
 
         case .shuttingDown:
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: true)
+            let closedConnectionAction = self.connections.connectionClosed(connectionID, shuttingDown: true)
 
             let connectionAction: ConnectionAction
             if self.connections.isEmpty {
