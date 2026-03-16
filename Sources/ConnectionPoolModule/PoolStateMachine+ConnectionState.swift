@@ -118,7 +118,11 @@ extension PoolStateMachine {
             case idle(Connection, maxStreams: UInt16, keepAlive: KeepAlive, idleTimer: Timer?)
             /// The connection is leased and executing a query. Valid transitions to: `.idle` and `.closed`
             case leased(Connection, usedStreams: UInt16, maxStreams: UInt16, keepAlive: KeepAlive)
-            /// The connection is closing. Valid transitions to: `.closed`
+            /// The connection received a close intent (e.g. GOAWAY). No new work will be assigned.
+            /// Once all remaining streams are released it transitions to `.closing`. Valid transitions
+            /// to: `.closing`, `.closed`.
+            case draining(Connection, usedStreams: UInt16)
+            /// The pool has given the order to the connection to close. Valid transitions to: `.closed`
             case closing(Connection)
             /// The connection is closed. Final state.
             case closed
@@ -128,10 +132,10 @@ extension PoolStateMachine {
         let id: Connection.ID
 
         @usableFromInline
-        private(set) var state: State = .starting
+        /*private*/ var state: State = .starting
 
         @usableFromInline
-        private(set) var nextTimerID: Int = 0
+        /*private*/ var nextTimerID: Int = 0
 
         @inlinable
         init(id: Connection.ID) {
@@ -145,7 +149,7 @@ extension PoolStateMachine {
                 return true
             case .idle(_, _, .running, _):
                 return false
-            case .backingOff, .starting, .closed, .closing, .leased:
+            case .backingOff, .starting, .leased, .draining, .closing, .closed:
                 return false
             }
         }
@@ -159,7 +163,7 @@ extension PoolStateMachine {
                 return keepAlive.usedStreams < maxStreams
             case .leased(_, let usedStreams, let maxStreams, let keepAlive):
                 return usedStreams + keepAlive.usedStreams < maxStreams
-            case .backingOff, .starting, .closed, .closing:
+            case .backingOff, .starting, .draining, .closed, .closing:
                 return false
             }
         }
@@ -167,7 +171,7 @@ extension PoolStateMachine {
         @inlinable
         var isLeased: Bool {
             switch self.state {
-            case .leased:
+            case .leased, .draining:
                 return true
             case .backingOff, .starting, .closed, .closing, .idle:
                 return false
@@ -175,9 +179,19 @@ extension PoolStateMachine {
         }
 
         @inlinable
+        var isDraining: Bool {
+            switch self.state {
+            case .draining:
+                return true
+            case .backingOff, .starting, .closed, .closing, .idle, .leased:
+                return false
+            }
+        }
+
+        @inlinable
         var isConnected: Bool {
             switch self.state {
-            case .idle, .leased:
+            case .idle, .leased, .draining:
                 return true
             case .backingOff, .starting, .closed, .closing:
                 return false
@@ -189,7 +203,7 @@ extension PoolStateMachine {
             switch self.state {
             case .closed:
                 return true
-            case .idle, .leased, .backingOff, .starting, .closing:
+            case .idle, .leased, .draining, .backingOff, .starting, .closing:
                 return false
             }
         }
@@ -200,7 +214,7 @@ extension PoolStateMachine {
             case .starting:
                 self.state = .idle(connection, maxStreams: maxStreams, keepAlive: .notScheduled, idleTimer: nil)
                 return .idle(availableStreams: maxStreams, newIdle: true)
-            case .backingOff, .idle, .leased, .closing, .closed:
+            case .backingOff, .idle, .leased, .draining, .closing, .closed:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
@@ -246,7 +260,7 @@ extension PoolStateMachine {
                     usedStreams: usedStreams + keepAlive.usedStreams
                 )
 
-            case .closing, .closed:
+            case .draining, .closing, .closed:
                 return nil
             }
         }
@@ -259,7 +273,7 @@ extension PoolStateMachine {
             var idleTimerState: State.Timer?
 
             switch self.state {
-            case .backingOff, .starting, .leased, .closing, .closed:
+            case .backingOff, .starting, .leased, .draining, .closing, .closed:
                 preconditionFailure("Invalid state: \(self.state)")
 
             case .idle(let connection, let maxStreams, .notScheduled, .none):
@@ -336,7 +350,7 @@ extension PoolStateMachine {
             case .idle(_,_,_, .none):
                 return nil
                 
-            case .leased, .closing, .closed:
+            case .leased, .draining, .closing, .closed:
                 return nil
             }
         }
@@ -350,7 +364,7 @@ extension PoolStateMachine {
                 self.state = .backingOff(backoffTimerState)
                 return ConnectionTimer(timerID: backoffTimerState.timerID, connectionID: self.id, usecase: .backoff)
 
-            case .backingOff, .idle, .leased, .closing, .closed:
+            case .backingOff, .idle, .leased, .draining, .closing, .closed:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
@@ -366,7 +380,7 @@ extension PoolStateMachine {
             case .backingOff(let timer):
                 self.state = .starting
                 return timer.cancellationContinuation
-            case .starting, .idle, .leased, .closing, .closed:
+            case .starting, .idle, .leased, .draining, .closing, .closed:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
@@ -377,7 +391,7 @@ extension PoolStateMachine {
             case .backingOff(let timer):
                 self.state = .closed
                 return timer.cancellationContinuation
-            case .starting, .idle, .leased, .closing, .closed:
+            case .starting, .idle, .leased, .draining, .closing, .closed:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
@@ -419,13 +433,21 @@ extension PoolStateMachine {
                 self.state = .leased(connection, usedStreams: usedStreams + newLeasedStreams, maxStreams: maxStreams, keepAlive: keepAlive)
                 return LeaseAction(connection: connection, timersToCancel: .init(), wasIdle: false)
 
-            case .backingOff, .starting, .closing, .closed:
+            case .backingOff, .starting, .closing, .closed, .draining:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
 
+        @usableFromInline
+        enum ReleaseAction {
+            /// the connection has enough space
+            case available(ConnectionAvailableInfo)
+            case drainingComplete(Connection)
+            case none
+        }
+
         @inlinable
-        mutating func release(streams returnedStreams: UInt16) -> ConnectionAvailableInfo? {
+        mutating func release(streams returnedStreams: UInt16) -> ReleaseAction {
             switch self.state {
             case .leased(let connection, let usedStreams, let maxStreams, let keepAlive):
                 precondition(usedStreams >= returnedStreams)
@@ -433,16 +455,32 @@ extension PoolStateMachine {
                 let availableStreams = maxStreams - (newUsedStreams + keepAlive.usedStreams)
                 if newUsedStreams == 0 {
                     self.state = .idle(connection, maxStreams: maxStreams, keepAlive: keepAlive, idleTimer: nil)
-                    return .idle(availableStreams: availableStreams, newIdle: true)
-                } else {
+                    return .available(.idle(availableStreams: availableStreams, newIdle: true))
+                } else if availableStreams > 0 {
                     self.state = .leased(connection, usedStreams: newUsedStreams, maxStreams: maxStreams, keepAlive: keepAlive)
-                    return .leased(availableStreams: availableStreams)
+                    return .available(.leased(availableStreams: availableStreams))
+                } else {
+                    // it can happen that we don't have streams available, even after streams
+                    // were released. this might be if the number of max streams was reduced,
+                    // before the connection got released.
+                    return .none
                 }
 
-            case .closing:
-                return nil
+            case .draining(let connection, let usedStreams):
+                precondition(usedStreams >= returnedStreams)
+                let newUsedStreams = usedStreams - returnedStreams
+                if newUsedStreams == 0 {
+                    self.state = .closing(connection)
+                    return .drainingComplete(connection)
+                } else {
+                    self.state = .draining(connection, usedStreams: newUsedStreams)
+                    return .none
+                }
 
-            case .backingOff, .starting, .idle, .closed:
+            case .closing, .closed:
+                return .none
+
+            case .backingOff, .starting, .idle:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
@@ -457,7 +495,7 @@ extension PoolStateMachine {
                     keepAliveTimerCancellationContinuation: timer.cancellationContinuation
                 )
 
-            case .leased, .closed, .closing:
+            case .leased, .draining, .closed, .closing:
                 return nil
 
             case .backingOff, .starting, .idle(_, _, .running, _), .idle(_, _, .notScheduled, _):
@@ -476,7 +514,7 @@ extension PoolStateMachine {
                 self.state = .leased(connection, usedStreams: usedStreams, maxStreams: maxStreams, keepAlive: .notScheduled)
                 return .leased(availableStreams: maxStreams - usedStreams)
 
-            case .closed, .closing:
+            case .draining, .closing, .closed:
                 return nil
 
             case .backingOff, .starting,
@@ -491,6 +529,32 @@ extension PoolStateMachine {
         @inlinable
         mutating func keepAliveFailed() -> CloseAction? {
             return self.close()
+        }
+
+        @usableFromInline
+        enum MarkForCloseAction {
+            case closeConnection(CloseAction)
+            case markedForClose(availableStreams: UInt16, keepAliveWasRunning: Bool)
+            case alreadyClosing
+        }
+
+        @inlinable
+        mutating func markForClose() -> MarkForCloseAction {
+            switch self.state {
+            case .idle:
+                guard let closeAction = self.closeIfIdle() else {
+                    preconditionFailure("Connection is idle but closeIfIdle returned nil")
+                }
+                return .closeConnection(closeAction)
+
+            case .leased(let connection, let usedStreams, let maxStreams, let keepAlive):
+                let availableStreams = maxStreams - usedStreams - keepAlive.usedStreams
+                self.state = .draining(connection, usedStreams: usedStreams)
+                return .markedForClose(availableStreams: availableStreams, keepAliveWasRunning: keepAlive.isRunning)
+
+            case .closing, .closed, .starting, .backingOff, .draining:
+                return .alreadyClosing
+            }
         }
 
         @inlinable
@@ -510,7 +574,7 @@ extension PoolStateMachine {
                         return cancelContinuation
                     }
 
-                case .starting, .idle, .leased, .closing, .closed:
+                case .starting, .idle, .leased, .closing, .closed, .draining:
                     return cancelContinuation
                 }
 
@@ -525,7 +589,7 @@ extension PoolStateMachine {
                         return cancelContinuation
                     }
 
-                case .starting, .backingOff, .leased, .closing, .closed:
+                case .starting, .backingOff, .leased, .closing, .closed, .draining:
                     return cancelContinuation
                 }
 
@@ -540,7 +604,7 @@ extension PoolStateMachine {
                         return cancelContinuation
                     }
 
-                case .starting, .backingOff, .leased, .closing, .closed, 
+                case .starting, .backingOff, .leased, .closing, .closed, .draining,
                      .idle(_, _, .running, _),
                      .idle(_, _, .notScheduled, _):
                     return cancelContinuation
@@ -551,7 +615,7 @@ extension PoolStateMachine {
         @inlinable
         mutating func cancelIdleTimer() -> TimerCancellationToken? {
             switch self.state {
-            case .starting, .backingOff, .leased, .closing, .closed:
+            case .starting, .backingOff, .leased, .closing, .closed, .draining:
                 return nil
 
             case .idle(let connection, let maxStreams, let keepAlive, let idleTimer):
@@ -620,7 +684,7 @@ extension PoolStateMachine {
                     runningKeepAlive: keepAlive.isRunning
                 )
 
-            case .leased, .closed, .closing:
+            case .leased, .closed, .closing, .draining:
                 return nil
 
             case .backingOff, .starting:
@@ -634,7 +698,7 @@ extension PoolStateMachine {
             case .starting:
                 self.state = .closed
 
-            case .idle, .leased, .closed, .closing, .backingOff:
+            case .idle, .leased, .closed, .closing, .backingOff, .draining:
                 preconditionFailure("Invalid state: \(self.state)")
             }
         }
@@ -676,6 +740,17 @@ extension PoolStateMachine {
                     usedStreams: keepAlive.usedStreams + usedStreams,
                     maxStreams: maxStreams,
                     runningKeepAlive: keepAlive.isRunning
+                )
+
+            case .draining(let connection, let usedStreams):
+                self.state = .closing(connection)
+                return CloseAction(
+                    connection: connection,
+                    previousConnectionState: .leased,
+                    cancelTimers: .init(),
+                    usedStreams: usedStreams,
+                    maxStreams: 0,
+                    runningKeepAlive: false
                 )
 
             case .backingOff(let timer):
@@ -754,6 +829,16 @@ extension PoolStateMachine {
                     wasRunningKeepAlive: keepAlive.isRunning
                 )
 
+            case .draining(_, let usedStreams):
+                self.state = .closed
+                return ClosedAction(
+                    previousConnectionState: .leased,
+                    cancelTimers: .init(),
+                    maxStreams: 0,
+                    usedStreams: usedStreams,
+                    wasRunningKeepAlive: false
+                )
+
             case .closing:
                 self.state = .closed
                 return ClosedAction(
@@ -813,5 +898,22 @@ extension PoolStateMachine.ConnectionState.CloseAction: Equatable where TimerCan
     @inlinable
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.cancelTimers == rhs.cancelTimers && lhs.connection === rhs.connection && lhs.maxStreams == rhs.maxStreams
+    }
+}
+
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+extension PoolStateMachine.ConnectionState.ReleaseAction: Equatable {
+    @inlinable
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case (.available(let l), .available(let r)):
+            return l == r
+        case (.drainingComplete(let l), .drainingComplete(let r)):
+            return l === r
+        case (.none, .none):
+            return true
+        default:
+            return false
+        }
     }
 }

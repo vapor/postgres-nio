@@ -1047,6 +1047,168 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(connection0.id)
         #expect(keepAliveAction.connection == .runKeepAlive(connection0, cancel0))
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnIdleConnectionClosesAndReplacesIfPersisted() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 4
+        configuration.maximumConnectionHardLimit = 4
+        configuration.keepAliveDuration = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        // Park the connection
+        guard case .scheduleTimers(let timers) = createdAction.connection else {
+            Issue.record("Expected scheduleTimers")
+            return
+        }
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keep alive timer")
+            return
+        }
+
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(stateMachine.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        // connectionWillClose on idle connection → should close
+        let willCloseAction = stateMachine.connectionWillClose(0)
+        #expect(willCloseAction.request == .none)
+        guard case .closeConnection(let closedConn, _) = willCloseAction.connection else {
+            Issue.record("Expected closeConnection action")
+            return
+        }
+        #expect(closedConn === connection)
+
+        // Now the connection actually closes → should create a replacement (persisted)
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.request == .none)
+        guard case .makeConnection(let newRequest, _) = closedAction.connection else {
+            Issue.record("Expected makeConnection for replacement")
+            return
+        }
+        #expect(newRequest.connectionID == 1) // new connection ID
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnLeasedDrainsAndCloses() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 4
+        configuration.maximumConnectionHardLimit = 4
+        configuration.keepAliveDuration = nil
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+
+        // Lease the connection
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseAction = stateMachine.leaseConnection(request)
+        guard case .leaseConnection(_, let leasedConn) = leaseAction.request else {
+            Issue.record("Expected leaseConnection")
+            return
+        }
+        #expect(leasedConn === connection)
+
+        // connectionWillClose on leased connection → no immediate action
+        let willCloseAction = stateMachine.connectionWillClose(0)
+        #expect(willCloseAction == .none())
+
+        // Release → should trigger close
+        let releaseAction = stateMachine.releaseConnection(connection, streams: 1)
+        #expect(releaseAction.request == .none)
+        guard case .closeConnection(let closedConn, _) = releaseAction.connection else {
+            Issue.record("Expected closeConnection on release after connectionWillClose")
+            return
+        }
+        #expect(closedConn === connection)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnLeasedWithKeepAlive_ClosesOnRelease() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 4
+        configuration.maximumConnectionHardLimit = 4
+        configuration.keepAliveDuration = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 100)
+        #expect(createdAction.request == .none)
+        guard case .scheduleTimers(let timers) = createdAction.connection else {
+            Issue.record("Expected scheduleTimers")
+            return
+        }
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keep alive timer")
+            return
+        }
+
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(stateMachine.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        // Trigger keepAlive
+        let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(0)
+        guard case .runKeepAlive(let kaConnection, _) = keepAliveAction.connection else {
+            Issue.record("Expected runKeepAlive")
+            return
+        }
+        #expect(kaConnection === connection)
+
+        // Lease while keepAlive is running
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseAction = stateMachine.leaseConnection(request)
+        guard case .leaseConnection(_, let leasedConn) = leaseAction.request else {
+            Issue.record("Expected leaseConnection")
+            return
+        }
+        #expect(leasedConn === connection)
+
+        // connectionWillClose while leased with keepAlive running → no immediate action
+        let willCloseAction = stateMachine.connectionWillClose(0)
+        #expect(willCloseAction == .none())
+
+        // Release → should trigger close immediately (don't wait for keepAlive)
+        let releaseAction = stateMachine.releaseConnection(connection, streams: 1)
+        #expect(releaseAction.request == .none)
+        guard case .closeConnection(let closedConn, _) = releaseAction.connection else {
+            Issue.record("Expected closeConnection on release after connectionWillClose")
+            return
+        }
+        #expect(closedConn === connection)
+    }
 }
 
 struct SomeError: Error {}

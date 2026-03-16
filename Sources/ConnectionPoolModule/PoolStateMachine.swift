@@ -344,10 +344,15 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func releaseConnection(_ connection: Connection, streams: UInt16) -> Action {
-        guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
+        switch self.connections.releaseConnection(connection.id, streams: streams) {
+        case .available(let index, let context):
+            return self.handleAvailableConnection(index: index, availableContext: context)
+        case .closeConnection(let closeAction):
+            self.cacheNoMoreConnectionsAllowed = false
+            return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+        case .none:
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     mutating func cancelRequest(id: RequestID) -> Action {
@@ -572,10 +577,15 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionKeepAliveDone(_ connection: Connection) -> Action {
         precondition(self.configuration.keepAliveDuration != nil)
-        guard let (index, context) = self.connections.keepAliveSucceeded(connection.id) else {
+        switch self.connections.keepAliveSucceeded(connection.id) {
+        case .available(let index, let context):
+            return self.handleAvailableConnection(index: index, availableContext: context)
+        case .closeConnection(let closeAction):
+            self.cacheNoMoreConnectionsAllowed = false
+            return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+        case .none:
             return .none()
         }
-        return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
     @inlinable
@@ -585,6 +595,17 @@ struct PoolStateMachine<
         }
 
         return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+    }
+
+    @inlinable
+    mutating func connectionWillClose(_ connectionID: ConnectionID) -> Action {
+        self.cacheNoMoreConnectionsAllowed = false
+        switch self.connections.connectionWillClose(connectionID) {
+        case .closeConnection(let closeAction):
+            return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+        case .none:
+            return .none()
+        }
     }
 
     @inlinable

@@ -28,7 +28,7 @@ import Testing
         #expect(state.isConnected)
         #expect(state.isLeased)
 
-        #expect(state.release(streams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.release(streams: 1) == .available(.idle(availableStreams: 1, newIdle: true)))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         #expect(
             parkResult.elementsEqual([
@@ -107,7 +107,7 @@ import Testing
         let initialIdleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
         #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        #expect(state.release(streams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.release(streams: 1) == .available(.idle(availableStreams: 1, newIdle: true)))
         #expect(
             state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true) ==
             [
@@ -175,7 +175,7 @@ import Testing
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [keepAliveTimerCancellationToken], wasIdle: true)
         )
 
-        #expect(state.release(streams: 10) == .leased(availableStreams: 80))
+        #expect(state.release(streams: 10) == .available(.leased(availableStreams: 80)))
 
         #expect(
             state.lease(streams: 40) ==
@@ -187,9 +187,9 @@ import Testing
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: false)
         )
 
-        #expect(state.release(streams: 1) == .leased(availableStreams: 1))
-        #expect(state.release(streams: 98) == .leased(availableStreams: 99))
-        #expect(state.release(streams: 1) == .idle(availableStreams: 100, newIdle: true))
+        #expect(state.release(streams: 1) == .available(.leased(availableStreams: 1)))
+        #expect(state.release(streams: 98) == .available(.leased(availableStreams: 99)))
+        #expect(state.release(streams: 1) == .available(.idle(availableStreams: 100, newIdle: true)))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -217,7 +217,7 @@ import Testing
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: true)
         )
 
-        #expect(state.release(streams: 10) == .leased(availableStreams: 79))
+        #expect(state.release(streams: 10) == .available(.leased(availableStreams: 79)))
         #expect(state.isAvailable)
         #expect(
             state.lease(streams: 79) ==
@@ -253,7 +253,7 @@ import Testing
             TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: true)
         )
 
-        #expect(state.release(streams: 10) == .leased(availableStreams: 80))
+        #expect(state.release(streams: 10) == .available(.leased(availableStreams: 80)))
         #expect(state.keepAliveSucceeded() == .leased(availableStreams: 80))
     }
 
@@ -280,5 +280,203 @@ import Testing
 
         #expect(state.closeIfIdle() == .init(connection: connection, previousConnectionState: .idle, cancelTimers: [keepAliveTimerCancellationToken, idleTimerCancellationToken], usedStreams: 0, maxStreams: 1, runningKeepAlive: false))
         #expect(state.runKeepAliveIfIdle(reducesAvailableStreams: true) == .none)
+    }
+
+    // MARK: - markForClose tests
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMarkForCloseOnIdleConnection() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+
+        let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
+        guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {
+            Issue.record("Expected to get two timers")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        let idleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+        #expect(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken) == nil)
+
+        guard case .closeConnection(let closeAction) = state.markForClose() else {
+            Issue.record("Expected closeConnection action for idle connection")
+            return
+        }
+        #expect(closeAction.connection === connection)
+        #expect(closeAction.previousConnectionState == .idle)
+        #expect(!state.isAvailable)
+        #expect(!state.isIdle)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMarkForCloseOnLeasedConnection() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
+        #expect(state.lease(streams: 2) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        guard case .markedForClose(availableStreams: let availableStreams, keepAliveWasRunning: let keepAliveWasRunning) = state.markForClose() else {
+            Issue.record("Expected markedForClose action for leased connection")
+            return
+        }
+        #expect(availableStreams == 2) // maxStreams(4) - usedStreams(2) - keepAlive(0)
+        #expect(keepAliveWasRunning == false)
+        #expect(!state.isAvailable)
+        #expect(state.isLeased)
+        #expect(state.isDraining)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMarkForCloseOnClosingConnection() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        _ = state.closeIfIdle()
+
+        guard case .alreadyClosing = state.markForClose() else {
+            Issue.record("Expected alreadyClosing for closing connection")
+            return
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testReleaseAfterMarkForClose() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        guard case .markedForClose(availableStreams: let availableStreams, keepAliveWasRunning: let keepAliveWasRunning) = state.markForClose() else {
+            Issue.record("Expected markedForClose")
+            return
+        }
+        #expect(availableStreams == 0) // fully used
+        #expect(keepAliveWasRunning == false)
+
+        // Release all streams — should transition to closing
+        #expect(state.release(streams: 1) == .drainingComplete(connection))
+        #expect(!state.isLeased)
+        #expect(!state.isAvailable)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMarkForCloseOnLeasedWithKeepAliveRunning_ReleaseDrainsWithoutWaitingForKeepAlive() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
+
+        // Park and start keepAlive
+        let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keepAliveTimer")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        // Start keepAlive
+        #expect(
+            state.runKeepAliveIfIdle(reducesAvailableStreams: true) ==
+            .init(connection: connection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken)
+        )
+
+        // Lease while keepAlive is running
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        // Mark for close — keepAlive is running
+        guard case .markedForClose(availableStreams: let availableStreams, keepAliveWasRunning: let keepAliveWasRunning) = state.markForClose() else {
+            Issue.record("Expected markedForClose")
+            return
+        }
+        #expect(availableStreams == 98) // maxStreams(100) - usedStreams(1) - keepAlive(1)
+        #expect(keepAliveWasRunning == true)
+        #expect(state.isDraining)
+
+        // Release all streams — should transition to closing immediately (don't wait for keepAlive)
+        #expect(state.release(streams: 1) == .drainingComplete(connection))
+        #expect(!state.isLeased)
+        #expect(!state.isDraining)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveSucceededOnDrainingIsNoOp() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
+
+        // Park and start keepAlive
+        let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keepAliveTimer")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        #expect(
+            state.runKeepAliveIfIdle(reducesAvailableStreams: true) ==
+            .init(connection: connection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken)
+        )
+
+        // Lease while keepAlive is running
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        // Mark for close
+        guard case .markedForClose = state.markForClose() else {
+            Issue.record("Expected markedForClose")
+            return
+        }
+        #expect(state.isDraining)
+
+        // keepAliveSucceeded on draining → no state change, still draining
+        #expect(state.keepAliveSucceeded() == nil)
+        #expect(state.isDraining)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveFailedOnDrainingForcesClose() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
+
+        // Park and start keepAlive
+        let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keepAliveTimer")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        #expect(
+            state.runKeepAliveIfIdle(reducesAvailableStreams: false) ==
+            .init(connection: connection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken)
+        )
+
+        // Lease while keepAlive is running
+        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        // Mark for close
+        guard case .markedForClose = state.markForClose() else {
+            Issue.record("Expected markedForClose")
+            return
+        }
+        #expect(state.isDraining)
+
+        // keepAliveFailed on draining → force close to closing
+        let closeAction = state.keepAliveFailed()
+        #expect(closeAction != nil)
+        #expect(closeAction?.connection === connection)
+        #expect(closeAction?.previousConnectionState == .leased)
+        #expect(!state.isDraining)
     }
 }
