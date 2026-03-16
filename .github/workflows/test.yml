@@ -190,28 +190,6 @@ jobs:
       - name: Build
         run: swift build --swift-sdk x86_64-swift-linux-musl
 
-  wasm:
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    container: swift:noble
-    timeout-minutes: 30
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v6
-      - name: Install linux dependencies
-        run: apt-get update -y -q && apt-get install -y -q curl jq
-      - name: Install SDK
-        run: |
-          tag="swift-$(swiftc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)-RELEASE"
-          checksum="$(curl -s https://www.swift.org/api/v1/install/releases.json | \
-            jq -r --arg tag "$tag" '.[] | select(.tag == $tag).platforms[] | select(.platform == "wasm-sdk").checksum // empty')"
-          swift sdk install https://download.swift.org/$(echo $tag | tr [A-Z] [a-z])/wasm-sdk/$tag/"$tag"_wasm.artifactbundle.tar.gz --checksum $checksum
-      - name: Build
-        run: |
-          tag="$(swiftc --version | grep -Po '(?<=\().+(?=\))')"
-          swift build --swift-sdk "$tag"_wasm
-
   submit-dependencies:
     permissions:
       contents: write
