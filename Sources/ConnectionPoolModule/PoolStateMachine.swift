@@ -558,7 +558,10 @@ struct PoolStateMachine<
     @inlinable
     mutating func connectionKeepAliveTimerTriggered(_ connectionID: ConnectionID) -> Action {
         precondition(self.configuration.keepAliveDuration != nil)
-        precondition(self.requestQueue.isEmpty)
+        // Removed: precondition(self.requestQueue.isEmpty)
+        // A lease request may have been queued after this keep-alive timer was scheduled
+        // (e.g. PG restart caused connections to close while new requests arrived).
+        // This mirrors the fix in connectionIdleTimerTriggered (PR #627).
 
         guard let keepAliveAction = self.connections.keepAliveIfIdle(connectionID) else {
             return .none()
