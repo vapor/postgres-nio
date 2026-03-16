@@ -4,18 +4,14 @@ concurrency:
   cancel-in-progress: true
 on: 
   push:
-    branches: 
-      - "main"
+    branches: [ "main" ]
   pull_request:
-    branches: 
-      - "*"
-env:
-  LOG_LEVEL: info
-permissions:
-  contents: read
+    branches: [ "*" ]
 
 jobs:
   linux-unit:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -27,15 +23,8 @@ jobs:
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
     steps:
-      - name: Display OS and Swift versions
-        shell: bash
-        run: |
-          [[ -z "${SWIFT_PLATFORM}" ]] && SWIFT_PLATFORM="$(. /etc/os-release && echo "${ID}${VERSION_ID}")"
-          [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
-          printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}"
-          swift --version
       - name: Install curl for Codecov
-        run: apt-get update -y -q && apt-get install -y curl
+        run: apt-get update -yq && apt-get install -y curl
       - name: Check out package
         uses: actions/checkout@v6
       - name: Run unit tests with Thread Sanitizer
@@ -47,6 +36,8 @@ jobs:
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
   linux-integration-and-dependencies:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -65,7 +56,7 @@ jobs:
       image: swift:6.2-noble
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
-    env:
+    env: &psql_shared_env
       # Unfortunately, fluent-postgres-driver details leak through here
       POSTGRES_DB: 'test_database'
       POSTGRES_USER: 'test_username'
@@ -74,23 +65,14 @@ jobs:
       POSTGRES_HOSTNAME_B: 'psql-b'
       POSTGRES_SOCKET: '/var/run/postgresql/.s.PGSQL.5432'
       POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
+      POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.postgres-auth }}
     services:
       psql-a: &psql_service_spec
         image: ${{ matrix.postgres-image }}
         volumes: [ 'pgrunshare:/var/run/postgresql' ]
-        env:
-          POSTGRES_USER: 'test_username'
-          POSTGRES_DB: 'test_database'
-          POSTGRES_PASSWORD: 'test_password'
-          POSTGRES_HOST_AUTH_METHOD: ${{ matrix.postgres-auth }}
-          POSTGRES_INITDB_ARGS: --auth-host=${{ matrix.postgres-auth }}
+        env: *psql_shared_env
       psql-b: *psql_service_spec
     steps:
-      - name: Display OS and Swift versions
-        run: |
-          [[ -z "${SWIFT_PLATFORM}" ]] && SWIFT_PLATFORM="$(. /etc/os-release && echo "${ID}${VERSION_ID}")"
-          [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
-          printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
         uses: actions/checkout@v6
         with: { path: 'postgres-nio' }
@@ -112,6 +94,8 @@ jobs:
         run: swift test --package-path fluent-postgres-driver
 
   macos-all:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -159,7 +143,8 @@ jobs:
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
           
   api-breakage:
-    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     container: swift:noble
     steps:
@@ -167,8 +152,69 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      # https://github.com/actions/checkout/issues/766
+      - name: Restore API baseline
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v5
+        with:
+          path: .api-breakage
+          key: api-breakage-${{ github.event.pull_request.base.sha }}
       - name: API breaking changes
         run: |
           git config --global --add safe.directory "${GITHUB_WORKSPACE}"
-          swift package diagnose-api-breaking-changes origin/main
+          swift package diagnose-api-breaking-changes --baseline-dir=./.api-breakage origin/main
+      - name: Cache API baseline
+        if: github.event_name == 'push' && github.ref_name == 'main'
+        uses: actions/cache/save@v5
+        with:
+          path: .api-breakage
+          key: api-breakage-${{ github.sha }}
+
+  musl:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    container: swift:noble
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install linux dependencies
+        run: apt-get update && apt-get install -y curl jq
+      - name: Install SDK
+        run: |
+          tag="swift-$(swiftc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)-RELEASE"
+          sdk_info="$(curl -s https://www.swift.org/api/v1/install/releases.json | jq -r --arg tag "$tag" '.[] | select(.tag == $tag).platforms[] | select(.platform == "static-sdk") | [.version, .checksum] | @tsv')"
+          version="$(echo "$sdk_info" | cut -f1)"
+          checksum="$(echo "$sdk_info" | cut -f2)"
+          swift sdk install "https://download.swift.org/$(echo $tag | tr [A-Z] [a-z])/static-sdk/$tag/${tag}_static-linux-${version}.artifactbundle.tar.gz" --checksum "$checksum"
+      - name: Build
+        run: swift build --swift-sdk x86_64-swift-linux-musl
+
+  wasm:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    container: swift:noble
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+      - name: Install linux dependencies
+        run: apt-get update -y -q && apt-get install -y -q curl jq
+      - name: Install SDK
+        run: |
+          tag="swift-$(swiftc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)-RELEASE"
+          checksum="$(curl -s https://www.swift.org/api/v1/install/releases.json | \
+            jq -r --arg tag "$tag" '.[] | select(.tag == $tag).platforms[] | select(.platform == "wasm-sdk").checksum // empty')"
+          swift sdk install https://download.swift.org/$(echo $tag | tr [A-Z] [a-z])/wasm-sdk/$tag/"$tag"_wasm.artifactbundle.tar.gz --checksum $checksum
+      - name: Build
+        run: |
+          tag="$(swiftc --version | grep -Po '(?<=\().+(?=\))')"
+          swift build --swift-sdk "$tag"_wasm
+
+  submit-dependencies:
+    permissions:
+      contents: write
+    if: github.event_name == 'push'
+    uses: vapor/ci/.github/workflows/submit-deps.yml@main
+    secrets: inherit
