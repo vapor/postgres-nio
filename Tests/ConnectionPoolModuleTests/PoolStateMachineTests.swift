@@ -977,4 +977,76 @@ typealias TestPoolStateMachine = PoolStateMachine<
             return
         }
     }
+
+    // Regression test: keep-alive timer fires while requestQueue is non-empty.
+    // This reproduces a crash (precondition failure at PoolStateMachine.swift:561)
+    // when PG restarts: connection creation fails, new lease requests get queued,
+    // but keep-alive timers on surviving idle connections are still armed.
+    // Mirrors the fix in connectionIdleTimerTriggered (vapor/postgres-nio PR #627).
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveTimerWithQueuedRequests() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 2
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // 1. Create two connections (the pool minimum)
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 2)
+
+        let connection0 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 1)
+
+        let created0 = stateMachine.connectionEstablished(connection0, maxStreams: 1)
+        let timer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(10))
+        let cancel0 = MockTimerCancellationToken(timer0)
+        #expect(created0.connection == .scheduleTimers([timer0]))
+        #expect(stateMachine.timerScheduled(timer0, cancelContinuation: cancel0) == .none)
+
+        let created1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        let timer1 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: .seconds(10))
+        let cancel1 = MockTimerCancellationToken(timer1)
+        #expect(created1.connection == .scheduleTimers([timer1]))
+        #expect(stateMachine.timerScheduled(timer1, cancelContinuation: cancel1) == .none)
+
+        // Both connections are idle with keep-alive timers armed
+        #expect(stateMachine.connections.stats.idle == 2)
+
+        // 2. Close connection 1 — pool will try to create a replacement
+        connection1.close()
+        let closedAction = stateMachine.connectionClosed(connection1)
+        // Pool should request a new connection to maintain minimum.
+        // Only connection 1's keep-alive timer is cancelled (connection 0 is still alive).
+        #expect(closedAction.connection == .makeConnection(.init(connectionID: 2), [cancel1]))
+
+        // 3. The replacement connection (id=2) fails to connect (PG is down)
+        let failAction = stateMachine.connectionEstablishFailed(
+            SomeError(),
+            for: .init(connectionID: 2)
+        )
+        // Pool enters connectionCreationFailing state and schedules a backoff timer
+        #expect(failAction.request == .none)
+
+        // 4. A lease request arrives — gets queued because pool is in connectionCreationFailing
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseAction = stateMachine.leaseConnection(request)
+        #expect(leaseAction.request == .none)  // queued, not served
+        #expect(leaseAction.connection == .none)
+
+        // 5. Keep-alive timer fires on connection 0 (still idle).
+        //    BUG: precondition(self.requestQueue.isEmpty) crashes here.
+        //    FIX: the guard on keepAliveIfIdle handles this safely.
+        let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(connection0.id)
+        #expect(keepAliveAction.connection == .runKeepAlive(connection0, cancel0))
+    }
 }
+
+struct SomeError: Error {}
