@@ -1,15 +1,23 @@
 import Atomics
 
-public struct ConnectionIDGenerator: ConnectionIDGeneratorProtocol {
-    static let globalGenerator = ConnectionIDGenerator()
+@usableFromInline
+package typealias ConnectionID = Int
 
-    private let atomic: ManagedAtomic<Int>
+@usableFromInline
+package struct ConnectionIDGenerator: Sendable {
+    @usableFromInline
+    package static let globalGenerator = ConnectionIDGenerator()
 
-    public init() {
+    @usableFromInline
+    /* private */ let atomic: ManagedAtomic<Int>
+
+    @usableFromInline
+    init() {
         self.atomic = .init(0)
     }
 
-    public func next() -> Int {
+    @inlinable
+    package func next() -> ConnectionID {
         return self.atomic.loadThenWrappingIncrement(ordering: .relaxed)
     }
 }

@@ -30,13 +30,13 @@ extension PoolStateMachine {
         var timerID: Int
 
         @usableFromInline
-        var connectionID: Connection.ID
+        var connectionID: ConnectionID
 
         @usableFromInline
         var usecase: Usecase
 
         @inlinable
-        init(timerID: Int, connectionID: Connection.ID, usecase: Usecase) {
+        init(timerID: Int, connectionID: ConnectionID, usecase: Usecase) {
             self.timerID = timerID
             self.connectionID = connectionID
             self.usecase = usecase
@@ -125,7 +125,7 @@ extension PoolStateMachine {
         }
 
         @usableFromInline
-        let id: Connection.ID
+        let id: ConnectionID
 
         @usableFromInline
         private(set) var state: State = .starting
@@ -134,7 +134,7 @@ extension PoolStateMachine {
         private(set) var nextTimerID: Int = 0
 
         @inlinable
-        init(id: Connection.ID) {
+        init(id: ConnectionID) {
             self.id = id
         }
 
@@ -387,13 +387,16 @@ extension PoolStateMachine {
             @usableFromInline
             var connection: Connection
             @usableFromInline
+            var connectionID: ConnectionID
+            @usableFromInline
             var timersToCancel: Max2Sequence<TimerCancellationToken>
             @usableFromInline
             var wasIdle: Bool
 
             @inlinable
-            init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>, wasIdle: Bool) {
+            init(connection: Connection, connectionID: ConnectionID, timersToCancel: Max2Sequence<TimerCancellationToken>, wasIdle: Bool) {
                 self.connection = connection
+                self.connectionID = connectionID
                 self.timersToCancel = timersToCancel
                 self.wasIdle = wasIdle
             }
@@ -412,12 +415,12 @@ extension PoolStateMachine {
                 }
                 precondition(maxStreams >= newLeasedStreams + keepAlive.usedStreams, "Invalid state: \(self.state)")
                 self.state = .leased(connection, usedStreams: newLeasedStreams, maxStreams: maxStreams, keepAlive: keepAlive)
-                return LeaseAction(connection: connection, timersToCancel: cancel, wasIdle: true)
+                return LeaseAction(connection: connection, connectionID: self.id, timersToCancel: cancel, wasIdle: true)
 
             case .leased(let connection, let usedStreams, let maxStreams, let keepAlive):
                 precondition(maxStreams >= usedStreams + newLeasedStreams + keepAlive.usedStreams, "Invalid state: \(self.state)")
                 self.state = .leased(connection, usedStreams: usedStreams + newLeasedStreams, maxStreams: maxStreams, keepAlive: keepAlive)
-                return LeaseAction(connection: connection, timersToCancel: .init(), wasIdle: false)
+                return LeaseAction(connection: connection, connectionID: self.id, timersToCancel: .init(), wasIdle: false)
 
             case .backingOff, .starting, .closing, .closed:
                 preconditionFailure("Invalid state: \(self.state)")

@@ -40,15 +40,13 @@ struct PoolConfiguration: Sendable {
 @usableFromInline
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 struct PoolStateMachine<
-    Connection: PooledConnection,
-    ConnectionIDGenerator: ConnectionIDGeneratorProtocol,
-    ConnectionID: Hashable & Sendable,
+    Connection: AnyObject & Sendable,
     Request: ConnectionRequestProtocol,
     RequestID,
     TimerCancellationToken: Sendable,
     Clock: _Concurrency.Clock,
     Instant: InstantProtocol
->: Sendable where Connection.ID == ConnectionID, ConnectionIDGenerator.ID == ConnectionID, RequestID == Request.ID, Clock.Duration == Duration, Clock.Instant == Instant {
+>: Sendable where RequestID == Request.ID, Clock.Duration == Duration, Clock.Instant == Instant {
 
     @usableFromInline
     struct ConnectionRequest: Hashable, Sendable {
@@ -94,7 +92,7 @@ struct PoolStateMachine<
         case scheduleTimers(Max2Sequence<Timer>)
         case makeConnection(ConnectionRequest, TinyFastSequence<TimerCancellationToken>)
         case makeConnectionsCancelAndScheduleTimers(TinyFastSequence<ConnectionRequest>, TinyFastSequence<TimerCancellationToken>, Max2Sequence<Timer>)
-        case runKeepAlive(Connection, TimerCancellationToken?)
+        case runKeepAlive(Connection, ConnectionID, TimerCancellationToken?)
         case cancelTimers(TinyFastSequence<TimerCancellationToken>)
         case closeConnection(Connection, Max2Sequence<TimerCancellationToken>)
         /// Start process of shutting down the connection pool. Close connections, cancel timers.
@@ -106,7 +104,7 @@ struct PoolStateMachine<
 
     @usableFromInline
     enum RequestAction {
-        case leaseConnection(TinyFastSequence<Request>, Connection)
+        case leaseConnection(TinyFastSequence<Request>, Connection, ConnectionID)
 
         case failRequest(Request, ConnectionPoolError)
         case failRequests(TinyFastSequence<Request>, ConnectionPoolError)
@@ -294,7 +292,7 @@ struct PoolStateMachine<
         switch self.connections.leaseConnectionOrSoonAvailableConnectionCount() {
         case .leasedConnection(let leaseResult):
             return .init(
-                request: .leaseConnection(TinyFastSequence(element: request), leaseResult.connection),
+                request: .leaseConnection(TinyFastSequence(element: request), leaseResult.connection, leaseResult.connectionID),
                 connection: .cancelTimers(.init(leaseResult.timersToCancel))
             )
 
@@ -343,8 +341,8 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func releaseConnection(_ connection: Connection, streams: UInt16) -> Action {
-        guard let (index, context) = self.connections.releaseConnection(connection.id, streams: streams) else {
+    mutating func releaseConnection(_ connection: ConnectionID, streams: UInt16) -> Action {
+        guard let (index, context) = self.connections.releaseConnection(connection, streams: streams) else {
             return .none()
         }
         return self.handleAvailableConnection(index: index, availableContext: context)
@@ -362,7 +360,7 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionEstablished(_ connection: Connection, maxStreams: UInt16) -> Action {
+    mutating func connectionEstablished(_ connection: Connection, connectionID: ConnectionID, maxStreams: UInt16) -> Action {
         switch self.poolState {
         case .running:
             break
@@ -377,7 +375,7 @@ struct PoolStateMachine<
             fatalError("Connection pool is not running")
         }
 
-        let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
+        let (index, context) = self.connections.newConnectionEstablished(connection, id: connectionID, maxStreams: maxStreams)
         return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
@@ -409,7 +407,7 @@ struct PoolStateMachine<
         let leaseResult = self.connections.leaseConnection(at: info.index, streams: leaseStreams)
 
         return .init(
-            request: .leaseConnection(requests, leaseResult.connection),
+            request: .leaseConnection(requests, leaseResult.connection, leaseResult.connectionID),
             connection: .cancelTimers(.init(leaseResult.timersToCancel))
         )
     }
@@ -566,13 +564,20 @@ struct PoolStateMachine<
         guard let keepAliveAction = self.connections.keepAliveIfIdle(connectionID) else {
             return .none()
         }
-        return .init(request: .none, connection: .runKeepAlive(keepAliveAction.connection, keepAliveAction.keepAliveTimerCancellationContinuation))
+        return .init(
+            request: .none,
+            connection: .runKeepAlive(
+                keepAliveAction.connection,
+                connectionID,
+                keepAliveAction.keepAliveTimerCancellationContinuation
+            )
+        )
     }
 
     @inlinable
-    mutating func connectionKeepAliveDone(_ connection: Connection) -> Action {
+    mutating func connectionKeepAliveDone(_ connectionID: ConnectionID) -> Action {
         precondition(self.configuration.keepAliveDuration != nil)
-        guard let (index, context) = self.connections.keepAliveSucceeded(connection.id) else {
+        guard let (index, context) = self.connections.keepAliveSucceeded(connectionID) else {
             return .none()
         }
         return self.handleAvailableConnection(index: index, availableContext: context)
@@ -712,7 +717,7 @@ struct PoolStateMachine<
                 scheduledTimers: []
             ) ?? .cancelTimers(.init(leaseResult.timersToCancel))
             return .init(
-                request: .leaseConnection(requests, leaseResult.connection),
+                request: .leaseConnection(requests, leaseResult.connection, leaseResult.connectionID),
                 connection: connectionAction
             )
         }
@@ -874,8 +879,8 @@ extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationTo
         case (.makeConnectionsCancelAndScheduleTimers(let lhsRequests, let lhsTokens, let lhsTimers),
             .makeConnectionsCancelAndScheduleTimers(let rhsRequests, let rhsTokens, let rhsTimers)):
             return lhsRequests == rhsRequests && lhsTokens == rhsTokens && lhsTimers == rhsTimers
-        case (.runKeepAlive(let lhsConn, let lhsToken), .runKeepAlive(let rhsConn, let rhsToken)):
-            return lhsConn === rhsConn && lhsToken == rhsToken
+        case (.runKeepAlive(let lhsConn, let lhsConnID, let lhsToken), .runKeepAlive(let rhsConn, let rhsConnID, let rhsToken)):
+            return lhsConn === rhsConn && lhsConnID == rhsConnID && lhsToken == rhsToken
         case (.closeConnection(let lhsConn, let lhsTimers), .closeConnection(let rhsConn, let rhsTimers)):
             return lhsConn === rhsConn && lhsTimers == rhsTimers
         case (.initiateShutdown(let lhs), .initiateShutdown(let rhs)):
@@ -898,7 +903,7 @@ extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationTo
 extension PoolStateMachine.ConnectionAction.Shutdown: Equatable where TimerCancellationToken: Equatable {
     @usableFromInline
     static func ==(lhs: Self, rhs: Self) -> Bool {
-        Set(lhs.connections.lazy.map(\.id)) == Set(rhs.connections.lazy.map(\.id)) && lhs.timersToCancel == rhs.timersToCancel
+        Set(lhs.connections.lazy.map {ObjectIdentifier($0)}) == Set(rhs.connections.lazy.map{ObjectIdentifier($0)}) && lhs.timersToCancel == rhs.timersToCancel
     }
 }
 
@@ -909,14 +914,9 @@ extension PoolStateMachine.RequestAction: Equatable where Request: Equatable {
     @usableFromInline
     static func ==(lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
-        case (.leaseConnection(let lhsRequests, let lhsConn), .leaseConnection(let rhsRequests, let rhsConn)):
-            guard lhsRequests.count == rhsRequests.count else { return false }
-            var lhsIterator = lhsRequests.makeIterator()
-            var rhsIterator = rhsRequests.makeIterator()
-            while let lhsNext = lhsIterator.next(), let rhsNext = rhsIterator.next() {
-                guard lhsNext.id == rhsNext.id else { return false }
-            }
-            return lhsConn === rhsConn
+        case (.leaseConnection(let lhsRequests, let lhsConn, let lhsConnID), .leaseConnection(let rhsRequests, let rhsConn, let rhsConnID)):
+            guard lhsConn === rhsConn && lhsConnID == rhsConnID else { return false }
+            return lhsRequests.elementsEqual(rhsRequests) { $0.id == $1.id }
 
         case (.failRequest(let lhsRequest, let lhsError), .failRequest(let rhsRequest, let rhsError)):
             return lhsRequest.id == rhsRequest.id && lhsError == rhsError

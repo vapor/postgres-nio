@@ -1,3 +1,4 @@
+import Atomics
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
@@ -15,13 +16,13 @@ public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
 /// A connection that can be pooled in a ``ConnectionPool``
 public protocol PooledConnection: AnyObject, Sendable {
     /// The connection's identifier type.
-    associatedtype ID: Hashable & Sendable
+//    associatedtype ID: Hashable & Sendable
 
     /// The connection's identifier. The identifier is passed to
     /// the connection factory method and must stay attached to
     /// the connection at all times. It must not change during
     /// the connection's lifetime.
-    var id: ID { get }
+//    var id: ID { get }
 
     /// A method to register closures that are invoked when the
     /// connection is closed. If the connection closed unexpectedly
@@ -45,9 +46,9 @@ public protocol PooledConnection: AnyObject, Sendable {
 //    func close()
 }
 
-public struct EventsCallbacks<ConnectionID: Sendable & Hashable>: Sendable {
+public struct EventsCallbacks: Sendable {
     @usableFromInline
-    var eventsDelegate: any EventsDelegate<ConnectionID>
+    let eventsDelegate: any EventsDelegate<ConnectionID>
     @usableFromInline
     var connectionID: ConnectionID
 
@@ -68,10 +69,14 @@ public struct EventsCallbacks<ConnectionID: Sendable & Hashable>: Sendable {
     public func connectionMaxStreamsChanged(_ newMaxStreams: UInt16) {
         self.eventsDelegate.connectionMaxStreamsChanged(self.connectionID, newMaxStreams: newMaxStreams)
     }
+
+    public func connectionReleased(streams: UInt16 = 1) {
+        self.eventsDelegate.connectionReleased(self.connectionID, streams: streams)
+    }
 }
 
 @usableFromInline
-protocol EventsDelegate<ConnectionID>: Sendable {
+protocol EventsDelegate<ConnectionID>: AnyObject, Sendable {
     associatedtype ConnectionID: Hashable & Sendable
 
     func connectionWillClose(_ connection: ConnectionID)
@@ -79,15 +84,16 @@ protocol EventsDelegate<ConnectionID>: Sendable {
     func connectionClosed(_ connectionID: ConnectionID, failure: (any Error)?)
 
     func connectionMaxStreamsChanged(_ connection: ConnectionID, newMaxStreams: UInt16)
+
+    func connectionReleased(_ connection: ConnectionID, streams: UInt16)
 }
 
 public protocol StructuredConnectionProvider: Sendable {
-    associatedtype Connection // : ~Copyable
+    associatedtype Connection: AnyObject
     associatedtype ConnectionID: Hashable
 
     func withConnection(
-        _ id: ConnectionID,
-        onConnected: (consuming Connection, Int, (EventsCallbacks<ConnectionID>) -> Void) async -> Void
+        onConnected: (consuming Connection, Int, (EventsCallbacks) -> Void) async -> Void
     ) async throws
 }
 
@@ -187,29 +193,22 @@ public struct ConnectionPoolConfiguration: Sendable {
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class ConnectionPool<
     Connection: PooledConnection,
-    ConnectionID: Hashable & Sendable,
-    ConnectionIDGenerator: ConnectionIDGeneratorProtocol,
     ConnectionProvider: StructuredConnectionProvider,
     Request: ConnectionRequestProtocol,
     RequestID: Hashable & Sendable,
     KeepAliveBehavior: ConnectionKeepAliveBehavior,
-    ObservabilityDelegate: ConnectionPoolObservabilityDelegate,
     Clock: _Concurrency.Clock
 >: Sendable where
-    Connection.ID == ConnectionID,
-    ConnectionIDGenerator.ID == ConnectionID,
-    ConnectionProvider.ConnectionID == ConnectionID,
     ConnectionProvider.Connection == Connection,
     Request.Connection == Connection,
     Request.ID == RequestID,
     KeepAliveBehavior.Connection == Connection,
-    ObservabilityDelegate.ConnectionID == ConnectionID,
     Clock.Duration == Duration
 {
 //    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
-    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
+    typealias StateMachine = PoolStateMachine<Connection, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let connectionProvider: ConnectionProvider
@@ -217,8 +216,8 @@ public final class ConnectionPool<
     @usableFromInline
     let keepAliveBehavior: KeepAliveBehavior
 
-    @usableFromInline 
-    let observabilityDelegate: ObservabilityDelegate
+//    @usableFromInline 
+//    let observabilityDelegate: ObservabilityDelegate
 
     @usableFromInline
     let clock: Clock
@@ -244,19 +243,37 @@ public final class ConnectionPool<
     @usableFromInline
     let eventContinuation: AsyncStream<NewPoolActions>.Continuation
 
-    public init(
+    public convenience init(
+        configuration: ConnectionPoolConfiguration,
+        connectionProvider: ConnectionProvider,
+        requestType: Request.Type,
+        keepAliveBehavior: KeepAliveBehavior,
+//        observabilityDelegate: ObservabilityDelegate,
+        clock: Clock,
+    ) {
+        self.init(
+            configuration: configuration,
+            idGenerator: ConnectionIDGenerator.globalGenerator,
+            requestType: requestType,
+            keepAliveBehavior: keepAliveBehavior,
+            clock: clock,
+            connectionProvider: connectionProvider
+        )
+    }
+
+    package init(
         configuration: ConnectionPoolConfiguration,
         idGenerator: ConnectionIDGenerator,
         requestType: Request.Type,
         keepAliveBehavior: KeepAliveBehavior,
-        observabilityDelegate: ObservabilityDelegate,
+//        observabilityDelegate: ObservabilityDelegate,
         clock: Clock,
         connectionProvider: ConnectionProvider
     ) {
         self.clock = clock
         self.connectionProvider = connectionProvider
         self.keepAliveBehavior = keepAliveBehavior
-        self.observabilityDelegate = observabilityDelegate
+//        self.observabilityDelegate = observabilityDelegate
         self.configuration = configuration
         var stateMachine = StateMachine(
             configuration: .init(configuration, keepAliveBehavior: keepAliveBehavior),
@@ -279,7 +296,7 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    public func releaseConnection(_ connection: Connection, streams: UInt16 = 1) {
+    func releaseConnection(_ connection: ConnectionID, streams: UInt16 = 1) {
         self.modifyStateAndRunActions { state in
             state.stateMachine.releaseConnection(connection, streams: streams)
         }
@@ -320,15 +337,15 @@ public final class ConnectionPool<
 
     /// Mark a connection as going away. Connection implementors have to call this method if the connection
     /// has received a close intent from the server. For example: an HTTP/2 GOAWAY frame.
-    public func connectionWillClose(_ connection: Connection) {
+//    public func connectionWillClose(_ connection: Connection) {
+//
+//    }
 
-    }
-
-    public func connectionReceivedNewMaxStreamSetting(_ connection: Connection, newMaxStreamSetting maxStreams: UInt16) {
-        self.modifyStateAndRunActions { state in
-            state.stateMachine.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: maxStreams)
-        }
-    }
+//    public func connectionReceivedNewMaxStreamSetting(_ connection: Connection, newMaxStreamSetting maxStreams: UInt16) {
+//        self.modifyStateAndRunActions { state in
+//            state.stateMachine.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: maxStreams)
+//        }
+//    }
 
     @inlinable
     public func run() async {
@@ -355,21 +372,21 @@ public final class ConnectionPool<
 
     // MARK: - Private Methods -
 
-    @inlinable
-    func connectionDidClose(_ connection: Connection, error: (any Error)?) {
-        self.observabilityDelegate.connectionClosed(id: connection.id, error: error)
-
-        self.modifyStateAndRunActions { state in
-            state.stateMachine.connectionClosed(connection.id)
-        }
-    }
+//    @inlinable
+//    func connectionDidClose(_ connection: Connection, error: (any Error)?) {
+//        self.observabilityDelegate.connectionClosed(id: connection.id, error: error)
+//
+//        self.modifyStateAndRunActions { state in
+//            state.stateMachine.connectionClosed(connection.id)
+//        }
+//    }
 
     // MARK: Events
 
     @usableFromInline
     enum NewPoolActions: Sendable {
         case makeConnection(StateMachine.ConnectionRequest)
-        case runKeepAlive(Connection)
+        case runKeepAlive(Connection, ConnectionID)
 
         case scheduleTimer(StateMachine.Timer)
     }
@@ -402,8 +419,8 @@ public final class ConnectionPool<
         case .makeConnection(let request):
             self.makeConnection(for: request, in: &taskGroup)
 
-        case .runKeepAlive(let connection):
-            self.runKeepAlive(connection, in: &taskGroup)
+        case .runKeepAlive(let connection, let connectionID):
+            self.runKeepAlive(connection, id: connectionID, in: &taskGroup)
 
         case .scheduleTimer(let timer):
             self.runTimer(timer, in: &taskGroup)
@@ -442,9 +459,9 @@ public final class ConnectionPool<
                 self.eventContinuation.yield(.scheduleTimer(timer))
             }
 
-        case .runKeepAlive(let connection, let cancelContinuation):
+        case .runKeepAlive(let connection, let connectionID, let cancelContinuation):
             cancelContinuation?.resume(returning: ())
-            self.eventContinuation.yield(.runKeepAlive(connection))
+            self.eventContinuation.yield(.runKeepAlive(connection, connectionID))
 
         case .scheduleTimers(let timers):
             for timer in timers {
@@ -476,9 +493,9 @@ public final class ConnectionPool<
     @inlinable
     /*private*/ func runRequestAction(_ action: StateMachine.RequestAction) {
         switch action {
-        case .leaseConnection(let requests, let connection):
-            let lease = ConnectionLease(connection: connection) { connection in
-                self.releaseConnection(connection)
+        case .leaseConnection(let requests, let connection, let connectionID):
+            let lease = ConnectionLease(connection: connection, connectionID: connectionID) { connectionID in
+                self.releaseConnection(connectionID)
             }
             for request in requests {
                 request.complete(with: .success(lease))
@@ -505,19 +522,19 @@ public final class ConnectionPool<
     @inlinable
     /*private*/ func makeConnection(for request: StateMachine.ConnectionRequest, in taskGroup: inout some TaskGroupProtocol) {
         taskGroup.addTask_ {
-            self.observabilityDelegate.startedConnecting(id: request.connectionID)
+//            self.observabilityDelegate.startedConnecting(id: request.connectionID)
 
             var connectionState: ConnectionState = .connecting
 
             do {
-                try await self.connectionProvider.withConnection(request.connectionID) {
+                try await self.connectionProvider.withConnection() {
                     connection, maxStreams, closure in
 
                     connectionState = .connected
 
                     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                         let bundle = ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: UInt16(maxStreams))
-                        self.connectionEstablished(bundle)
+                        self.connectionEstablished(bundle, id: request.connectionID)
 
                         let callbacks = EventsCallbacks(eventsDelegate: self, connectionID: request.connectionID)
                         closure(callbacks)
@@ -544,13 +561,14 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func connectionEstablished(_ connectionBundle: ConnectionAndMetadata<Connection>) {
-        self.observabilityDelegate.connectSucceeded(id: connectionBundle.connection.id, streamCapacity: connectionBundle.maximalStreamsOnConnection)
+    /*private*/ func connectionEstablished(_ connectionBundle: ConnectionAndMetadata<Connection>, id: ConnectionID) {
+//        self.observabilityDelegate.connectSucceeded(id: connectionBundle.connection.id, streamCapacity: connectionBundle.maximalStreamsOnConnection)
 
         self.modifyStateAndRunActions { state in
             state.lastConnectError = nil
             return state.stateMachine.connectionEstablished(
                 connectionBundle.connection,
+                connectionID: id,
                 maxStreams: connectionBundle.maximalStreamsOnConnection
             )
         }
@@ -558,7 +576,7 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func connectionEstablishFailed(_ error: any Error, for request: StateMachine.ConnectionRequest) {
-        self.observabilityDelegate.connectFailed(id: request.connectionID, error: error)
+//        self.observabilityDelegate.connectFailed(id: request.connectionID, error: error)
 
         self.modifyStateAndRunActions { state in
             state.lastConnectError = error
@@ -567,23 +585,23 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func runKeepAlive(_ connection: Connection, in taskGroup: inout some TaskGroupProtocol) {
-        self.observabilityDelegate.keepAliveTriggered(id: connection.id)
+    /*private*/ func runKeepAlive(_ connection: Connection, id: ConnectionID, in taskGroup: inout some TaskGroupProtocol) {
+//        self.observabilityDelegate.keepAliveTriggered(id: connection.id)
 
         taskGroup.addTask_ {
             do {
                 try await self.keepAliveBehavior.runKeepAlive(for: connection)
 
-                self.observabilityDelegate.keepAliveSucceeded(id: connection.id)
+//                self.observabilityDelegate.keepAliveSucceeded(id: connection.id)
 
                 self.modifyStateAndRunActions { state in
-                    state.stateMachine.connectionKeepAliveDone(connection)
+                    state.stateMachine.connectionKeepAliveDone(id)
                 }
             } catch {
-                self.observabilityDelegate.keepAliveFailed(id: connection.id, error: error)
+//                self.observabilityDelegate.keepAliveFailed(id: connection.id, error: error)
 
                 self.modifyStateAndRunActions { state in
-                    state.stateMachine.connectionKeepAliveFailed(connection.id)
+                    state.stateMachine.connectionKeepAliveFailed(id)
                 }
             }
         }
@@ -591,7 +609,7 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func closeConnection(_ connection: Connection) {
-        self.observabilityDelegate.connectionClosing(id: connection.id)
+//        self.observabilityDelegate.connectionClosing(id: connection.id)
 
 //        connection.close()
     }
@@ -660,19 +678,29 @@ public final class ConnectionPool<
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension ConnectionPool: EventsDelegate {
-    public func connectionClosed(_ connectionID: ConnectionID, failure: (any Error)?) {
+    @inlinable
+    func connectionClosed(_ connectionID: ConnectionID, failure: (any Error)?) {
         self.modifyStateAndRunActions { state in
             state.stateMachine.connectionClosed(connectionID)
         }
     }
 
-    public func connectionMaxStreamsChanged(_ connection: ConnectionID, newMaxStreams: UInt16) {
+    @inlinable
+    func connectionMaxStreamsChanged(_ connection: ConnectionID, newMaxStreams: UInt16) {
         self.modifyStateAndRunActions { state in
             state.stateMachine.connectionReceivedNewMaxStreamSetting(connection, newMaxStreamSetting: newMaxStreams)
         }
     }
 
-    public func connectionWillClose(_ connection: ConnectionID) {
+    @inlinable
+    func connectionReleased(_ connection: ConnectionID, streams: UInt16) {
+        self.modifyStateAndRunActions { state in
+            state.stateMachine.releaseConnection(connection, streams: streams)
+        }
+    }
+
+    @inlinable
+    func connectionWillClose(_ connection: ConnectionID) {
         fatalError()
     }
 }

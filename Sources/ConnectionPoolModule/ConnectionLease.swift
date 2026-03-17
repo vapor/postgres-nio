@@ -1,17 +1,20 @@
 public struct ConnectionLease<Connection: PooledConnection>: Sendable {
     public var connection: Connection
 
+    public var connectionID: Int
+
     @usableFromInline
-    let _release: @Sendable (Connection) -> ()
+    let _release: @Sendable (ConnectionID) -> ()
 
     @inlinable
-    public init(connection: Connection, release: @escaping @Sendable (Connection) -> Void) {
+    package init(connection: Connection, connectionID: ConnectionID, release: @escaping @Sendable (ConnectionID) -> Void) {
         self.connection = connection
+        self.connectionID = connectionID
         self._release = release
     }
 
     @inlinable
     public func release() {
-        self._release(self.connection)
+        self._release(self.connectionID)
     }
 }
