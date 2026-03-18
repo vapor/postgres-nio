@@ -393,7 +393,7 @@ extension PostgresConnection {
             self.channel.triggerUserOutboundEvent(PSQLOutgoingEvent.gracefulShutdown, promise: promise)
             return try await promise.futureResult.get()
         } onCancel: {
-            self.close()
+            _ = self.close()
         }
     }
 

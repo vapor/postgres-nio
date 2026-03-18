@@ -2,7 +2,7 @@ import _ConnectionPoolModule
 import DequeModule
 import NIOConcurrencyHelpers
 
-public final class MockConnection: PooledConnection, Sendable {
+public final class MockConnection: PooledConnection {
     public typealias ID = Int
 
     public let id: ID
