@@ -1,10 +1,14 @@
+import Atomics
 import Logging
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOSSL
+import _ConnectionPoolModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-final class ConnectionFactory: Sendable {
+final class ConnectionFactory: StructuredConnectionProvider {
+
+    static let nextConnectionID = ManagedAtomic(0)
 
     struct ConfigCache: Sendable {
         var config: PostgresClient.Configuration
@@ -35,18 +39,29 @@ final class ConnectionFactory: Sendable {
         self.logger = logger
     }
 
-    func makeConnection(_ connectionID: PostgresConnection.ID, pool: PostgresClient.Pool) async throws -> PostgresConnection {
+    func withConnection(
+        onConnected: (consuming PostgresConnection, Int, (EventsCallbacks) -> Void) async -> Void
+    ) async throws {
         let config = try await self.makeConnectionConfig()
+        let connectionID = Self.nextConnectionID.loadThenWrappingIncrement(ordering: .relaxed)
 
         var connectionLogger = self.logger
         connectionLogger[postgresMetadataKey: .connectionID] = "\(connectionID)"
 
-        return try await PostgresConnection.connect(
+        let connection = try await PostgresConnection.connect(
             on: self.eventLoopGroup.any(),
             configuration: config,
             id: connectionID,
             logger: connectionLogger
         ).get()
+
+        await onConnected(connection, 1) { events in
+            connection.closeFuture.whenComplete { _ in
+                events.connectionClosed(nil)
+            }
+        }
+
+        try await connection.close()
     }
 
     func makeConnectionConfig() async throws -> PostgresConnection.Configuration {

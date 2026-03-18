@@ -240,11 +240,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     typealias Pool = ConnectionPool<
         PostgresConnection,
-        PostgresStructuredFactory,
+        ConnectionFactory,
         ConnectionRequest<PostgresConnection>,
         ConnectionRequest.ID,
         PostgresKeepAliveBehavor,
-//        PostgresClientMetrics,
         ContinuousClock
     >
 
@@ -286,10 +285,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         self.pool = ConnectionPool(
             configuration: .init(configuration),
-            connectionProvider: PostgresStructuredFactory(logger: backgroundLogger),
+            connectionProvider: factory,
             requestType: ConnectionRequest<PostgresConnection>.self,
             keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-//            observabilityDelegate: .init(logger: backgroundLogger),
             clock: ContinuousClock()
         )
     }

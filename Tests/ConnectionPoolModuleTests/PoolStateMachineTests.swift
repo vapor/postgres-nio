@@ -1007,13 +1007,13 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection0 = MockConnection(id: 0)
         let connection1 = MockConnection(id: 1)
 
-        let created0 = stateMachine.connectionEstablished(connection0, maxStreams: 1)
+        let created0 = stateMachine.connectionEstablished(connection0, connectionID: connection0.id, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connection0.id))
         let timer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(10))
         let cancel0 = MockTimerCancellationToken(timer0)
         #expect(created0.connection == .scheduleTimers([timer0]))
         #expect(stateMachine.timerScheduled(timer0, cancelContinuation: cancel0) == .none)
 
-        let created1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        let created1 = stateMachine.connectionEstablished(connection1, connectionID: connection1.id, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connection1.id))
         let timer1 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: .seconds(10))
         let cancel1 = MockTimerCancellationToken(timer1)
         #expect(created1.connection == .scheduleTimers([timer1]))
@@ -1024,7 +1024,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         // 2. Close connection 1 — pool will try to create a replacement
         connection1.close()
-        let closedAction = stateMachine.connectionClosed(connection1)
+        let closedAction = stateMachine.connectionClosed(connection1.id)
         // Pool should request a new connection to maintain minimum.
         // Only connection 1's keep-alive timer is cancelled (connection 0 is still alive).
         #expect(closedAction.connection == .makeConnection(.init(connectionID: 2), [cancel1]))
@@ -1047,7 +1047,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         //    BUG: precondition(self.requestQueue.isEmpty) crashes here.
         //    FIX: the guard on keepAliveIfIdle handles this safely.
         let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(connection0.id)
-        #expect(keepAliveAction.connection == .runKeepAlive(connection0, cancel0))
+        #expect(keepAliveAction.connection == .runKeepAlive(connection0, connection0.id, nil))
     }
 }
 

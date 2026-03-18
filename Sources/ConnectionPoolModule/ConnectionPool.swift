@@ -90,7 +90,6 @@ protocol EventsDelegate<ConnectionID>: AnyObject, Sendable {
 
 public protocol StructuredConnectionProvider: Sendable {
     associatedtype Connection: AnyObject
-    associatedtype ConnectionID: Hashable
 
     func withConnection(
         onConnected: (consuming Connection, Int, (EventsCallbacks) -> Void) async -> Void
@@ -397,7 +396,6 @@ public final class ConnectionPool<
         for await event in self.eventStream {
             self.runEvent(event, in: &taskGroup)
         }
-        taskGroup.cancelAll()
     }
 
     @inlinable
@@ -412,7 +410,6 @@ public final class ConnectionPool<
                 running -= 1
             }
         }
-        taskGroup.cancelAll()
     }
 
     @inlinable
