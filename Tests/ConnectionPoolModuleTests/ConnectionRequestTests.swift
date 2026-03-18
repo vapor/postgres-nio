@@ -9,7 +9,7 @@ import Testing
         let lease = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<ConnectionLease<MockConnection>, any Error>) in
             let request = ConnectionRequest(id: 42, continuation: continuation)
             #expect(request.id == 42)
-            let lease = ConnectionLease(connection: mockConnection) { _ in }
+            let lease = ConnectionLease(connection: mockConnection, connectionID: 1, release: { _ in })
             continuation.resume(with: .success(lease))
         }
 

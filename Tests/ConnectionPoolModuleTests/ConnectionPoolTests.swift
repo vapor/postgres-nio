@@ -19,11 +19,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: ContinuousClock()
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: ContinuousClock(),
+            connectionProvider: factory
+        )
 
         // the same connection is reused 1000 times
 
@@ -54,9 +52,8 @@ import Testing
             taskGroup.cancelAll()
 
             #expect(factory.pendingConnectionAttemptsCount == 0)
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
 
         #expect(factory.runningConnections.count == 0)
@@ -75,11 +72,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         await withTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask_ {
@@ -121,11 +116,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         await withTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask_ {
@@ -159,11 +152,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: ContinuousClock()
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: ContinuousClock(),
+            connectionProvider: factory
+        )
 
         let hasFinished = ManagedAtomic(false)
         let createdConnections = ManagedAtomic(0)
@@ -212,10 +203,7 @@ import Testing
 
             taskGroup.cancelAll()
 
-            #expect(hasFinished.load(ordering: .relaxed) == false)
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
         }
 
         #expect(createdConnections.load(ordering: .relaxed) == config.maximumConnectionHardLimit)
@@ -241,11 +229,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -297,9 +283,8 @@ import Testing
 
             taskGroup.cancelAll()
 
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -321,11 +306,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -384,9 +367,8 @@ import Testing
 
             taskGroup.cancelAll()
 
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -408,11 +390,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -453,9 +433,8 @@ import Testing
             taskGroup.cancelAll()
             print("cancelled")
 
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -478,11 +457,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -514,9 +491,8 @@ import Testing
             }
 
             taskGroup.cancelAll()
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -539,11 +515,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -579,9 +553,8 @@ import Testing
 
             // shutdown
             taskGroup.cancelAll()
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -604,11 +577,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -633,11 +604,7 @@ import Testing
                 #expect(error as? ConnectionPoolError == .poolShutdown)
             }
 
-            print("will close connections: \(factory.runningConnections)")
-            for connection in factory.runningConnections {
-                try await connection.signalToClose
-                connection.closeIfClosing()
-            }
+
         }
     }
 
@@ -660,11 +627,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -696,10 +661,8 @@ import Testing
                 }
             }
 
-            for connection in factory.runningConnections {
-                try await connection.signalToClose
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -722,11 +685,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -763,9 +724,8 @@ import Testing
 
             // shutdown
             taskGroup.cancelAll()
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -788,11 +748,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -812,7 +770,7 @@ import Testing
             connectionLease.append(lease)
             requests.removeFirst()
 
-            pool.connectionReceivedNewMaxStreamSetting(lease.connection, newMaxStreamSetting: 21)
+            pool.connectionMaxStreamsChanged(lease.connectionID, newMaxStreams: 21)
 
             for (_, request) in requests.enumerated() {
                 let connection = try await request.future.success
@@ -826,7 +784,7 @@ import Testing
             pool.leaseConnections(requests)
 
             // release all 21 leased streams in a single call
-            pool.releaseConnection(lease.connection, streams: 21)
+            pool.releaseConnection(lease.connectionID, streams: 21)
 
             // ensure all 20 new requests got fulfilled
             for request in requests {
@@ -836,14 +794,13 @@ import Testing
 
             // release all 20 leased streams one by one
             for _ in requests {
-                pool.releaseConnection(lease.connection, streams: 1)
+                pool.releaseConnection(lease.connectionID, streams: 1)
             }
 
             // shutdown
             taskGroup.cancelAll()
-            for connection in factory.runningConnections {
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -866,11 +823,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -880,14 +835,12 @@ import Testing
                 return 1
             }
             let lease = try await pool.leaseConnection()
-            pool.releaseConnection(lease.connection)
+            pool.releaseConnection(lease.connectionID)
 
             pool.triggerForceShutdown()
 
-            for connection in factory.runningConnections {
-                try await connection.signalToClose
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -910,11 +863,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -927,12 +878,10 @@ import Testing
 
             pool.triggerForceShutdown()
 
-            pool.releaseConnection(lease.connection)
+            pool.releaseConnection(lease.connectionID)
 
-            for connection in factory.runningConnections {
-                try await connection.signalToClose
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -955,11 +904,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -991,10 +938,8 @@ import Testing
 
             try await leaseFailedWaiter.success
 
-            for connection in factory.runningConnections {
-                try await connection.signalToClose
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 
@@ -1018,11 +963,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -1064,11 +1007,9 @@ import Testing
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -1122,10 +1063,8 @@ import Testing
             // shutdown
             pool.triggerForceShutdown()
 
-            for connection in factory.runningConnections {
-                try await connection.signalToClose
-                connection.closeIfClosing()
-            }
+
+
         }
     }
 }

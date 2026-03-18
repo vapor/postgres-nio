@@ -208,7 +208,7 @@ public final class ConnectionPool<
 //    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
-    typealias StateMachine = PoolStateMachine<Connection, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
+    typealias StateMachine = PoolStateMachine<Connection, Request, Request.ID, CheckedContinuation<Void, Never>, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let connectionProvider: ConnectionProvider
@@ -397,6 +397,7 @@ public final class ConnectionPool<
         for await event in self.eventStream {
             self.runEvent(event, in: &taskGroup)
         }
+        taskGroup.cancelAll()
     }
 
     @inlinable
@@ -411,6 +412,7 @@ public final class ConnectionPool<
                 running -= 1
             }
         }
+        taskGroup.cancelAll()
     }
 
     @inlinable
@@ -471,13 +473,13 @@ public final class ConnectionPool<
         case .cancelTimers(let timers):
             self.cancelTimers(timers)
 
-        case .closeConnection(let connection, let timers):
-            self.closeConnection(connection)
+        case .closeConnection(let timers, let closeContinuation):
+            closeContinuation?.resume()
             self.cancelTimers(timers)
 
         case .initiateShutdown(let cleanup):
-            for connection in cleanup.connections {
-                self.closeConnection(connection)
+            for closeContinuation in cleanup.closeContinuations {
+                closeContinuation.resume()
             }
             self.cancelTimers(cleanup.timersToCancel)
 
@@ -532,12 +534,39 @@ public final class ConnectionPool<
 
                     connectionState = .connected
 
-                    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                        let bundle = ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: UInt16(maxStreams))
-                        self.connectionEstablished(bundle, id: request.connectionID)
+                    let continuationBox = NIOLockedValueBox<CheckedContinuation<Void, Never>?>(nil)
 
-                        let callbacks = EventsCallbacks(eventsDelegate: self, connectionID: request.connectionID)
-                        closure(callbacks)
+                    await withTaskCancellationHandler {
+                        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                            let shouldResumeImmediately = continuationBox.withLockedValue { box -> Bool in
+                                if Task.isCancelled {
+                                    return true
+                                }
+                                box = continuation
+                                return false
+                            }
+
+                            if shouldResumeImmediately {
+                                continuation.resume()
+                            } else {
+                                // Clear the box so onCancel won't resume this continuation;
+                                // ownership is transferred to the state machine.
+                                continuationBox.withLockedValue { $0 = nil }
+
+                                let bundle = ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: UInt16(maxStreams))
+                                self.connectionEstablished(bundle, id: request.connectionID, closeContinuation: continuation)
+
+                                let callbacks = EventsCallbacks(eventsDelegate: self, connectionID: request.connectionID)
+                                closure(callbacks)
+                            }
+                        }
+                    } onCancel: {
+                        let continuation = continuationBox.withLockedValue { box -> CheckedContinuation<Void, Never>? in
+                            let cont = box
+                            box = nil
+                            return cont
+                        }
+                        continuation?.resume()
                     }
 
                     connectionState = .released
@@ -561,7 +590,7 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func connectionEstablished(_ connectionBundle: ConnectionAndMetadata<Connection>, id: ConnectionID) {
+    /*private*/ func connectionEstablished(_ connectionBundle: ConnectionAndMetadata<Connection>, id: ConnectionID, closeContinuation: CheckedContinuation<Void, Never>) {
 //        self.observabilityDelegate.connectSucceeded(id: connectionBundle.connection.id, streamCapacity: connectionBundle.maximalStreamsOnConnection)
 
         self.modifyStateAndRunActions { state in
@@ -569,7 +598,8 @@ public final class ConnectionPool<
             return state.stateMachine.connectionEstablished(
                 connectionBundle.connection,
                 connectionID: id,
-                maxStreams: connectionBundle.maximalStreamsOnConnection
+                maxStreams: connectionBundle.maximalStreamsOnConnection,
+                closeContinuation: closeContinuation
             )
         }
     }
@@ -605,13 +635,6 @@ public final class ConnectionPool<
                 }
             }
         }
-    }
-
-    @inlinable
-    /*private*/ func closeConnection(_ connection: Connection) {
-//        self.observabilityDelegate.connectionClosing(id: connection.id)
-
-//        connection.close()
     }
 
     @usableFromInline

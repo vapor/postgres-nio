@@ -32,7 +32,7 @@ import Testing
         var connected: UInt16 = 0
         for request in requests {
             let newConnection = MockConnection(id: request.connectionID)
-            let (_, context) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
+            let (_, context) = connections.newConnectionEstablished(newConnection, id: request.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(request.connectionID))
             #expect(context.info == .idle(availableStreams: 1, newIdle: true))
             #expect(context.use == .persisted)
             connected += 1
@@ -69,7 +69,7 @@ import Testing
         #expect(connections.stats == .init(connecting: 1))
 
         let newConnection = MockConnection(id: request.connectionID)
-        let (_, establishedContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
+        let (_, establishedContext) = connections.newConnectionEstablished(newConnection, id: request.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(request.connectionID))
         #expect(establishedContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedContext.use == .demand)
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
@@ -189,14 +189,14 @@ import Testing
         #expect(connections.stats == .init(connecting: 3))
 
         let newSecondConnection = MockConnection(id: secondRequest.connectionID)
-        let (_, establishedSecondConnectionContext) = connections.newConnectionEstablished(newSecondConnection, maxStreams: 1)
+        let (_, establishedSecondConnectionContext) = connections.newConnectionEstablished(newSecondConnection, id: secondRequest.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(secondRequest.connectionID))
         #expect(establishedSecondConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedSecondConnectionContext.use == .persisted)
         #expect(connections.stats == .init(connecting: 2, idle: 1, availableStreams: 1))
         #expect(connections.soonAvailableConnections == 2)
 
         let newThirdConnection = MockConnection(id: thirdRequest.connectionID)
-        let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, maxStreams: 1)
+        let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, id: thirdRequest.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(thirdRequest.connectionID))
         #expect(establishedThirdConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedThirdConnectionContext.use == .demand)
         #expect(connections.stats == .init(connecting: 1, idle: 2, availableStreams: 2))
@@ -246,7 +246,7 @@ import Testing
         #expect(connections.stats == .init(connecting: 2))
 
         let newFirstConnection = MockConnection(id: firstRequest.connectionID)
-        let (_, establishedFirstConnectionContext) = connections.newConnectionEstablished(newFirstConnection, maxStreams: 1)
+        let (_, establishedFirstConnectionContext) = connections.newConnectionEstablished(newFirstConnection, id: firstRequest.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(firstRequest.connectionID))
         #expect(establishedFirstConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedFirstConnectionContext.use == .demand)
         #expect(connections.stats == .init(connecting: 1, idle: 1, availableStreams: 1))
@@ -285,7 +285,7 @@ import Testing
         }
 
         let newConnection = MockConnection(id: firstRequest.connectionID)
-        let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
+        let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, id: firstRequest.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(firstRequest.connectionID))
         #expect(establishedConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedConnectionContext.use == .persisted)
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
@@ -324,7 +324,7 @@ import Testing
         }
 
         let newConnection = MockConnection(id: firstRequest.connectionID)
-        let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
+        let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, id: firstRequest.connectionID, maxStreams: 1, closeContinuation: MockConnectionCloseToken(firstRequest.connectionID))
         #expect(establishedConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
         _ = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)

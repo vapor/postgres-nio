@@ -199,14 +199,14 @@ extension PoolStateMachine {
         ///            Call ``parkConnection(at:)``, ``leaseConnection(at:)`` or ``closeConnection(at:)``
         ///            with the supplied index after this.
         @inlinable
-        mutating func newConnectionEstablished(_ connection: Connection, id: ConnectionID, maxStreams: UInt16) -> (Int, AvailableConnectionContext) {
+        mutating func newConnectionEstablished(_ connection: Connection, id: ConnectionID, maxStreams: UInt16, closeContinuation: ConnectionCloseToken) -> (Int, AvailableConnectionContext) {
             guard let index = self.connections.firstIndex(where: { $0.id == id }) else {
                 preconditionFailure("There is a new connection that we didn't request!")
             }
             self.stats.connecting -= 1
             self.stats.idle += 1
             self.stats.availableStreams += maxStreams
-            let connectionInfo = self.connections[index].connected(connection, maxStreams: maxStreams)
+            let connectionInfo = self.connections[index].connected(connection, maxStreams: maxStreams, closeContinuation: closeContinuation)
             // TODO: If this is an overflow connection, but we are currently also creating a
             //       persisted connection, we might want to swap those.
             let context = self.makeAvailableConnectionContextForConnection(at: index, info: connectionInfo)
@@ -482,7 +482,8 @@ extension PoolStateMachine {
             // keepAlive cannot happen without a connection
             return CloseAction(
                 connection: closeAction.connection!,
-                timersToCancel: closeAction.cancelTimers
+                timersToCancel: closeAction.cancelTimers,
+                closeContinuation: closeAction.closeContinuation
             )
         }
 
@@ -496,10 +497,14 @@ extension PoolStateMachine {
             @usableFromInline
             private(set) var timersToCancel: Max2Sequence<TimerCancellationToken>
 
+            @usableFromInline
+            private(set) var closeContinuation: ConnectionCloseToken?
+
             @inlinable
-            init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>) {
+            init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>, closeContinuation: ConnectionCloseToken?) {
                 self.connection = connection
                 self.timersToCancel = timersToCancel
+                self.closeContinuation = closeContinuation
             }
         }
 
@@ -517,7 +522,8 @@ extension PoolStateMachine {
 
             return CloseAction(
                 connection: closeAction.connection!,
-                timersToCancel: closeAction.cancelTimers
+                timersToCancel: closeAction.cancelTimers,
+                closeContinuation: closeAction.closeContinuation
             )
         }
 
@@ -556,7 +562,8 @@ extension PoolStateMachine {
             if let connection = closeAction.connection {
                 return .close(CloseAction(
                     connection: connection,
-                    timersToCancel: closeAction.cancelTimers
+                    timersToCancel: closeAction.cancelTimers,
+                    closeContinuation: closeAction.closeContinuation
                 ))
             } else {
                 // if there is no connection we should delete this now
@@ -715,6 +722,9 @@ extension PoolStateMachine {
                 case .close(let closeAction):
                     cleanup.connections.append(closeAction.connection)
                     cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
+                    if let closeContinuation = closeAction.closeContinuation {
+                        cleanup.closeContinuations.append(closeContinuation)
+                    }
 
                 case .cancelTimers(let timers):
                     cleanup.timersToCancel.append(contentsOf: timers)

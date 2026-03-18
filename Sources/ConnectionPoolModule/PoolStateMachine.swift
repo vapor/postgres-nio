@@ -44,6 +44,7 @@ struct PoolStateMachine<
     Request: ConnectionRequestProtocol,
     RequestID,
     TimerCancellationToken: Sendable,
+    ConnectionCloseToken: Sendable,
     Clock: _Concurrency.Clock,
     Instant: InstantProtocol
 >: Sendable where RequestID == Request.ID, Clock.Duration == Duration, Clock.Instant == Instant {
@@ -81,11 +82,14 @@ struct PoolStateMachine<
             var connections: [Connection]
             @usableFromInline
             var timersToCancel: [TimerCancellationToken]
+            @usableFromInline
+            var closeContinuations: [ConnectionCloseToken]
 
             @inlinable
             init() {
                 self.connections = []
                 self.timersToCancel = []
+                self.closeContinuations = []
             }
         }
 
@@ -94,10 +98,10 @@ struct PoolStateMachine<
         case makeConnectionsCancelAndScheduleTimers(TinyFastSequence<ConnectionRequest>, TinyFastSequence<TimerCancellationToken>, Max2Sequence<Timer>)
         case runKeepAlive(Connection, ConnectionID, TimerCancellationToken?)
         case cancelTimers(TinyFastSequence<TimerCancellationToken>)
-        case closeConnection(Connection, Max2Sequence<TimerCancellationToken>)
+        case closeConnection(Max2Sequence<TimerCancellationToken>, ConnectionCloseToken?)
         /// Start process of shutting down the connection pool. Close connections, cancel timers.
         case initiateShutdown(Shutdown)
-        /// All connections have been closed, the pool event stream can be ended. 
+        /// All connections have been closed, the pool event stream can be ended.
         case cancelEventStreamAndFinalCleanup([TimerCancellationToken])
         case none
     }
@@ -360,7 +364,7 @@ struct PoolStateMachine<
     }
 
     @inlinable
-    mutating func connectionEstablished(_ connection: Connection, connectionID: ConnectionID, maxStreams: UInt16) -> Action {
+    mutating func connectionEstablished(_ connection: Connection, connectionID: ConnectionID, maxStreams: UInt16, closeContinuation: ConnectionCloseToken) -> Action {
         switch self.poolState {
         case .running:
             break
@@ -375,7 +379,7 @@ struct PoolStateMachine<
             fatalError("Connection pool is not running")
         }
 
-        let (index, context) = self.connections.newConnectionEstablished(connection, id: connectionID, maxStreams: maxStreams)
+        let (index, context) = self.connections.newConnectionEstablished(connection, id: connectionID, maxStreams: maxStreams, closeContinuation: closeContinuation)
         return self.handleAvailableConnection(index: index, availableContext: context)
     }
 
@@ -589,7 +593,7 @@ struct PoolStateMachine<
             return .none()
         }
 
-        return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+        return .init(request: .none, connection: .closeConnection(closeAction.timersToCancel, closeAction.closeContinuation))
     }
 
     @inlinable
@@ -613,7 +617,7 @@ struct PoolStateMachine<
         }
 
         self.cacheNoMoreConnectionsAllowed = false
-        return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
+        return .init(request: .none, connection: .closeConnection(closeAction.timersToCancel, closeAction.closeContinuation))
     }
 
     @inlinable
@@ -734,7 +738,7 @@ struct PoolStateMachine<
                     case .close(let closeAction):
                         return .init(
                             request: .none,
-                            connection: .closeConnection(closeAction.connection, closeAction.timersToCancel)
+                            connection: .closeConnection(closeAction.timersToCancel, closeAction.closeContinuation)
                         )
                     case .cancelTimers(let timers):
                         return .init(
@@ -760,7 +764,7 @@ struct PoolStateMachine<
             if let closeAction = self.connections.closeConnectionIfIdle(at: index) {
                 return .init(
                     request: .none,
-                    connection: .closeConnection(closeAction.connection, closeAction.timersToCancel)
+                    connection: .closeConnection(closeAction.timersToCancel, closeAction.closeContinuation)
                 )
             } else {
                 return .none()
@@ -881,8 +885,8 @@ extension PoolStateMachine.ConnectionAction: Equatable where TimerCancellationTo
             return lhsRequests == rhsRequests && lhsTokens == rhsTokens && lhsTimers == rhsTimers
         case (.runKeepAlive(let lhsConn, let lhsConnID, let lhsToken), .runKeepAlive(let rhsConn, let rhsConnID, let rhsToken)):
             return lhsConn === rhsConn && lhsConnID == rhsConnID && lhsToken == rhsToken
-        case (.closeConnection(let lhsConn, let lhsTimers), .closeConnection(let rhsConn, let rhsTimers)):
-            return lhsConn === rhsConn && lhsTimers == rhsTimers
+        case (.closeConnection(let lhsTimers, _), .closeConnection(let rhsTimers, _)):
+            return lhsTimers == rhsTimers
         case (.initiateShutdown(let lhs), .initiateShutdown(let rhs)):
             return lhs == rhs
         case (.cancelEventStreamAndFinalCleanup(let lhs), .cancelEventStreamAndFinalCleanup(let rhs)):

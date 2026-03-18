@@ -73,6 +73,7 @@ let package = Package(
             name: "_ConnectionPoolTestUtils",
             dependencies: [
                 "_ConnectionPoolModule",
+                .product(name: "Atomics", package: "swift-atomics"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
             ],
             path: "Sources/ConnectionPoolTestUtils",
