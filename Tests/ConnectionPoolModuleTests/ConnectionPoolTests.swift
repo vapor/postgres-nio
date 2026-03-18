@@ -16,11 +16,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            clock: ContinuousClock(),
-            connectionProvider: factory
+            clock: ContinuousClock()
         )
 
         // the same connection is reused 1000 times
@@ -52,8 +52,6 @@ import Testing
             taskGroup.cancelAll()
 
             #expect(factory.pendingConnectionAttemptsCount == 0)
-
-
         }
 
         #expect(factory.runningConnections.count == 0)
@@ -69,11 +67,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         await withTaskGroup(of: Void.self) { taskGroup in
@@ -113,11 +111,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         await withTaskGroup(of: Void.self) { taskGroup in
@@ -149,11 +147,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            clock: ContinuousClock(),
-            connectionProvider: factory
+            clock: ContinuousClock()
         )
 
         let hasFinished = ManagedAtomic(false)
@@ -202,8 +200,6 @@ import Testing
             }
 
             taskGroup.cancelAll()
-
-
         }
 
         #expect(createdConnections.load(ordering: .relaxed) == config.maximumConnectionHardLimit)
@@ -226,11 +222,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -282,9 +278,6 @@ import Testing
             clock.advance(to: clock.now.advanced(by: keepAliveDuration))
 
             taskGroup.cancelAll()
-
-
-
         }
     }
 
@@ -303,11 +296,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -366,9 +359,6 @@ import Testing
             #expect(failingKeepAliveDidRun.load(ordering: .relaxed) == true)
 
             taskGroup.cancelAll()
-
-
-
         }
     }
 
@@ -387,11 +377,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -425,16 +415,11 @@ import Testing
             clock.advance(to: clock.now.advanced(by: keepAliveDuration))
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { print("keep alive 1 has run") }
                 #expect(keepAliveConnection === connectionLease.connection)
                 return true
             }
 
             taskGroup.cancelAll()
-            print("cancelled")
-
-
-
         }
     }
 
@@ -454,11 +439,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -491,8 +476,6 @@ import Testing
             }
 
             taskGroup.cancelAll()
-
-
         }
     }
 
@@ -512,11 +495,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -553,8 +536,6 @@ import Testing
 
             // shutdown
             taskGroup.cancelAll()
-
-
         }
     }
 
@@ -574,14 +555,14 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        await withTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
                 await pool.run()
             }
@@ -603,8 +584,6 @@ import Testing
                 print("failed")
                 #expect(error as? ConnectionPoolError == .poolShutdown)
             }
-
-
         }
     }
 
@@ -624,14 +603,14 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
-        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+        await withTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
                 await pool.run()
             }
@@ -660,9 +639,6 @@ import Testing
                     #expect(error as? ConnectionPoolError == .poolShutdown)
                 }
             }
-
-
-
         }
     }
 
@@ -682,11 +658,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -724,8 +700,6 @@ import Testing
 
             // shutdown
             taskGroup.cancelAll()
-
-
         }
     }
 
@@ -745,11 +719,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionFuture.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -799,8 +773,6 @@ import Testing
 
             // shutdown
             taskGroup.cancelAll()
-
-
         }
     }
 
@@ -820,11 +792,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -838,9 +810,6 @@ import Testing
             pool.releaseConnection(lease.connectionID)
 
             pool.triggerForceShutdown()
-
-
-
         }
     }
 
@@ -860,11 +829,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -901,11 +870,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -937,9 +906,6 @@ import Testing
             triggerShutdownWaiter.yield(value: ())
 
             try await leaseFailedWaiter.success
-
-
-
         }
     }
 
@@ -960,11 +926,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -1004,11 +970,11 @@ import Testing
 
         let pool = ConnectionPool(
             configuration: config,
+            connectionProvider: factory,
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<MockConnection>.self,
             keepAliveBehavior: keepAlive,
-            clock: clock,
-            connectionProvider: factory
+            clock: clock
         )
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -1062,9 +1028,6 @@ import Testing
             
             // shutdown
             pool.triggerForceShutdown()
-
-
-
         }
     }
 }

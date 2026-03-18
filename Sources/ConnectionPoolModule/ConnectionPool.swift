@@ -210,32 +210,29 @@ public final class ConnectionPool<
         connectionProvider: ConnectionProvider,
         requestType: Request.Type,
         keepAliveBehavior: KeepAliveBehavior,
-//        observabilityDelegate: ObservabilityDelegate,
-        clock: Clock,
+        clock: Clock
     ) {
         self.init(
             configuration: configuration,
+            connectionProvider: connectionProvider,
             idGenerator: ConnectionIDGenerator.globalGenerator,
             requestType: requestType,
             keepAliveBehavior: keepAliveBehavior,
-            clock: clock,
-            connectionProvider: connectionProvider
+            clock: clock
         )
     }
 
     package init(
         configuration: ConnectionPoolConfiguration,
+        connectionProvider: ConnectionProvider,
         idGenerator: ConnectionIDGenerator,
         requestType: Request.Type,
         keepAliveBehavior: KeepAliveBehavior,
-//        observabilityDelegate: ObservabilityDelegate,
-        clock: Clock,
-        connectionProvider: ConnectionProvider
+        clock: Clock
     ) {
         self.clock = clock
         self.connectionProvider = connectionProvider
         self.keepAliveBehavior = keepAliveBehavior
-//        self.observabilityDelegate = observabilityDelegate
         self.configuration = configuration
         var stateMachine = StateMachine(
             configuration: .init(configuration, keepAliveBehavior: keepAliveBehavior),
@@ -535,12 +532,14 @@ public final class ConnectionPool<
     ) {
 //        self.observabilityDelegate.connectSucceeded(id: connectionBundle.connection.id, streamCapacity: connectionBundle.maximalStreamsOnConnection)
 
+        var maybeCloseContinuation: CheckedContinuation<Void, Never>? = closeContinuation
+
         self.modifyStateAndRunActions { state in
             if Task.isCancelled {
-                // TODO: Inform state machine about connection cancelled task
-                return .init(request: .none, connection: .closeConnection(.init(), closeContinuation))
+                return state.stateMachine.connectionEstablishFailed(CancellationError(), for: .init(connectionID: id))
             }
 
+            defer { maybeCloseContinuation = nil }
             state.lastConnectError = nil
             return state.stateMachine.connectionEstablished(
                 connection,
@@ -548,6 +547,10 @@ public final class ConnectionPool<
                 maxStreams: maxStreams,
                 closeContinuation: closeContinuation
             )
+        }
+
+        if let closeContinuation = maybeCloseContinuation {
+            closeContinuation.resume()
         }
     }
 
