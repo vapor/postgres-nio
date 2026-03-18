@@ -1,50 +1,23 @@
 import Atomics
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
+@usableFromInline
+struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
+    @usableFromInline
+    var connection: Connection
 
-    public var connection: Connection
+    @usableFromInline
+    var maximalStreamsOnConnection: UInt16
 
-    public var maximalStreamsOnConnection: UInt16
-
-    public init(connection: Connection, maximalStreamsOnConnection: UInt16) {
+    @inlinable
+    init(connection: Connection, maximalStreamsOnConnection: UInt16) {
         self.connection = connection
         self.maximalStreamsOnConnection = maximalStreamsOnConnection
     }
 }
 
 /// A connection that can be pooled in a ``ConnectionPool``
-public protocol PooledConnection: AnyObject, Sendable {
-    /// The connection's identifier type.
-//    associatedtype ID: Hashable & Sendable
-
-    /// The connection's identifier. The identifier is passed to
-    /// the connection factory method and must stay attached to
-    /// the connection at all times. It must not change during
-    /// the connection's lifetime.
-//    var id: ID { get }
-
-    /// A method to register closures that are invoked when the
-    /// connection is closed. If the connection closed unexpectedly
-    /// the closure shall be called with the underlying error.
-    /// In most NIO clients this can be easily implemented by
-    /// attaching to the `channel.closeFuture`:
-    /// ```
-    ///   func onClose(
-    ///     _ closure: @escaping @Sendable ((any Error)?) -> ()
-    ///   ) {
-    ///     channel.closeFuture.whenComplete { _ in
-    ///       closure(previousError)
-    ///     }
-    ///   }
-    /// ```
-//    func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ())
-
-    /// Close the running connection. Once the close has completed
-    /// closures that were registered in `onClose` must be
-    /// invoked.
-//    func close()
-}
+public typealias PooledConnection = AnyObject & Sendable
 
 public struct EventsCallbacks: Sendable {
     @usableFromInline
@@ -88,8 +61,8 @@ protocol EventsDelegate<ConnectionID>: AnyObject, Sendable {
     func connectionReleased(_ connection: ConnectionID, streams: UInt16)
 }
 
-public protocol StructuredConnectionProvider: Sendable {
-    associatedtype Connection: AnyObject
+public protocol ConnectionProvider: Sendable {
+    associatedtype Connection: PooledConnection
 
     func withConnection(
         onConnected: (consuming Connection, Int, (EventsCallbacks) -> Void) async -> Void
@@ -192,7 +165,7 @@ public struct ConnectionPoolConfiguration: Sendable {
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class ConnectionPool<
     Connection: PooledConnection,
-    ConnectionProvider: StructuredConnectionProvider,
+    ConnectionProvider: _ConnectionPoolModule.ConnectionProvider,
     Request: ConnectionRequestProtocol,
     RequestID: Hashable & Sendable,
     KeepAliveBehavior: ConnectionKeepAliveBehavior,

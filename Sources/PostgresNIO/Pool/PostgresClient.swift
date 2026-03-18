@@ -524,11 +524,7 @@ extension ConnectionPoolConfiguration {
     }
 }
 
-extension PostgresConnection: PooledConnection {
-    public func close() {
-        self.channel.close(mode: .all, promise: nil)
-    }
-
+extension PostgresConnection {
     public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
         self.closeFuture.whenComplete { _ in closure(nil) }
     }

@@ -8,7 +8,7 @@
 import Atomics
 import _ConnectionPoolModule
 
-struct PostgresStructuredFactory: StructuredConnectionProvider {
+struct PostgresStructuredFactory: ConnectionProvider {
 
     let connectionID = ManagedAtomic<Int>(0)
 

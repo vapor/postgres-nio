@@ -4,7 +4,7 @@ import DequeModule
 import NIOConcurrencyHelpers
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-public final class MockConnectionFactory<Clock: _Concurrency.Clock>: StructuredConnectionProvider, Sendable where Clock.Duration == Duration {
+public final class MockConnectionFactory<Clock: _Concurrency.Clock>: ConnectionProvider, Sendable where Clock.Duration == Duration {
     typealias ConnectionIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator
     public typealias Request = ConnectionRequest<MockConnection>
     public typealias KeepAliveBehavior = MockPingPongBehavior

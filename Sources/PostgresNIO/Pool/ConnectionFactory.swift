@@ -6,7 +6,7 @@ import NIOSSL
 import _ConnectionPoolModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-final class ConnectionFactory: StructuredConnectionProvider {
+final class ConnectionFactory: ConnectionProvider {
 
     static let nextConnectionID = ManagedAtomic(0)
 
