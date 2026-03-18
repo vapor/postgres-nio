@@ -37,7 +37,7 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: ConnectionP
     }
 
     public func withConnection(
-        onConnected: (consuming MockConnection, Int, (EventsCallbacks) -> Void) async -> Void
+        onConnected: (consuming MockConnection, UInt16, (EventsCallbacks) -> Void) async -> Void
     ) async throws {
         if let autoMaxStreams = self.autoMaxStreams {
             let id = self.mockIDGenerator.wrappingIncrementThenLoad(ordering: .relaxed)
@@ -47,7 +47,7 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: ConnectionP
                 state.runningConnections[id] = connection
             }
 
-            await onConnected(connection, Int(autoMaxStreams)) { callbacks in
+            await onConnected(connection, autoMaxStreams) { callbacks in
                 connection.onClose { error in
                     callbacks.connectionClosed(error)
                 }
@@ -79,7 +79,7 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: ConnectionP
             }
         }
 
-        await onConnected(connection, Int(maxStreams)) { callbacks in
+        await onConnected(connection, maxStreams) { callbacks in
             connection.onClose { error in
                 callbacks.connectionClosed(error)
             }

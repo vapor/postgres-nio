@@ -40,7 +40,7 @@ final class ConnectionFactory: ConnectionProvider {
     }
 
     func withConnection(
-        onConnected: (PostgresConnection, Int, (EventsCallbacks) -> Void) async -> Void
+        onConnected: (PostgresConnection, UInt16, (EventsCallbacks) -> Void) async -> Void
     ) async throws {
         let config = try await self.makeConnectionConfig()
         let connectionID = Self.nextConnectionID.loadThenWrappingIncrement(ordering: .relaxed)

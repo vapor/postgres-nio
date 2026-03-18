@@ -65,18 +65,8 @@ public protocol ConnectionProvider: Sendable {
     associatedtype Connection: PooledConnection
 
     func withConnection(
-        onConnected: (consuming Connection, Int, (EventsCallbacks) -> Void) async -> Void
+        onConnected: (consuming Connection, UInt16, (EventsCallbacks) -> Void) async -> Void
     ) async throws
-}
-
-/// A connection ID generator. Its returned connection IDs will
-/// be used when creating new ``PooledConnection``s.
-public protocol ConnectionIDGeneratorProtocol: Sendable {
-    /// The connection's identifier type.
-    associatedtype ID: Hashable & Sendable
-
-    /// The next connection ID that shall be used.
-    func next() -> ID
 }
 
 /// A keep-alive behavior for connections maintained by the pool.
@@ -504,45 +494,23 @@ public final class ConnectionPool<
 
                     connectionState = .connected
 
-                    let continuationBox = NIOLockedValueBox<CheckedContinuation<Void, Never>?>(nil)
+                    // NOTE:
+                    // We don't need cancellation tracking here, as the parent task (pool.run()) already
+                    // monitors gracefulShutdown and cancellation.
+                    await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                        self.connectionEstablished(
+                            connection: connection,
+                            maxStreams: maxStreams,
+                            id: request.connectionID,
+                            closeContinuation: continuation
+                        )
 
-                    await withTaskCancellationHandler {
-                        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                            let shouldResumeImmediately = continuationBox.withLockedValue { box -> Bool in
-                                if Task.isCancelled {
-                                    return true
-                                }
-                                box = continuation
-                                return false
-                            }
-
-                            if shouldResumeImmediately {
-                                continuation.resume()
-                            } else {
-                                // Clear the box so onCancel won't resume this continuation;
-                                // ownership is transferred to the state machine.
-                                continuationBox.withLockedValue { $0 = nil }
-
-                                let bundle = ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: UInt16(maxStreams))
-                                self.connectionEstablished(bundle, id: request.connectionID, closeContinuation: continuation)
-
-                                let callbacks = EventsCallbacks(eventsDelegate: self, connectionID: request.connectionID)
-                                closure(callbacks)
-                            }
-                        }
-                    } onCancel: {
-                        let continuation = continuationBox.withLockedValue { box -> CheckedContinuation<Void, Never>? in
-                            let cont = box
-                            box = nil
-                            return cont
-                        }
-                        continuation?.resume()
+                        let callbacks = EventsCallbacks(eventsDelegate: self, connectionID: request.connectionID)
+                        closure(callbacks)
                     }
 
                     connectionState = .released
                 }
-
-
             } catch {
                 switch connectionState {
                 case .connecting:
@@ -554,21 +522,30 @@ public final class ConnectionPool<
                 case .released:
                     break
                 }
-
             }
         }
     }
 
     @inlinable
-    /*private*/ func connectionEstablished(_ connectionBundle: ConnectionAndMetadata<Connection>, id: ConnectionID, closeContinuation: CheckedContinuation<Void, Never>) {
+    /*private*/ func connectionEstablished(
+        connection: Connection,
+        maxStreams: UInt16,
+        id: ConnectionID,
+        closeContinuation: CheckedContinuation<Void, Never>
+    ) {
 //        self.observabilityDelegate.connectSucceeded(id: connectionBundle.connection.id, streamCapacity: connectionBundle.maximalStreamsOnConnection)
 
         self.modifyStateAndRunActions { state in
+            if Task.isCancelled {
+                // TODO: Inform state machine about connection cancelled task
+                return .init(request: .none, connection: .closeConnection(.init(), closeContinuation))
+            }
+
             state.lastConnectError = nil
             return state.stateMachine.connectionEstablished(
-                connectionBundle.connection,
+                connection,
                 connectionID: id,
-                maxStreams: connectionBundle.maximalStreamsOnConnection,
+                maxStreams: maxStreams,
                 closeContinuation: closeContinuation
             )
         }
