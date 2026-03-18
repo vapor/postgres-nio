@@ -1047,7 +1047,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         //    BUG: precondition(self.requestQueue.isEmpty) crashes here.
         //    FIX: the guard on keepAliveIfIdle handles this safely.
         let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(connection0.id)
-        #expect(keepAliveAction.connection == .runKeepAlive(connection0, connection0.id, nil))
+        #expect(keepAliveAction.connection == .runKeepAlive(connection0, connection0.id, cancel0))
     }
 }
 
