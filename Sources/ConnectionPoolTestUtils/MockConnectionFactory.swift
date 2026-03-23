@@ -37,7 +37,7 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: ConnectionP
     }
 
     public func withConnection(
-        onConnected: (consuming MockConnection, UInt16, (EventsCallbacks) -> Void) async -> Void
+        onConnected: (MockConnection, UInt16, (EventsCallbacks) -> Void) async -> Void
     ) async throws {
         if let autoMaxStreams = self.autoMaxStreams {
             let id = self.mockIDGenerator.wrappingIncrementThenLoad(ordering: .relaxed)
