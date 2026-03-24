@@ -166,7 +166,6 @@ class PostgresChannelHandlerTests: XCTestCase {
             password: config.password,
             database: config.database
         )
-//        let state = ConnectionStateMachine(.waitingToStartAuthentication)
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,

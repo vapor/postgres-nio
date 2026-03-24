@@ -171,7 +171,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             promise.succeed()
         case .failPromise(let promise, error: let error):
             promise.fail(error)
-}
+        }
     }
 
     /// Cancel the currently executing operation, if it is cancellable.
