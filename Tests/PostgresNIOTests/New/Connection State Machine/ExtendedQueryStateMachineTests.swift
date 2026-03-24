@@ -5,10 +5,9 @@ import Logging
 @testable import PostgresNIO
 
 @Suite struct ExtendedQueryStateMachineTests {
-    
-    @Test func testExtendedQueryWithoutDataRowsHappyPath() {
-        var state = ConnectionStateMachine.readyForQuery()
-        
+    @Test func testExtendedQueryWithoutDataRowsHappyPath() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
@@ -24,9 +23,9 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
-    @Test func testExtendedQueryWithDataRowsHappyPath() {
-        var state = ConnectionStateMachine.readyForQuery()
-        
+    @Test func testExtendedQueryWithDataRowsHappyPath() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
@@ -78,8 +77,8 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
-    @Test func testExtendedQueryWithNoQuery() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testExtendedQueryWithNoQuery() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
@@ -96,9 +95,9 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
-    @Test func testReceiveTotallyUnexpectedMessageInQuery() {
-        var state = ConnectionStateMachine.readyForQuery()
-        
+    @Test func testReceiveTotallyUnexpectedMessageInQuery() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
@@ -114,8 +113,8 @@ import Logging
                        .failQuery(promise, with: psqlError, cleanupContext: .init(action: .close, tasks: [], error: psqlError, closePromise: nil)))
     }
 
-    @Test func testExtendedQueryIsCancelledImmediately() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testExtendedQueryIsCancelledImmediately() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
@@ -158,8 +157,8 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
-    @Test func testExtendedQueryIsCancelledWithReadPending() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testExtendedQueryIsCancelledWithReadPending() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
@@ -200,8 +199,8 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
-    @Test func testCancelQueryAfterServerError() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testCancelQueryAfterServerError() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
@@ -254,8 +253,8 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
-    @Test func testQueryErrorDoesNotKillConnection() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testQueryErrorDoesNotKillConnection() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
@@ -275,8 +274,8 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
-    @Test func testQueryErrorAfterCancelDoesNotKillConnection() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testQueryErrorAfterCancelDoesNotKillConnection() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let logger = Logger.psqlTest
         let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
@@ -294,5 +293,4 @@ import Logging
 
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
-
 }

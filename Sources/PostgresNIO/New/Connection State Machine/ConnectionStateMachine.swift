@@ -161,14 +161,6 @@ struct ConnectionStateMachine {
         self.requireBackendKeyData = requireBackendKeyData
     }
 
-    #if DEBUG
-    /// for testing purposes only
-    init(_ state: State, requireBackendKeyData: Bool = true) {
-        self.state = state
-        self.requireBackendKeyData = requireBackendKeyData
-    }
-    #endif
-
     enum TLSConfiguration {
         case disable
         case prefer
