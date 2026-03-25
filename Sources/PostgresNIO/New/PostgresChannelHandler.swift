@@ -38,24 +38,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.logger = logger
         self.decoder = NIOSingleStepByteToMessageProcessor(PostgresBackendMessageDecoder())
     }
-    
-    #if DEBUG
-    /// for testing purposes only
-    init(
-        configuration: PostgresConnection.InternalConfiguration,
-        eventLoop: any EventLoop,
-        state: ConnectionStateMachine = .init(.initialized),
-        logger: Logger = .psqlNoOpLogger,
-        configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> Void)?
-    ) {
-        self.state = state
-        self.eventLoop = eventLoop
-        self.configuration = configuration
-        self.configureSSLCallback = configureSSLCallback
-        self.logger = logger
-        self.decoder = NIOSingleStepByteToMessageProcessor(PostgresBackendMessageDecoder())
-    }
-    #endif
 
     // MARK: Handler lifecycle
     
@@ -189,7 +171,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             promise.succeed()
         case .failPromise(let promise, error: let error):
             promise.fail(error)
-}
+        }
     }
 
     /// Cancel the currently executing operation, if it is cancellable.

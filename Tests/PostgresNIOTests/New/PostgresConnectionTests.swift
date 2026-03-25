@@ -278,6 +278,52 @@ import Synchronization
         }
     }
 
+    /// Verifies that closing the connection while actively listening
+    /// tears down the listener cleanly without crashing.
+    @Test func testListenOnConnectionClose() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                try await confirmation(expectedCount: 1) { confirmation in
+                    taskGroup.addTask {
+                        do {
+                            try await connection.listen(on: "foo") { events in
+                                for try await _ in events {
+                                    // Connection will be closed; iteration should end with an error.
+                                }
+                            }
+                        } catch {
+                            // Expected: the connection was closed while listening.
+                            confirmation.confirm()
+                        }
+                    }
+
+                    let listenMessage = try await channel.waitForUnpreparedRequest()
+                    #expect(listenMessage.parse.query == #"LISTEN "foo";"#)
+
+                    try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                    try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                    try await channel.writeInbound(PostgresBackendMessage.noData)
+                    try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
+                    try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                    // Simulate a connection drop while the listener is active.
+                    struct ConnectionDropped: Error {}
+                    channel.pipeline.fireErrorCaught(ConnectionDropped())
+                    channel.pipeline.fireChannelInactive()
+
+                    switch await taskGroup.nextResult()! {
+                    case .success:
+                        break
+                    case .failure(let failure):
+                        Issue.record("Unexpected error: \(failure)")
+                    }
+                }
+
+            }
+        }
+    }
+
     @Test func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in

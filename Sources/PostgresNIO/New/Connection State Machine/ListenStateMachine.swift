@@ -179,7 +179,11 @@ extension ListenStateMachine {
         mutating func cancelListening(id: Int) -> CancelAction {
             switch self.state {
             case .initialized:
-                fatalError("Invalid state: \(self.state)")
+                // A cancel can arrive after startListeningFailed has already
+                // reset the state to .initialized (e.g. the task cancellation
+                // handler fires after the start error path completes). This is
+                // a benign race — there is nothing left to cancel.
+                return .none
                 
             case .starting(var listeners):
                 let removed = listeners.removeValue(forKey: id)
