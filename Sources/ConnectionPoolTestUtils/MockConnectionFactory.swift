@@ -1,24 +1,25 @@
 import _ConnectionPoolModule
+import Atomics
 import DequeModule
 import NIOConcurrencyHelpers
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable where Clock.Duration == Duration {
-    public typealias ConnectionIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator
+public final class MockConnectionFactory<Clock: _Concurrency.Clock>: ConnectionProvider, Sendable where Clock.Duration == Duration {
+    typealias ConnectionIDGenerator = _ConnectionPoolModule.ConnectionIDGenerator
     public typealias Request = ConnectionRequest<MockConnection>
     public typealias KeepAliveBehavior = MockPingPongBehavior
-    public typealias MetricsDelegate = NoOpConnectionPoolMetrics<Int>
     public typealias ConnectionID = Int
     public typealias Connection = MockConnection
 
     let stateBox = NIOLockedValueBox(State())
+    let mockIDGenerator = ManagedAtomic<Int>(0)
 
     struct State {
-        var attempts = Deque<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>)>()
+        var attempts = Deque<CheckedContinuation<(MockConnection, UInt16), any Error>>()
 
-        var waiter = Deque<CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>>()
+        var waiter = Deque<CheckedContinuation<CheckedContinuation<(MockConnection, UInt16), any Error>, Never>>()
 
-        var runningConnections = [ConnectionID: Connection]()
+        var runningConnections = [Int: Connection]()
     }
 
     let autoMaxStreams: UInt16?
@@ -35,67 +36,89 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
         self.stateBox.withLockedValue { Array($0.runningConnections.values) }
     }
 
-    public func makeConnection(
-        id: Int,
-        for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>, NoOpConnectionPoolMetrics<Int>, Clock>
-    ) async throws -> ConnectionAndMetadata<MockConnection> {
+    public func withConnection(
+        onConnected: (MockConnection, UInt16, (EventsCallbacks) -> Void) async -> Void
+    ) async throws {
         if let autoMaxStreams = self.autoMaxStreams {
+            let id = self.mockIDGenerator.wrappingIncrementThenLoad(ordering: .relaxed)
             let connection = MockConnection(id: id)
-            Task {
-                try? await connection.signalToClose
-                connection.closeIfClosing()
+
+            self.stateBox.withLockedValue { state in
+                state.runningConnections[id] = connection
             }
-            return .init(connection: connection, maximalStreamsOnConnection: autoMaxStreams)
+
+            await onConnected(connection, autoMaxStreams) { callbacks in
+                connection.onClose { error in
+                    callbacks.connectionClosed(error)
+                }
+            }
+
+            // After onConnected returns, close the connection (structured lifecycle)
+            connection.close()
+            connection.closeIfClosing()
+
+            self.stateBox.withLockedValue { state in
+                _ = state.runningConnections.removeValue(forKey: id)
+            }
+            return
         }
 
-        // we currently don't support cancellation when creating a connection
-        let result = try await withCheckedThrowingContinuation { (checkedContinuation: CheckedContinuation<(MockConnection, UInt16), any Error>) in
-            let waiter = self.stateBox.withLockedValue { state -> (CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>)? in
+        // Manual mode: coordinate with nextConnectAttempt
+        let (connection, maxStreams) = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(MockConnection, UInt16), any Error>) in
+            let waiter = self.stateBox.withLockedValue { state -> CheckedContinuation<CheckedContinuation<(MockConnection, UInt16), any Error>, Never>? in
                 if let waiter = state.waiter.popFirst() {
                     return waiter
                 } else {
-                    state.attempts.append((id, checkedContinuation))
+                    state.attempts.append(continuation)
                     return nil
                 }
             }
 
             if let waiter {
-                waiter.resume(returning: (id, checkedContinuation))
+                waiter.resume(returning: continuation)
             }
         }
 
-        return .init(connection: result.0, maximalStreamsOnConnection: result.1)
+        await onConnected(connection, maxStreams) { callbacks in
+            connection.onClose { error in
+                callbacks.connectionClosed(error)
+            }
+        }
+
+        // After onConnected returns, close the connection (structured lifecycle)
+        connection.close()
+        connection.closeIfClosing()
+
+        self.stateBox.withLockedValue { state in
+            _ = state.runningConnections.removeValue(forKey: connection.id)
+        }
     }
 
     @discardableResult
     public func nextConnectAttempt(_ closure: (ConnectionID) async throws -> UInt16) async rethrows -> Connection {
-        let (connectionID, continuation) = await withCheckedContinuation { (continuation: CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>) in
-            let attempt = self.stateBox.withLockedValue { state -> (ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>)? in
+        let continuation = await withCheckedContinuation { (outerContinuation: CheckedContinuation<CheckedContinuation<(MockConnection, UInt16), any Error>, Never>) in
+            let attempt = self.stateBox.withLockedValue { state -> CheckedContinuation<(MockConnection, UInt16), any Error>? in
                 if let attempt = state.attempts.popFirst() {
                     return attempt
                 } else {
-                    state.waiter.append(continuation)
+                    state.waiter.append(outerContinuation)
                     return nil
                 }
             }
 
             if let attempt {
-                continuation.resume(returning: attempt)
+                outerContinuation.resume(returning: attempt)
             }
         }
 
-        do {
-            let streamCount = try await closure(connectionID)
-            let connection = MockConnection(id: connectionID)
+        let mockID = self.mockIDGenerator.wrappingIncrementThenLoad(ordering: .relaxed)
 
-            connection.onClose { _ in
-                self.stateBox.withLockedValue { state in
-                    _ = state.runningConnections.removeValue(forKey: connectionID)
-                }
-            }
+        do {
+            let streamCount = try await closure(mockID)
+            let connection = MockConnection(id: mockID)
 
             self.stateBox.withLockedValue { state in
-                _ = state.runningConnections[connectionID] = connection
+                state.runningConnections[mockID] = connection
             }
 
             continuation.resume(returning: (connection, streamCount))

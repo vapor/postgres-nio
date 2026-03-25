@@ -12,13 +12,10 @@ let benchmarks: @Sendable () -> Void = {
 
         let pool = ConnectionPool(
             configuration: configuration,
-            idGenerator: ConnectionIDGenerator(),
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         await withTaskGroup { taskGroup in
 
@@ -63,13 +60,10 @@ let benchmarks: @Sendable () -> Void = {
 
         let pool = ConnectionPool(
             configuration: configuration,
-            idGenerator: ConnectionIDGenerator(),
             keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
-            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
-            clock: clock
-        ) {
-            try await factory.makeConnection(id: $0, for: $1)
-        }
+            clock: clock,
+            connectionProvider: factory
+        )
 
         await withTaskGroup { taskGroup in
 

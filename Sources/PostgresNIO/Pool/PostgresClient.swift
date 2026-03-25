@@ -240,12 +240,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     typealias Pool = ConnectionPool<
         PostgresConnection,
-        PostgresConnection.ID,
-        ConnectionIDGenerator,
+        ConnectionFactory,
         ConnectionRequest<PostgresConnection>,
         ConnectionRequest.ID,
         PostgresKeepAliveBehavor,
-        PostgresClientMetrics,
         ContinuousClock
     >
 
@@ -287,16 +285,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         self.pool = ConnectionPool(
             configuration: .init(configuration),
-            idGenerator: ConnectionIDGenerator(),
+            connectionProvider: factory,
             requestType: ConnectionRequest<PostgresConnection>.self,
             keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-            observabilityDelegate: .init(logger: backgroundLogger),
             clock: ContinuousClock()
-        ) { (connectionID, pool) in
-            let connection = try await factory.makeConnection(connectionID, pool: pool)
-
-            return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
-        }
+        )
     }
     
     /// Lease a connection for the provided `closure`'s lifetime.
@@ -531,11 +524,7 @@ extension ConnectionPoolConfiguration {
     }
 }
 
-extension PostgresConnection: PooledConnection {
-    public func close() {
-        self.channel.close(mode: .all, promise: nil)
-    }
-
+extension PostgresConnection {
     public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
         self.closeFuture.whenComplete { _ in closure(nil) }
     }

@@ -8,6 +8,8 @@ extension PoolStateMachine {
         @usableFromInline
         var connection: Connection
         @usableFromInline
+        var connectionID: ConnectionID
+        @usableFromInline
         var timersToCancel: Max2Sequence<TimerCancellationToken>
         @usableFromInline
         var wasIdle: Bool
@@ -17,11 +19,13 @@ extension PoolStateMachine {
         @inlinable
         init(
             connection: Connection,
+            connectionID: ConnectionID,
             timersToCancel: Max2Sequence<TimerCancellationToken>,
             wasIdle: Bool,
             use: ConnectionGroup.ConnectionUse
         ) {
             self.connection = connection
+            self.connectionID = connectionID
             self.timersToCancel = timersToCancel
             self.wasIdle = wasIdle
             self.use = use
@@ -195,14 +199,14 @@ extension PoolStateMachine {
         ///            Call ``parkConnection(at:)``, ``leaseConnection(at:)`` or ``closeConnection(at:)``
         ///            with the supplied index after this.
         @inlinable
-        mutating func newConnectionEstablished(_ connection: Connection, maxStreams: UInt16) -> (Int, AvailableConnectionContext) {
-            guard let index = self.connections.firstIndex(where: { $0.id == connection.id }) else {
+        mutating func newConnectionEstablished(_ connection: Connection, id: ConnectionID, maxStreams: UInt16, closeContinuation: ConnectionCloseToken) -> (Int, AvailableConnectionContext) {
+            guard let index = self.connections.firstIndex(where: { $0.id == id }) else {
                 preconditionFailure("There is a new connection that we didn't request!")
             }
             self.stats.connecting -= 1
             self.stats.idle += 1
             self.stats.availableStreams += maxStreams
-            let connectionInfo = self.connections[index].connected(connection, maxStreams: maxStreams)
+            let connectionInfo = self.connections[index].connected(connection, maxStreams: maxStreams, closeContinuation: closeContinuation)
             // TODO: If this is an overflow connection, but we are currently also creating a
             //       persisted connection, we might want to swap those.
             let context = self.makeAvailableConnectionContextForConnection(at: index, info: connectionInfo)
@@ -210,7 +214,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func backoffNextConnectionAttempt(_ connectionID: Connection.ID) -> ConnectionTimer {
+        mutating func backoffNextConnectionAttempt(_ connectionID: ConnectionID) -> ConnectionTimer {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("We tried to create a new connection that we know nothing about?")
             }
@@ -228,7 +232,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func backoffDone(_ connectionID: Connection.ID, retry: Bool) -> BackoffDoneAction {
+        mutating func backoffDone(_ connectionID: ConnectionID, retry: Bool) -> BackoffDoneAction {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("We tried to create a new connection that we know nothing about?")
             }
@@ -351,6 +355,7 @@ extension PoolStateMachine {
             self.stats.availableStreams -= streams
             return LeaseResult(
                 connection: leaseResult.connection,
+                connectionID: leaseResult.connectionID,
                 timersToCancel: leaseResult.timersToCancel,
                 wasIdle: leaseResult.wasIdle,
                 use: use
@@ -392,7 +397,7 @@ extension PoolStateMachine {
         ///            Call ``leaseConnection(at:)`` or ``closeConnection(at:)`` with the supplied index after
         ///            this. If you want to park the connection no further call is required.
         @inlinable
-        mutating func releaseConnection(_ connectionID: Connection.ID, streams: UInt16) -> (Int, AvailableConnectionContext)? {
+        mutating func releaseConnection(_ connectionID: ConnectionID, streams: UInt16) -> (Int, AvailableConnectionContext)? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 return nil
             }
@@ -415,7 +420,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func keepAliveIfIdle(_ connectionID: Connection.ID) -> KeepAliveAction? {
+        mutating func keepAliveIfIdle(_ connectionID: ConnectionID) -> KeepAliveAction? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 // because of a race this connection (connection close runs against trigger of ping pong)
                 // was already removed from the state machine.
@@ -435,7 +440,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func keepAliveSucceeded(_ connectionID: Connection.ID) -> (Int, AvailableConnectionContext)? {
+        mutating func keepAliveSucceeded(_ connectionID: ConnectionID) -> (Int, AvailableConnectionContext)? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 // keepAliveSucceeded can race against, closeIfIdle, shutdowns or connection errors
                 return nil
@@ -458,7 +463,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func keepAliveFailed(_ connectionID: Connection.ID) -> CloseAction? {
+        mutating func keepAliveFailed(_ connectionID: ConnectionID) -> CloseAction? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 // Connection has already been closed
                 return nil
@@ -477,7 +482,8 @@ extension PoolStateMachine {
             // keepAlive cannot happen without a connection
             return CloseAction(
                 connection: closeAction.connection!,
-                timersToCancel: closeAction.cancelTimers
+                timersToCancel: closeAction.cancelTimers,
+                closeContinuation: closeAction.closeContinuation
             )
         }
 
@@ -491,10 +497,14 @@ extension PoolStateMachine {
             @usableFromInline
             private(set) var timersToCancel: Max2Sequence<TimerCancellationToken>
 
+            @usableFromInline
+            private(set) var closeContinuation: ConnectionCloseToken?
+
             @inlinable
-            init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>) {
+            init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>, closeContinuation: ConnectionCloseToken?) {
                 self.connection = connection
                 self.timersToCancel = timersToCancel
+                self.closeContinuation = closeContinuation
             }
         }
 
@@ -512,7 +522,8 @@ extension PoolStateMachine {
 
             return CloseAction(
                 connection: closeAction.connection!,
-                timersToCancel: closeAction.cancelTimers
+                timersToCancel: closeAction.cancelTimers,
+                closeContinuation: closeAction.closeContinuation
             )
         }
 
@@ -551,7 +562,8 @@ extension PoolStateMachine {
             if let connection = closeAction.connection {
                 return .close(CloseAction(
                     connection: connection,
-                    timersToCancel: closeAction.cancelTimers
+                    timersToCancel: closeAction.cancelTimers,
+                    closeContinuation: closeAction.closeContinuation
                 ))
             } else {
                 // if there is no connection we should delete this now
@@ -564,7 +576,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func closeConnectionIfIdle(_ connectionID: Connection.ID) -> CloseAction? {
+        mutating func closeConnectionIfIdle(_ connectionID: ConnectionID) -> CloseAction? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 // because of a race this connection (connection close runs against trigger of timeout)
                 // was already removed from the state machine.
@@ -582,7 +594,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func rescheduleIdleTimer(_ connectionID: Connection.ID) -> ConnectionTimer? {
+        mutating func rescheduleIdleTimer(_ connectionID: ConnectionID) -> ConnectionTimer? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 // because of a race this connection (connection close runs against trigger of timeout)
                 // was already removed from the state machine.
@@ -598,7 +610,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func destroyFailedConnection(_ connectionID: Connection.ID) -> TimerCancellationToken? {
+        mutating func destroyFailedConnection(_ connectionID: ConnectionID) -> TimerCancellationToken? {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("Failing a connection we don't have a record of.")
             }
@@ -609,7 +621,7 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func destroyBackingOffConnection(_ connectionID: Connection.ID) -> Max2Sequence<TimerCancellationToken> {
+        mutating func destroyBackingOffConnection(_ connectionID: ConnectionID) -> Max2Sequence<TimerCancellationToken> {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("Failing a connection we don't have a record of.")
             }
@@ -659,7 +671,7 @@ extension PoolStateMachine {
         ///            supplied index after this. If nil is returned the connection was closed by the state machine and was
         ///            therefore already removed.
         @inlinable
-        mutating func connectionClosed(_ connectionID: Connection.ID, shuttingDown: Bool) -> ClosedAction {
+        mutating func connectionClosed(_ connectionID: ConnectionID, shuttingDown: Bool) -> ClosedAction {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("All connections that have been created should say goodbye exactly once!")
             }
@@ -710,6 +722,9 @@ extension PoolStateMachine {
                 case .close(let closeAction):
                     cleanup.connections.append(closeAction.connection)
                     cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
+                    if let closeContinuation = closeAction.closeContinuation {
+                        cleanup.closeContinuations.append(closeContinuation)
+                    }
 
                 case .cancelTimers(let timers):
                     cleanup.timersToCancel.append(contentsOf: timers)

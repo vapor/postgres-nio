@@ -16,12 +16,12 @@ import Testing
         #expect(!state.isConnected)
         #expect(!state.isLeased)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 1, newIdle: true))
         #expect(state.isIdle)
         #expect(state.isAvailable)
         #expect(state.isConnected)
         #expect(state.isLeased == false)
-        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+        #expect(state.lease(streams: 1) == .init(connection: connection, connectionID: connectionID, timersToCancel: .init(), wasIdle: true))
 
         #expect(!state.isIdle)
         #expect(!state.isAvailable)
@@ -50,6 +50,7 @@ import Testing
 
         let expectLeaseAction = TestConnectionState.LeaseAction(
             connection: connection,
+            connectionID: connectionID,
             timersToCancel: [idleTimerCancellationToken, keepAliveTimerCancellationToken],
             wasIdle: true
         )
@@ -61,7 +62,7 @@ import Testing
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         #expect(
             parkResult ==
@@ -78,7 +79,7 @@ import Testing
 
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         let idleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
-        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+        #expect(state.lease(streams: 1) == .init(connection: connection, connectionID: connectionID, timersToCancel: .init(), wasIdle: true))
 
         #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == keepAliveTimerCancellationToken)
         #expect(state.timerScheduled(idleTimer, cancelContinuation: idleTimerCancellationToken) == idleTimerCancellationToken)
@@ -89,7 +90,7 @@ import Testing
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         #expect(
             parkResult.elementsEqual([
@@ -105,7 +106,7 @@ import Testing
 
         let initialKeepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         let initialIdleTimerCancellationToken = MockTimerCancellationToken(idleTimer)
-        #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+        #expect(state.lease(streams: 1) == .init(connection: connection, connectionID: connectionID, timersToCancel: .init(), wasIdle: true))
 
         #expect(state.release(streams: 1) == .idle(availableStreams: 1, newIdle: true))
         #expect(
@@ -152,7 +153,7 @@ import Testing
         #expect(state.retryConnect() == forthBackoffTimerCancellationToken)
 
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 1, newIdle: true))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -160,7 +161,7 @@ import Testing
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 100, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else {
             Issue.record("Expected to get a keepAliveTimer")
@@ -172,19 +173,19 @@ import Testing
 
         #expect(
             state.lease(streams: 30) ==
-            TestConnectionState.LeaseAction(connection: connection, timersToCancel: [keepAliveTimerCancellationToken], wasIdle: true)
+            TestConnectionState.LeaseAction(connection: connection, connectionID: connectionID, timersToCancel: [keepAliveTimerCancellationToken], wasIdle: true)
         )
 
         #expect(state.release(streams: 10) == .leased(availableStreams: 80))
 
         #expect(
             state.lease(streams: 40) ==
-            TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: false)
+            TestConnectionState.LeaseAction(connection: connection, connectionID: connectionID, timersToCancel: [], wasIdle: false)
         )
 
         #expect(
             state.lease(streams: 40) ==
-            TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: false)
+            TestConnectionState.LeaseAction(connection: connection, connectionID: connectionID, timersToCancel: [], wasIdle: false)
         )
 
         #expect(state.release(streams: 1) == .leased(availableStreams: 1))
@@ -197,7 +198,7 @@ import Testing
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 100, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else {
             Issue.record("Expected to get a keepAliveTimer")
@@ -214,14 +215,14 @@ import Testing
 
         #expect(
             state.lease(streams: 30) ==
-            TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: true)
+            TestConnectionState.LeaseAction(connection: connection, connectionID: connectionID, timersToCancel: [], wasIdle: true)
         )
 
         #expect(state.release(streams: 10) == .leased(availableStreams: 79))
         #expect(state.isAvailable)
         #expect(
             state.lease(streams: 79) ==
-            TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: false)
+            TestConnectionState.LeaseAction(connection: connection, connectionID: connectionID, timersToCancel: [], wasIdle: false)
         )
         #expect(!state.isAvailable)
         #expect(state.keepAliveSucceeded() == .leased(availableStreams: 1))
@@ -233,7 +234,7 @@ import Testing
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 100) == .idle(availableStreams: 100, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 100, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 100, newIdle: true))
         let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
         guard let keepAliveTimer = timers.first else {
             Issue.record("Expected to get a keepAliveTimer")
@@ -250,7 +251,7 @@ import Testing
 
         #expect(
             state.lease(streams: 30) ==
-            TestConnectionState.LeaseAction(connection: connection, timersToCancel: [], wasIdle: true)
+            TestConnectionState.LeaseAction(connection: connection, connectionID: connectionID, timersToCancel: [], wasIdle: true)
         )
 
         #expect(state.release(streams: 10) == .leased(availableStreams: 80))
@@ -262,7 +263,7 @@ import Testing
         let connectionID = 1
         var state = TestConnectionState(id: connectionID)
         let connection = MockConnection(id: connectionID)
-        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+        #expect(state.connected(connection, maxStreams: 1, closeContinuation: MockConnectionCloseToken(connectionID)) == .idle(availableStreams: 1, newIdle: true))
         let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
         guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {
             Issue.record("Expected to get two timers")
