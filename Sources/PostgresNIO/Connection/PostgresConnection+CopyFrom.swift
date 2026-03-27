@@ -98,12 +98,82 @@ public struct PostgresCopyFromWriter: Sendable {
     }
 }
 
-/// Specifies the format in which data is transferred to the backend in a COPY operation.
+/// Specifies the options provided to the `COPY` operation.
 ///
 /// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the options' meanings
 /// and their default values.
-public struct PostgresCopyFromFormat: Sendable {
+public struct PostgresCopyFromOptions: Sendable {
+    public enum Format:  String, Sendable {
+        case text
+        case csv
+        // case binary?
+    }
+    
+    public enum Header: Sendable {
+        case boolean(Bool)
+        case match
+    }
+
+    /// See the `FORMAT` option in Postgres's `COPY` command.
+    public var format: Format
+    
+    /// Whether to request that rows copied into a newly created or truncated table are frozen.
+    ///
+    /// See the `FREEZE` option in Postgres's `COPY` command.
+    public var freeze: Bool? = nil
+
+    /// The delimiter that separates columns in the data.
+    ///
+    /// See the `DELIMITER` option in Postgres's `COPY` command.
+    public var delimiter: UnicodeScalar? = nil
+    
+    /// String that represents `NULL` values in input data.
+    ///
+    /// See the `NULL` option in Postgres's `COPY` command.
+    public var null: String? = nil
+
+    /// Whether the input contains a header line.
+    ///
+    /// See the `HEADER` option in Postgres's `COPY` command.
+    public var header: Header? = nil
+    
+    /// Quote character used in CSV format.
+    ///
+    /// See the `QUOTE` option in Postgres's `COPY` command.
+    public var quote: UnicodeScalar? = nil
+    
+    /// Escape character used in CSV format.
+    ///
+    /// See the `ESCAPE` option in Postgres's `COPY` command.
+    public var escape: UnicodeScalar? = nil
+    
+    /// Name of the source file encoding.
+    ///
+    /// See the `ENCODING` option in Postgres's `COPY` command.
+    public var encoding: String? = nil
+
+    public init(
+        format: Format,
+        freeze: Bool? = nil,
+        delimiter: UnicodeScalar? = nil,
+        null: String? = nil,
+        header: Header? = nil,
+        quote: UnicodeScalar? = nil,
+        escape: UnicodeScalar? = nil,
+        encoding: String? = nil
+    ) {
+        self.format = format
+        self.freeze = freeze
+        self.delimiter = delimiter
+        self.null = null
+        self.header = header
+        self.quote = quote
+        self.escape = escape
+        self.encoding = encoding
+    }
+
     /// Options that can be used to modify the `text` format of a COPY operation.
+    @available(*, deprecated, message: "Use `PostgresCopyFromOptions(format:delimiter:header:)` instead.")
     public struct TextOptions: Sendable {
         /// The delimiter that separates columns in the data.
         ///
@@ -113,16 +183,14 @@ public struct PostgresCopyFromFormat: Sendable {
         public init() {}
     }
 
-    enum Format {
-        case text(TextOptions)
-    }
-
-    var format: Format
-
-    public static func text(_ options: TextOptions) -> PostgresCopyFromFormat {
-        return PostgresCopyFromFormat(format: .text(options))
+    @available(*, deprecated, message: "Use `PostgresCopyFromOptions(format:delimiter:header:)` instead.")
+    public static func text(_ options: TextOptions) -> PostgresCopyFromOptions {
+        return PostgresCopyFromOptions(format: .text, delimiter: options.delimiter)
     }
 }
+
+@available(*, deprecated, renamed: "PostgresCopyFromOptions")
+public typealias PostgresCopyFromFormat = PostgresCopyFromOptions
 
 /// Create a `COPY ... FROM STDIN` query based on the given parameters.
 ///
@@ -134,8 +202,14 @@ public struct PostgresCopyFromFormat: Sendable {
 private func buildCopyFromQuery(
     table: String,
     columns: [String] = [],
-    format: PostgresCopyFromFormat
+    options: PostgresCopyFromOptions
 ) -> PostgresQuery {
+    @inline(__always)
+    func sqlLiteral(_ value: String) -> String {
+        // Escape single quotes in SQL string literals.
+        "'\(value.replacingOccurrences(of: "'", with: "''"))'"
+    }
+    
     var query = """
         COPY "\(table)"
         """
@@ -146,13 +220,35 @@ private func buildCopyFromQuery(
     }
     query += " FROM STDIN"
     var queryOptions: [String] = []
-    switch format.format {
-    case .text(let options):
-        queryOptions.append("FORMAT text")
-        if let delimiter = options.delimiter {
-            // Set the delimiter as a Unicode code point. This avoids the possibility of SQL injection.
-            queryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
+    queryOptions.append("FORMAT \(options.format)")
+    if let freeze = options.freeze {
+        queryOptions.append("FREEZE \(freeze)")
+    }
+    if let delimiter = options.delimiter {
+        // Set the delimiter as a Unicode code point. This avoids the possibility of SQL injection.
+        queryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
+    }
+    if let null = options.null {
+        queryOptions.append("NULL \(sqlLiteral(null))")
+    }
+    if let header = options.header {
+        switch header {
+        case .boolean(let value):
+            queryOptions.append("HEADER \(value)")
+        case .match:
+            queryOptions.append("HEADER match")
         }
+    }
+    if let quote = options.quote {
+        // Set the quote character as a Unicode code point. This avoids the possibility of SQL injection.
+        queryOptions.append("QUOTE U&'\\\(String(format: "%04x", quote.value))'")
+    }
+    if let escape = options.escape {
+        // Set the escape character as a Unicode code point. This avoids the possibility of SQL injection.
+        queryOptions.append("ESCAPE U&'\\\(String(format: "%04x", escape.value))'")
+    }
+    if let encoding = options.encoding {
+        queryOptions.append("ENCODING \(sqlLiteral(encoding))")
     }
     precondition(!queryOptions.isEmpty)
     query += " WITH ("
@@ -167,7 +263,7 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - table: The name of the table into which to copy the data.
     ///   - columns: The name of the columns to copy. If an empty array is passed, all columns are assumed to be copied.
-    ///   - format: Options that specify the format of the data that is produced by `writeData`.
+    ///   - options: Options that specify the format of the data that is produced by `writeData`.
     ///   - logger: The `Logger` to log into for the operation.
     ///   - file: The file the operation was started in. Used for better error reporting.
     ///   - line: The line the operation was started in. Used for better error reporting.
@@ -181,7 +277,7 @@ extension PostgresConnection {
     public func copyFrom(
         table: String,
         columns: [String] = [],
-        format: PostgresCopyFromFormat = .text(.init()),
+        options: PostgresCopyFromOptions = .init(format: .text),
         logger: Logger,
         file: String = #fileID,
         line: Int = #line,
@@ -191,7 +287,7 @@ extension PostgresConnection {
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
         let writer: PostgresCopyFromWriter = try await withCheckedThrowingContinuation { continuation in
             let context = ExtendedQueryContext(
-                copyFromQuery: buildCopyFromQuery(table: table, columns: columns, format: format),
+                copyFromQuery: buildCopyFromQuery(table: table, columns: columns, options: options),
                 triggerCopy: continuation,
                 logger: logger
             )
@@ -224,5 +320,43 @@ extension PostgresConnection {
         // copy mode, so we don't need to send another `CopyFail`. Thus, this must not be handled in the `do` block
         // above.
         try await writer.done()
+    }
+
+    /// Copy data into a table using a `COPY <table name> FROM STDIN` query.
+    ///
+    /// - Parameters:
+    ///   - table: The name of the table into which to copy the data.
+    ///   - columns: The name of the columns to copy. If an empty array is passed, all columns are assumed to be copied.
+    ///   - format: Options that specify the format of the data that is produced by `writeData`.
+    ///   - logger: The `Logger` to log into for the operation.
+    ///   - file: The file the operation was started in. Used for better error reporting.
+    ///   - line: The line the operation was started in. Used for better error reporting.
+    ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call `write` on the
+    ///     writer provided by the closure to send data to the backend and return from the closure once all data is sent.
+    ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown
+    ///     by the `copyFrom` function.
+    ///
+    /// - Important: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
+    ///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
+    @available(*, deprecated, renamed: "copyFrom(table:columns:options:logger:file:line:writeData:)")
+    @_disfavoredOverload
+    public func copyFrom(
+        table: String,
+        columns: [String] = [],
+        format: PostgresCopyFromFormat = .init(format: .text),
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        writeData: (PostgresCopyFromWriter) async throws -> Void
+    ) async throws {
+        try await self.copyFrom(
+            table: table,
+            columns: columns,
+            options: format,
+            logger: logger,
+            file: file,
+            line: line,
+            writeData: writeData
+        )
     }
 }
