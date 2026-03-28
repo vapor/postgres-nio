@@ -11,7 +11,7 @@ import Testing
         var queue = TestQueue()
         #expect(queue.isEmpty)
 
-        let request1 = MockRequest(connectionType: MockConnection.self)
+        let request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request1)
         #expect(queue.count == 1)
         #expect(!queue.isEmpty)
@@ -26,11 +26,11 @@ import Testing
         var queue = TestQueue()
         #expect(queue.isEmpty)
 
-        var request1 = MockRequest(connectionType: MockConnection.self)
+        var request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request1)
-        var request2 = MockRequest(connectionType: MockConnection.self)
+        var request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request2)
-        var request3 = MockRequest(connectionType: MockConnection.self)
+        var request3 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request3)
 
         do {
@@ -51,11 +51,11 @@ import Testing
         var queue = TestQueue()
         #expect(queue.isEmpty)
 
-        var request1 = MockRequest(connectionType: MockConnection.self)
+        var request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request1)
-        var request2 = MockRequest(connectionType: MockConnection.self)
+        var request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request2)
-        var request3 = MockRequest(connectionType: MockConnection.self)
+        var request3 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request3)
 
         do {
@@ -79,11 +79,11 @@ import Testing
         var queue = TestQueue()
         #expect(queue.isEmpty)
 
-        var request1 = MockRequest(connectionType: MockConnection.self)
+        var request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request1)
-        var request2 = MockRequest(connectionType: MockConnection.self)
+        var request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request2)
-        var request3 = MockRequest(connectionType: MockConnection.self)
+        var request3 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request3)
 
         do {
@@ -117,11 +117,11 @@ import Testing
         var queue = TestQueue()
         #expect(queue.isEmpty)
 
-        var request1 = MockRequest(connectionType: MockConnection.self)
+        var request1 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request1)
-        var request2 = MockRequest(connectionType: MockConnection.self)
+        var request2 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request2)
-        var request3 = MockRequest(connectionType: MockConnection.self)
+        var request3 = MockRequest(connectionType: MockConnection<NothingConnectionPoolExecutor>.self)
         queue.queue(request3)
 
         do {

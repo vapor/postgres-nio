@@ -143,9 +143,11 @@ public final class ConnectionPool<
     Connection: PooledConnection,
     ConnectionID: Hashable & Sendable,
     ConnectionIDGenerator: ConnectionIDGeneratorProtocol,
+    ConnectionConfiguration: Equatable & Sendable,
     Request: ConnectionRequestProtocol,
     RequestID: Hashable & Sendable,
     KeepAliveBehavior: ConnectionKeepAliveBehavior,
+    Executor: ConnectionPoolExecutor,
     ObservabilityDelegate: ConnectionPoolObservabilityDelegate,
     Clock: _Concurrency.Clock
 >: Sendable where
@@ -157,13 +159,18 @@ public final class ConnectionPool<
     ObservabilityDelegate.ConnectionID == ConnectionID,
     Clock.Duration == Duration
 {
-    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
+    public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionConfiguration, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, ConnectionConfiguration, Request, RequestID, KeepAliveBehavior, Executor, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
     typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let factory: ConnectionFactory
+
+    public let executor: Executor
+
+    @usableFromInline
+    let connectionConfiguration: ConnectionConfiguration
 
     @usableFromInline
     let keepAliveBehavior: KeepAliveBehavior
@@ -197,18 +204,22 @@ public final class ConnectionPool<
 
     public init(
         configuration: ConnectionPoolConfiguration,
+        connectionConfiguration: ConnectionConfiguration,
         idGenerator: ConnectionIDGenerator,
         requestType: Request.Type,
         keepAliveBehavior: KeepAliveBehavior,
+        executor: Executor,
         observabilityDelegate: ObservabilityDelegate,
         clock: Clock,
         connectionFactory: @escaping ConnectionFactory
     ) {
+        self.executor = executor
         self.clock = clock
         self.factory = connectionFactory
         self.keepAliveBehavior = keepAliveBehavior
         self.observabilityDelegate = observabilityDelegate
         self.configuration = configuration
+        self.connectionConfiguration = connectionConfiguration
         var stateMachine = StateMachine(
             configuration: .init(configuration, keepAliveBehavior: keepAliveBehavior),
             generator: idGenerator,
@@ -263,10 +274,19 @@ public final class ConnectionPool<
         }
     }
 
-    public func cancelLeaseConnection(_ requestID: RequestID) {
+    @discardableResult
+    public func cancelLeaseConnection(_ requestID: RequestID) -> Bool {
+        var found = false
         self.modifyStateAndRunActions { state in
-            state.stateMachine.cancelRequest(id: requestID)
+            let action = state.stateMachine.cancelRequest(id: requestID)
+            if case .failRequest = action.request {
+                found = true
+            } else {
+                found = false
+            }
+            return action
         }
+        return found
     }
 
     /// Mark a connection as going away. Connection implementors have to call this method if the connection
@@ -279,6 +299,13 @@ public final class ConnectionPool<
         self.modifyStateAndRunActions { state in
             state.stateMachine.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: maxStreams)
         }
+    }
+
+    @inlinable
+    public func updateConfiguration(_ configuration: ConnectionConfiguration, forceReconnection: Bool) {
+        // TODO: Implement connection will close correctly
+        // If the forceReconnection flag is set, we should gracefully close the connection once they
+        // are returned the next time.
     }
 
     @inlinable
@@ -448,11 +475,11 @@ public final class ConnectionPool<
 
     @inlinable
     /*private*/ func makeConnection(for request: StateMachine.ConnectionRequest, in taskGroup: inout some TaskGroupProtocol) {
-        taskGroup.addTask_ {
+        self.addTask(into: &taskGroup) {
             self.observabilityDelegate.startedConnecting(id: request.connectionID)
 
             do {
-                let bundle = try await self.factory(request.connectionID, self)
+                let bundle = try await self.factory(request.connectionID, self.connectionConfiguration, self)
                 self.connectionEstablished(bundle)
 
                 // after the connection has been established, we keep the task open. This ensures
@@ -497,7 +524,7 @@ public final class ConnectionPool<
     /*private*/ func runKeepAlive(_ connection: Connection, in taskGroup: inout some TaskGroupProtocol) {
         self.observabilityDelegate.keepAliveTriggered(id: connection.id)
 
-        taskGroup.addTask_ {
+        self.addTask(into: &taskGroup) {
             do {
                 try await self.keepAliveBehavior.runKeepAlive(for: connection)
 
@@ -531,8 +558,8 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func runTimer(_ timer: StateMachine.Timer, in poolGroup: inout some TaskGroupProtocol) {
-        poolGroup.addTask_ { () async -> () in
+    /*private*/ func runTimer(_ timer: StateMachine.Timer, in taskGroup: inout some TaskGroupProtocol) {
+        self.addTask(into: &taskGroup) { () async -> () in
             await withTaskGroup(of: TimerRunResult.self, returning: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
@@ -583,6 +610,17 @@ public final class ConnectionPool<
             token.resume()
         }
     }
+
+    @inlinable
+    func addTask(into taskGroup: inout some TaskGroupProtocol, operation: @isolated(any) @escaping @Sendable () async -> Void) {
+        #if compiler(>=6.0)
+        if #available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *), let executor = self.executor as? TaskExecutor {
+            taskGroup.addTask_(executorPreference: executor, operation: operation)
+            return
+        }
+        #endif
+        taskGroup.addTask_(operation: operation)
+    }
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -604,6 +642,11 @@ protocol TaskGroupProtocol {
     // under exactly this name and others have different attributes. So let's pick
     // a name that doesn't clash anywhere and implement it using the standard `addTask`.
     mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void)
+
+    #if compiler(>=6.0)
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *)
+    mutating func addTask_(executorPreference: ((any TaskExecutor)?), operation: @isolated(any) @escaping @Sendable () async -> Void)
+    #endif
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
@@ -612,6 +655,14 @@ extension DiscardingTaskGroup: TaskGroupProtocol {
     mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
+
+    #if compiler(>=6.0)
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *)
+    @inlinable
+    mutating func addTask_(executorPreference: (any TaskExecutor)?, operation: @isolated(any) @escaping @Sendable () async -> Void) {
+        self.addTask(executorPreference: executorPreference, operation: operation)
+    }
+    #endif
 }
 
 extension TaskGroup<Void>: TaskGroupProtocol {
@@ -619,4 +670,12 @@ extension TaskGroup<Void>: TaskGroupProtocol {
     mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
+
+    #if compiler(>=6.0)
+    @available(macOS 15.0, iOS 18.0, tvOS 18.0, watchOS 11.0, *)
+    @inlinable
+    mutating func addTask_(executorPreference: (any TaskExecutor)?, operation: @isolated(any) @escaping @Sendable () async -> Void) {
+        self.addTask(executorPreference: executorPreference, operation: operation)
+    }
+    #endif
 }

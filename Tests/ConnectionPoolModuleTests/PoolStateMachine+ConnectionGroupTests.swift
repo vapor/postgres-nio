@@ -4,6 +4,7 @@ import Testing
 
 @Suite struct PoolStateMachine_ConnectionGroupTests {
     var idGenerator = ConnectionIDGenerator()
+    let executor = NothingConnectionPoolExecutor()
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testRefillConnections() {
@@ -31,7 +32,7 @@ import Testing
 
         var connected: UInt16 = 0
         for request in requests {
-            let newConnection = MockConnection(id: request.connectionID)
+            let newConnection = MockConnection(id: request.connectionID, executor: self.executor)
             let (_, context) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
             #expect(context.info == .idle(availableStreams: 1, newIdle: true))
             #expect(context.use == .persisted)
@@ -68,7 +69,7 @@ import Testing
         #expect(connections.soonAvailableConnections == 1)
         #expect(connections.stats == .init(connecting: 1))
 
-        let newConnection = MockConnection(id: request.connectionID)
+        let newConnection = MockConnection(id: request.connectionID, executor: self.executor)
         let (_, establishedContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         #expect(establishedContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedContext.use == .demand)
@@ -188,14 +189,14 @@ import Testing
         }
         #expect(connections.stats == .init(connecting: 3))
 
-        let newSecondConnection = MockConnection(id: secondRequest.connectionID)
+        let newSecondConnection = MockConnection(id: secondRequest.connectionID, executor: self.executor)
         let (_, establishedSecondConnectionContext) = connections.newConnectionEstablished(newSecondConnection, maxStreams: 1)
         #expect(establishedSecondConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedSecondConnectionContext.use == .persisted)
         #expect(connections.stats == .init(connecting: 2, idle: 1, availableStreams: 1))
         #expect(connections.soonAvailableConnections == 2)
 
-        let newThirdConnection = MockConnection(id: thirdRequest.connectionID)
+        let newThirdConnection = MockConnection(id: thirdRequest.connectionID, executor: self.executor)
         let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, maxStreams: 1)
         #expect(establishedThirdConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedThirdConnectionContext.use == .demand)
@@ -245,7 +246,7 @@ import Testing
         }
         #expect(connections.stats == .init(connecting: 2))
 
-        let newFirstConnection = MockConnection(id: firstRequest.connectionID)
+        let newFirstConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (_, establishedFirstConnectionContext) = connections.newConnectionEstablished(newFirstConnection, maxStreams: 1)
         #expect(establishedFirstConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedFirstConnectionContext.use == .demand)
@@ -284,7 +285,7 @@ import Testing
             return
         }
 
-        let newConnection = MockConnection(id: firstRequest.connectionID)
+        let newConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         #expect(establishedConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedConnectionContext.use == .persisted)
@@ -323,7 +324,7 @@ import Testing
             return
         }
 
-        let newConnection = MockConnection(id: firstRequest.connectionID)
+        let newConnection = MockConnection(id: firstRequest.connectionID, executor: self.executor)
         let (connectionIndex, establishedConnectionContext) = connections.newConnectionEstablished(newConnection, maxStreams: 1)
         #expect(establishedConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
