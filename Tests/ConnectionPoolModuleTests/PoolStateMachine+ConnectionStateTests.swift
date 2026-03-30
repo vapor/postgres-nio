@@ -479,4 +479,31 @@ import Testing
         #expect(closeAction?.previousConnectionState == .leased)
         #expect(!state.isDraining)
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testReleaseAfterMaxStreamsReduced() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
+
+        // Lease 3 out of 4 streams
+        #expect(state.lease(streams: 3) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        // Server reduces maxStreams to 2 while we hold 3
+        let info = state.newMaxStreamSetting(2)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == 2)
+        #expect(info?.oldMaxStreams == 4)
+
+        // Release 1 stream: usedStreams goes from 3 to 2, but maxStreams is 2 so availableStreams = 0
+        #expect(state.release(streams: 1) == .none)
+        #expect(state.isLeased)
+
+        // Release another: usedStreams goes from 2 to 1, availableStreams = 1
+        #expect(state.release(streams: 1) == .available(.leased(availableStreams: 1)))
+
+        // Release last: usedStreams = 0 → idle
+        #expect(state.release(streams: 1) == .available(.idle(availableStreams: 2, newIdle: true)))
+    }
 }

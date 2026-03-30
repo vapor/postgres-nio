@@ -463,6 +463,7 @@ extension PoolStateMachine {
                     // it can happen that we don't have streams available, even after streams
                     // were released. this might be if the number of max streams was reduced,
                     // before the connection got released.
+                    self.state = .leased(connection, usedStreams: newUsedStreams, maxStreams: maxStreams, keepAlive: keepAlive)
                     return .none
                 }
 
