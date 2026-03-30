@@ -646,4 +646,86 @@ import Testing
         }
         #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 1))
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnPersistedSwapsWithOverflow() {
+        // Setup: min=1, softLimit=1, hardLimit=2
+        // This gives us 1 persisted slot (index 0) and 1 overflow slot (index 1)
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 1,
+            maximumConcurrentConnectionHardLimit: 2,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        // Create the persisted connection
+        let requests = connections.refillConnections()
+        #expect(requests.count == 1)
+        let persistedConn = MockConnection(id: requests[0].connectionID)
+        let (_, persistedCtx) = connections.newConnectionEstablished(persistedConn, maxStreams: 1)
+        #expect(persistedCtx.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+
+        // Lease the persisted connection
+        guard case .leasedConnection(let leaseResult1) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease persisted connection")
+            return
+        }
+        #expect(leaseResult1.use == .persisted)
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Create an overflow connection
+        guard let overflowRequest = connections.createNewOverflowConnectionIfPossible() else {
+            Issue.record("Expected to create overflow connection")
+            return
+        }
+        let overflowConn = MockConnection(id: overflowRequest.connectionID)
+        let (_, overflowCtx) = connections.newConnectionEstablished(overflowConn, maxStreams: 1)
+        #expect(overflowCtx.use == .overflow)
+        #expect(connections.stats == .init(idle: 1, leased: 1, availableStreams: 1, leasedStreams: 1))
+
+        // Lease the overflow connection
+        guard case .leasedConnection(let leaseResult2) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease overflow connection")
+            return
+        }
+        #expect(leaseResult2.use == .overflow)
+        #expect(connections.stats == .init(leased: 2, leasedStreams: 2))
+
+        // Mark the persisted connection for close (it's leased, so it drains)
+        guard case .none = connections.connectionWillClose(persistedConn.id) else {
+            Issue.record("Expected .none (connection is leased, so it drains)")
+            return
+        }
+        #expect(connections.stats == .init(leased: 2, leasedStreams: 2))
+
+        // The overflow connection should have been swapped into the persisted slot.
+        // Verify by checking that connection at index 0 is the overflow connection.
+        #expect(connections.connections[0].id == overflowConn.id)
+        #expect(connections.connections[1].id == persistedConn.id)
+
+        // Release the draining connection (now at overflow index) → triggers close
+        guard case .closeConnection = connections.releaseConnection(persistedConn.id, streams: 1) else {
+            Issue.record("Expected draining connection to close on release")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, closing: 1, leasedStreams: 1))
+
+        // When the draining connection closes, it's in the overflow slot,
+        // so no replacement connection should be created.
+        let closedAction = connections.connectionClosed(persistedConn.id, shuttingDown: false)
+        #expect(closedAction.newConnectionRequest == nil)
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Release the promoted connection (now persisted at index 0)
+        guard case .available(let idx, let ctx) = connections.releaseConnection(overflowConn.id, streams: 1) else {
+            Issue.record("Expected connection to become available")
+            return
+        }
+        #expect(idx == 0)
+        #expect(ctx.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+    }
 }

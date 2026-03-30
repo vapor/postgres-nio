@@ -402,6 +402,23 @@ extension PoolStateMachine {
                 self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
                 self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
 
+                // If the closing connection occupies a persisted or demand slot, try to
+                // swap it with an established overflow connection to promote the overflow
+                // connection early, before the closing connection is actually removed.
+                // Overflow connections are always leased (they can never be parked), so
+                // no new timers need to be created for the promoted connection at this
+                // time. Once the overflow connection is released, idle timeout and keep
+                // alive timers will be created for it.
+                if index < self.maximumConcurrentConnectionSoftLimit,
+                   self.connections.count > self.maximumConcurrentConnectionSoftLimit
+                {
+                    if let overflowIndex = (self.maximumConcurrentConnectionSoftLimit..<self.connections.count)
+                        .first(where: { self.connections[$0].isConnected && !self.connections[$0].isDraining })
+                    {
+                        self.connections.swapAt(index, overflowIndex)
+                    }
+                }
+
                 return .closeConnection(CloseAction(
                     connection: closeAction.connection!,
                     timersToCancel: closeAction.cancelTimers
@@ -410,6 +427,25 @@ extension PoolStateMachine {
             case .markedForClose(let availableStreams, let keepAliveWasRunning):
                 self.stats.availableStreams -= availableStreams
                 self.stats.runningKeepAlive -= keepAliveWasRunning ? 1 : 0
+
+                // If the draining connection occupies a persisted or demand slot, try to
+                // swap it with an established overflow connection. This promotes the
+                // overflow connection into the persisted/demand slot so that no replacement
+                // connection needs to be created when the draining connection finally closes.
+                // Overflow connections are always leased (they can never be parked), so
+                // no new timers need to be created for the promoted connection at this
+                // time. Once the overflow connection is released, idle timeout and keep
+                // alive timers will be created for it.
+                if index < self.maximumConcurrentConnectionSoftLimit,
+                   self.connections.count > self.maximumConcurrentConnectionSoftLimit
+                {
+                    if let overflowIndex = (self.maximumConcurrentConnectionSoftLimit..<self.connections.count)
+                        .first(where: { self.connections[$0].isConnected && !self.connections[$0].isDraining })
+                    {
+                        self.connections.swapAt(index, overflowIndex)
+                    }
+                }
+
                 return .none
 
             case .alreadyClosing:
