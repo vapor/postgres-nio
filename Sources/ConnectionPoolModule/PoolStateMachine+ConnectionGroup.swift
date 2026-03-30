@@ -557,10 +557,10 @@ extension PoolStateMachine {
         @usableFromInline
         struct CloseAction {
             @usableFromInline
-            private(set) var connection: Connection
+            var connection: Connection
 
             @usableFromInline
-            private(set) var timersToCancel: Max2Sequence<TimerCancellationToken>
+            var timersToCancel: Max2Sequence<TimerCancellationToken>
 
             @inlinable
             init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>) {

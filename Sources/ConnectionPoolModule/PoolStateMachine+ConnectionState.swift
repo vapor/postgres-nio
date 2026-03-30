@@ -92,7 +92,7 @@ extension PoolStateMachine {
                 let timerID: Int
 
                 @usableFromInline
-                private(set) var cancellationContinuation: TimerCancellationToken?
+                /*private*/ var cancellationContinuation: TimerCancellationToken?
 
                 @inlinable
                 init(id: Int) {

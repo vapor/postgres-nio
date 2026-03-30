@@ -224,17 +224,17 @@ struct PoolStateMachine<
     @usableFromInline let generator: ConnectionIDGenerator
 
     @usableFromInline
-    private(set) var connections: ConnectionGroup
+    /*private*/ var connections: ConnectionGroup
     @usableFromInline
-    private(set) var requestQueue: RequestQueue
+    /*private*/ var requestQueue: RequestQueue
     @usableFromInline
-    private(set) var poolState: PoolState = .running
+    /*private*/ var poolState: PoolState = .running
     @usableFromInline
-    private(set) var gracefulShutdownTriggered: Bool = false
+    /*private*/ var gracefulShutdownTriggered: Bool = false
     @usableFromInline
     let clock: Clock
     @usableFromInline
-    private(set) var cacheNoMoreConnectionsAllowed: Bool = false
+    /*private*/ var cacheNoMoreConnectionsAllowed: Bool = false
 
     @inlinable
     init(
