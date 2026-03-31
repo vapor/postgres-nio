@@ -31,6 +31,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
         .package(url: "https://github.com/apple/swift-collections.git", from: "1.0.4"),
+        .package(url: "https://github.com/apple/swift-distributed-tracing.git", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.25.0"),
@@ -57,6 +58,7 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -82,6 +84,7 @@ let package = Package(
             name: "PostgresNIOTests",
             dependencies: [
                 .target(name: "PostgresNIO"),
+                .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
             ],
@@ -103,6 +106,7 @@ let package = Package(
             name: "IntegrationTests",
             dependencies: [
                 .target(name: "PostgresNIO"),
+                .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
             ],
             swiftSettings: swiftSettings

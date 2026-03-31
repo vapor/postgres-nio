@@ -154,6 +154,72 @@ While this looks at first glance like a classic case of [SQL injection](https://
 
 Some queries do not receive any rows from the server (most often `INSERT`, `UPDATE`, and `DELETE` queries with no `RETURNING` clause, not to mention most DDL queries). To support this, the [`query(_:logger:)`] method is marked `@discardableResult`, so that the compiler does not issue a warning if the return value is not used. 
 
+## Tracing
+
+PostgresNIO can emit distributed tracing spans for database operations, but tracing is disabled by default.
+
+After bootstrapping your tracer, opt in through either `PostgresClient.Configuration.Options` or `PostgresConnection.Configuration.Options`:
+
+```swift
+import PostgresNIO
+import Tracing
+
+InstrumentationSystem.bootstrap(MyTracer())
+
+var config = PostgresClient.Configuration(
+  host: "localhost",
+  port: 5432,
+  username: "my_username",
+  password: "my_password",
+  database: "my_database",
+  tls: .disable
+)
+
+config.options.tracing.isEnabled = true
+```
+
+By default, PostgresNIO uses the bootstrapped global tracer when tracing is enabled. You can override that for tests or specialized setups:
+
+```swift
+config.options.tracing.tracer = myTracer
+```
+
+`db.query.text` uses a safe default and is only attached when PostgresNIO can treat the SQL as parameterized or when PostgresNIO generated the SQL itself and can provide a sanitized tracing form. Raw non-parameterized user SQL is omitted by default. If you want raw SQL text on every span, opt in explicitly:
+
+```swift
+config.options.tracing.queryTextPolicy = .recordAll
+```
+
+By default, statement metadata only uses exact low-cardinality information for operations whose semantics are already known to PostgresNIO, such as explicit `prepare`, explicit `deallocate`, and `copyFrom`. Generic query execution typically falls back to a target-based span name such as the database namespace.
+
+If you want SQL verb grouping like `SELECT`, `INSERT`, or `UPDATE` on generic query spans for backends such as Datadog, opt in explicitly:
+
+```swift
+config.options.tracing.statementMetadataPolicy = .inferred
+```
+
+If you do not want optional statement metadata at all, disable it:
+
+```swift
+config.options.tracing.statementMetadataPolicy = .disabled
+```
+
+Tracing errors keep a privacy-preserving default description. If you want PostgresNIO to attach the primary server error message to failed spans, opt in explicitly:
+
+```swift
+config.options.tracing.errorDetailsPolicy = .message
+```
+
+If you want the full debug description on failed spans, including enriched query context and source locations when available, opt in explicitly:
+
+```swift
+config.options.tracing.errorDetailsPolicy = .debugDescription
+```
+
+Use `.debugDescription` only when that additional visibility is acceptable for your deployment and data handling requirements.
+
+The first tracing release instruments `query`, prepared statement execution, explicit `prepare`, explicit `deallocate`, `copyFrom`, and `withTransaction`. It does not currently emit spans for connection establishment, authentication, pool maintenance, or `LISTEN` / `NOTIFY`.
+
 ## Security
 
 Please see [SECURITY.md] for details on the security process.

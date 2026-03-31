@@ -53,7 +53,7 @@ public struct PreparedQuery: Sendable {
     }
 
     public func deallocate() -> EventLoopFuture<Void> {
-        self.underlying.connection.close(.preparedStatement(self.underlying.name), logger: self.database.logger)
+        self.underlying.connection.tracedDeallocate(self.underlying.name, logger: self.database.logger)
     }
 }
 

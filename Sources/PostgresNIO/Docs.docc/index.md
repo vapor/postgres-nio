@@ -42,6 +42,7 @@ configure ``PostgresConnection`` to use `Network.framework` as the underlying tr
 
 - <doc:coding>
 - <doc:prepared-statement>
+- <doc:tracing>
 - <doc:listen>
 
 ### Errors
