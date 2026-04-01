@@ -271,8 +271,10 @@ public final class ConnectionPool<
 
     /// Mark a connection as going away. Connection implementors have to call this method if the connection
     /// has received a close intent from the server. For example: an HTTP/2 GOAWAY frame.
-    public func connectionWillClose(_ connection: Connection) {
-
+    public func connectionWillClose(_ connectionID: ConnectionID) {
+        self.modifyStateAndRunActions { state in
+            state.stateMachine.connectionWillClose(connectionID)
+        }
     }
 
     public func connectionReceivedNewMaxStreamSetting(_ connection: Connection, newMaxStreamSetting maxStreams: UInt16) {

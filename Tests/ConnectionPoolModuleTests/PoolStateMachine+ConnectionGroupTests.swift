@@ -82,7 +82,7 @@ import Testing
         #expect(newConnection === leaseResult.connection)
         #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
 
-        guard let (index, releasedContext) = connections.releaseConnection(leaseResult.connection.id, streams: 1) else {
+        guard case .available(let index, let releasedContext) = connections.releaseConnection(leaseResult.connection.id, streams: 1) else {
             Issue.record("Expected that this connection is still active")
             return
         }
@@ -103,7 +103,7 @@ import Testing
         #expect(newConnection === keepAliveAction.connection)
         #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
 
-        guard let (_, pingPongContext) = connections.keepAliveSucceeded(newConnection.id) else {
+        guard case .available(_, let pingPongContext) = connections.keepAliveSucceeded(newConnection.id) else {
             Issue.record("Expected to get an AvailableContext")
             return
         }
@@ -298,7 +298,7 @@ import Testing
         #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
         #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
 
-        guard let (_, afterPingIdleContext) = connections.keepAliveSucceeded(newConnection.id) else {
+        guard case .available(_, let afterPingIdleContext) = connections.keepAliveSucceeded(newConnection.id) else {
             Issue.record("Expected to receive an AvailableContext")
             return
         }
@@ -341,5 +341,501 @@ import Testing
             return
         }
         #expect(connections.stats == .init(closing: 1))
+    }
+
+    // MARK: - connectionWillClose tests
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnIdleConnection() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        let requests = connections.refillConnections()
+        guard let request = requests.first else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (index, _) = connections.newConnectionEstablished(connection, maxStreams: 1)
+        _ = connections.parkConnection(at: index, hasBecomeIdle: true)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+
+        guard case .closeConnection(let closeAction) = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected closeConnection action")
+            return
+        }
+        #expect(closeAction.connection === connection)
+        #expect(connections.stats == .init(closing: 1, availableStreams: 0))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnLeasedConnection() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 4)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 4))
+
+        // Lease 2 out of 4 streams
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        #expect(connections.stats == .init(leased: 1, availableStreams: 2, leasedStreams: 2))
+
+        guard case .none = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected none action for leased connection")
+            return
+        }
+        // availableStreams should be decremented by the unused capacity (2)
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 2))
+
+        // Connection should no longer be found by leaseConnection
+        #expect(connections.leaseConnection() == nil)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnLeasedThenRelease() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 1)
+        _ = connections.leaseConnection()
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Mark for close while leased
+        guard case .none = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected none action")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Release → should close
+        guard case .closeConnection(let closeAction) = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected closeConnection on release after markForClose")
+            return
+        }
+        #expect(closeAction.connection === connection)
+        #expect(connections.stats == .init(closing: 1))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnLeasedPartialRelease() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 4)
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        #expect(connections.stats == .init(leased: 1, availableStreams: 1, leasedStreams: 3))
+
+        // Mark for close
+        guard case .none = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected none")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 3))
+
+        // Partial release — still has streams in use
+        guard case .none = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected none on partial release")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 2))
+
+        // Release another
+        guard case .none = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected none on partial release")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Release last stream — should close
+        guard case .closeConnection(let closeAction) = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected closeConnection on final release")
+            return
+        }
+        #expect(closeAction.connection === connection)
+        #expect(connections.stats == .init(closing: 1))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveSucceededOnMarkedIdleConnection() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        let requests = connections.refillConnections()
+        guard let request = requests.first else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (connectionIndex, _) = connections.newConnectionEstablished(connection, maxStreams: 1)
+        _ = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
+
+        let keepAliveTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: request.connectionID, usecase: .keepAlive)
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        // Start keep alive
+        guard let keepAliveAction = connections.keepAliveIfIdle(connection.id) else {
+            Issue.record("Expected keep alive action")
+            return
+        }
+        #expect(keepAliveAction.connection === connection)
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+
+        // Now mark for close while keep alive is running
+        // Since keepAlive is running on idle, closeIfIdle triggers immediately
+        guard case .closeConnection(let closeAction) = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected closeConnection when marking idle connection (with keepAlive running)")
+            return
+        }
+        #expect(closeAction.connection === connection)
+        // idle -= 1, closing += 1, runningKeepAlive -= 1 (from closeAction)
+        #expect(connections.stats == .init(closing: 1))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnLeasedWithKeepAlive_ReleaseClosesWithoutWaitingForKeepAlive() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (connectionIndex, _) = connections.newConnectionEstablished(connection, maxStreams: 100)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 100))
+
+        // Park and start keepAlive
+        let timers = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keepAlive timer")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+
+        guard let keepAliveAction = connections.keepAliveIfIdle(connection.id) else {
+            Issue.record("Expected keep alive action")
+            return
+        }
+        #expect(keepAliveAction.connection === connection)
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 99))
+
+        // Lease a stream while keepAlive is running
+        guard case .leasedConnection(let leaseResult) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease a connection")
+            return
+        }
+        #expect(leaseResult.connection === connection)
+        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 98, leasedStreams: 1))
+
+        // Mark for close — runningKeepAlive should be decremented at mark time
+        guard case .none = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected none action for leased connection")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 1))
+
+        // Release → should close immediately (don't wait for keepAlive)
+        guard case .closeConnection(let closeAction) = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected closeConnection on release after markForClose")
+            return
+        }
+        #expect(closeAction.connection === connection)
+        #expect(connections.stats == .init(closing: 1))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testKeepAliveSucceededOnDrainingConnection_NoOp() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (connectionIndex, _) = connections.newConnectionEstablished(connection, maxStreams: 100)
+
+        // Park and start keepAlive
+        let timers = connections.parkConnection(at: connectionIndex, hasBecomeIdle: true)
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keepAlive timer")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+        _ = connections.keepAliveIfIdle(connection.id)
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 99))
+
+        // Lease while keepAlive is running
+        _ = connections.leaseConnectionOrSoonAvailableConnectionCount()
+        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 98, leasedStreams: 1))
+
+        // Mark for close — runningKeepAlive decremented here
+        guard case .none = connections.connectionWillClose(connection.id) else {
+            Issue.record("Expected none")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 1))
+
+        // keepAliveSucceeded while draining → no-op, stats unchanged
+        guard case .none = connections.keepAliveSucceeded(connection.id) else {
+            Issue.record("Expected none for keepAliveSucceeded on draining connection")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 1))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionWillCloseOnPersistedSwapsWithOverflow() {
+        // Setup: min=1, softLimit=1, hardLimit=2
+        // This gives us 1 persisted slot (index 0) and 1 overflow slot (index 1)
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 1,
+            maximumConcurrentConnectionHardLimit: 2,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        // Create the persisted connection
+        let requests = connections.refillConnections()
+        #expect(requests.count == 1)
+        let persistedConn = MockConnection(id: requests[0].connectionID)
+        let (_, persistedCtx) = connections.newConnectionEstablished(persistedConn, maxStreams: 1)
+        #expect(persistedCtx.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+
+        // Lease the persisted connection
+        guard case .leasedConnection(let leaseResult1) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease persisted connection")
+            return
+        }
+        #expect(leaseResult1.use == .persisted)
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Create an overflow connection
+        guard let overflowRequest = connections.createNewOverflowConnectionIfPossible() else {
+            Issue.record("Expected to create overflow connection")
+            return
+        }
+        let overflowConn = MockConnection(id: overflowRequest.connectionID)
+        let (_, overflowCtx) = connections.newConnectionEstablished(overflowConn, maxStreams: 1)
+        #expect(overflowCtx.use == .overflow)
+        #expect(connections.stats == .init(idle: 1, leased: 1, availableStreams: 1, leasedStreams: 1))
+
+        // Lease the overflow connection
+        guard case .leasedConnection(let leaseResult2) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease overflow connection")
+            return
+        }
+        #expect(leaseResult2.use == .overflow)
+        #expect(connections.stats == .init(leased: 2, leasedStreams: 2))
+
+        // Mark the persisted connection for close (it's leased, so it drains)
+        guard case .none = connections.connectionWillClose(persistedConn.id) else {
+            Issue.record("Expected .none (connection is leased, so it drains)")
+            return
+        }
+        #expect(connections.stats == .init(leased: 2, leasedStreams: 2))
+
+        // The overflow connection should have been swapped into the persisted slot.
+        // Verify by checking that connection at index 0 is the overflow connection.
+        #expect(connections.connections[0].id == overflowConn.id)
+        #expect(connections.connections[1].id == persistedConn.id)
+
+        // Release the draining connection (now at overflow index) → triggers close
+        guard case .closeConnection = connections.releaseConnection(persistedConn.id, streams: 1) else {
+            Issue.record("Expected draining connection to close on release")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, closing: 1, leasedStreams: 1))
+
+        // When the draining connection closes, it's in the overflow slot,
+        // so no replacement connection should be created.
+        let closedAction = connections.connectionClosed(persistedConn.id, shuttingDown: false)
+        #expect(closedAction.newConnectionRequest == nil)
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Release the promoted connection (now persisted at index 0)
+        guard case .available(let idx, let ctx) = connections.releaseConnection(overflowConn.id, streams: 1) else {
+            Issue.record("Expected connection to become available")
+            return
+        }
+        #expect(idx == 0)
+        #expect(ctx.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+    }
+
+    // MARK: - connectionReceivedNewMaxStreamSetting tests
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test(arguments: [(4, 8), (8, 4)])
+    func changeStreamsOnIdleConnection(initial: UInt16, update: UInt16) {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        let requests = connections.refillConnections()
+        guard let request = requests.first else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: initial)
+        #expect(connections.stats == .init(idle: 1, availableStreams: initial))
+
+        let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: update)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == update)
+        #expect(info?.oldMaxStreams == initial)
+        #expect(info?.usedStreams == 0)
+        #expect(connections.stats == .init(idle: 1, availableStreams: update))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func decreaseMaxStreamsBelowUsedStreams() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 4)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 4))
+
+        // Lease 3 streams
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        #expect(connections.stats == .init(leased: 1, availableStreams: 1, leasedStreams: 3))
+
+        // Decrease maxStreams to 2 (below the 3 used streams)
+        let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: 2)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == 2)
+        #expect(info?.oldMaxStreams == 4)
+        // availableStreams should go to 0 (was 1, decrease by min(2, 1) = 1)
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 3))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func newMaxStreamSettingForUnknownConnectionID() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        _ = connections.refillConnections()
+        let info = connections.connectionReceivedNewMaxStreamSetting(999, newMaxStreamSetting: 8)
+        #expect(info == nil)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func newMaxStreamSettingOnDrainingConnection() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 4)
+
+        // Lease and mark for close (draining)
+        _ = connections.leaseConnection()
+        _ = connections.connectionWillClose(connection.id)
+        let statsBeforeMaxStreamChange = connections.stats
+
+        // newMaxStreamSetting on draining should return nil, stats unchanged
+        let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: 8)
+        #expect(info == nil)
+        #expect(connections.stats == statsBeforeMaxStreamChange)
     }
 }
