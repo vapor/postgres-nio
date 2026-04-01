@@ -480,6 +480,117 @@ import Testing
         #expect(!state.isDraining)
     }
 
+    // MARK: - newMaxStreamSetting tests
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test(arguments: [(4, 8), (8, 4)])
+    func changeMaxStreamsOnIdleConnection(initial: UInt16, update: UInt16) {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: initial) == .idle(availableStreams: initial, newIdle: true))
+
+        let info = state.newMaxStreamSetting(update)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == update)
+        #expect(info?.oldMaxStreams == initial)
+        #expect(info?.usedStreams == 0)
+        #expect(state.isAvailable)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func increaseMaxStreamsOnLeasedConnection() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
+        #expect(state.lease(streams: 3) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+
+        let info = state.newMaxStreamSetting(8)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == 8)
+        #expect(info?.oldMaxStreams == 4)
+        #expect(info?.usedStreams == 3)
+        #expect(state.isAvailable)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testNewMaxStreamSettingOnDrainingClosingClosedReturnsNil() {
+        // draining
+        do {
+            let connectionID = 1
+            var state = TestConnectionState(id: connectionID)
+            let connection = MockConnection(id: connectionID)
+            #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
+            #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
+            _ = state.markForClose()
+            #expect(state.isDraining)
+            #expect(state.newMaxStreamSetting(8) == nil)
+        }
+
+        // closing
+        do {
+            let connectionID = 2
+            var state = TestConnectionState(id: connectionID)
+            let connection = MockConnection(id: connectionID)
+            #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+            _ = state.closeIfIdle()
+            #expect(state.newMaxStreamSetting(8) == nil)
+        }
+
+        // closed
+        do {
+            let connectionID = 3
+            var state = TestConnectionState(id: connectionID)
+            let connection = MockConnection(id: connectionID)
+            #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+            _ = state.closeIfIdle()
+            _ = state.closed()
+            #expect(state.isClosed)
+            #expect(state.newMaxStreamSetting(8) == nil)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testIncreaseMaxStreamsWhileKeepAliveRunning() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
+        let timers = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: false)
+        guard let keepAliveTimer = timers.first else {
+            Issue.record("Expected a keepAliveTimer")
+            return
+        }
+        let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
+        #expect(
+            state.runKeepAliveIfIdle(reducesAvailableStreams: true) ==
+            .init(connection: connection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken)
+        )
+
+        let info = state.newMaxStreamSetting(8)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == 8)
+        #expect(info?.oldMaxStreams == 4)
+        // keepAlive consuming a stream should be reflected in usedStreams
+        #expect(info?.usedStreams == 1)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testSetMaxStreamsToSameValue() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
+
+        let info = state.newMaxStreamSetting(4)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == 4)
+        #expect(info?.oldMaxStreams == 4)
+        #expect(info?.usedStreams == 0)
+    }
+
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testReleaseAfterMaxStreamsReduced() {
         let connectionID = 1

@@ -301,7 +301,16 @@ extension PoolStateMachine {
                 return nil
             }
 
-            self.stats.availableStreams += maxStreams - info.oldMaxStreams
+            // Use signed-safe arithmetic to avoid UInt16 underflow when the
+            // server reduces maxStreams. The min() clamp is needed because
+            // availableStreams may be less than the decrease when streams are
+            // already leased (those are tracked in leasedStreams, not here).
+            if maxStreams >= info.oldMaxStreams {
+                self.stats.availableStreams += maxStreams - info.oldMaxStreams
+            } else {
+                let decrease = info.oldMaxStreams - maxStreams
+                self.stats.availableStreams -= min(decrease, self.stats.availableStreams)
+            }
 
             return NewMaxStreamInfo(index: index, info: info)
         }

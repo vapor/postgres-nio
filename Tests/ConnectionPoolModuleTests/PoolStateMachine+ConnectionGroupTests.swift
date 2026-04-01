@@ -728,4 +728,114 @@ import Testing
         #expect(ctx.use == .persisted)
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
     }
+
+    // MARK: - connectionReceivedNewMaxStreamSetting tests
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test(arguments: [(4, 8), (8, 4)])
+    func changeStreamsOnIdleConnection(initial: UInt16, update: UInt16) {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        let requests = connections.refillConnections()
+        guard let request = requests.first else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: initial)
+        #expect(connections.stats == .init(idle: 1, availableStreams: initial))
+
+        let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: update)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == update)
+        #expect(info?.oldMaxStreams == initial)
+        #expect(info?.usedStreams == 0)
+        #expect(connections.stats == .init(idle: 1, availableStreams: update))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func decreaseMaxStreamsBelowUsedStreams() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 4)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 4))
+
+        // Lease 3 streams
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        _ = connections.leaseConnection()
+        #expect(connections.stats == .init(leased: 1, availableStreams: 1, leasedStreams: 3))
+
+        // Decrease maxStreams to 2 (below the 3 used streams)
+        let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: 2)
+        #expect(info != nil)
+        #expect(info?.newMaxStreams == 2)
+        #expect(info?.oldMaxStreams == 4)
+        // availableStreams should go to 0 (was 1, decrease by min(2, 1) = 1)
+        #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 3))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func newMaxStreamSettingForUnknownConnectionID() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        _ = connections.refillConnections()
+        let info = connections.connectionReceivedNewMaxStreamSetting(999, newMaxStreamSetting: 8)
+        #expect(info == nil)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func newMaxStreamSettingOnDrainingConnection() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (_, _) = connections.newConnectionEstablished(connection, maxStreams: 4)
+
+        // Lease and mark for close (draining)
+        _ = connections.leaseConnection()
+        _ = connections.connectionWillClose(connection.id)
+        let statsBeforeMaxStreamChange = connections.stats
+
+        // newMaxStreamSetting on draining should return nil, stats unchanged
+        let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: 8)
+        #expect(info == nil)
+        #expect(connections.stats == statsBeforeMaxStreamChange)
+    }
 }

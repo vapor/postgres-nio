@@ -268,20 +268,16 @@ import Testing
             // validate that a keep alive timer and an idle timeout timer is scheduled
             var expectedInstants: Set<MockClock.Instant> = [.init(keepAliveDuration), .init(config.idleTimeout)]
             let deadline1 = await clock.nextTimerScheduled()
-            print(deadline1)
             #expect(expectedInstants.remove(deadline1) != nil)
             let deadline2 = await clock.nextTimerScheduled()
-            print(deadline2)
             #expect(expectedInstants.remove(deadline2) != nil)
             #expect(expectedInstants.isEmpty == true)
 
             // move clock forward to keep alive
             let newTime = clock.now.advanced(by: keepAliveDuration)
             clock.advance(to: newTime)
-            print("clock advanced to: \(newTime)")
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { print("keep alive 1 has run") }
                 #expect(keepAliveConnection === connectionLease.connection)
                 return true
             }
@@ -290,7 +286,6 @@ import Testing
 
             let deadline3 = await clock.nextTimerScheduled()
             #expect(deadline3 == clock.now.advanced(by: keepAliveDuration))
-            print(deadline3)
 
             // race keep alive vs timeout
             clock.advance(to: clock.now.advanced(by: keepAliveDuration))
@@ -348,10 +343,8 @@ import Testing
             // validate that a keep alive timer and an idle timeout timer is scheduled
             var expectedInstants: Set<MockClock.Instant> = [.init(keepAliveDuration), .init(config.idleTimeout)]
             let deadline1 = await clock.nextTimerScheduled()
-            print(deadline1)
             #expect(expectedInstants.remove(deadline1) != nil)
             let deadline2 = await clock.nextTimerScheduled()
-            print(deadline2)
             #expect(expectedInstants.remove(deadline2) != nil)
             #expect(expectedInstants.isEmpty)
 
@@ -435,23 +428,19 @@ import Testing
             // validate that a keep alive timer and an idle timeout timer is scheduled
             var expectedInstants: Set<MockClock.Instant> = [.init(keepAliveDuration), .init(config.idleTimeout)]
             let deadline1 = await clock.nextTimerScheduled()
-            print(deadline1)
             #expect(expectedInstants.remove(deadline1) != nil)
             let deadline2 = await clock.nextTimerScheduled()
-            print(deadline2)
             #expect(expectedInstants.remove(deadline2) != nil)
             #expect(expectedInstants.isEmpty)
 
             clock.advance(to: clock.now.advanced(by: keepAliveDuration))
 
             await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { print("keep alive 1 has run") }
                 #expect(keepAliveConnection === connectionLease.connection)
                 return true
             }
 
             taskGroup.cancelAll()
-            print("cancelled")
 
             for connection in factory.runningConnections {
                 connection.closeIfClosing()
@@ -629,11 +618,9 @@ import Testing
                 _ = try await pool.leaseConnection()
                 Issue.record("Expected a failure")
             } catch {
-                print("failed")
                 #expect(error as? ConnectionPoolError == .poolShutdown)
             }
 
-            print("will close connections: \(factory.runningConnections)")
             for connection in factory.runningConnections {
                 try await connection.signalToClose
                 connection.closeIfClosing()
@@ -1249,6 +1236,210 @@ import Testing
             }
 
             // Shut down cleanly
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func decreaseMaxStreams() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 1
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // Create a connection with 4 streams
+            let requests = (0..<3).map { ConnectionFuture(id: $0) }
+            pool.leaseConnections(requests)
+
+            let createdConnection = await factory.nextConnectAttempt { _ in
+                return 4
+            }
+
+            let lease1 = try await requests[0].future.success
+            let lease2 = try await requests[1].future.success
+            let lease3 = try await requests[2].future.success
+            #expect(lease1.connection === createdConnection)
+
+            // Decrease maxStreams from 4 to 2 while 3 streams are leased
+            pool.connectionReceivedNewMaxStreamSetting(createdConnection, newMaxStreamSetting: 2)
+
+            // Release stream — 2 out of 2 are still used
+            lease1.release()
+
+            // Lease again, but 2 out of 2 are still used
+            let request4 = ConnectionFuture(id: 3)
+            pool.leaseConnection(request4)
+            #expect(request4.future.isUnfulfilled)
+
+            // Release stream — this means more space is available
+            lease2.release()
+            let lease4 = try await request4.future.success
+            #expect(lease4.connection === createdConnection)
+
+            // Release streams — all streams available again
+            lease3.release()
+            lease4.release()
+
+            // Verify pool still works after decrease
+            let newRequest = ConnectionFuture(id: 10)
+            pool.leaseConnections([newRequest])
+            let newLease = try await newRequest.future.success
+            #expect(newLease.connection === createdConnection)
+            newLease.release()
+
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func increaseMaxStreamsWithNoWaitingRequests() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 1
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // Create connection with 1 stream, lease it
+            let request = ConnectionFuture(id: 0)
+            pool.leaseConnection(request)
+            let createdConnection = await factory.nextConnectAttempt { _ in
+                return 1
+            }
+            let lease = try await request.future.success
+            #expect(lease.connection === createdConnection)
+
+            // Increase maxStreams with no waiting requests
+            pool.connectionReceivedNewMaxStreamSetting(createdConnection, newMaxStreamSetting: 10)
+
+            // Release and verify we can now lease multiple streams
+            lease.release()
+
+            let multiRequests = (1..<6).map { ConnectionFuture(id: $0) }
+            pool.leaseConnections(multiRequests)
+            for req in multiRequests {
+                let l = try await req.future.success
+                #expect(l.connection === createdConnection)
+                l.release()
+            }
+
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func multipleMaxStreamsChangesInSequence() async throws {
+        let clock = MockClock()
+        let factory = MockConnectionFactory<MockClock>()
+        let keepAliveDuration = Duration.seconds(30)
+        let keepAlive = MockPingPongBehavior(keepAliveFrequency: keepAliveDuration, connectionType: MockConnection.self)
+
+        var mutableConfig = ConnectionPoolConfiguration()
+        mutableConfig.minimumConnectionCount = 0
+        mutableConfig.maximumConnectionSoftLimit = 1
+        mutableConfig.maximumConnectionHardLimit = 1
+        mutableConfig.idleTimeout = .seconds(10)
+        let config = mutableConfig
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionFuture.self,
+            keepAliveBehavior: keepAlive,
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await pool.run()
+            }
+
+            // Create connection with 1 stream
+            let request = ConnectionFuture(id: 0)
+            pool.leaseConnections([request])
+            let createdConnection = await factory.nextConnectAttempt { _ in
+                return 1
+            }
+            let lease = try await request.future.success
+            lease.release()
+
+            // Increase to 10
+            pool.connectionReceivedNewMaxStreamSetting(createdConnection, newMaxStreamSetting: 10)
+
+            // Decrease to 3
+            pool.connectionReceivedNewMaxStreamSetting(createdConnection, newMaxStreamSetting: 3)
+
+            // Verify we can lease up to 3 streams
+            let requests = (1..<4).map { ConnectionFuture(id: $0) }
+            pool.leaseConnections(requests)
+            var leases = [ConnectionLease<MockConnection>]()
+            for req in requests {
+                let l = try await req.future.success
+                #expect(l.connection === createdConnection)
+                leases.append(l)
+            }
+
+            // Release all
+            for lease in leases {
+                lease.release()
+            }
+
             taskGroup.cancelAll()
             for connection in factory.runningConnections {
                 connection.closeIfClosing()

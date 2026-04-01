@@ -489,8 +489,6 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                         XCTAssertEqual(counter, end)
                     } catch let error as CancellationError {
                         XCTAssertGreaterThanOrEqual(counter, 1)
-                        // Expected
-                        print("\(error)")
                     } catch {
                         XCTFail("Unexpected error: \(error)")
                     }
