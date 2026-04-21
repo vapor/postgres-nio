@@ -1398,6 +1398,96 @@ typealias TestPoolStateMachine = PoolStateMachine<
         // Should only lease 1 (the waiting request count)
         #expect(leasedRequests.count == 1)
     }
+
+    /// Regression test: when the idle-timeout timer fires while a lease request is waiting
+    /// in the queue (because a keep-alive is currently consuming the connection's only
+    /// stream), `connectionIdleTimerTriggered` reschedules a fresh idle timer. Prior to the
+    /// fix, the old idle timer's `TimerCancellationToken` was silently dropped, which in
+    /// `ConnectionPool.runTimer` manifests as:
+    ///
+    ///     SWIFT TASK CONTINUATION MISUSE: runTimer(_:in:) leaked its continuation
+    ///     without resuming it.
+    ///
+    /// because the stored `CheckedContinuation<Void, Never>` is never resumed. This test
+    /// drives the state machine into that exact race and asserts the returned action
+    /// surfaces the old cancellation token so the caller can resume it.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testIdleTimerReschedulePreservesOldCancellationToken() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 1
+        configuration.maximumConnectionHardLimit = 1
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // Lease a request — triggers creation of a demand connection.
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction1 = stateMachine.leaseConnection(request1)
+        guard case .makeConnection(let makeRequest, _) = leaseAction1.connection else {
+            Issue.record("expected .makeConnection, got \(leaseAction1.connection)")
+            return
+        }
+
+        // Establish the connection — because the request is queued it is leased immediately.
+        let connection = MockConnection(id: makeRequest.connectionID)
+        let establishedAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(establishedAction.request == .leaseConnection(.init(element: request1), connection))
+
+        // Release the connection — parks with both keep-alive and idle timers because this
+        // is a demand connection (index >= minimumConcurrentConnections).
+        let releaseAction = stateMachine.releaseConnection(connection, streams: 1)
+        let keepAliveTimer = TestPoolStateMachine.Timer(
+            .init(timerID: 0, connectionID: connection.id, usecase: .keepAlive),
+            duration: configuration.keepAliveDuration!
+        )
+        let idleTimer = TestPoolStateMachine.Timer(
+            .init(timerID: 1, connectionID: connection.id, usecase: .idleTimeout),
+            duration: configuration.idleTimeoutDuration
+        )
+        #expect(releaseAction.connection == .scheduleTimers([keepAliveTimer, idleTimer]))
+
+        // Register cancellation tokens for both timers (simulates the child task in
+        // `ConnectionPool.runTimer` storing its continuation via `timerScheduled`).
+        let keepAliveToken = MockTimerCancellationToken(keepAliveTimer)
+        let idleToken = MockTimerCancellationToken(idleTimer)
+        #expect(stateMachine.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveToken) == nil)
+        #expect(stateMachine.timerScheduled(idleTimer, cancelContinuation: idleToken) == nil)
+
+        // Keep-alive fires — the connection transitions to keepAlive: .running, idleTimer: .some.
+        let keepAliveFired = stateMachine.timerTriggered(keepAliveTimer)
+        #expect(keepAliveFired.connection == .runKeepAlive(connection, keepAliveToken))
+
+        // Queue a second request. Because the running keep-alive consumes the only stream,
+        // the request stays in the queue.
+        let request2 = MockRequest(connectionType: MockConnection.self)
+        _ = stateMachine.leaseConnection(request2)
+
+        // Idle timer fires while the keep-alive is still running and the queue is non-empty.
+        // This is the `rescheduleIdleTimer` code path.
+        let newIdleTimer = TestPoolStateMachine.Timer(
+            .init(timerID: 2, connectionID: connection.id, usecase: .idleTimeout),
+            duration: configuration.idleTimeoutDuration
+        )
+        let idleFired = stateMachine.timerTriggered(idleTimer)
+
+        // The returned action must carry the old idle timer's cancellation token so the
+        // pool can resume its continuation. Before the fix this was an empty
+        // `.scheduleTimers([newIdleTimer])` and `idleToken` was dropped on the floor.
+        #expect(
+            idleFired.connection == .makeConnectionsCancelAndScheduleTimers(
+                .init(),
+                .init(element: idleToken),
+                .init(newIdleTimer)
+            )
+        )
+    }
 }
 
 struct SomeError: Error {}

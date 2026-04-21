@@ -620,8 +620,26 @@ struct PoolStateMachine<
             // might pickup the lease request (which would cancel the idle timeout) or the lease request might
             // already be handled by another (currently busy connection), in which case the idle timeout can
             // trigger eventually.
-            let timer = self.connections.rescheduleIdleTimer(connectionID)
-            return .init(request: .none, connection: .scheduleTimers(timer.map { [self.mapTimers($0)] } ?? []))
+            guard let (newTimer, oldCancellationToken) = self.connections.rescheduleIdleTimer(connectionID) else {
+                return .none()
+            }
+            let scheduledTimers = Max2Sequence(self.mapTimers(newTimer))
+            // We must propagate the old idle timer's cancellation continuation so that the
+            // `ConnectionPool.runTimer` child task that stored it can be resumed. Dropping it here
+            // produces a "SWIFT TASK CONTINUATION MISUSE: runTimer(_:in:) leaked its continuation
+            // without resuming it" runtime warning (the stored `CheckedContinuation` is never
+            // resumed and eventually deallocated).
+            if let oldCancellationToken {
+                return .init(
+                    request: .none,
+                    connection: .makeConnectionsCancelAndScheduleTimers(
+                        .init(),
+                        .init(element: oldCancellationToken),
+                        scheduledTimers
+                    )
+                )
+            }
+            return .init(request: .none, connection: .scheduleTimers(scheduledTimers))
         }
 
         guard let closeAction = self.connections.closeConnectionIfIdle(connectionID) else {
