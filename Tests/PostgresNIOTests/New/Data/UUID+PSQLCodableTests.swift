@@ -81,7 +81,6 @@ import NIOCore
         }
     }
 
-    #if compiler(>=6.1)
     @Test func testDecodeFailureFromBytes() {
         let uuid = UUID()
         var buffer = ByteBuffer()
@@ -129,5 +128,4 @@ import NIOCore
             #expect(error == .typeMismatch)
         }
     }
-    #endif
 }
