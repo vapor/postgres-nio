@@ -131,34 +131,57 @@ public struct PostgresCopyFromFormat: Sendable {
 ///
 /// - Warning: The table and column names are inserted into the `COPY FROM` query as passed and might thus be
 ///   susceptible to SQL injection. Ensure no untrusted data is contained in these strings.
+private struct CopyFromQueries: Sendable {
+    let executionQuery: PostgresQuery
+    let safeTracingText: String?
+}
+
 private func buildCopyFromQuery(
     table: String,
     columns: [String] = [],
-    format: PostgresCopyFromFormat
-) -> PostgresQuery {
-    var query = """
+    format: PostgresCopyFromFormat,
+    includeSafeTracingText: Bool
+) -> CopyFromQueries {
+    func append(_ fragment: String, to value: inout String?) {
+        value?.append(fragment)
+    }
+
+    var executionQuery = """
         COPY "\(table)"
         """
+    var safeTracingText = includeSafeTracingText ? executionQuery : nil
     if !columns.isEmpty {
-        query += "("
-        query += columns.map { #""\#($0)""# }.joined(separator: ",")
-        query += ")"
+        let columnList = columns.map { #""\#($0)""# }.joined(separator: ",")
+        executionQuery += "("
+        executionQuery += columnList
+        executionQuery += ")"
+        append("(\(columnList))", to: &safeTracingText)
     }
-    query += " FROM STDIN"
-    var queryOptions: [String] = []
+    executionQuery += " FROM STDIN"
+    append(" FROM STDIN", to: &safeTracingText)
+    var executionQueryOptions: [String] = []
+    var safeTracingOptions: [String]? = includeSafeTracingText ? [] : nil
     switch format.format {
     case .text(let options):
-        queryOptions.append("FORMAT text")
+        executionQueryOptions.append("FORMAT text")
+        safeTracingOptions?.append("FORMAT text")
         if let delimiter = options.delimiter {
             // Set the delimiter as a Unicode code point. This avoids the possibility of SQL injection.
-            queryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
+            executionQueryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
+            safeTracingOptions?.append("DELIMITER ?")
         }
     }
-    precondition(!queryOptions.isEmpty)
-    query += " WITH ("
-    query += queryOptions.map { "\($0)" }.joined(separator: ",")
-    query += ")"
-    return "\(unescaped: query)"
+    precondition(!executionQueryOptions.isEmpty)
+    executionQuery += " WITH ("
+    executionQuery += executionQueryOptions.joined(separator: ",")
+    executionQuery += ")"
+    if let safeTracingOptions {
+        append(" WITH (\(safeTracingOptions.joined(separator: ",")))", to: &safeTracingText)
+    }
+    return .init(
+        executionQuery: "\(unescaped: executionQuery)",
+        safeTracingText: safeTracingText
+    )
 }
 
 extension PostgresConnection {
@@ -187,11 +210,74 @@ extension PostgresConnection {
         line: Int = #line,
         writeData: (PostgresCopyFromWriter) async throws -> Void
     )  async throws {
+        let copyQuery = buildCopyFromQuery(
+            table: table,
+            columns: columns,
+            format: format,
+            includeSafeTracingText: self.shouldBuildSafeLibraryGeneratedQueryText
+        )
+        let span = self.makeTraceSpan(
+            for: .libraryQuery(
+                copyQuery.executionQuery,
+                safeQueryText: copyQuery.safeTracingText ?? copyQuery.executionQuery.sql,
+                exactSummary: .init(
+                    operationName: "COPY",
+                    querySummary: nil,
+                    collectionName: table,
+                    storedProcedureName: nil
+                )
+            ),
+            file: file,
+            line: UInt(line)
+        )
+        if let span {
+            do {
+                try await self.copyFromUntraced(
+                    copyQuery: copyQuery.executionQuery,
+                    logger: logger,
+                    writeData: writeData
+                )
+                span.succeed()
+            } catch {
+                let tracedError = enrichTracingError(
+                    error,
+                    query: copyQuery.executionQuery,
+                    file: file,
+                    line: line
+                )
+                span.fail(tracedError)
+                throw tracedError
+            }
+            return
+        }
+
+        do {
+            try await self.copyFromUntraced(
+                copyQuery: copyQuery.executionQuery,
+                logger: logger,
+                writeData: writeData
+            )
+        } catch {
+            throw enrichTracingError(
+                error,
+                query: copyQuery.executionQuery,
+                file: file,
+                line: line
+            )
+        }
+    }
+
+    private func copyFromUntraced(
+        copyQuery: PostgresQuery,
+        logger: Logger,
+        writeData: (PostgresCopyFromWriter) async throws -> Void
+    ) async throws {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
+
         let writer: PostgresCopyFromWriter = try await withCheckedThrowingContinuation { continuation in
             let context = ExtendedQueryContext(
-                copyFromQuery: buildCopyFromQuery(table: table, columns: columns, format: format),
+                copyFromQuery: copyQuery,
                 triggerCopy: continuation,
                 logger: logger
             )

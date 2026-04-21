@@ -3,6 +3,7 @@ import NIOSSL
 import Atomics
 import Logging
 import ServiceLifecycle
+import Tracing
 import _ConnectionPoolModule
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
@@ -135,6 +136,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
+            /// Distributed tracing options for this client's database operations.
+            public var tracing: PostgresTracingConfiguration = .init()
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -253,6 +257,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     let factory: ConnectionFactory
     let runningAtomic = ManagedAtomic(false)
     let backgroundLogger: Logger
+    let tracingConfiguration: PostgresTracingConfiguration?
+    let tracingConnectionInfo: PostgresTracingConnectionInfo?
 
     /// Creates a new ``PostgresClient``, that does not log any background information.
     ///
@@ -284,6 +290,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
         self.factory = factory
         self.backgroundLogger = backgroundLogger
+        self.tracingConfiguration = configuration.options.tracing.isEnabled ? configuration.options.tracing : nil
+        self.tracingConnectionInfo = self.tracingConfiguration.map { _ in
+            PostgresTracingConnectionInfo(configuration: configuration)
+        }
 
         self.pool = ConnectionPool(
             configuration: .init(configuration),
@@ -355,8 +365,41 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         _ closure: (PostgresConnection) async throws -> sending Result
     ) async throws -> sending Result {
         // for 6.0 to compile we need to explicitly forward the isolation.
-        try await self.withConnection(isolation: isolation) { connection in
-            try await connection.withTransaction(logger: logger, file: file, line: line, isolation: isolation, closure)
+        let span = self.makeTraceSpan(for: .transaction, file: file, line: UInt(line))
+        guard let span else {
+            return try await self.withConnection(isolation: isolation) { connection in
+                try await connection._withTransactionUntraced(
+                    logger: logger,
+                    file: file,
+                    line: line,
+                    isolation: isolation,
+                    closure
+                )
+            }
+        }
+
+        do {
+            return try await self.withConnection(isolation: isolation) { connection in
+                try await connection.withTraceContextOverride(span.context) {
+                    do {
+                        let result = try await connection._withTransactionUntraced(
+                            logger: logger,
+                            file: file,
+                            line: line,
+                            isolation: isolation,
+                            closure
+                        )
+                        span.succeed()
+                        return result
+                    } catch {
+                        span.fail(error)
+                        throw error
+                    }
+                }
+            }
+        } catch {
+            span.fail(error)
+            throw error
         }
     }
 
@@ -377,6 +420,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         line: Int = #line
     ) async throws -> PostgresRowSequence {
         let logger = logger ?? Self.loggingDisabled
+        let span = self.makeQueryTraceSpan(for: query, file: file, line: UInt(line))
         do {
             guard query.binds.count <= Int(UInt16.max) else {
                 throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
@@ -397,20 +441,24 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
             connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
 
-            promise.futureResult.whenFailure { _ in
+            let responseFuture = promise.futureResult.flatMapThrowing {
+                if let span {
+                    $0.installTracing(span, managesLifecycle: true)
+                }
+                return $0.asyncSequence(onFinish: {
+                    lease.release()
+                })
+            }
+
+            responseFuture.whenFailure { _ in
                 lease.release()
             }
 
-            return try await promise.futureResult.map {
-                $0.asyncSequence(onFinish: {
-                    lease.release()
-                })
-            }.get()
-        } catch var error as PSQLError {
-            error.file = file
-            error.line = line
-            error.query = query
-            throw error // rethrow with more metadata
+            return try await responseFuture.get()
+        } catch {
+            let tracedError = enrichTracingError(error, query: query, file: file, line: line)
+            span?.fail(tracedError)
+            throw tracedError
         }
     }
 
@@ -423,6 +471,12 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ) async throws -> AsyncThrowingMapSequence<PostgresRowSequence, Row> where Row == Statement.Row {
         let bindings = try preparedStatement.makeBindings()
         let logger = logger ?? Self.loggingDisabled
+        let span = self.makePreparedExecutionTraceSpan(
+            sql: Statement.sql,
+            bindCount: bindings.count,
+            file: file,
+            line: UInt(line)
+        )
 
         do {
             let lease = try await self.leaseConnection()
@@ -439,22 +493,27 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             ))
             connection.channel.write(task, promise: nil)
 
-            promise.futureResult.whenFailure { _ in
+            let responseFuture = promise.futureResult.flatMapThrowing {
+                if let span {
+                    $0.installTracing(span, managesLifecycle: true)
+                }
+                return $0.asyncSequence(onFinish: { lease.release() })
+            }
+
+            responseFuture.whenFailure { _ in
                 lease.release()
             }
 
-            return try await promise.futureResult
-                .map { $0.asyncSequence(onFinish: { lease.release() }) }
-                .get()
-                .map { try preparedStatement.decodeRow($0) }
-        } catch var error as PSQLError {
-            error.file = file
-            error.line = line
-            error.query = .init(
-                unsafeSQL: Statement.sql,
-                binds: bindings
+            return try await responseFuture.get().map { try preparedStatement.decodeRow($0) }
+        } catch {
+            let tracedError = enrichTracingError(
+                error,
+                query: .init(unsafeSQL: Statement.sql, binds: bindings),
+                file: file,
+                line: line
             )
-            throw error // rethrow with more metadata
+            span?.fail(tracedError)
+            throw tracedError
         }
     }
 
@@ -491,6 +550,64 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         return try await self.pool.leaseConnection()
     }
 
+    private func makeTraceSpan(
+        for operation: @autoclosure () -> PostgresTraceOperation,
+        parentContext: ServiceContext? = nil,
+        function: String = #function,
+        file: String = #fileID,
+        line: UInt = #line
+    ) -> PostgresTraceSpan? {
+        guard let configuration = self.tracingConfiguration,
+              let connectionInfo = self.tracingConnectionInfo,
+              let tracer = configuration.resolvedTracer
+        else {
+            return nil
+        }
+
+        return operation().makeSpan(
+            tracer: tracer,
+            configuration: configuration,
+            connectionInfo: connectionInfo,
+            parentContext: parentContext ?? ServiceContext.current,
+            function: function,
+            file: file,
+            line: line
+        )
+    }
+
+    private func makeQueryTraceSpan(
+        for query: PostgresQuery,
+        parentContext: ServiceContext? = nil,
+        function: String = #function,
+        file: String = #fileID,
+        line: UInt = #line
+    ) -> PostgresTraceSpan? {
+        self.makeTraceSpan(
+            for: .userQuery(query),
+            parentContext: parentContext,
+            function: function,
+            file: file,
+            line: line
+        )
+    }
+
+    private func makePreparedExecutionTraceSpan(
+        sql: String,
+        bindCount: Int,
+        parentContext: ServiceContext? = nil,
+        function: String = #function,
+        file: String = #fileID,
+        line: UInt = #line
+    ) -> PostgresTraceSpan? {
+        self.makeTraceSpan(
+            for: .preparedExecution(sql: sql, bindCount: bindCount),
+            parentContext: parentContext,
+            function: function,
+            file: file,
+            line: line
+        )
+    }
+
     /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
     ///
     /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
@@ -516,7 +633,7 @@ struct PostgresKeepAliveBehavor: ConnectionKeepAliveBehavior {
     }
 
     func runKeepAlive(for connection: PostgresConnection) async throws {
-        try await connection.query(self.behavior!.query, logger: self.logger).map { _ in }.get()
+        try await connection.runMaintenanceQuery(self.behavior!.query, logger: self.logger)
     }
 }
 
