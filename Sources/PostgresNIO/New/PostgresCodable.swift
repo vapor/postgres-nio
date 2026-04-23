@@ -233,3 +233,4 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
         }
     }
 }
+

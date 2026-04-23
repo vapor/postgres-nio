@@ -92,6 +92,65 @@ extension PostgresQuery {
         public mutating func appendInterpolation(unescaped interpolated: String) {
             self.sql.append(contentsOf: interpolated)
         }
+
+        // MARK: JSONB convenience interpolation
+
+        /// Bind an arbitrary `Encodable & Sendable` value as a JSONB parameter.
+        ///
+        /// ```swift
+        /// let query: PostgresQuery = "INSERT INTO t (data) VALUES (\(jsonb: myModel))"
+        /// ```
+        @inlinable
+        public mutating func appendInterpolation<Value: Encodable & Sendable>(jsonb value: Value) throws {
+            try self.binds.append(PostgresJSONB(value), context: .default)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        /// Bind an optional `Encodable & Sendable` value as a JSONB parameter, or NULL if `nil`.
+        @inlinable
+        public mutating func appendInterpolation<Value: Encodable & Sendable>(jsonb value: Optional<Value>) throws {
+            switch value {
+            case .none:
+                self.binds.appendNull()
+            case .some(let value):
+                try self.binds.append(PostgresJSONB(value), context: .default)
+            }
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        /// Bind an array of `Encodable & Sendable` values as a native Postgres `JSONB[]` array parameter.
+        ///
+        /// Each element is individually JSONB-encoded within the Postgres array wire format.
+        ///
+        /// ```swift
+        /// let query: PostgresQuery = "INSERT INTO t (tags) VALUES (\(jsonb: arrayOfModels))"
+        /// ```
+        @inlinable
+        public mutating func appendInterpolation<Element: Encodable & Sendable>(jsonb value: [Element]) throws {
+            try self.binds.append(PostgresJSONBArray(value), context: .default)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        /// Bind an arbitrary `Encodable & Sendable` value as a JSONB parameter with a custom encoding context.
+        @inlinable
+        public mutating func appendInterpolation<Value: Encodable & Sendable, JSONEncoder: PostgresJSONEncoder>(
+            jsonb value: Value,
+            context: PostgresEncodingContext<JSONEncoder>
+        ) throws {
+            try self.binds.append(PostgresJSONB(value), context: context)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
+
+        /// Bind an array of `Encodable & Sendable` values as a native Postgres `JSONB[]` array parameter
+        /// with a custom encoding context.
+        @inlinable
+        public mutating func appendInterpolation<Element: Encodable & Sendable, JSONEncoder: PostgresJSONEncoder>(
+            jsonb value: [Element],
+            context: PostgresEncodingContext<JSONEncoder>
+        ) throws {
+            try self.binds.append(PostgresJSONBArray(value), context: context)
+            self.sql.append(contentsOf: "$\(self.binds.count)")
+        }
     }
 }
 
