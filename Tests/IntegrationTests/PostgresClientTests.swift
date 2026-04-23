@@ -354,11 +354,11 @@ extension PostgresClient.Configuration {
         var tlsConfiguration = TLSConfiguration.makeClientConfiguration()
         tlsConfiguration.certificateVerification = .none
         var clientConfig = PostgresClient.Configuration(
-            host: env("POSTGRES_HOSTNAME") ?? "localhost",
-            port: env("POSTGRES_PORT").flatMap({ Int($0) }) ?? 5432,
-            username: env("POSTGRES_USER") ?? "test_username",
-            password: env("POSTGRES_PASSWORD") ?? "test_password",
-            database: env("POSTGRES_DB") ?? "test_database",
+            host: TestConfiguration.hostname,
+            port: TestConfiguration.port,
+            username: TestConfiguration.username,
+            password: TestConfiguration.password,
+            database: TestConfiguration.database,
             tls: .prefer(tlsConfiguration)
         )
         clientConfig.options.minimumConnections = 0

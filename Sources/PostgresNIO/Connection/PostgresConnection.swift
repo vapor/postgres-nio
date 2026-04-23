@@ -338,12 +338,14 @@ extension PostgresConnection {
         username: String,
         database: String? = nil,
         password: String? = nil,
+        additionalParameters: [(String, String)] = [],
         logger: Logger = .init(label: "codes.vapor.postgres")
     ) -> EventLoopFuture<Void> {
         let authContext = AuthContext(
             username: username,
             password: password,
-            database: database)
+            database: database,
+            additionalParameters: additionalParameters)
         let outgoing = PSQLOutgoingEvent.authenticate(authContext)
         self.channel.triggerUserOutboundEvent(outgoing, promise: nil)
 

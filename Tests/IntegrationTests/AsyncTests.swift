@@ -72,8 +72,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             var counter = 0
 
             for try await element in rows.decode((Int, String, String, String, String?, Int, Date, Date, String, String).self) {
-                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
-                XCTAssertEqual(element.2, env("POSTGRES_USER") ?? "test_username")
+                XCTAssertEqual(element.1, TestConfiguration.database)
+                XCTAssertEqual(element.2, TestConfiguration.username)
 
                 XCTAssertEqual(element.8, query.sql)
                 XCTAssertEqual(element.9, "active")
@@ -534,7 +534,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             var counter = 0
 
             for try await element in results {
-                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
+                XCTAssertEqual(element.1, TestConfiguration.database)
                 counter += 1
             }
 
@@ -543,7 +543,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             // Second execution, which reuses the existing prepared statement
             results = try await connection.execute(preparedStatement, logger: .psqlTest)
             for try await element in results {
-                XCTAssertEqual(element.1, env("POSTGRES_DB") ?? "test_database")
+                XCTAssertEqual(element.1, TestConfiguration.database)
                 counter += 1
             }
         }

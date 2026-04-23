@@ -21,14 +21,14 @@ final class IntegrationTests: XCTestCase {
     func testAuthenticationFailure() throws {
         // If the postgres server trusts every connection, it is really hard to create an
         // authentication failure.
-        try XCTSkipIf(env("POSTGRES_HOST_AUTH_METHOD") == "trust")
+        try XCTSkipIf(TestConfiguration.hostAuthMethod == "trust")
 
         let config = PostgresConnection.Configuration(
-            host: env("POSTGRES_HOSTNAME") ?? "localhost",
-            port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
-            username: env("POSTGRES_USER") ?? "test_username",
+            host: TestConfiguration.hostname,
+            port: TestConfiguration.port,
+            username: TestConfiguration.username,
             password: "wrong_password",
-            database: env("POSTGRES_DB") ?? "test_database",
+            database: TestConfiguration.database,
             tls: .disable
         )
 

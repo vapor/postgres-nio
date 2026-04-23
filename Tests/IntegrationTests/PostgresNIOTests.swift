@@ -36,7 +36,7 @@ final class PostgresNIOTests: XCTestCase {
     }
     
     func testConnectUDSAndClose() throws {
-        try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
+        try XCTSkipUnless(TestConfiguration.socket != nil)
         let conn = try PostgresConnection.testUDS(on: eventLoop).wait()
         try conn.close().wait()
     }
@@ -58,7 +58,7 @@ final class PostgresNIOTests: XCTestCase {
     }
 
     func testSimpleQueryVersionUsingUDS() throws {
-        try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
+        try XCTSkipUnless(TestConfiguration.socket != nil)
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.testUDS(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
@@ -1504,7 +1504,7 @@ final class PostgresNIOTests: XCTestCase {
 let isLoggingConfigured: Bool = {
     LoggingSystem.bootstrap { label in
         var handler = StreamLogHandler.standardOutput(label: label)
-        handler.logLevel = env("LOG_LEVEL").flatMap { .init(rawValue: $0) } ?? .info
+        handler.logLevel = TestConfiguration.env("LOG_LEVEL").flatMap { .init(rawValue: $0) } ?? .info
         return handler
     }
     return true
