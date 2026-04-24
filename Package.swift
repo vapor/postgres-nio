@@ -1,4 +1,4 @@
-// swift-tools-version:6.1
+// swift-tools-version:6.3
 import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
@@ -20,15 +20,15 @@ let package = Package(
         .library(name: "_ConnectionPoolTestUtils", targets: ["_ConnectionPoolTestUtils"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.2.0"),
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.0.4"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
-        .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
-        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.25.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "3.9.0" ..< "5.0.0"),
-        .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.1"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
-        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
+        .package(url: "https://github.com/apple/swift-atomics.git", from: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.4.1"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.99.0"),
+        .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.28.0"),
+        .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "4.5.0" ..< "5.0.0"),
+        .package(url: "https://github.com/apple/swift-metrics.git", from: "2.10.1"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.12.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.11.0"),
     ],
     targets: [
         .target(
