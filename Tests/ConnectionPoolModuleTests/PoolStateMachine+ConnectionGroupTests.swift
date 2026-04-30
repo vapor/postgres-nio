@@ -45,15 +45,18 @@ import Testing
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testMakeConnectionLeaseItAndDropItHappyPath() {
+    @Test("make connection, lease it and drop it", arguments: [true, false])
+    func testMakeConnectionLeaseItAndDropItHappyPath(keepAliveReducesAvailableStreams: Bool) {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 0,
             maximumConcurrentConnectionSoftLimit: 4,
             maximumConcurrentConnectionHardLimit: 4,
             keepAlive: true,
-            keepAliveReducesAvailableStreams: true
+            keepAliveReducesAvailableStreams: keepAliveReducesAvailableStreams
         )
+
+        let keepAliveStreams: UInt16 = keepAliveReducesAvailableStreams ? 1 : 0
 
         let requests = connections.refillConnections()
         #expect(connections.isEmpty)
@@ -101,7 +104,7 @@ import Testing
             return
         }
         #expect(newConnection === keepAliveAction.connection)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 1 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         guard case .available(_, let pingPongContext) = connections.keepAliveSucceeded(newConnection.id) else {
             Issue.record("Expected to get an AvailableContext")
@@ -264,15 +267,17 @@ import Testing
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testPingPong() {
+    @Test("ping, pong", arguments: [true, false]) func pingPong(keepAliveReducesAvailableStreams: Bool) {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 1,
             maximumConcurrentConnectionSoftLimit: 4,
             maximumConcurrentConnectionHardLimit: 4,
             keepAlive: true,
-            keepAliveReducesAvailableStreams: true
+            keepAliveReducesAvailableStreams: keepAliveReducesAvailableStreams
         )
+
+        let keepAliveStreams: UInt16 = keepAliveReducesAvailableStreams ? 1 : 0
 
         let requests = connections.refillConnections()
         #expect(!connections.isEmpty)
@@ -296,7 +301,7 @@ import Testing
         #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
         #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 1 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         guard case .available(_, let afterPingIdleContext) = connections.keepAliveSucceeded(newConnection.id) else {
             Issue.record("Expected to receive an AvailableContext")
@@ -333,7 +338,7 @@ import Testing
         #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
         #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0, leasedStreams: 1))
 
         _ = connections.closeConnectionIfIdle(newConnection.id)
         guard connections.keepAliveFailed(newConnection.id) == nil else {
@@ -498,14 +503,15 @@ import Testing
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testKeepAliveSucceededOnMarkedIdleConnection() {
+    @Test("connection will close on keep-alive running connection", arguments: [true, false])
+    func connectionWillCloseOnKeepAliveRunningConnection(keepAliveReducesAvailableStreams: Bool) {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 1,
             maximumConcurrentConnectionSoftLimit: 4,
             maximumConcurrentConnectionHardLimit: 4,
             keepAlive: true,
-            keepAliveReducesAvailableStreams: true
+            keepAliveReducesAvailableStreams: keepAliveReducesAvailableStreams
         )
 
         let requests = connections.refillConnections()
@@ -527,7 +533,7 @@ import Testing
             return
         }
         #expect(keepAliveAction.connection === connection)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: keepAliveReducesAvailableStreams ? 0 : 1, leasedStreams: keepAliveReducesAvailableStreams ? 1 : 0))
 
         // Now mark for close while keep alive is running
         // Since keepAlive is running on idle, closeIfIdle triggers immediately
@@ -541,15 +547,18 @@ import Testing
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testConnectionWillCloseOnLeasedWithKeepAlive_ReleaseClosesWithoutWaitingForKeepAlive() {
+    @Test("connection will close on keep-alive and leased connection – close should not wait for keep alive", arguments: [true, false])
+    func connectionWillCloseOnLeasedWithKeepAlive_ReleaseClosesWithoutWaitingForKeepAlive(keepAliveReducesAvailableStreams: Bool) {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 0,
             maximumConcurrentConnectionSoftLimit: 4,
             maximumConcurrentConnectionHardLimit: 4,
             keepAlive: true,
-            keepAliveReducesAvailableStreams: true
+            keepAliveReducesAvailableStreams: keepAliveReducesAvailableStreams
         )
+
+        let keepAliveStreams: UInt16 = keepAliveReducesAvailableStreams ? 1 : 0
 
         guard let request = connections.createNewDemandConnectionIfPossible() else {
             Issue.record("Expected a connection request")
@@ -573,7 +582,7 @@ import Testing
             return
         }
         #expect(keepAliveAction.connection === connection)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 99))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 100 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         // Lease a stream while keepAlive is running
         guard case .leasedConnection(let leaseResult) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
@@ -581,7 +590,7 @@ import Testing
             return
         }
         #expect(leaseResult.connection === connection)
-        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 98, leasedStreams: 1))
+        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 99 - keepAliveStreams, leasedStreams: 1 + keepAliveStreams))
 
         // Mark for close — runningKeepAlive should be decremented at mark time
         guard case .none = connections.connectionWillClose(connection.id) else {
@@ -600,15 +609,18 @@ import Testing
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func testKeepAliveSucceededOnDrainingConnection_NoOp() {
+    @Test("connection will close on keep-alive running connection – keep alive succeed is ignored", arguments: [true, false])
+    func keepAliveSucceededOnDrainingConnection_NoOp(keepAliveReducesAvailableStreams: Bool) {
         var connections = TestPoolStateMachine.ConnectionGroup(
             generator: self.idGenerator,
             minimumConcurrentConnections: 0,
             maximumConcurrentConnectionSoftLimit: 4,
             maximumConcurrentConnectionHardLimit: 4,
             keepAlive: true,
-            keepAliveReducesAvailableStreams: true
+            keepAliveReducesAvailableStreams: keepAliveReducesAvailableStreams
         )
+
+        let keepAliveStreams: UInt16 = keepAliveReducesAvailableStreams ? 1 : 0
 
         guard let request = connections.createNewDemandConnectionIfPossible() else {
             Issue.record("Expected a connection request")
@@ -626,11 +638,11 @@ import Testing
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         _ = connections.keepAliveIfIdle(connection.id)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 99))
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 100 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         // Lease while keepAlive is running
         _ = connections.leaseConnectionOrSoonAvailableConnectionCount()
-        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 98, leasedStreams: 1))
+        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 99 - keepAliveStreams, leasedStreams: 1 + keepAliveStreams))
 
         // Mark for close — runningKeepAlive decremented here
         guard case .none = connections.connectionWillClose(connection.id) else {

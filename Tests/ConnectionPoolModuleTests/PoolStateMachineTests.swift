@@ -1488,6 +1488,132 @@ typealias TestPoolStateMachine = PoolStateMachine<
             )
         )
     }
+
+    // MARK: - Keep alive timers
+
+    // Regression test: connectionClosed fires while keepAlive is running on the connection.
+    // This can happen during a network partition where the TCP channel closes (firing
+    // closeFuture -> onClose -> connectionClosed) before the in-flight keepAlive query
+    // failure propagates to connectionKeepAliveFailed. The bug: stats.leasedStreams is
+    // decremented by keepAlive.usedStreams (=1), but leasedStreams was never incremented
+    // for keepAlive streams — only availableStreams was decremented when keepAlive started.
+    // This underflows leasedStreams (UInt16), corrupting pool stats.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test("connection closed while keep alive is running", arguments: [true, false]) func connectionClosedWhileKeepAliveRunning(keepAliveReducesAvailableStreams: Bool) {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(10)
+        configuration.keepAliveReducesAvailableStreams = keepAliveReducesAvailableStreams
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // 1. Establish the minimum connection (persisted slot, index 0)
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+        let connection0 = MockConnection(id: 0)
+        let created0 = stateMachine.connectionEstablished(connection0, maxStreams: 1)
+        let keepAliveTimer0 = TestPoolStateMachine.Timer(
+            .init(timerID: 0, connectionID: 0, usecase: .keepAlive),
+            duration: .seconds(10)
+        )
+        let cancelToken0 = MockTimerCancellationToken(keepAliveTimer0)
+        #expect(created0.connection == .scheduleTimers([keepAliveTimer0]))
+        #expect(stateMachine.timerScheduled(keepAliveTimer0, cancelContinuation: cancelToken0) == .none)
+        #expect(stateMachine.connections.stats.idle == 1)
+        #expect(stateMachine.connections.stats.availableStreams == 1)
+
+        // 2. keepAlive timer fires — connection enters .idle(.running(true))
+        //    availableStreams drops from 1 to 0; leasedStreams stays 0
+        let keepAliveAction = stateMachine.connectionKeepAliveTimerTriggered(connection0.id)
+        #expect(keepAliveAction.connection == .runKeepAlive(connection0, cancelToken0))
+        #expect(stateMachine.connections.stats.idle == 1)
+        #expect(stateMachine.connections.stats.availableStreams == (keepAliveReducesAvailableStreams ? 0 : 1))
+        #expect(stateMachine.connections.stats.leasedStreams == (keepAliveReducesAvailableStreams ? 1 : 0), "The keep alive consumes a stream")
+
+        // 3. Network partition: TCP channel drops. NIO fires channelInactive -> closeFuture
+        //    completes -> onClose -> connectionClosed BEFORE the keepAlive query failure
+        //    propagates to connectionKeepAliveFailed.
+        //    Bug: connectionClosed subtracts keepAlive.usedStreams(=1) from leasedStreams(=0),
+        //    underflowing leasedStreams to UInt16.max and corrupting pool stats.
+        let closedAction = stateMachine.connectionClosed(connection0)
+        // Pool should create a new connection to maintain minimum
+        #expect(closedAction.connection == .makeConnection(.init(connectionID: 1), []))
+
+        // After the fix: stats must be consistent — no underflow
+        #expect(stateMachine.connections.stats.leasedStreams == 0)
+        #expect(stateMachine.connections.stats.availableStreams == 0)
+        #expect(stateMachine.connections.stats.idle == 0)
+        #expect(stateMachine.connections.stats.runningKeepAlive == 0)
+    }
+
+    // Regression test: network partition closes multiple minimum connections simultaneously.
+    // A second connectionClosed call (for a connection that was still idle when swapForDeletion
+    // runs) must not crash even when pool is in connectionCreationFailing state.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func networkPartitionAllMinimumConnectionsClose() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 2
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 4
+        configuration.keepAliveDuration = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // 1. Establish both minimum connections
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 2)
+        let connection0 = MockConnection(id: 0)
+        let connection1 = MockConnection(id: 1)
+
+        let created0 = stateMachine.connectionEstablished(connection0, maxStreams: 1)
+        let timer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(10))
+        let cancel0 = MockTimerCancellationToken(timer0)
+        #expect(stateMachine.timerScheduled(timer0, cancelContinuation: cancel0) == .none)
+        _ = created0
+
+        let created1 = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        let timer1 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .keepAlive), duration: .seconds(10))
+        let cancel1 = MockTimerCancellationToken(timer1)
+        #expect(stateMachine.timerScheduled(timer1, cancelContinuation: cancel1) == .none)
+        _ = created1
+        #expect(stateMachine.connections.stats.idle == 2)
+
+        // 2. Network partition: connection1 drops first
+        let closed1 = stateMachine.connectionClosed(connection1)
+        // Pool makes a new connection to maintain minimum; cancel connection1's keepAlive timer
+        #expect(closed1.connection == .makeConnection(.init(connectionID: 2), [cancel1]))
+
+        // 3. Replacement (id=2) fails — pool enters connectionCreationFailing
+        let failAction = stateMachine.connectionEstablishFailed(SomeError(), for: .init(connectionID: 2))
+        #expect(failAction.request == .none)
+
+        // 4. 8 seconds later (as in the real crash): connection0 also drops
+        //    Pool is in connectionCreationFailing; connection0 is still idle in the array.
+        let closed0 = stateMachine.connectionClosed(connection0)
+        // Pool should try to create another connection; cancel connection0's keepAlive timer
+        guard case .makeConnection(let newRequest, _) = closed0.connection else {
+            Issue.record("Expected .makeConnection, got \(closed0.connection)")
+            return
+        }
+        #expect(newRequest.connectionID != 0)
+        #expect(newRequest.connectionID != 1)
+
+        // Stats must be consistent after both closes
+        #expect(stateMachine.connections.stats.idle == 0)
+        #expect(stateMachine.connections.stats.leasedStreams == 0)
+    }
 }
 
 struct SomeError: Error {}

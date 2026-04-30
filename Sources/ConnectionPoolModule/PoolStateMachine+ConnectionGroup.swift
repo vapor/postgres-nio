@@ -410,6 +410,7 @@ extension PoolStateMachine {
                 self.stats.closing += 1
                 self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
                 self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
+                self.stats.leasedStreams -= closeAction.usedStreams // keep alive may use streams
 
                 // If the closing connection occupies a persisted or demand slot, try to
                 // swap it with an established overflow connection to promote the overflow
@@ -435,7 +436,10 @@ extension PoolStateMachine {
 
             case .markedForClose(let availableStreams, let keepAliveWasRunning):
                 self.stats.availableStreams -= availableStreams
-                self.stats.runningKeepAlive -= keepAliveWasRunning ? 1 : 0
+                if keepAliveWasRunning {
+                    self.stats.leasedStreams -= self.keepAliveReducesAvailableStreams ? 1 : 0
+                    self.stats.runningKeepAlive -= 1
+                }
 
                 // If the draining connection occupies a persisted or demand slot, try to
                 // swap it with an established overflow connection. This promotes the
@@ -528,6 +532,7 @@ extension PoolStateMachine {
             self.stats.runningKeepAlive += 1
             if self.keepAliveReducesAvailableStreams {
                 self.stats.availableStreams -= 1
+                self.stats.leasedStreams += 1
             }
 
             return action
@@ -557,6 +562,7 @@ extension PoolStateMachine {
             self.stats.runningKeepAlive -= 1
             if self.keepAliveReducesAvailableStreams {
                 self.stats.availableStreams += 1
+                self.stats.leasedStreams -= 1
             }
 
             let context = self.makeAvailableConnectionContextForConnection(at: index, info: connectionInfo)
@@ -625,6 +631,7 @@ extension PoolStateMachine {
             self.stats.closing += 1
             self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
             self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
+            self.stats.leasedStreams -= closeAction.usedStreams // a keep alive may use a stream even while idle
 
             return CloseAction(
                 connection: closeAction.connection!,
