@@ -1,3 +1,4 @@
+import Atomics
 import NIOCore
 import Logging
 
@@ -46,6 +47,10 @@ final class PSQLRowStream: @unchecked Sendable {
     internal let rowDescription: [RowDescription.Column]
     private let lookupTable: [String: Int]
     private var downstreamState: DownstreamState
+    private var tracing: (span: PostgresTraceSpan, managesLifecycle: Bool)?
+    // Set to true (on the event loop) when CommandComplete arrives for the async sequence path.
+    // Read from any thread in didTerminate() to end the span synchronously before the event loop hop.
+    private let asyncSequenceCompletedSuccessfully = ManagedAtomic(false)
     
     init(
         source: Source,
@@ -66,6 +71,7 @@ final class PSQLRowStream: @unchecked Sendable {
         }
         
         self.downstreamState = .waitingForConsumer(bufferState)
+        self.tracing = nil
         
         self.eventLoop = eventLoop
         self.logger = logger
@@ -76,6 +82,22 @@ final class PSQLRowStream: @unchecked Sendable {
             lookup[column.name] = index
         }
         self.lookupTable = lookup
+    }
+
+    deinit {
+        if let tracing = self.tracing, tracing.managesLifecycle {
+            switch self.downstreamState {
+            case .consumed(.success):
+                tracing.span.succeed()
+            default:
+                tracing.span.fail(CancellationError())
+            }
+        }
+    }
+
+    func installTracing(_ span: PostgresTraceSpan, managesLifecycle: Bool) {
+        self.eventLoop.preconditionInEventLoop()
+        self.tracing = (span, managesLifecycle)
     }
     
     // MARK: Async Sequence
@@ -105,12 +127,14 @@ final class PSQLRowStream: @unchecked Sendable {
 
         case .finished(let buffer, let summary):
             _ = source.yield(contentsOf: buffer)
+            self.asyncSequenceCompletedSuccessfully.store(true, ordering: .relaxed)
             source.finish()
             onFinish()
             self.downstreamState = .consumed(.success(summary))
 
         case .failure(let error):
             source.finish(error)
+            self.failTracingIfNeeded(error)
             self.downstreamState = .consumed(.failure(error))
         }
         
@@ -155,6 +179,7 @@ final class PSQLRowStream: @unchecked Sendable {
         case .asyncSequence(_, let dataSource, let onFinish):
             self.downstreamState = .consumed(.failure(CancellationError()))
             dataSource.cancel(for: self)
+            self.failTracingIfNeeded(CancellationError())
             onFinish()
 
         case .consumed:
@@ -238,7 +263,9 @@ final class PSQLRowStream: @unchecked Sendable {
                         lookupTable: self.lookupTable,
                         columns: self.rowDescription
                     )
-                    try onRow(row)
+                    try self.withTracingContext {
+                        try onRow(row)
+                    }
                 }
                 
                 buffer.removeAll()
@@ -261,7 +288,9 @@ final class PSQLRowStream: @unchecked Sendable {
                         lookupTable: self.lookupTable,
                         columns: self.rowDescription
                     )
-                    try onRow(row)
+                    try self.withTracingContext {
+                        try onRow(row)
+                    }
                 }
                 
                 self.downstreamState = .consumed(.success(summary))
@@ -306,7 +335,9 @@ final class PSQLRowStream: @unchecked Sendable {
                         lookupTable: self.lookupTable,
                         columns: self.rowDescription
                     )
-                    try onRow(row)
+                    try self.withTracingContext {
+                        try onRow(row)
+                    }
                 }
                 // immediately request more
                 dataSource.request(for: self)
@@ -359,14 +390,17 @@ final class PSQLRowStream: @unchecked Sendable {
             
         case .iteratingRows(_, let promise, _):
             self.downstreamState = .consumed(.success(.tag(commandTag)))
+            self.finishTracingIfNeeded()
             promise.succeed(())
             
         case .waitingForAll(let rows, let promise, _):
             self.downstreamState = .consumed(.success(.tag(commandTag)))
+            self.finishTracingIfNeeded()
             promise.succeed(rows)
 
         case .asyncSequence(let source, _, let onFinish):
             self.downstreamState = .consumed(.success(.tag(commandTag)))
+            self.asyncSequenceCompletedSuccessfully.store(true, ordering: .relaxed)
             source.finish()
             onFinish()
 
@@ -379,20 +413,24 @@ final class PSQLRowStream: @unchecked Sendable {
         switch self.downstreamState {
         case .waitingForConsumer(.streaming):
             self.downstreamState = .waitingForConsumer(.failure(error))
+            self.failTracingIfNeeded(error)
             
         case .waitingForConsumer(.finished), .waitingForConsumer(.failure), .consumed(.success(.emptyResponse)):
             preconditionFailure("How can we get another end, if an end was already signalled?")
             
         case .iteratingRows(_, let promise, _):
             self.downstreamState = .consumed(.failure(error))
+            self.failTracingIfNeeded(error)
             promise.fail(error)
             
         case .waitingForAll(_, let promise, _):
             self.downstreamState = .consumed(.failure(error))
+            self.failTracingIfNeeded(error)
             promise.fail(error)
 
         case .asyncSequence(let consumer, _, let onFinish):
             self.downstreamState = .consumed(.failure(error))
+            self.failTracingIfNeeded(error)
             consumer.finish(error)
             onFinish()
 
@@ -416,6 +454,29 @@ final class PSQLRowStream: @unchecked Sendable {
             break
         }
     }
+
+    private func withTracingContext<T>(_ body: () throws -> T) rethrows -> T {
+        guard let tracing = self.tracing else {
+            return try body()
+        }
+        return try tracing.span.withContext {
+            try body()
+        }
+    }
+
+    private func finishTracingIfNeeded() {
+        guard let tracing = self.tracing, tracing.managesLifecycle else {
+            return
+        }
+        tracing.span.succeed()
+    }
+
+    private func failTracingIfNeeded(_ error: any Error) {
+        guard let tracing = self.tracing, tracing.managesLifecycle else {
+            return
+        }
+        tracing.span.fail(error)
+    }
     
     var commandTag: String {
         guard case .consumed(.success(let consumed)) = self.downstreamState else {
@@ -436,7 +497,36 @@ extension PSQLRowStream: NIOAsyncSequenceProducerDelegate {
     }
 
     func didTerminate() {
-        self.cancel()
+        // End the span synchronously, before the event loop hop, so it closes the moment the
+        // consumer's `for try await` loop exits preventing overlap with the next sequential query.
+        if let tracing = self.tracing, tracing.managesLifecycle {
+            if self.asyncSequenceCompletedSuccessfully.load(ordering: .relaxed) {
+                tracing.span.succeed()
+            } else {
+                tracing.span.fail(CancellationError())
+            }
+        }
+
+        if self.eventLoop.inEventLoop {
+            self.didTerminate0()
+        } else {
+            self.eventLoop.execute {
+                self.didTerminate0()
+            }
+        }
+    }
+
+    private func didTerminate0() {
+        switch self.downstreamState {
+        case .consumed(.success), .consumed(.failure):
+            break
+
+        case .asyncSequence:
+            self.cancel0()
+
+        case .waitingForConsumer, .iteratingRows, .waitingForAll:
+            preconditionFailure("Invalid state: \(self.downstreamState)")
+        }
     }
 }
 
