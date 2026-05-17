@@ -1042,6 +1042,34 @@ import Synchronization
         }
     }
 
+    @Test(.timeLimit(.minutes(1))) func connectEnforcesDeadlineWithSilentServer() async throws {
+        try await withSilentServer { port in
+            var config = PostgresConnection.Configuration(
+                host: "127.0.0.1",
+                port: port,
+                username: "postgres",
+                password: "irrelevant",
+                database: "test",
+                tls: .disable
+            )
+            config.options.connectTimeout = .milliseconds(500)
+
+            let start = ContinuousClock.now
+
+            await #expect(throws: PSQLError.self) {
+                _ = try await PostgresConnection.connect(
+                    configuration: config,
+                    id: 1,
+                    logger: Logger(label: "test")
+                )
+            }
+
+            let elapsed = ContinuousClock.now - start
+            #expect(elapsed < .seconds(5))
+            #expect(elapsed >= .milliseconds(400))
+        }
+    }
+
     func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in

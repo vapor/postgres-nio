@@ -46,7 +46,7 @@ final class ConnectionFactory: Sendable {
             configuration: config,
             id: connectionID,
             logger: connectionLogger
-        ).get()
+        )
     }
 
     func makeConnectionConfig() async throws -> PostgresConnection.Configuration {
