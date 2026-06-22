@@ -1,17 +1,17 @@
 import Atomics
 import NIOEmbedded
-import Dispatch
-import XCTest
+import NIOPosix
+import Testing
 @testable import PostgresNIO
 import NIOCore
 import Logging
 
-final class PostgresRowSequenceTests: XCTestCase {
+@Suite struct PostgresRowSequenceTests {
     let logger = Logger(label: "PSQLRowStreamTests")
-    let eventLoop = EmbeddedEventLoop()
 
-    func testBackpressureWorks() async throws {
+    @Test func testBackpressureWorks() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -19,28 +19,29 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ], 
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
         let rowSequence = stream.asyncSequence()
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         let dataRow: DataRow = [ByteBuffer(integer: Int64(1))]
         stream.receive([dataRow])
 
         var iterator = rowSequence.makeAsyncIterator()
         let row = try await iterator.next()
-        XCTAssertEqual(dataSource.requestCount, 1)
-        XCTAssertEqual(row?.data, dataRow)
+        #expect(dataSource.requestCount == 1)
+        #expect(row?.data == dataRow)
 
         stream.receive(completion: .success("SELECT 1"))
         let empty = try await iterator.next()
-        XCTAssertNil(empty)
+        #expect(empty == nil)
     }
 
 
-    func testCancellationWorksWhileIterating() async throws {
+    @Test func testCancellationWorksWhileIterating() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -48,18 +49,18 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
         let rowSequence = stream.asyncSequence()
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         let dataRows: [DataRow] = (0..<128).map { [ByteBuffer(integer: Int64($0))] }
         stream.receive(dataRows)
 
         var counter = 0
         for try await row in rowSequence {
-            XCTAssertEqual(try row.decode(Int.self), counter)
+            #expect(try row.decode(Int.self) == counter)
             counter += 1
 
             if counter == 64 {
@@ -67,11 +68,12 @@ final class PostgresRowSequenceTests: XCTestCase {
             }
         }
 
-        XCTAssertEqual(dataSource.cancelCount, 1)
+        #expect(dataSource.cancelCount == 1)
     }
 
-    func testCancellationWorksBeforeIterating() async throws {
+    @Test func testCancellationWorksBeforeIterating() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -79,24 +81,25 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
         let rowSequence = stream.asyncSequence()
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         let dataRows: [DataRow] = (0..<128).map { [ByteBuffer(integer: Int64($0))] }
         stream.receive(dataRows)
 
         var iterator: PostgresRowSequence.AsyncIterator? = rowSequence.makeAsyncIterator()
         iterator = nil
 
-        XCTAssertEqual(dataSource.cancelCount, 1)
-        XCTAssertNil(iterator, "Surpress warning")
+        #expect(dataSource.cancelCount == 1)
+        #expect(iterator == nil, "Surpress warning")
     }
 
-    func testDroppingTheSequenceCancelsTheSource() async throws {
+    @Test func testDroppingTheSequenceCancelsTheSource() throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -104,19 +107,20 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
         var rowSequence: PostgresRowSequence? = stream.asyncSequence()
         rowSequence = nil
 
-        XCTAssertEqual(dataSource.cancelCount, 1)
-        XCTAssertNil(rowSequence, "Surpress warning")
+        #expect(dataSource.cancelCount == 1)
+        #expect(rowSequence == nil, "Surpress warning")
     }
 
-    func testStreamBasedOnCompletedQuery() async throws {
+    @Test func testStreamBasedOnCompletedQuery() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -124,7 +128,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -135,15 +139,16 @@ final class PostgresRowSequenceTests: XCTestCase {
 
         var counter = 0
         for try await row in rowSequence {
-            XCTAssertEqual(try row.decode(Int.self), counter)
+            #expect(try row.decode(Int.self) == counter)
             counter += 1
         }
 
-        XCTAssertEqual(dataSource.cancelCount, 0)
+        #expect(dataSource.cancelCount == 0)
     }
 
-    func testStreamIfInitializedWithAllData() async throws {
+    @Test func testStreamIfInitializedWithAllData() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -151,7 +156,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -163,15 +168,16 @@ final class PostgresRowSequenceTests: XCTestCase {
 
         var counter = 0
         for try await row in rowSequence {
-            XCTAssertEqual(try row.decode(Int.self), counter)
+            #expect(try row.decode(Int.self) == counter)
             counter += 1
         }
 
-        XCTAssertEqual(dataSource.cancelCount, 0)
+        #expect(dataSource.cancelCount == 0)
     }
 
-    func testStreamIfInitializedWithError() async throws {
+    @Test func testStreamIfInitializedWithError() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -179,7 +185,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -192,14 +198,15 @@ final class PostgresRowSequenceTests: XCTestCase {
             for try await _ in rowSequence {
                 counter += 1
             }
-            XCTFail("Expected that an error was thrown before.")
+            Issue.record("Expected that an error was thrown before.")
         } catch {
-            XCTAssertEqual(error as? PSQLError, .serverClosedConnection(underlying: nil))
+            #expect(error as? PSQLError == .serverClosedConnection(underlying: nil))
         }
     }
 
-    func testSucceedingRowContinuationsWorks() async throws {
+    @Test func testSucceedingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
+        let eventLoop = NIOSingletons.posixEventLoopGroup.next()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -207,31 +214,32 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: eventLoop,
             logger: self.logger
         )
 
-        let rowSequence = stream.asyncSequence()
+        let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             let dataRows: [DataRow] = (0..<1).map { [ByteBuffer(integer: Int64($0))] }
             stream.receive(dataRows)
         }
 
         let row1 = try await rowIterator.next()
-        XCTAssertEqual(try row1?.decode(Int.self), 0)
+        #expect(try row1?.decode(Int.self) == 0)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             stream.receive(completion: .success("SELECT 1"))
         }
 
         let row2 = try await rowIterator.next()
-        XCTAssertNil(row2)
+        #expect(row2 == nil)
     }
 
-    func testFailingRowContinuationsWorks() async throws {
+    @Test func testFailingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
+        let eventLoop = NIOSingletons.posixEventLoopGroup.next()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -239,35 +247,36 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: eventLoop,
             logger: self.logger
         )
 
-        let rowSequence = stream.asyncSequence()
+        let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             let dataRows: [DataRow] = (0..<1).map { [ByteBuffer(integer: Int64($0))] }
             stream.receive(dataRows)
         }
 
         let row1 = try await rowIterator.next()
-        XCTAssertEqual(try row1?.decode(Int.self), 0)
+        #expect(try row1?.decode(Int.self) == 0)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + .seconds(1)) {
+        eventLoop.scheduleTask(in: .seconds(1)) {
             stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
         }
 
         do {
             _ = try await rowIterator.next()
-            XCTFail("Expected that an error was thrown before.")
+            Issue.record("Expected that an error was thrown before.")
         } catch {
-            XCTAssertEqual(error as? PSQLError, .serverClosedConnection(underlying: nil))
+            #expect(error as? PSQLError == .serverClosedConnection(underlying: nil))
         }
     }
 
-    func testAdaptiveRowBufferShrinksAndGrows() async throws {
+    @Test func testAdaptiveRowBufferShrinksAndGrows() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -275,7 +284,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -285,20 +294,20 @@ final class PostgresRowSequenceTests: XCTestCase {
         let rowSequence = stream.asyncSequence()
         var rowIterator = rowSequence.makeAsyncIterator()
 
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         _ = try await rowIterator.next() // new buffer size will be target -> don't ask for more
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
-        XCTAssertEqual(dataSource.requestCount, 1)
+        #expect(dataSource.requestCount == 1)
 
         // if the buffer gets new rows so that it has equal or more than target (the target size
         // should be halved), however shrinking is only allowed AFTER the first extra rows were
         // received.
         let addDataRows1: [DataRow] = [[ByteBuffer(integer: Int64(0))]]
         stream.receive(addDataRows1)
-        XCTAssertEqual(dataSource.requestCount, 1)
+        #expect(dataSource.requestCount == 1)
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
-        XCTAssertEqual(dataSource.requestCount, 2)
+        #expect(dataSource.requestCount == 2)
 
         // if the buffer gets new rows so that it has equal or more than target (the target size
         // should be halved)
@@ -307,31 +316,32 @@ final class PostgresRowSequenceTests: XCTestCase {
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
         for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget / 2) {
             _ = try await rowIterator.next() // Remove all rows until we are back at target
-            XCTAssertEqual(dataSource.requestCount, 2)
+            #expect(dataSource.requestCount == 2)
         }
 
         // if we remove another row we should trigger getting new rows.
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
-        XCTAssertEqual(dataSource.requestCount, 3)
+        #expect(dataSource.requestCount == 3)
 
         // remove all remaining rows... this will trigger a target size double
         for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget/2 - 1) {
             _ = try await rowIterator.next() // Remove all rows until we are back at target
-            XCTAssertEqual(dataSource.requestCount, 3)
+            #expect(dataSource.requestCount == 3)
         }
 
         let fillBufferDataRows: [DataRow] = (0..<AdaptiveRowBuffer.defaultBufferTarget + 1).map { [ByteBuffer(integer: Int64($0))] }
         stream.receive(fillBufferDataRows)
 
-        XCTAssertEqual(dataSource.requestCount, 3)
+        #expect(dataSource.requestCount == 3)
         _ = try await rowIterator.next() // new buffer size will be target -> don't ask for more
-        XCTAssertEqual(dataSource.requestCount, 3)
+        #expect(dataSource.requestCount == 3)
         _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
-        XCTAssertEqual(dataSource.requestCount, 4)
+        #expect(dataSource.requestCount == 4)
     }
 
-    func testAdaptiveRowShrinksToMin() async throws {
+    @Test func testAdaptiveRowShrinksToMin() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -339,7 +349,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -352,9 +362,9 @@ final class PostgresRowSequenceTests: XCTestCase {
         var rowIterator = rowSequence.makeAsyncIterator()
 
         // shrinking the buffer is only allowed after the first extra rows were received
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         _ = try await rowIterator.next()
-        XCTAssertEqual(dataSource.requestCount, 1)
+        #expect(dataSource.requestCount == 1)
 
         stream.receive([[ByteBuffer(integer: Int64(1))]])
 
@@ -363,10 +373,10 @@ final class PostgresRowSequenceTests: XCTestCase {
         while currentTarget > AdaptiveRowBuffer.defaultBufferMinimum {
             // the buffer is filled up to currentTarget at that point, if we remove one row and add
             // one row it should shrink
-            XCTAssertEqual(dataSource.requestCount, expectedRequestCount)
+            #expect(dataSource.requestCount == expectedRequestCount)
             _ = try await rowIterator.next()
             expectedRequestCount += 1
-            XCTAssertEqual(dataSource.requestCount, expectedRequestCount)
+            #expect(dataSource.requestCount == expectedRequestCount)
 
             stream.receive([[ByteBuffer(integer: Int64(1))], [ByteBuffer(integer: Int64(1))]])
             let newTarget = currentTarget / 2
@@ -375,17 +385,18 @@ final class PostgresRowSequenceTests: XCTestCase {
             // consume all messages that are to much.
             for _ in 0..<toDrop {
                 _ = try await rowIterator.next()
-                XCTAssertEqual(dataSource.requestCount, expectedRequestCount)
+                #expect(dataSource.requestCount == expectedRequestCount)
             }
 
             currentTarget = newTarget
         }
 
-        XCTAssertEqual(currentTarget, AdaptiveRowBuffer.defaultBufferMinimum)
+        #expect(currentTarget == AdaptiveRowBuffer.defaultBufferMinimum)
     }
 
-    func testStreamBufferAcceptsNewRowsEventhoughItDidntAskForIt() async throws {
+    @Test func testStreamBufferAcceptsNewRowsEventhoughItDidntAskForIt() async throws {
         let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
@@ -393,7 +404,7 @@ final class PostgresRowSequenceTests: XCTestCase {
                 ],
                 dataSource
             ),
-            eventLoop: self.eventLoop,
+            eventLoop: embeddedEventLoop,
             logger: self.logger
         )
 
@@ -404,9 +415,9 @@ final class PostgresRowSequenceTests: XCTestCase {
         let rowSequence = stream.asyncSequence()
         var rowIterator = rowSequence.makeAsyncIterator()
 
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
         _ = try await rowIterator.next()
-        XCTAssertEqual(dataSource.requestCount, 0)
+        #expect(dataSource.requestCount == 0)
 
         let finalDataRows: [DataRow] = (0..<messagePerChunk).map { [ByteBuffer(integer: Int64(messagePerChunk + $0))] }
         stream.receive(finalDataRows)
@@ -415,12 +426,67 @@ final class PostgresRowSequenceTests: XCTestCase {
         var counter = 1
         for _ in 0..<(2 * messagePerChunk - 1) {
             let row = try await rowIterator.next()
-            XCTAssertEqual(try row?.decode(Int.self), counter)
+            #expect(try row?.decode(Int.self) == counter)
             counter += 1
         }
 
         let emptyRow = try await rowIterator.next()
-        XCTAssertNil(emptyRow)
+        #expect(emptyRow == nil)
+    }
+
+    @Test func testGettingColumnsReturnsCorrectColumnInformation() {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+
+        let sourceColumns = [
+            RowDescription.Column(
+                name: "id",
+                tableOID: 12345,
+                columnAttributeNumber: 1,
+                dataType: .int8,
+                dataTypeSize: 8,
+                dataTypeModifier: -1,
+                format: .binary
+            ),
+            RowDescription.Column(
+                name: "name",
+                tableOID: 12345,
+                columnAttributeNumber: 2,
+                dataType: .text,
+                dataTypeSize: -1,
+                dataTypeModifier: -1,
+                format: .text
+            )
+        ]
+
+        let expectedColumns = PostgresColumns(underlying: sourceColumns)
+
+        let stream = PSQLRowStream(
+            source: .stream(sourceColumns, dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let rowSequence = stream.asyncSequence()
+        let actualColumns = rowSequence.columns
+
+        #expect(actualColumns == expectedColumns)
+    }
+
+    @Test func testGettingColumnsWithEmptyColumns() {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let rowSequence = stream.asyncSequence()
+        let columns = rowSequence.columns
+
+        #expect(columns.isEmpty)
     }
 }
 

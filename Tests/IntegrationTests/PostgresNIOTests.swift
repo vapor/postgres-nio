@@ -1,5 +1,6 @@
 import Logging
 @testable import PostgresNIO
+import Atomics
 import XCTest
 import NIOCore
 import NIOPosix
@@ -8,13 +9,15 @@ import NIOSSL
 
 final class PostgresNIOTests: XCTestCase {
     
-    private var group: EventLoopGroup!
-
-    private var eventLoop: EventLoop { self.group.next() }
+    private var group: (any EventLoopGroup)!
+    private var eventLoop: any EventLoop { self.group.next() }
+    
+    override class func setUp() {
+        XCTAssertTrue(isLoggingConfigured)
+    }
     
     override func setUpWithError() throws {
         try super.setUpWithError()
-        XCTAssertTrue(isLoggingConfigured)
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
     
@@ -110,59 +113,59 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
 
-        var receivedNotifications: [PostgresMessage.NotificationResponse] = []
+        let receivedNotifications = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications.append(notification)
+            receivedNotifications.wrappingIncrement(ordering: .relaxed)
+            XCTAssertEqual(notification.channel, "example")
+            XCTAssertEqual(notification.payload, "")
         }
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
-        XCTAssertEqual(receivedNotifications.count, 1)
-        XCTAssertEqual(receivedNotifications.first?.channel, "example")
-        XCTAssertEqual(receivedNotifications.first?.payload, "")
+        XCTAssertEqual(receivedNotifications.load(ordering: .relaxed), 1)
     }
 
     func testNotificationsNonEmptyPayload() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var receivedNotifications: [PostgresMessage.NotificationResponse] = []
+        let receivedNotifications = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications.append(notification)
+            receivedNotifications.wrappingIncrement(ordering: .relaxed)
+            XCTAssertEqual(notification.channel, "example")
+            XCTAssertEqual(notification.payload, "Notification payload example")
         }
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example, 'Notification payload example'").wait())
         // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
-        XCTAssertEqual(receivedNotifications.count, 1)
-        XCTAssertEqual(receivedNotifications.first?.channel, "example")
-        XCTAssertEqual(receivedNotifications.first?.payload, "Notification payload example")
+        XCTAssertEqual(receivedNotifications.load(ordering: .relaxed), 1)
     }
 
     func testNotificationsRemoveHandlerWithinHandler() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var receivedNotifications = 0
+        let receivedNotifications = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications += 1
+            receivedNotifications.wrappingIncrement(ordering: .relaxed)
             context.stop()
         }
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
-        XCTAssertEqual(receivedNotifications, 1)
+        XCTAssertEqual(receivedNotifications.load(ordering: .relaxed), 1)
     }
 
     func testNotificationsRemoveHandlerOutsideHandler() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var receivedNotifications = 0
+        let receivedNotifications = ManagedAtomic<Int>(0)
         let context = conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications += 1
+            receivedNotifications.wrappingIncrement(ordering: .relaxed)
         }
         XCTAssertNotNil(context)
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
@@ -171,47 +174,47 @@ final class PostgresNIOTests: XCTestCase {
         context?.stop()
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
-        XCTAssertEqual(receivedNotifications, 1)
+        XCTAssertEqual(receivedNotifications.load(ordering: .relaxed), 1)
     }
 
     func testNotificationsMultipleRegisteredHandlers() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var receivedNotifications1 = 0
+        let receivedNotifications1 = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications1 += 1
+            receivedNotifications1.wrappingIncrement(ordering: .relaxed)
         }
-        var receivedNotifications2 = 0
+        let receivedNotifications2 = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications2 += 1
+            receivedNotifications2.wrappingIncrement(ordering: .relaxed)
         }
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
-        XCTAssertEqual(receivedNotifications1, 1)
-        XCTAssertEqual(receivedNotifications2, 1)
+        XCTAssertEqual(receivedNotifications1.load(ordering: .relaxed), 1)
+        XCTAssertEqual(receivedNotifications2.load(ordering: .relaxed), 1)
     }
 
     func testNotificationsMultipleRegisteredHandlersRemoval() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var receivedNotifications1 = 0
+        let receivedNotifications1 = ManagedAtomic<Int>(0)
         XCTAssertNotNil(conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications1 += 1
+            receivedNotifications1.wrappingIncrement(ordering: .relaxed)
             context.stop()
         })
-        var receivedNotifications2 = 0
+        let receivedNotifications2 = ManagedAtomic<Int>(0)
         XCTAssertNotNil(conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications2 += 1
+            receivedNotifications2.wrappingIncrement(ordering: .relaxed)
         })
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
-        XCTAssertEqual(receivedNotifications1, 1)
-        XCTAssertEqual(receivedNotifications2, 2)
+        XCTAssertEqual(receivedNotifications1.load(ordering: .relaxed), 1)
+        XCTAssertEqual(receivedNotifications2.load(ordering: .relaxed), 2)
     }
 
     func testNotificationHandlerFiltersOnChannel() {
@@ -615,21 +618,53 @@ final class PostgresNIOTests: XCTestCase {
         let a = PostgresNumeric(string: "123456.789123")!
         let b = PostgresNumeric(string: "-123456.789123")!
         let c = PostgresNumeric(string: "3.14159265358979")!
+        let d = PostgresNumeric(string: "1234567898765")!
+        let e = PostgresNumeric(string: "0.00000080216390553684")!
+        let f = PostgresNumeric(string: "0.0000080216390553684")!
+        let g = PostgresNumeric(string: "0.000080216390553684")!
+        let h = PostgresNumeric(string: "802163905536840000.0")!
+        let i = PostgresNumeric(string: "8021639055368400000.0")!
+        let j = PostgresNumeric(string: "80216390553684000000.0")!
+        let k = PostgresNumeric(string: "802163905536840000.000080216390553684")!
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("""
         select
             $1::numeric as a,
             $2::numeric as b,
-            $3::numeric as c
+            $3::numeric as c,
+            $4::numeric as d,
+            $5::numeric as e,
+            $6::numeric as f,
+            $7::numeric as g,
+            $8::numeric as h,
+            $9::numeric as i,
+            $10::numeric as j,
+            $11::numeric as k
         """, [
             .init(numeric: a),
             .init(numeric: b),
-            .init(numeric: c)
+            .init(numeric: c),
+            .init(numeric: d),
+            .init(numeric: e),
+            .init(numeric: f),
+            .init(numeric: g),
+            .init(numeric: h),
+            .init(numeric: i),
+            .init(numeric: j),
+            .init(numeric: k)
         ]).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "a"].decimal, Decimal(string: "123456.789123")!)
         XCTAssertEqual(row?[data: "b"].decimal, Decimal(string: "-123456.789123")!)
         XCTAssertEqual(row?[data: "c"].decimal, Decimal(string: "3.14159265358979")!)
+        XCTAssertEqual(row?[data: "d"].decimal, Decimal(string: "1234567898765")!)
+        XCTAssertEqual(row?[data: "e"].decimal, Decimal(string: "0.00000080216390553684")!)
+        XCTAssertEqual(row?[data: "f"].decimal, Decimal(string: "0.0000080216390553684")!)
+        XCTAssertEqual(row?[data: "g"].decimal, Decimal(string: "0.000080216390553684")!)
+        XCTAssertEqual(row?[data: "h"].decimal, Decimal(string: "802163905536840000.0")!)
+        XCTAssertEqual(row?[data: "i"].decimal, Decimal(string: "8021639055368400000.0")!)
+        XCTAssertEqual(row?[data: "j"].decimal, Decimal(string: "80216390553684000000.0")!)
+        XCTAssertEqual(row?[data: "k"].decimal, Decimal(string: "802163905536840000.000080216390553684")!)
     }
     
     func testDecimalStringSerialization() {
@@ -783,6 +818,44 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "array"].array(of: Int64?.self), [1, nil, 3])
     }
     
+    @available(*, deprecated, message: "Testing deprecated functionality")
+    func testDateArraySerialize() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        let date1 = Date(timeIntervalSince1970: 1704088800),
+            date2 = Date(timeIntervalSince1970: 1706767200),
+            date3 = Date(timeIntervalSince1970: 1709272800)
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("""
+        select
+            $1::timestamptz[] as array
+        """, [
+            PostgresData(array: [date1, date2, date3])
+        ]).wait())
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(row?[data: "array"].array(of: Date.self), [date1, date2, date3])
+    }
+
+    @available(*, deprecated, message: "Testing deprecated functionality")
+    func testDateArraySerializeAsPostgresDate() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        let date1 = Date(timeIntervalSince1970: 1704088800),//8766
+            date2 = Date(timeIntervalSince1970: 1706767200),//8797
+            date3 = Date(timeIntervalSince1970: 1709272800) //8826
+        var data = PostgresData(array: [date1, date2, date3].map { Int32(($0.timeIntervalSince1970 - 946_684_800) / 86_400).postgresData }, elementType: .date)
+        data.type = .dateArray // N.B.: `.date` format is an Int32 count of days since psqlStartDate
+        var rows: PostgresQueryResult?
+        XCTAssertNoThrow(rows = try conn?.query("select $1::date[] as array", [data]).wait())
+        let row = rows?.first?.makeRandomAccess()
+        XCTAssertEqual(
+            row?[data: "array"].array(of: Date.self)?.map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) },
+            [date1, date2, date3].map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) }
+        )
+    }
+
     // https://github.com/vapor/postgres-nio/issues/143
     func testEmptyStringFromNonNullColumn() {
         var conn: PostgresConnection?
@@ -882,6 +955,22 @@ final class PostgresNIOTests: XCTestCase {
             XCTAssertNoThrow(object = try rows?.first?.decode(Object.self, context: .default))
             XCTAssertEqual(object?.foo, 1)
             XCTAssertEqual(object?.bar, 2)
+        }
+    }
+
+    func testJSONBDecodeString() {
+        var conn: PostgresConnection?
+        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
+        do {
+            var rows: PostgresQueryResult?
+            XCTAssertNoThrow(rows = try conn?.query("select '{\"hello\": \"world\"}'::jsonb as data").wait())
+            
+            var resultString: String?
+            XCTAssertNoThrow(resultString = try rows?.first?.decode(String.self, context: .default))
+
+            XCTAssertEqual(resultString, "{\"hello\": \"world\"}")
         }
     }
 
@@ -985,28 +1074,6 @@ final class PostgresNIOTests: XCTestCase {
             let decodedClosedRange: ClosedRange<Int64>? = try row?.decode(ClosedRange<Int64>.self, context: .default)
             XCTAssertEqual(closedRange, decodedClosedRange)
         }
-    }
-
-    func testRemoteTLSServer() {
-        // postgres://uymgphwj:7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA@elmer.db.elephantsql.com:5432/uymgphwj
-        var conn: PostgresConnection?
-        let logger = Logger(label: "test")
-        let sslContext = try! NIOSSLContext(configuration: .makeClientConfiguration())
-        let config = PostgresConnection.Configuration(
-            host: "elmer.db.elephantsql.com",
-            port: 5432,
-            username: "uymgphwj",
-            password: "7_tHbREdRwkqAdu4KoIS7hQnNxr8J1LA",
-            database: "uymgphwj",
-            tls: .require(sslContext)
-        )
-        XCTAssertNoThrow(conn = try PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
-        XCTAssertEqual(rows?.count, 1)
-        let row = rows?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "version"].string?.contains("PostgreSQL"), true)
     }
 
     @available(*, deprecated, message: "Test deprecated functionality")
@@ -1239,11 +1306,11 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow( try conn?.close().wait() ) }
         var queries: [[PostgresRow]]?
-        XCTAssertNoThrow(queries = try conn?.prepare(query: "SELECT $1::text as foo;", handler: { query in
+        XCTAssertNoThrow(queries = try conn?.prepare(query: "SELECT $1::text as foo;", handler: { [eventLoop] query in
             let a = query.execute(["a"])
             let b = query.execute(["b"])
             let c = query.execute(["c"])
-            return EventLoopFuture.whenAllSucceed([a, b, c], on: self.eventLoop)
+            return EventLoopFuture.whenAllSucceed([a, b, c], on: eventLoop)
         }).wait())
         XCTAssertEqual(queries?.count, 3)
         var resultIterator = queries?.makeIterator()
@@ -1437,7 +1504,7 @@ final class PostgresNIOTests: XCTestCase {
 let isLoggingConfigured: Bool = {
     LoggingSystem.bootstrap { label in
         var handler = StreamLogHandler.standardOutput(label: label)
-        handler.logLevel = env("LOG_LEVEL").flatMap { Logger.Level(rawValue: $0) } ?? .debug
+        handler.logLevel = env("LOG_LEVEL").flatMap { .init(rawValue: $0) } ?? .info
         return handler
     }
     return true

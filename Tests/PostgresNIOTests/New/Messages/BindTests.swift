@@ -1,10 +1,10 @@
-import XCTest
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class BindTests: XCTestCase {
-    
-    func testEncodeBind() {
+@Suite struct BindTests {
+
+    @Test func testEncodeBind() {
         var bindings = PostgresBindings()
         bindings.append("Hello", context: .default)
         bindings.append("World", context: .default)
@@ -14,34 +14,34 @@ class BindTests: XCTestCase {
         encoder.bind(portalName: "", preparedStatementName: "", bind: bindings)
         var byteBuffer = encoder.flushBuffer()
 
-        XCTAssertEqual(byteBuffer.readableBytes, 37)
-        XCTAssertEqual(PostgresFrontendMessage.ID.bind.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), 36)
-        XCTAssertEqual("", byteBuffer.readNullTerminatedString())
-        XCTAssertEqual("", byteBuffer.readNullTerminatedString())
+        #expect(byteBuffer.readableBytes == 37)
+        #expect(PostgresFrontendMessage.ID.bind.rawValue == byteBuffer.readInteger(as: UInt8.self))
+        #expect(byteBuffer.readInteger(as: Int32.self) == 36)
+        #expect("" == byteBuffer.readNullTerminatedString())
+        #expect("" == byteBuffer.readNullTerminatedString())
         // the number of parameters
-        XCTAssertEqual(2, byteBuffer.readInteger(as: Int16.self))
+        #expect(2 == byteBuffer.readInteger(as: Int16.self))
         // all (two) parameters have the same format (binary)
-        XCTAssertEqual(1, byteBuffer.readInteger(as: Int16.self))
-        XCTAssertEqual(1, byteBuffer.readInteger(as: Int16.self))
-        
+        #expect(1 == byteBuffer.readInteger(as: Int16.self))
+        #expect(1 == byteBuffer.readInteger(as: Int16.self))
+
         // read number of parameters
-        XCTAssertEqual(2, byteBuffer.readInteger(as: Int16.self))
-        
+        #expect(2 == byteBuffer.readInteger(as: Int16.self))
+
         // hello length
-        XCTAssertEqual(5, byteBuffer.readInteger(as: Int32.self))
-        XCTAssertEqual("Hello", byteBuffer.readString(length: 5))
-        
+        #expect(5 == byteBuffer.readInteger(as: Int32.self))
+        #expect("Hello" == byteBuffer.readString(length: 5))
+
         // world length
-        XCTAssertEqual(5, byteBuffer.readInteger(as: Int32.self))
-        XCTAssertEqual("World", byteBuffer.readString(length: 5))
-        
+        #expect(5 == byteBuffer.readInteger(as: Int32.self))
+        #expect("World" == byteBuffer.readString(length: 5))
+
         // all response values have the same format: therefore one format byte is next
-        XCTAssertEqual(1, byteBuffer.readInteger(as: Int16.self))
+        #expect(1 == byteBuffer.readInteger(as: Int16.self))
         // all response values have the same format (binary)
-        XCTAssertEqual(1, byteBuffer.readInteger(as: Int16.self))
-        
+        #expect(1 == byteBuffer.readInteger(as: Int16.self))
+
         // nothing left to read
-        XCTAssertEqual(byteBuffer.readableBytes, 0)
+        #expect(byteBuffer.readableBytes == 0)
     }
 }

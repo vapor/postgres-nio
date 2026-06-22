@@ -1,4 +1,5 @@
 import XCTest
+import Atomics
 import NIOCore
 @testable import PostgresNIO
 
@@ -69,11 +70,11 @@ class JSON_PSQLCodableTests: XCTestCase {
     }
 
     func testCustomEncoderIsUsed() {
-        class TestEncoder: PostgresJSONEncoder {
-            var encodeHits = 0
+        final class TestEncoder: PostgresJSONEncoder {
+            let encodeHits = ManagedAtomic(0)
 
             func encode<T>(_ value: T, into buffer: inout ByteBuffer) throws where T : Encodable {
-                self.encodeHits += 1
+                self.encodeHits.wrappingIncrement(ordering: .relaxed)
             }
 
             func encode<T>(_ value: T) throws -> Data where T : Encodable {
@@ -85,6 +86,6 @@ class JSON_PSQLCodableTests: XCTestCase {
         let encoder = TestEncoder()
         var buffer = ByteBuffer()
         XCTAssertNoThrow(try hello.encode(into: &buffer, context: .init(jsonEncoder: encoder)))
-        XCTAssertEqual(encoder.encodeHits, 1)
+        XCTAssertEqual(encoder.encodeHits.load(ordering: .relaxed), 1)
     }
 }

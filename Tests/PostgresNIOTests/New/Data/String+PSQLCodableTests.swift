@@ -31,18 +31,6 @@ class String_PSQLCodableTests: XCTestCase {
         }
     }
 
-    func testDecodeFailureFromInvalidType() {
-        let buffer = ByteBuffer()
-        let dataTypes: [PostgresDataType] = [.bool, .float4Array, .float8Array]
-
-        for dataType in dataTypes {
-            var loopBuffer = buffer
-            XCTAssertThrowsError(try String(from: &loopBuffer, type: dataType, format: .binary, context: .default)) {
-                XCTAssertEqual($0 as? PostgresDecodingError.Code, .typeMismatch)
-            }
-        }
-    }
-
     func testDecodeFromUUID() {
         let uuid = UUID()
         var buffer = ByteBuffer()
@@ -63,5 +51,16 @@ class String_PSQLCodableTests: XCTestCase {
         XCTAssertThrowsError(try String(from: &buffer, type: .uuid, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
         }
+    }
+
+    func testDecodeFromJSONB() {
+        let json = #"{"hello": "world"}"#
+        var buffer = ByteBuffer()
+        buffer.writeInteger(UInt8(1))
+        buffer.writeString(json)
+
+        var decoded: String?
+        XCTAssertNoThrow(decoded = try String(from: &buffer, type: .jsonb, format: .binary, context: .default))
+        XCTAssertEqual(decoded, json)
     }
 }

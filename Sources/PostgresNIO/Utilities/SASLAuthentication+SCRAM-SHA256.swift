@@ -1,13 +1,11 @@
 import Crypto
+import _CryptoExtras
 import Foundation
 
-extension UInt8: ExpressibleByUnicodeScalarLiteral {
+extension UInt8 {
     fileprivate static var NUL: UInt8 { return 0x00 /* yeah, just U+0000 man */ }
     fileprivate static var comma: UInt8 { return 0x2c /* .init(ascii: ",") */ }
     fileprivate static var equals: UInt8 { return 0x3d /* .init(ascii: "=") */ }
-    public init(unicodeScalarLiteral value: Unicode.Scalar) {
-        self.init(ascii: value)
-    }
 }
 
 fileprivate extension String {
@@ -87,7 +85,7 @@ fileprivate extension Array where Element == UInt8 {
     */
     var isValidScramValue: Bool {
         // TODO: FInd a better way than doing a whole construction of String...
-        return self.count > 0 && !(String(bytes: self, encoding: .utf8)?.contains(",") ?? true)
+        return self.count > 0 && !(String(decoding: self, as: Unicode.UTF8.self).contains(","))
     }
 
 }
@@ -171,52 +169,51 @@ fileprivate struct SCRAMMessageParser {
     static func parseAttributePair(name: [UInt8], value: [UInt8], isGS2Header: Bool = false) -> SCRAMAttribute? {
         guard name.count == 1 || isGS2Header else { return nil }
         switch name.first {
-            case "m" where !isGS2Header: return .m(value)
-            case "r" where !isGS2Header: return String(printableAscii: value).map { .r($0) }
-            case "c" where !isGS2Header:
-                guard let parsedAttrs = value.decodingBase64().flatMap({ parse(raw: $0, isGS2Header: true) }) else { return nil }
-                guard (1...3).contains(parsedAttrs.count) else { return nil }
-                switch (parsedAttrs.first, parsedAttrs.dropFirst(1).first, parsedAttrs.dropFirst(2).first) {
-                    case let (.gp(.bind(name, .none)), .a(ident), .gm(data)): return .c(binding: .bind(name, data), authIdentity: ident)
-                    case let (.gp(.bind(name, .none)), .gm(data),     .none): return .c(binding: .bind(name, data))
-                    case let (.gp(bind),               .a(ident),     .none): return .c(binding: bind, authIdentity: ident)
-                    case let (.gp(bind),               .none,         .none): return .c(binding: bind)
-                    default: return nil
-                }
-            case "n" where !isGS2Header: return String(bytes: value, encoding: .utf8)?.decodedAsSaslName.map { .n($0) }
-            case "s" where !isGS2Header: return value.decodingBase64().map { .s($0) }
-            case "i" where !isGS2Header: return String(printableAscii: value).flatMap { UInt32.init($0) }.map { .i($0) }
-            case "p" where !isGS2Header: return value.decodingBase64().map { .p($0) }
-            case "v" where !isGS2Header: return value.decodingBase64().map { .v($0) }
-            case "e" where !isGS2Header: // TODO: actually map the specific enum string values
-                guard value.isValidScramValue else { return nil }
-                return String(bytes: value, encoding: .utf8).flatMap { SCRAMServerError(rawValue: $0) }.map { .e($0) }
-            
-            case "y" where isGS2Header && value.count == 0: return .gp(.unused)
-            case "n" where isGS2Header && value.count == 0: return .gp(.unsupported)
-            case "p" where isGS2Header: return String(asciiAlphanumericMorse: value).map { .gp(.bind($0, nil)) }
-            case "a" where isGS2Header: return String(bytes: value, encoding: .utf8)?.decodedAsSaslName.map { .a($0) }
-            case .none where isGS2Header: return .a(nil)
+        case UInt8(ascii: "m") where !isGS2Header: return .m(value)
+        case UInt8(ascii: "r") where !isGS2Header: return String(printableAscii: value).map { .r($0) }
+        case UInt8(ascii: "c") where !isGS2Header:
+            guard let parsedAttrs = value.decodingBase64().flatMap({ parse(raw: $0, isGS2Header: true) }) else { return nil }
+            guard (1...3).contains(parsedAttrs.count) else { return nil }
+            switch (parsedAttrs.first, parsedAttrs.dropFirst(1).first, parsedAttrs.dropFirst(2).first) {
+                case let (.gp(.bind(name, .none)), .a(ident), .gm(data)): return .c(binding: .bind(name, data), authIdentity: ident)
+                case let (.gp(.bind(name, .none)), .gm(data),     .none): return .c(binding: .bind(name, data))
+                case let (.gp(bind),               .a(ident),     .none): return .c(binding: bind, authIdentity: ident)
+                case let (.gp(bind),               .none,         .none): return .c(binding: bind)
+                default: return nil
+            }
+        case UInt8(ascii: "n") where !isGS2Header: return String(decoding: value, as: Unicode.UTF8.self).decodedAsSaslName.map { .n($0) }
+        case UInt8(ascii: "s") where !isGS2Header: return value.decodingBase64().map { .s($0) }
+        case UInt8(ascii: "i") where !isGS2Header: return String(printableAscii: value).flatMap { UInt32.init($0) }.map { .i($0) }
+        case UInt8(ascii: "p") where !isGS2Header: return value.decodingBase64().map { .p($0) }
+        case UInt8(ascii: "v") where !isGS2Header: return value.decodingBase64().map { .v($0) }
+        case UInt8(ascii: "e") where !isGS2Header: // TODO: actually map the specific enum string values
+            guard value.isValidScramValue else { return nil }
+            return SCRAMServerError(rawValue: String(decoding: value, as: Unicode.UTF8.self)).flatMap { .e($0) }
 
-            default:
-                if isGS2Header {
-                    return .gm(name + value)
-                } else {
-                    guard value.count > 0, value.isValidScramValue else { return nil }
-                    return .optional(name: CChar(name[0]), value: value)
-                }
+        case UInt8(ascii: "y") where isGS2Header && value.count == 0: return .gp(.unused)
+        case UInt8(ascii: "n") where isGS2Header && value.count == 0: return .gp(.unsupported)
+        case UInt8(ascii: "p") where isGS2Header: return String(asciiAlphanumericMorse: value).map { .gp(.bind($0, nil)) }
+        case UInt8(ascii: "a") where isGS2Header: return String(decoding: value, as: Unicode.UTF8.self).decodedAsSaslName.map { .a($0) }
+        case .none where isGS2Header: return .a(nil)
+
+        default:
+            if isGS2Header {
+                return .gm(name + value)
+            } else {
+                guard value.count > 0, value.isValidScramValue else { return nil }
+                return .optional(name: CChar(name[0]), value: value)
+            }
         }
     }
     
     static func parse(raw: [UInt8], isGS2Header: Bool = false) -> [SCRAMAttribute]? {
-        
         // There are two ways to implement this parse:
         //  1. All-at-once: Split on comma, split each on equals, validate
         //     each results in a valid attribute.
         //  2. Sequential: State machine lookahead parse.
         // The former is simpler. The latter provides better validation.
-        let likelyAttributeSets = raw.split(separator: .comma, maxSplits: isGS2Header ? 3 : Int.max, omittingEmptySubsequences: false)
-        let likelyAttributePairs = likelyAttributeSets.map { $0.split(separator: .equals, maxSplits: 2, omittingEmptySubsequences: false) }
+        let likelyAttributeSets = raw.split(separator: .comma, maxSplits: isGS2Header ? 2 : Int.max, omittingEmptySubsequences: false)
+        let likelyAttributePairs = likelyAttributeSets.map { $0.split(separator: .equals, maxSplits: 1, omittingEmptySubsequences: false) }
         
         let results = likelyAttributePairs.map { parseAttributePair(name: Array($0[0]), value: $0.dropFirst().first.map { Array($0) } ?? [], isGS2Header: isGS2Header) }
         let validResults = results.compactMap { $0 }
@@ -231,45 +228,45 @@ fileprivate struct SCRAMMessageParser {
         for attribute in attributes {
             switch attribute {
                 case .m(let value):
-                    result.append("m"); result.append("="); result.append(contentsOf: value)
+                    result.append(UInt8(ascii: "m")); result.append(.equals); result.append(contentsOf: value)
                 case .r(let nonce):
-                    result.append("r"); result.append("="); result.append(contentsOf: nonce.utf8.map { UInt8($0) })
+                    result.append(UInt8(ascii: "r")); result.append(.equals); result.append(contentsOf: nonce.utf8.map { UInt8($0) })
                 case .n(let name):
-                    result.append("n"); result.append("="); result.append(contentsOf: name.encodedAsSaslName.utf8.map { UInt8($0) })
+                    result.append(UInt8(ascii: "n")); result.append(.equals); result.append(contentsOf: name.encodedAsSaslName.utf8.map { UInt8($0) })
                 case .s(let salt):
-                    result.append("s"); result.append("="); result.append(contentsOf: salt.encodingBase64())
+                    result.append(UInt8(ascii: "s")); result.append(.equals); result.append(contentsOf: salt.encodingBase64())
                 case .i(let count):
-                    result.append("i"); result.append("="); result.append(contentsOf: "\(count)".utf8.map { UInt8($0) })
+                    result.append(UInt8(ascii: "i")); result.append(.equals); result.append(contentsOf: "\(count)".utf8.map { UInt8($0) })
                 case .p(let proof):
-                    result.append("p"); result.append("="); result.append(contentsOf: proof.encodingBase64())
+                    result.append(UInt8(ascii: "p")); result.append(.equals); result.append(contentsOf: proof.encodingBase64())
                 case .v(let signature):
-                    result.append("v"); result.append("="); result.append(contentsOf: signature.encodingBase64())
+                    result.append(UInt8(ascii: "v")); result.append(.equals); result.append(contentsOf: signature.encodingBase64())
                 case .e(let error):
-                    result.append("e"); result.append("="); result.append(contentsOf: error.rawValue.utf8.map { UInt8($0) })
+                    result.append(UInt8(ascii: "e")); result.append(.equals); result.append(contentsOf: error.rawValue.utf8.map { UInt8($0) })
                 case .c(let binding, let identity):
                     if isInitialGS2Header {
                         switch binding {
-                            case .unsupported: result.append("n")
-                            case .unused: result.append("y")
-                            case .bind(let name, _): result.append("p"); result.append("="); result.append(contentsOf: name.utf8.map { UInt8($0) })
+                        case .unsupported: result.append(UInt8(ascii: "n"))
+                        case .unused: result.append(UInt8(ascii: "y"))
+                        case .bind(let name, _): result.append(UInt8(ascii: "p")); result.append(.equals); result.append(contentsOf: name.utf8.map { UInt8($0) })
                         }
-                        result.append(",")
+                        result.append(.comma)
                         if let identity = identity {
-                            result.append("a"); result.append("="); result.append(contentsOf: identity.encodedAsSaslName.utf8.map { UInt8($0) })
+                            result.append(UInt8(ascii: "a")); result.append(.equals); result.append(contentsOf: identity.encodedAsSaslName.utf8.map { UInt8($0) })
                         }
-                        result.append(",")
+                        result.append(.comma)
                     } else {
                         guard var partial = serialize([attribute], isInitialGS2Header: true) else { return nil }
                         if case let .bind(_, data) = binding {
                             guard let data = data else { return nil }
                             partial.append(contentsOf: data)
                         }
-                        result.append("c"); result.append("="); result.append(contentsOf: partial.encodingBase64())
+                        result.append(UInt8(ascii: "c")); result.append(.equals); result.append(contentsOf: partial.encodingBase64())
                     }
                 default:
                     return nil
             }
-            result.append(",")
+            result.append(.comma)
         }
         return result.dropLast()
     }
@@ -296,7 +293,7 @@ internal struct SHA256: SASLAuthenticationMechanism {
     ///               authenticating user. If the closure throws, authentication
     ///               immediately fails with the thrown error.
     internal init(username: String, password: @escaping () throws -> String) {
-        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().data(using: .utf8)!), []) }, bindingInfo: .unsupported)
+        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().utf8), []) }, bindingInfo: .unsupported)
     }
     
     /// Set up a server-side `SCRAM-SHA-256` authentication.
@@ -342,7 +339,7 @@ internal struct SHA256_PLUS: SASLAuthenticationMechanism {
     ///   - channelBindingData: The appropriate data associated with the RFC5056
     ///                         channel binding specified.
     internal init(username: String, password: @escaping () throws -> String, channelBindingName: String, channelBindingData: [UInt8]) {
-        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().data(using: .utf8)!), []) }, bindingInfo: .bind(channelBindingName, channelBindingData))
+        self._impl = .init(username: username, passwordGrabber: { _ in try (Array(password().utf8), []) }, bindingInfo: .bind(channelBindingName, channelBindingData))
     }
     
     /// Set up a server-side `SCRAM-SHA-256` authentication.
@@ -369,7 +366,7 @@ internal struct SHA256_PLUS: SASLAuthenticationMechanism {
 } // enum SCRAM
 } // enum SASLMechanism
 
-/// Common impplementation of SCRAM-SHA-256 and SCRAM-SHA-256-PLUS
+/// Common implementation of SCRAM-SHA-256 and SCRAM-SHA-256-PLUS
 fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
 
     /// Initialized with initial client state
@@ -470,10 +467,10 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         // TODO: Perform `Normalize(password)`, aka the SASLprep profile (RFC4013) of stringprep (RFC3454)
         
         // Calculate `AuthMessage`, `ClientSignature`, and `ClientProof`
-        let saltedPassword = Hi(string: password, salt: serverSalt, iterations: serverIterations)
-        let clientKey = HMAC<SHA256>.authenticationCode(for: "Client Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+        let saltedPassword = try Hi(string: password, salt: serverSalt, iterations: serverIterations)
+        let clientKey = HMAC<SHA256>.authenticationCode(for: Data("Client Key".utf8), using: saltedPassword)
         let storedKey = SHA256.hash(data: Data(clientKey))
-        var authMessage = firstMessageBare; authMessage.append(","); authMessage.append(contentsOf: message); authMessage.append(","); authMessage.append(contentsOf: clientFinalNoProof)
+        var authMessage = firstMessageBare; authMessage.append(.comma); authMessage.append(contentsOf: message); authMessage.append(.comma); authMessage.append(contentsOf: clientFinalNoProof)
         let clientSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: storedKey))
         var clientProof = Array(clientKey)
         
@@ -486,12 +483,14 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         }
         
         // Generate a `client-final-message`
-        var clientFinalMessage = clientFinalNoProof; clientFinalMessage.append(",")
+        var clientFinalMessage = clientFinalNoProof; clientFinalMessage.append(.comma)
         guard let proofPart = SCRAMMessageParser.serialize([.p(Array(clientProof))]) else { throw SASLAuthenticationError.genericAuthenticationFailure }
         clientFinalMessage.append(contentsOf: proofPart)
-        
+
+        let saltedPasswordBytes = saltedPassword.withUnsafeBytes { [UInt8]($0) }
+
         // Save state and send
-        self.state = .clientSentFinalMessage(saltedPassword: saltedPassword, authMessage: authMessage)
+        self.state = .clientSentFinalMessage(saltedPassword: saltedPasswordBytes, authMessage: authMessage)
         return .continue(response: clientFinalMessage)
     }
     
@@ -505,7 +504,7 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         switch incomingAttributes.first {
             case .v(let verifier):
                 // Verify server signature
-                let serverKey = HMAC<SHA256>.authenticationCode(for: "Server Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+                let serverKey = HMAC<SHA256>.authenticationCode(for: Data("Server Key".utf8), using: .init(data: saltedPassword))
                 let serverSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: serverKey))
                 
                 guard Array(serverSignature) == verifier else {
@@ -589,9 +588,9 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         guard nonce == repeatNonce else { throw SASLAuthenticationError.genericAuthenticationFailure }
         
         // Compute client signature
-        let clientKey = HMAC<SHA256>.authenticationCode(for: "Client Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+        let clientKey = HMAC<SHA256>.authenticationCode(for: Data("Client Key".utf8), using: .init(data: saltedPassword))
         let storedKey = SHA256.hash(data: Data(clientKey))
-        var authMessage = clientBareFirstMessage; authMessage.append(","); authMessage.append(contentsOf: serverFirstMessage); authMessage.append(","); authMessage.append(contentsOf: message.dropLast(proof.count + 3))
+        var authMessage = clientBareFirstMessage; authMessage.append(.comma); authMessage.append(contentsOf: serverFirstMessage); authMessage.append(.comma); authMessage.append(contentsOf: message.dropLast(proof.count + 3))
         let clientSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: storedKey))
         
         // Recompute client key from signature and proof, verify match
@@ -608,7 +607,7 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
         guard storedKey == restoredKey else { throw SCRAMServerError.invalidProof }
         
         // Compute server signature
-        let serverKey = HMAC<SHA256>.authenticationCode(for: "Server Key".data(using: .utf8)!, using: .init(data: saltedPassword))
+        let serverKey = HMAC<SHA256>.authenticationCode(for: Data("Server Key".utf8), using: .init(data: saltedPassword))
         let serverSignature = HMAC<SHA256>.authenticationCode(for: authMessage, using: .init(data: serverKey))
         
         // Generate a `server-final-message`
@@ -644,19 +643,12 @@ fileprivate final class SASLMechanism_SCRAM_SHA256_Common {
   HMAC() == output length of H().
   ````
 */
-private func Hi(string: [UInt8], salt: [UInt8], iterations: UInt32) -> [UInt8] {
-    let key = SymmetricKey(data: string)
-    var Ui = HMAC<SHA256>.authenticationCode(for: salt + [0x00, 0x00, 0x00, 0x01], using: key) // salt + 0x00000001 as big-endian
-    var Hi = Array(Ui)
-    
-    Hi.withUnsafeMutableBytes { Hibuf -> Void in
-        for _ in 2...iterations {
-            Ui = HMAC<SHA256>.authenticationCode(for: Data(Ui), using: key)
-            
-            Ui.withUnsafeBytes { Uibuf -> Void in
-                for i in 0..<Uibuf.count { Hibuf[i] ^= Uibuf[i] }
-            }
-        }
-    }
-    return Hi
+private func Hi(string: [UInt8], salt: [UInt8], iterations: UInt32) throws -> SymmetricKey {
+    try KDF.Insecure.PBKDF2.deriveKey(
+        from: string,
+        salt: salt,
+        using: .sha256,
+        outputByteCount: 32,
+        unsafeUncheckedRounds: Int(iterations)
+    )
 }

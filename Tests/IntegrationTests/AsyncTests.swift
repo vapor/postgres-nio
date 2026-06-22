@@ -84,6 +84,36 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    func testAdditionalParametersTakeEffect() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        let query: PostgresQuery = """
+            SELECT
+                current_setting('application_name');
+            """
+
+        let applicationName = "postgres-nio-test"
+        var options = PostgresConnection.Configuration.Options()
+        options.additionalStartupParameters = [
+            ("application_name", applicationName)
+        ]
+
+        try await withTestConnection(on: eventLoop, options: options) { connection in
+            let rows = try await connection.query(query, logger: .psqlTest)
+            var counter = 0
+
+            for try await element in rows.decode(String.self) {
+                XCTAssertEqual(element, applicationName)
+                
+                counter += 1
+            }
+
+            XCTAssertGreaterThanOrEqual(counter, 1)
+        }
+    }
+
     func testSelectTimeoutWhileLongRunningQuery() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -224,26 +254,188 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenAndNotify() async throws {
+        let channelNames = [
+            "foo",
+            "default"
+        ]
+        
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        for channelName in channelNames {
+            try await self.withTestConnection(on: eventLoop) { connection in
+                let stream = try await connection.listen(channelName)
+                var iterator = stream.makeAsyncIterator()
+
+                try await self.withTestConnection(on: eventLoop) { other in
+                    try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'bar';"#, logger: .psqlTest)
+
+                    try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'foo';"#, logger: .psqlTest)
+                }
+
+                let first = try await iterator.next()
+                XCTAssertEqual(first?.payload, "bar")
+
+                let second = try await iterator.next()
+                XCTAssertEqual(second?.payload, "foo")
+            }
+        }
+    }
+
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
+    func testListenTwiceChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
 
         try await self.withTestConnection(on: eventLoop) { connection in
-            let stream = try await connection.listen("foo")
-            var iterator = stream.makeAsyncIterator()
+            // Concurrently listen on a channel that is initially closed
+            async let stream1later = connection.listen("same-channel")
+            async let stream2later = connection.listen("same-channel")
+            let (stream1, stream2) = try await (stream1later, stream2later)
 
-            try await self.withTestConnection(on: eventLoop) { other in
-                try await other.query(#"NOTIFY foo, 'bar';"#, logger: .psqlTest)
-
-                try await other.query(#"NOTIFY foo, 'foo';"#, logger: .psqlTest)
+            _ = try await self.withTestConnection(on: eventLoop) { other in
+                try await other.query(#"NOTIFY "\#(unescaped: "same-channel")";"#, logger: .psqlTest)
             }
 
-            let first = try await iterator.next()
-            XCTAssertEqual(first?.payload, "bar")
+            var stream1EventReceived = false
+            var stream2EventReceived = false
 
-            let second = try await iterator.next()
-            XCTAssertEqual(second?.payload, "foo")
+            for try await _ in stream1 {
+                stream1EventReceived = true
+                break
+            }
+
+            for try await _ in stream2 {
+                stream2EventReceived = true
+                break
+            }
+
+            XCTAssertTrue(stream1EventReceived)
+            XCTAssertTrue(stream2EventReceived)
+        }
+    }
+
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
+    func testListenOnClosedChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            try await connection.close()
+            do {
+                _ = try await connection.listen("futile")
+                XCTFail("Expected not to get any events")
+            } catch let error as PSQLError where error.code == .listenFailed {
+                // Expected
+            }
+        }
+    }
+
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
+    func testListenThenCloseChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            let stream = try await connection.listen("hopeful")
+            try await connection.close()
+            do {
+                for try await _ in stream {
+                    XCTFail("Expected not to get any events")
+                }
+                XCTFail("Expected not to have reached the end of stream")
+            } catch is PSQLError {
+                // Expected
+            }
+        }
+    }
+
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
+    func testListenThenClosingChannel() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            _ = try await connection.listen("initial")
+            async let asyncClose: () = connection.close()
+            let stream: PostgresNotificationSequence
+            do {
+                stream = try await connection.listen("hopeful")
+            } catch let error as PSQLError where error.code == .listenFailed {
+                // Expected
+                return
+            }
+            try await asyncClose
+            do {
+                for try await _ in stream {
+                    XCTFail("Expected not to get any events")
+                }
+                XCTFail("Expected not to have reached the end of stream")
+            } catch is PSQLError {
+                // Expected
+            }
+        }
+    }
+
+    func testListenOnChannelWithClosure() async throws {
+        let channelNames = [
+            "foo",
+            "default"
+        ]
+        
+        let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
+        let eventLoop = eventLoopGroup.next()
+
+        for channelName in channelNames {
+            try await self.withTestConnection(on: eventLoop) { connection in
+                try await connection.listen(on: channelName) { stream in
+                    var iterator = stream.makeAsyncIterator()
+
+                    try await self.withTestConnection(on: eventLoop) { other in
+                        try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'bar';"#, logger: .psqlTest)
+
+                        try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'foo';"#, logger: .psqlTest)
+                    }
+
+                    let first = try await iterator.next()
+                    XCTAssertEqual(first?.payload, "bar")
+
+                    let second = try await iterator.next()
+                    XCTAssertEqual(second?.payload, "foo")
+                }
+            }
+        }
+    }
+
+    func testLeavingTheScopeSecondsAfterCancellationDoesNotCrash() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                let (stream, cont) = AsyncStream.makeStream(of: Void.self)
+
+                taskGroup.addTask {
+                    try await connection.listen(on: "foo") { stream in
+                        cont.yield()
+                        for try await _ in stream {}
+                        _ = await Task {
+                            try? await Task.sleep(for: .seconds(1))
+                        }.result
+                        // scope is left long after task is cancelled
+                    }
+                }
+                // wait until listen has started by using an AsyncStream.
+                await stream.first { _ in true }
+                taskGroup.cancelAll()
+            }
         }
     }
 
@@ -297,8 +489,6 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                         XCTAssertEqual(counter, end)
                     } catch let error as CancellationError {
                         XCTAssertGreaterThanOrEqual(counter, 1)
-                        // Expected
-                        print("\(error)")
                     } catch {
                         XCTFail("Unexpected error: \(error)")
                     }
@@ -323,7 +513,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         let eventLoop = eventLoopGroup.next()
 
         struct TestPreparedStatement: PostgresPreparedStatement {
-            static var sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
+            static let sql = "SELECT pid, datname FROM pg_stat_activity WHERE state = $1"
             typealias Row = (Int, String)
 
             var state: String
@@ -358,17 +548,180 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             }
         }
     }
+
+    static let preparedStatementTestTable = "AsyncTestPreparedStatementTestTable"
+    func testPreparedStatementWithIntegerBinding() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        struct InsertPreparedStatement: PostgresPreparedStatement {
+            static let name = "INSERT-AsyncTestPreparedStatementTestTable"
+
+            static let sql = #"INSERT INTO "\#(AsyncPostgresConnectionTests.preparedStatementTestTable)" (uuid) VALUES ($1);"#
+            typealias Row = ()
+
+            var uuid: UUID
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.uuid)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                ()
+            }
+        }
+
+        struct SelectPreparedStatement: PostgresPreparedStatement {
+            static let name = "SELECT-AsyncTestPreparedStatementTestTable"
+
+            static let sql = #"SELECT id, uuid FROM "\#(AsyncPostgresConnectionTests.preparedStatementTestTable)" WHERE id <= $1;"#
+            typealias Row = (Int, UUID)
+
+            var id: Int
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.id)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                try row.decode((Int, UUID).self)
+            }
+        }
+
+        do {
+            try await withTestConnection(on: eventLoop) { connection in
+                try await connection.query("""
+                    CREATE TABLE IF NOT EXISTS "\(unescaped: Self.preparedStatementTestTable)" (
+                        id SERIAL PRIMARY KEY,
+                        uuid UUID NOT NULL
+                    )
+                    """,
+                    logger: .psqlTest
+                )
+
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+
+                let rows = try await connection.execute(SelectPreparedStatement(id: 3), logger: .psqlTest)
+                var counter = 0
+                for try await (id, uuid) in rows {
+                    Logger.psqlTest.info("Received row", metadata: [
+                        "id": "\(id)", "uuid": "\(uuid)"
+                    ])
+                    counter += 1
+                }
+
+                try await connection.query("""
+                    DROP TABLE "\(unescaped: Self.preparedStatementTestTable)";
+                    """,
+                    logger: .psqlTest
+                )
+            }
+        } catch {
+            XCTFail("Unexpected error: \(String(describing: error))")
+        }
+    }
+
+    static let preparedStatementWithOptionalTestTable = "AsyncTestPreparedStatementWithOptionalTestTable"
+    func testPreparedStatementWithOptionalBinding() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        let eventLoop = eventLoopGroup.next()
+
+        struct InsertPreparedStatement: PostgresPreparedStatement {
+            static let name = "INSERT-AsyncTestPreparedStatementWithOptionalTestTable"
+
+            static let sql = #"INSERT INTO "\#(AsyncPostgresConnectionTests.preparedStatementWithOptionalTestTable)" (uuid) VALUES ($1);"#
+            typealias Row = ()
+
+            var uuid: UUID?
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.uuid)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                ()
+            }
+        }
+
+        struct SelectPreparedStatement: PostgresPreparedStatement {
+            static let name = "SELECT-AsyncTestPreparedStatementWithOptionalTestTable"
+
+            static let sql = #"SELECT id, uuid FROM "\#(AsyncPostgresConnectionTests.preparedStatementWithOptionalTestTable)" WHERE id <= $1;"#
+            typealias Row = (Int, UUID?)
+
+            var id: Int
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.id)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresNIO.PostgresRow) throws -> Row {
+                try row.decode((Int, UUID?).self)
+            }
+        }
+
+        do {
+            try await withTestConnection(on: eventLoop) { connection in
+                try await connection.query("""
+                    CREATE TABLE IF NOT EXISTS "\(unescaped: Self.preparedStatementWithOptionalTestTable)" (
+                        id SERIAL PRIMARY KEY,
+                        uuid UUID
+                    )
+                    """,
+                    logger: .psqlTest
+                )
+
+                _ = try await connection.execute(InsertPreparedStatement(uuid: nil), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: nil), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: .init()), logger: .psqlTest)
+                _ = try await connection.execute(InsertPreparedStatement(uuid: nil), logger: .psqlTest)
+
+                let rows = try await connection.execute(SelectPreparedStatement(id: 3), logger: .psqlTest)
+                var counter = 0
+                for try await (id, uuid) in rows {
+                    Logger.psqlTest.info("Received row", metadata: [
+                        "id": "\(id)", "uuid": "\(String(describing: uuid))"
+                    ])
+                    counter += 1
+                }
+
+                try await connection.query("""
+                    DROP TABLE "\(unescaped: Self.preparedStatementWithOptionalTestTable)";
+                    """,
+                    logger: .psqlTest
+                )
+            }
+        } catch {
+            XCTFail("Unexpected error: \(String(describing: error))")
+        }
+    }
 }
 
 extension XCTestCase {
 
     func withTestConnection<Result>(
-        on eventLoop: EventLoop,
+        on eventLoop: any EventLoop,
+        options: PostgresConnection.Configuration.Options? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,
         _ closure: (PostgresConnection) async throws -> Result
     ) async throws -> Result  {
-        let connection = try await PostgresConnection.test(on: eventLoop).get()
+        let connection = try await PostgresConnection.test(on: eventLoop, options: options).get()
 
         do {
             let result = try await closure(connection)

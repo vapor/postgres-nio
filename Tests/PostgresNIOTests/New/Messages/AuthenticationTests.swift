@@ -1,10 +1,10 @@
-import XCTest
+import Testing
 import NIOCore
 import NIOTestUtils
 @testable import PostgresNIO
 
-class AuthenticationTests: XCTestCase {
-    
+@Suite struct AuthenticationTests {
+
     func testDecodeAuthentication() {
         var expected = [PostgresBackendMessage]()
         var buffer = ByteBuffer()
@@ -39,9 +39,11 @@ class AuthenticationTests: XCTestCase {
         encoder.encode(data: .authentication(.sspi), out: &buffer)
         expected.append(.authentication(.sspi))
         
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
-        ))
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, expected)],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
+            )
+        }
     }
 }

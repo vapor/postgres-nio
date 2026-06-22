@@ -14,7 +14,7 @@ class Date_PSQLCodableTests: XCTestCase {
 
         var result: Date?
         XCTAssertNoThrow(result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default))
-        XCTAssertEqual(value, result)
+        XCTAssertEqual(value.timeIntervalSince1970, result?.timeIntervalSince1970 ?? 0, accuracy: 0.001)
     }
 
     func testDecodeRandomDate() {

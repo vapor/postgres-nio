@@ -1,10 +1,10 @@
-import XCTest
+import Testing
 import NIOCore
 import NIOTestUtils
 @testable import PostgresNIO
 
-class BackendKeyDataTests: XCTestCase {
-    func testDecode() {
+@Suite struct BackendKeyDataTests {
+    @Test func testDecode() {
         let buffer = ByteBuffer.backendMessage(id: .backendKeyData) { buffer in
             buffer.writeInteger(Int32(1234))
             buffer.writeInteger(Int32(4567))
@@ -14,12 +14,15 @@ class BackendKeyDataTests: XCTestCase {
             (buffer, [PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567))]),
         ]
         
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: expectedInOuts,
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: expectedInOuts,
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
+            )
+        }
     }
     
-    func testDecodeInvalidLength() {
+    @Test func testDecodeInvalidLength() {
         var buffer = ByteBuffer()
         buffer.psqlWriteBackendMessageID(.backendKeyData)
         buffer.writeInteger(Int32(11))
@@ -30,10 +33,11 @@ class BackendKeyDataTests: XCTestCase {
             (buffer, [PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567))]),
         ]
         
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: expected,
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) })) {
-            XCTAssert($0 is PostgresMessageDecodingError)
+        #expect(throws: PostgresMessageDecodingError.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: expected,
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
+            )
         }
     }
 }

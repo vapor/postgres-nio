@@ -39,8 +39,8 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
             case 196608:
                 var user: String?
                 var database: String?
-                var options: String?
-                
+                var options = [(String, String)]()
+
                 while let name = messageSlice.readNullTerminatedString(), messageSlice.readerIndex < finalIndex {
                     let value = messageSlice.readNullTerminatedString()
                     
@@ -51,11 +51,10 @@ struct PSQLFrontendMessageDecoder: NIOSingleStepByteToMessageDecoder {
                     case "database":
                         database = value
                         
-                    case "options":
-                        options = value
-                        
                     default:
-                        break
+                        if let value = value {
+                            options.append((name, value))
+                        }
                     }
                 }
                 
@@ -168,6 +167,18 @@ extension PostgresFrontendMessage {
                     resultColumnFormats: resultColumnFormats
                 )
             )
+
+        case .copyData:
+            return .copyData(CopyData(data: buffer))
+
+        case .copyDone:
+            return .copyDone
+
+        case .copyFail:
+            guard let message = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            return .copyFail(CopyFail(message: message))
 
         case .close:
             preconditionFailure("TODO: Unimplemented")

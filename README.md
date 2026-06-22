@@ -1,31 +1,36 @@
 <p align="center">
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/1130717/259709891-64d4c78b-1cd1-4446-8746-d3a009992811.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/1130717/259710040-d79ee9eb-b5d9-4a82-a894-3eb5ef366c1f.png">
-  <img src="https://user-images.githubusercontent.com/1130717/259710040-d79ee9eb-b5d9-4a82-a894-3eb5ef366c1f.png" height="96" alt="PostgresNIO">
-</picture>
+<img src="https://design.vapor.codes/images/vapor-postgresnio.svg" height="96" alt="PostgresNIO">
 <br>
 <br>
-<a name="https://www.swift.org/sswg/incubation-process.html"><img src="https://img.shields.io/badge/sswg-graduated-green.svg" alt="SSWG Incubation Level: Graduated"></a>
-<a href="https://api.vapor.codes/postgresnio/documentation/postgresnio/"><img src="https://img.shields.io/badge/read_the-docs-2196f3.svg" alt="Documentation"></a>
-<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-brightgreen.svg" alt="MIT License"></a>
-<a href="https://github.com/vapor/postgres-nio/actions/workflows/test.yml"><img src="https://github.com/vapor/postgres-nio/actions/workflows/test.yml/badge.svg" alt="Continuous Integration"></a>
-<a href="https://swift.org"><img src="https://img.shields.io/badge/swift-5.6-brightgreen.svg" alt="Swift 5.6"></a>
+<a href="https://api.vapor.codes/postgresnio/documentation/postgresnio/">
+    <img src="https://design.vapor.codes/images/readthedocs.svg" alt="Documentation">
+</a>
+<a href="LICENSE">
+    <img src="https://design.vapor.codes/images/mitlicense.svg" alt="MIT License">
+</a>
+<a href="https://github.com/vapor/postgres-nio/actions/workflows/test.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/vapor/postgres-nio/test.yml?event=push&style=plastic&logo=github&label=tests&logoColor=%23ccc" alt="Continuous Integration">
+</a>
+<a href="https://swift.org">
+    <img src="https://design.vapor.codes/images/swift60up.svg" alt="Swift 6.0+">
+</a>
+<a href="https://www.swift.org/sswg/incubation-process.html">
+    <img src="https://design.vapor.codes/images/sswg-graduated.svg" alt="SSWG Incubation Level: Graduated">
+</a>
 </p>
-<br>
+
 🐘 Non-blocking, event-driven Swift client for PostgreSQL built on [SwiftNIO].
 
 Features:
 
 - A [`PostgresConnection`] which allows you to connect to, authorize with, query, and retrieve results from a PostgreSQL server
+- A [`PostgresClient`] which pools and manages connections 
 - An async/await interface that supports backpressure 
 - Automatic conversions between Swift primitive types and the Postgres wire format
-- Integrated with the Swift server ecosystem, including use of [SwiftLog].
+- Integrated with the Swift server ecosystem, including use of [SwiftLog] and [ServiceLifecycle].
 - Designed to run efficiently on all supported platforms (tested extensively on Linux and Darwin systems)
 - Support for `Network.framework` when available (e.g. on Apple platforms)
 - Supports running on Unix Domain Sockets
-
-PostgresNIO does not provide a `ConnectionPool` as of today, but this is a [feature high on our list](https://github.com/vapor/postgres-nio/issues/256). If you need a `ConnectionPool` today, please have a look at Vapor's [PostgresKit]. 
 
 ## API Docs
 
@@ -34,13 +39,16 @@ detailed look at all of the classes, structs, protocols, and more.
 
 ## Getting started
 
+Interested in an example? We prepared a simple [Birthday example](https://github.com/vapor/postgres-nio/blob/main/Snippets/Birthdays.swift)
+in the Snippets folder.
+
 #### Adding the dependency
 
 Add `PostgresNIO` as dependency to your `Package.swift`:
 
 ```swift
   dependencies: [
-    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.14.0"),
+    .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
     ...
   ]
 ```
@@ -54,14 +62,14 @@ Add `PostgresNIO` to the target you want to use it in:
   ]
 ```
 
-#### Creating a connection
+#### Creating a client
 
-To create a connection, first create a connection configuration object:
+To create a [`PostgresClient`], which pools connections for you, first create a configuration object:
 
 ```swift
 import PostgresNIO
 
-let config = PostgresConnection.Configuration(
+let config = PostgresClient.Configuration(
   host: "localhost",
   port: 5432,
   username: "my_username",
@@ -71,50 +79,35 @@ let config = PostgresConnection.Configuration(
 )
 ```
 
-To create a connection we need a [`Logger`], that is used to log connection background events.
-
+Next you can create you client with it:
 ```swift
-import Logging
-
-let logger = Logger(label: "postgres-logger")
+let client = PostgresClient(configuration: config)
 ```
 
-Now we can put it together:
-
+Once you have create your client, you must [`run()`] it:
 ```swift
-import PostgresNIO
-import Logging
+await withTaskGroup(of: Void.self) { taskGroup in
+    taskGroup.addTask {
+        await client.run() // !important
+    }
 
-let logger = Logger(label: "postgres-logger")
+    // You can use the client while the `client.run()` method is not cancelled.
 
-let config = PostgresConnection.Configuration(
-  host: "localhost",
-  port: 5432,
-  username: "my_username",
-  password: "my_password",
-  database: "my_database",
-  tls: .disable
-)
-
-let connection = try await PostgresConnection.connect(
-  configuration: config,
-  id: 1,
-  logger: logger
-)
-
-// Close your connection once done
-try await connection.close()
+    // To shutdown the client, cancel its run method, by cancelling the taskGroup.
+    taskGroup.cancelAll()
+}
 ```
 
 #### Querying
 
-Once a connection is established, queries can be sent to the server. This is very straightforward:
+Once a client is running, queries can be sent to the server. This is straightforward:
 
 ```swift
-let rows = try await connection.query("SELECT id, username, birthday FROM users", logger: logger)
+let rows = try await client.query("SELECT id, username, birthday FROM users")
 ```
 
-The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. The rows can be iterated one-by-one: 
+The query will return a [`PostgresRowSequence`], which is an AsyncSequence of [`PostgresRow`]s. 
+The rows can be iterated one-by-one: 
 
 ```swift
 for try await row in rows {
@@ -150,7 +143,7 @@ Sending parameterized queries to the database is also supported (in the coolest 
 let id = 1
 let username = "fancyuser"
 let birthday = Date()
-try await connection.query("""
+try await client.query("""
   INSERT INTO users (id, username, birthday) VALUES (\(id), \(username), \(birthday))
   """, 
   logger: logger
@@ -166,23 +159,24 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 Please see [SECURITY.md] for details on the security process.
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
-[Documentation]: https://swiftpackageindex.com/vapor/postgres-nio/documentation
+[Documentation]: https://api.vapor.codes/postgresnio/documentation/postgresnio
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
-[Swift 5.6]: https://swift.org
+[Swift 6.0]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
-[`PostgresConnection`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/
-[`query(_:logger:)`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
-[`PostgresQuery`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresquery/
-[`PostgresRow`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrow/
-[`PostgresRowSequence`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresrowsequence/
-[`PostgresDecodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresdecodable/
-[`PostgresEncodable`]: https://swiftpackageindex.com/vapor/postgres-nio/documentation/postgresnio/postgresencodable/
-
-[PostgresKit]: https://github.com/vapor/postgres-kit
-
+[`PostgresConnection`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection
+[`PostgresClient`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresclient
+[`run()`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresclient/run()
+[`query(_:logger:)`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
+[`PostgresQuery`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresquery
+[`PostgresRow`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrow
+[`PostgresRowSequence`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrowsequence
+[`PostgresDecodable`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresdecodable
+[`PostgresEncodable`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresencodable
 [SwiftNIO]: https://github.com/apple/swift-nio
+[PostgresKit]: https://github.com/vapor/postgres-kit
 [SwiftLog]: https://github.com/apple/swift-log
+[ServiceLifecycle]: https://github.com/swift-server/swift-service-lifecycle
 [`Logger`]: https://apple.github.io/swift-log/docs/current/Logging/Structs/Logger.html

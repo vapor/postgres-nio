@@ -168,7 +168,7 @@ struct AuthenticationStateMachine {
         switch self.state {
         case .initialized:
             preconditionFailure("""
-                The `AuthenticationStateMachine` must be immidiatly started after creation.
+                The `AuthenticationStateMachine` must be immediately started after creation.
                 """)
         case .startupMessageSent,
              .passwordAuthenticationSent,

@@ -5,7 +5,7 @@ import NIOCore
 class Decimal_PSQLCodableTests: XCTestCase {
 
     func testRoundTrip() {
-        let values: [Decimal] = [1.1, .pi, -5e-12]
+        let values: [Decimal] = [1.1, .pi, -5e-12, 0.00000080216390553684]
 
         for value in values {
             var buffer = ByteBuffer()

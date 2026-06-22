@@ -1,9 +1,9 @@
-import XCTest
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class ParseTests: XCTestCase {
-    func testEncode() {
+@Suite struct ParseTests {
+    @Test func testEncode() {
         let preparedStatementName = "test"
         let query = "SELECT version()"
         let parameters: [PostgresDataType] = [.bool, .int8, .bytea, .varchar, .text, .uuid, .json, .jsonbArray]
@@ -22,14 +22,14 @@ class ParseTests: XCTestCase {
         // + 4 preparedStatement (3 + 1 null terminator)
         // + 1 query ()
         
-        XCTAssertEqual(byteBuffer.readableBytes, length)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt8.self), PostgresFrontendMessage.ID.parse.rawValue)
-        XCTAssertEqual(byteBuffer.readInteger(as: Int32.self), Int32(length - 1))
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), preparedStatementName)
-        XCTAssertEqual(byteBuffer.readNullTerminatedString(), query)
-        XCTAssertEqual(byteBuffer.readInteger(as: UInt16.self), UInt16(parameters.count))
+        #expect(byteBuffer.readableBytes == length)
+        #expect(byteBuffer.readInteger(as: UInt8.self) == PostgresFrontendMessage.ID.parse.rawValue)
+        #expect(byteBuffer.readInteger(as: Int32.self) == Int32(length - 1))
+        #expect(byteBuffer.readNullTerminatedString() == preparedStatementName)
+        #expect(byteBuffer.readNullTerminatedString() == query)
+        #expect(byteBuffer.readInteger(as: UInt16.self) == UInt16(parameters.count))
         for dataType in parameters {
-            XCTAssertEqual(byteBuffer.readInteger(as: UInt32.self), dataType.rawValue)
+            #expect(byteBuffer.readInteger(as: UInt32.self) == dataType.rawValue)
         }
     }
 }

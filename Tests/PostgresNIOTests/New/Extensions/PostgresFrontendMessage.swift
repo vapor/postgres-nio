@@ -36,6 +36,14 @@ enum PostgresFrontendMessage: Equatable {
         let secretKey: Int32
     }
 
+    struct CopyData: Hashable {
+        var data: ByteBuffer
+    }
+
+    struct CopyFail: Hashable {
+        var message: String
+    }
+
     enum Close: Hashable {
         case preparedStatement(String)
         case portal(String)
@@ -103,7 +111,7 @@ enum PostgresFrontendMessage: Equatable {
         static let requestCode: Int32 = 80877103
     }
 
-    struct Startup: Hashable {
+    struct Startup: Equatable {
         static let versionThree: Int32 = 0x00_03_00_00
 
         /// Creates a `Startup` with "3.0" as the protocol version.
@@ -119,7 +127,7 @@ enum PostgresFrontendMessage: Equatable {
         /// The protocol version number is followed by one or more pairs of parameter
         /// name and value strings. A zero byte is required as a terminator after
         /// the last name/value pair. `user` is required, others are optional.
-        struct Parameters: Hashable {
+        struct Parameters: Equatable {
             enum Replication {
                 case `true`
                 case `false`
@@ -136,12 +144,33 @@ enum PostgresFrontendMessage: Equatable {
             /// of setting individual run-time parameters.) Spaces within this string are
             /// considered to separate arguments, unless escaped with a
             /// backslash (\); write \\ to represent a literal backslash.
-            var options: String?
+            var options: [(String, String)]
 
             /// Used to connect in streaming replication mode, where a small set of
             /// replication commands can be issued instead of SQL statements. Value
             /// can be true, false, or database, and the default is false.
             var replication: Replication
+
+            static func ==(lhs: Self, rhs: Self) -> Bool {
+                guard lhs.user == rhs.user
+                        && lhs.database == rhs.database
+                        && lhs.replication == rhs.replication
+                        && lhs.options.count == rhs.options.count
+                else {
+                    return false
+                }
+
+                var lhsIterator = lhs.options.makeIterator()
+                var rhsIterator = rhs.options.makeIterator()
+
+                while let lhsNext = lhsIterator.next(), let rhsNext = rhsIterator.next() {
+                    guard lhsNext.0 == rhsNext.0 && lhsNext.1 == rhsNext.1 else {
+                        return false
+                    }
+                }
+                return true
+            }
+
         }
 
         var parameters: Parameters
@@ -149,6 +178,9 @@ enum PostgresFrontendMessage: Equatable {
 
     case bind(Bind)
     case cancel(Cancel)
+    case copyData(CopyData)
+    case copyDone
+    case copyFail(CopyFail)
     case close(Close)
     case describe(Describe)
     case execute(Execute)
@@ -165,6 +197,9 @@ enum PostgresFrontendMessage: Equatable {
     enum ID: UInt8, Equatable {
         
         case bind
+        case copyData
+        case copyDone
+        case copyFail
         case close
         case describe
         case execute
@@ -180,12 +215,18 @@ enum PostgresFrontendMessage: Equatable {
             switch rawValue {
             case UInt8(ascii: "B"):
                 self = .bind
+            case UInt8(ascii: "c"):
+                self = .copyDone
             case UInt8(ascii: "C"):
                 self = .close
+            case UInt8(ascii: "d"):
+                self = .copyData
             case UInt8(ascii: "D"):
                 self = .describe
             case UInt8(ascii: "E"):
                 self = .execute
+            case UInt8(ascii: "f"):
+                self = .copyFail
             case UInt8(ascii: "H"):
                 self = .flush
             case UInt8(ascii: "P"):
@@ -209,6 +250,12 @@ enum PostgresFrontendMessage: Equatable {
             switch self {
             case .bind:
                 return UInt8(ascii: "B")
+            case .copyData:
+                return UInt8(ascii: "d")
+            case .copyDone:
+                return UInt8(ascii: "c")
+            case .copyFail:
+                return UInt8(ascii: "f")
             case .close:
                 return UInt8(ascii: "C")
             case .describe:
@@ -242,6 +289,12 @@ extension PostgresFrontendMessage {
             return .bind
         case .cancel:
             preconditionFailure("Cancel messages don't have an identifier")
+        case .copyData:
+            return .copyData
+        case .copyDone:
+            return .copyDone
+        case .copyFail:
+            return .copyFail
         case .close:
             return .close
         case .describe:
@@ -268,5 +321,127 @@ extension PostgresFrontendMessage {
             return .terminate
 
         }
+    }
+}
+
+/// Convenience accessors to get a specific case or `nil` if the enum is of a different case.
+extension PostgresFrontendMessage {
+    var bind: Bind? {
+        guard case .bind(let bind) = self else {
+            return nil
+        }
+        return bind
+    }
+
+    var cancel: Cancel? {
+        guard case .cancel(let cancel) = self else {
+            return nil
+        }
+        return cancel
+    }
+
+    var copyData: CopyData? {
+        guard case .copyData(let copyData) = self else {
+            return nil
+        }
+        return copyData
+    }
+
+    var copyDone: Void? {
+        guard case .copyDone = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var copyFail: CopyFail? {
+        guard case .copyFail(let copyFail) = self else {
+            return nil
+        }
+        return copyFail
+    }
+
+    var close: Close? {
+        guard case .close(let close) = self else {
+            return nil
+        }
+        return close
+    }
+
+    var describe: Describe? {
+        guard case .describe(let describe) = self else {
+            return nil
+        }
+        return describe
+    }
+
+    var execute: Execute? {
+        guard case .execute(let execute) = self else {
+            return nil
+        }
+        return execute
+    }
+
+    var flush: Void? {
+        guard case .flush = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var parse: Parse? {
+        guard case .parse(let parse) = self else {
+            return nil
+        }
+        return parse
+    }
+
+    var password: Password? {
+        guard case .password(let password) = self else {
+            return nil
+        }
+        return password
+    }
+
+    var saslInitialResponse: SASLInitialResponse? {
+        guard case .saslInitialResponse(let saslInitialResponse) = self else {
+            return nil
+        }
+        return saslInitialResponse
+    }
+
+    var saslResponse: SASLResponse? {
+        guard case .saslResponse(let saslResponse) = self else {
+            return nil
+        }
+        return saslResponse
+    }
+
+    var sslRequest: Void? {
+        guard case .sslRequest = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var sync: Void? {
+        guard case .sync = self else {
+            return nil
+        }
+        return ()
+    }
+
+    var startup: Startup? {
+        guard case .startup(let startup) = self else {
+            return nil
+        }
+        return startup
+    }
+
+    var terminate: Void? {
+        guard case .terminate = self else {
+            return nil
+        }
+        return ()
     }
 }

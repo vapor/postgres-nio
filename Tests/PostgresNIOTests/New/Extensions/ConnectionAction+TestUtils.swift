@@ -2,7 +2,8 @@ import class Foundation.JSONEncoder
 import NIOCore
 @testable import PostgresNIO
 
-extension ConnectionStateMachine.ConnectionAction: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
+extension PostgresNIO.ConnectionStateMachine.ConnectionAction: Swift.Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case (.read, read):
@@ -17,6 +18,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return true
         case (.establishSSLConnection, establishSSLConnection):
             return true
+        case (.closeConnection(let lhs), .closeConnection(let rhs)):
+            return lhs?.futureResult === rhs?.futureResult
         case (.closeConnectionAndCleanup(let lhs), .closeConnectionAndCleanup(let rhs)):
             return lhs == rhs
         case (.sendPasswordMessage(let lhsMethod, let lhsAuthContext), sendPasswordMessage(let rhsMethod, let rhsAuthContext)):
@@ -35,8 +38,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
             return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag
         case (.forwardStreamError(let lhsError, let lhsRead, let lhsCleanupContext), .forwardStreamError(let rhsError , let rhsRead, let rhsCleanupContext)):
             return lhsError == rhsError && lhsRead == rhsRead && lhsCleanupContext == rhsCleanupContext
-        case (.sendParseDescribeSync(let lhsName, let lhsQuery), .sendParseDescribeSync(let rhsName, let rhsQuery)):
-            return lhsName == rhsName && lhsQuery == rhsQuery
+        case (.sendParseDescribeSync(let lhsName, let lhsQuery, let lhsDataTypes), .sendParseDescribeSync(let rhsName, let rhsQuery, let rhsDataTypes)):
+            return lhsName == rhsName && lhsQuery == rhsQuery && lhsDataTypes == rhsDataTypes
         case (.succeedPreparedStatementCreation(let lhsPromise, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsPromise, let rhsRowDescription)):
             return lhsPromise.futureResult === rhsPromise.futureResult && lhsRowDescription == rhsRowDescription
         case (.fireChannelInactive, .fireChannelInactive):
@@ -47,7 +50,8 @@ extension ConnectionStateMachine.ConnectionAction: Equatable {
     }
 }
 
-extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol'
+extension PostgresNIO.ConnectionStateMachine.ConnectionAction.CleanUpContext: Swift.Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         guard lhs.closePromise?.futureResult === rhs.closePromise?.futureResult else {
             return false
@@ -66,14 +70,73 @@ extension ConnectionStateMachine.ConnectionAction.CleanUpContext: Equatable {
 }
 
 extension ConnectionStateMachine {
-    static func readyForQuery(transactionState: PostgresBackendMessage.TransactionState = .idle) -> Self {
-        let connectionContext = Self.createConnectionContext(transactionState: transactionState)
-        return ConnectionStateMachine(.readyForQuery(connectionContext))
+    struct UnexpectedAction: Error {
+        var actual: ConnectionStateMachine.ConnectionAction
+        var expected: ConnectionStateMachine.ConnectionAction
     }
-    
-    static func createConnectionContext(transactionState: PostgresBackendMessage.TransactionState = .idle) -> ConnectionContext {
-        let backendKeyData = BackendKeyData(processID: 2730, secretKey: 882037977)
-        
+
+    static func makeAuthenticatedIdle(
+        username: String = "test",
+        password: String? = "abc123",
+        database: String = "test",
+        additionalParameters: [(String, String)] = [],
+        salt: UInt32 = 0x00_01_02_03,
+        requireBackendKeyData: Bool = true
+    ) throws(UnexpectedAction) -> ConnectionStateMachine {
+        let authContext = AuthContext(
+            username: username,
+            password: password,
+            database: database,
+            additionalParameters: additionalParameters
+        )
+        var state = ConnectionStateMachine(requireBackendKeyData: requireBackendKeyData)
+        let connectedAction = state.connected(tls: .require)
+        guard connectedAction == .sendSSLRequest else {
+            throw UnexpectedAction(actual: connectedAction, expected: .sendSSLRequest)
+        }
+        let sslSupportedReceivedAction = state.sslSupportedReceived(unprocessedBytes: 0)
+        guard sslSupportedReceivedAction == .establishSSLConnection else {
+            throw UnexpectedAction(actual: sslSupportedReceivedAction, expected: .establishSSLConnection)
+        }
+        let sslHandlerAddedAction = state.sslHandlerAdded()
+        guard sslHandlerAddedAction == .wait else {
+            throw UnexpectedAction(actual: sslHandlerAddedAction, expected: .wait)
+        }
+        let sslEstablishedAction = state.sslEstablished()
+        guard sslEstablishedAction == .provideAuthenticationContext else {
+            throw UnexpectedAction(actual: sslEstablishedAction, expected: .provideAuthenticationContext)
+        }
+        let provideAuthContextAction = state.provideAuthenticationContext(authContext)
+        guard provideAuthContextAction == .sendStartupMessage(authContext) else {
+            throw UnexpectedAction(actual: provideAuthContextAction, expected: .sendStartupMessage(authContext))
+        }
+        let authenticationMessageReceivedAction = state.authenticationMessageReceived(.md5(salt: salt))
+        guard authenticationMessageReceivedAction == .sendPasswordMessage(.md5(salt: salt), authContext) else {
+            throw UnexpectedAction(actual: authenticationMessageReceivedAction, expected: .sendPasswordMessage(.md5(salt: salt), authContext))
+        }
+        let authenticationCompleteAction = state.authenticationMessageReceived(.ok)
+        guard authenticationCompleteAction == .wait else {
+            throw UnexpectedAction(actual: authenticationCompleteAction, expected: .wait)
+        }
+
+        return state
+    }
+
+    static func makeReadyForQuery(
+        username: String = "test",
+        password: String? = "abc123",
+        database: String = "test",
+        additionalParameters: [(String, String)] = [],
+        salt: UInt32 = 0x00_01_02_03
+    ) throws(UnexpectedAction) -> ConnectionStateMachine {
+        var state = try Self.makeAuthenticatedIdle(
+            username: username,
+            password: password,
+            database: database,
+            additionalParameters: additionalParameters,
+            salt: salt
+        )
+
         let paramaters = [
             "DateStyle": "ISO, MDY",
             "application_name": "",
@@ -87,22 +150,37 @@ extension ConnectionStateMachine {
             "IntervalStyle": "postgres",
             "standard_conforming_strings": "on"
         ]
-        
-        return ConnectionContext(
-            backendKeyData: backendKeyData,
-            parameters: paramaters,
-            transactionState: transactionState
-        )
+
+        for (name, value) in paramaters {
+            let parameterStatusReceivedAction = state.parameterStatusReceived(.init(parameter: name, value: value))
+            guard parameterStatusReceivedAction == .wait else {
+                throw UnexpectedAction(actual: parameterStatusReceivedAction, expected: .wait)
+            }
+        }
+
+        let parameterStatusReceivedAction = state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882037977))
+        guard parameterStatusReceivedAction == .wait else {
+            throw UnexpectedAction(actual: parameterStatusReceivedAction, expected: .wait)
+        }
+
+        let readyForQueryReceivedAction = state.readyForQueryReceived(.idle)
+        guard readyForQueryReceivedAction == .fireEventReadyForQuery else {
+            throw UnexpectedAction(actual: readyForQueryReceivedAction, expected: .fireEventReadyForQuery)
+        }
+
+        return state
     }
 }
 
-extension PSQLError: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
+extension PostgresNIO.PSQLError: Swift.Equatable {
     public static func == (lhs: PSQLError, rhs: PSQLError) -> Bool {
         return true
     }
 }
 
-extension PSQLTask: Equatable {
+// fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
+extension PostgresNIO.PSQLTask: Swift.Equatable {
     public static func == (lhs: PSQLTask, rhs: PSQLTask) -> Bool {
         switch (lhs, rhs) {
         case (.extendedQuery(let lhs), .extendedQuery(let rhs)):

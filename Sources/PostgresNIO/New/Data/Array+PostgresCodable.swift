@@ -1,9 +1,10 @@
 import NIOCore
+import struct Foundation.Date
 import struct Foundation.UUID
 
 // MARK: Protocols
 
-/// A type, of which arrays can be encoded into and decoded from a postgres binary format
+/// A type of which arrays can be encoded into and decoded from a Postgres binary format.
 public protocol PostgresArrayEncodable: PostgresEncodable {
     static var psqlArrayType: PostgresDataType { get }
 }
@@ -83,6 +84,12 @@ extension UUID: PostgresArrayDecodable {}
 
 extension UUID: PostgresArrayEncodable {
     public static var psqlArrayType: PostgresDataType { .uuidArray }
+}
+
+extension Date: PostgresArrayDecodable {}
+
+extension Date: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .timestamptzArray }
 }
 
 extension Range: PostgresArrayDecodable where Bound: PostgresRangeArrayDecodable {}

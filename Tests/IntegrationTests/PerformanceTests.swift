@@ -6,9 +6,9 @@ import NIOPosix
 import NIOTestUtils
 
 final class PerformanceTests: XCTestCase {
-    private var group: EventLoopGroup!
+    private var group: (any EventLoopGroup)!
 
-    private var eventLoop: EventLoop { self.group.next() }
+    private var eventLoop: any EventLoop { self.group.next() }
     
     override func setUpWithError() throws {
         try super.setUpWithError()
@@ -272,7 +272,7 @@ private func prepareTableToMeasureSelectPerformance(
     batchSize: Int = 1_000,
     schema: String,
     fixtureData: [PostgresData],
-    on eventLoop: EventLoop,
+    on eventLoop: any EventLoop,
     file: StaticString = #filePath,
     line: UInt = #line
 ) throws {

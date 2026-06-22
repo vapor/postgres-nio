@@ -25,7 +25,7 @@ struct PostgresFrontendMessageEncoder {
         self.buffer = buffer
     }
 
-    mutating func startup(user: String, database: String?) {
+    mutating func startup(user: String, database: String?, options: [(String, String)]) {
         self.clearIfNeeded()
         self.buffer.psqlLengthPrefixed { buffer in
             buffer.writeInteger(Self.startupVersionThree)
@@ -35,6 +35,13 @@ struct PostgresFrontendMessageEncoder {
             if let database = database {
                 buffer.writeNullTerminatedString("database")
                 buffer.writeNullTerminatedString(database)
+            }
+
+            // we don't send replication parameters, as the default is false and this is what we
+            // need for a client
+            for (key, value) in options {
+                buffer.writeNullTerminatedString(key)
+                buffer.writeNullTerminatedString(value)
             }
 
             buffer.writeInteger(UInt8(0))
@@ -160,6 +167,28 @@ struct PostgresFrontendMessageEncoder {
         self.buffer.writeMultipleIntegers(UInt32(8), Self.sslRequestCode)
     }
 
+    /// Adds the `CopyData` message ID and `dataLength` to the message buffer but not the actual data.
+    /// 
+    /// The caller of this function is expected to write the encoder's message buffer to the backend after calling this
+    /// function, followed by sending the actual data to the backend.
+    mutating func copyDataHeader(dataLength: UInt32) {
+        self.clearIfNeeded()
+        self.buffer.psqlWriteMultipleIntegers(id: .copyData, length: dataLength)
+    }
+
+    mutating func copyDone() {
+        self.clearIfNeeded()
+        self.buffer.psqlWriteMultipleIntegers(id: .copyDone, length: 0)
+    }
+
+    mutating func copyFail(message: String) {
+        self.clearIfNeeded()
+        var messageBuffer = ByteBuffer()
+        messageBuffer.writeNullTerminatedString(message)
+        self.buffer.psqlWriteMultipleIntegers(id: .copyFail, length: UInt32(messageBuffer.readableBytes))
+        self.buffer.writeImmutableBuffer(messageBuffer)
+    }
+
     mutating func sync() {
         self.clearIfNeeded()
         self.buffer.psqlWriteMultipleIntegers(id: .sync, length: 0)
@@ -190,6 +219,9 @@ struct PostgresFrontendMessageEncoder {
 private enum FrontendMessageID: UInt8, Hashable, Sendable {
     case bind = 66 // B
     case close = 67 // C
+    case copyData = 100 // d
+    case copyDone = 99 // c
+    case copyFail = 102 // f
     case describe = 68 // D
     case execute = 69 // E
     case flush = 72 // H

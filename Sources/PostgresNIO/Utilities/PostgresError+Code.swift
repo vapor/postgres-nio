@@ -1,5 +1,5 @@
 extension PostgresError {
-    public struct Code: ExpressibleByStringLiteral, Equatable {
+    public struct Code: Sendable, ExpressibleByStringLiteral, Equatable {
         // Class 00 — Successful Completion
         public static let successfulCompletion: Code = "00000"
         

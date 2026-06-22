@@ -172,7 +172,7 @@ final class PostgresRowTests: XCTestCase {
                 name: "name",
                 tableOID: 1,
                 columnAttributeNumber: 1,
-                dataType: .int8,
+                dataType: .text,
                 dataTypeSize: 0,
                 dataTypeModifier: 0,
                 format: .binary
@@ -185,7 +185,7 @@ final class PostgresRowTests: XCTestCase {
             columns: rowDescription
         )
 
-        XCTAssertThrowsError(try row.decode((UUID?, String).self)) { error in
+        XCTAssertThrowsError(try row.decode((UUID?, Int).self)) { error in
             guard let psqlError = error as? PostgresDecodingError else { return XCTFail("Unexpected error type") }
 
             XCTAssertEqual(psqlError.columnName, "name")
@@ -194,8 +194,8 @@ final class PostgresRowTests: XCTestCase {
             XCTAssertEqual(psqlError.file, #fileID)
             XCTAssertEqual(psqlError.postgresData, ByteBuffer(integer: 123))
             XCTAssertEqual(psqlError.postgresFormat, .binary)
-            XCTAssertEqual(psqlError.postgresType, .int8)
-            XCTAssert(psqlError.targetType == String.self)
+            XCTAssertEqual(psqlError.postgresType, .text)
+            XCTAssert(psqlError.targetType == Int.self)
         }
     }
 }

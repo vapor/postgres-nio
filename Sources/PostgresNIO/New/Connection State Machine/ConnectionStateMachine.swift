@@ -88,7 +88,32 @@ struct ConnectionStateMachine {
         case sendParseDescribeBindExecuteSync(PostgresQuery)
         case sendBindExecuteSync(PSQLExecuteStatement)
         case failQuery(EventLoopPromise<PSQLRowStream>, with: PSQLError, cleanupContext: CleanUpContext?)
+        /// Fail a query's execution by resuming the continuation with the given error. When `sync` is `true`, send a
+        /// `Sync` message to the backend.
+        case failQueryContinuation(AnyErrorContinuation, with: PSQLError, sync: Bool, cleanupContext: CleanUpContext?)
+        /// Succeed the promise with the rows from the given query result.
         case succeedQuery(EventLoopPromise<PSQLRowStream>, with: QueryResult)
+        /// Succeed the continuation with a void result. When `sync` is `true`, send a `Sync` message to the backend.
+        case succeedQueryContinuation(CheckedContinuation<Void, any Error>, sync: Bool)
+
+        /// Trigger a data transfer returning a `PostgresCopyFromWriter` to the given continuation.
+        ///
+        /// Once the data transfer is triggered, it will send `CopyData` messages to the backend. After that the state
+        /// machine needs to be prodded again to send a `CopyDone` or `CopyFail` by calling
+        /// `PostgresChannelHandler.sendCopyDone` or `PostgresChannelHandler.sendCopyFail`.
+        case triggerCopyData(CheckedContinuation<PostgresCopyFromWriter, any Error>)
+
+        /// Send a `CopyDone` and `Sync` message to the backend.
+        case sendCopyDoneAndSync
+
+        /// Send a `CopyFail` message to the backend with the given error message.
+        case sendCopyFail(message: String)
+
+        /// Fail the promise with the given error and close the connection.
+        ///
+        /// This is used when we want to cancel a COPY operation while waiting for backpressure relieve. In that case we
+        /// can't recover the connection because we can't send any messages to the backend, so we need to close it.
+        case failPromiseAndCloseConnection(EventLoopPromise<Void>, error: PSQLError, cleanupContext: CleanUpContext)
 
         // --- streaming actions
         // actions if query has requested next row but we are waiting for backend
@@ -97,7 +122,7 @@ struct ConnectionStateMachine {
         case forwardStreamError(PSQLError, read: Bool, cleanupContext: CleanUpContext?)
         
         // Prepare statement actions
-        case sendParseDescribeSync(name: String, query: String)
+        case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
         case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
         case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PSQLError, cleanupContext: CleanUpContext?)
 
@@ -107,6 +132,25 @@ struct ConnectionStateMachine {
         case failClose(CloseCommandContext, with: PSQLError, cleanupContext: CleanUpContext?)
     }
     
+    enum ChannelWritabilityChangedAction {
+        /// No action needs to be taken based on the writability change.
+        case none
+
+        /// Resume the given continuation successfully.
+        case succeedPromise(EventLoopPromise<Void>)
+    }
+
+    enum CheckBackendCanReceiveCopyDataAction {
+        /// Don't perform any action.
+        case none
+
+        /// Succeed the promise with a Void result.
+        case succeedPromise(EventLoopPromise<Void>)
+
+        /// Fail the promise with the given error.
+        case failPromise(EventLoopPromise<Void>, error: any Error)
+    }
+
     private var state: State
     private let requireBackendKeyData: Bool
     private var taskQueue = CircularBuffer<PSQLTask>()
@@ -116,14 +160,6 @@ struct ConnectionStateMachine {
         self.state = .initialized
         self.requireBackendKeyData = requireBackendKeyData
     }
-
-    #if DEBUG
-    /// for testing purposes only
-    init(_ state: State, requireBackendKeyData: Bool = true) {
-        self.state = state
-        self.requireBackendKeyData = requireBackendKeyData
-    }
-    #endif
 
     enum TLSConfiguration {
         case disable
@@ -587,7 +623,9 @@ struct ConnectionStateMachine {
             switch queryContext.query {
             case .executeStatement(_, let promise), .unnamed(_, let promise):
                 return .failQuery(promise, with: psqlErrror, cleanupContext: nil)
-            case .prepareStatement(_, _, let promise):
+            case .copyFrom(_, let triggerCopy):
+                return .failQueryContinuation(.copyFromWriter(triggerCopy), with: psqlErrror, sync: false, cleanupContext: nil)
+            case .prepareStatement(_, _, _, let promise):
                 return .failPreparedStatementCreation(promise, with: psqlErrror, cleanupContext: nil)
             }
         case .closeCommand(let closeContext):
@@ -624,21 +662,19 @@ struct ConnectionStateMachine {
     mutating func readEventCaught() -> ConnectionAction {
         switch self.state {
         case .initialized:
-            preconditionFailure("Received a read event on a connection that was never opened.")
-        case .sslRequestSent:
+            preconditionFailure("Invalid state: \(self.state). Read event before connection established?")
+
+        case .sslRequestSent,
+             .sslNegotiated,
+             .sslHandlerAdded,
+             .waitingToStartAuthentication,
+             .authenticating,
+             .authenticated,
+             .readyForQuery,
+             .closing:
+            // all states in which we definitely want to make further forward progress...
             return .read
-        case .sslNegotiated:
-            return .read
-        case .sslHandlerAdded:
-            return .read
-        case .waitingToStartAuthentication:
-            return .read
-        case .authenticating:
-            return .read
-        case .authenticated:
-            return .read
-        case .readyForQuery:
-            return .read
+
         case .extendedQuery(var extendedQuery, let connectionContext):
             self.state = .modifying // avoid CoW
             let action = extendedQuery.readEventCaught()
@@ -651,13 +687,26 @@ struct ConnectionStateMachine {
             self.state = .closeCommand(closeState, connectionContext)
             return self.modify(with: action)
 
-        case .closing:
-            return .read
         case .closed:
-            preconditionFailure("How can we receive a read, if the connection is closed")
+            // Generally we shouldn't see this event (read after connection closed?!).
+            // But truth is, adopters run into this, again and again. So preconditioning here leads
+            // to unnecessary crashes. So let's be resilient and just make more forward progress.
+            // If we really care, we probably need to dive deep into PostgresNIO and SwiftNIO.
+            return .read
+
         case .modifying:
-            preconditionFailure("Invalid state")
+            preconditionFailure("Invalid state: \(self.state)")
         }
+    }
+
+    mutating func channelWritabilityChanged(isWritable: Bool) -> ChannelWritabilityChangedAction {
+        guard case .extendedQuery(var queryState, let connectionContext) = state else {
+            return .none
+        }
+        self.state = .modifying // avoid CoW
+        let action = queryState.channelWritabilityChanged(isWritable: isWritable)
+        self.state = .extendedQuery(queryState, connectionContext)
+        return action
     }
     
     // MARK: - Running Queries -
@@ -751,6 +800,58 @@ struct ConnectionStateMachine {
         return self.modify(with: action)
     }
     
+    mutating func copyInResponseReceived(_ copyInResponse: PostgresBackendMessage.CopyInResponse) -> ConnectionAction {
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
+            return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.copyInResponse(copyInResponse)))
+        }
+
+        self.state = .modifying // avoid CoW
+        let action = queryState.copyInResponseReceived(copyInResponse)
+        self.state = .extendedQuery(queryState, connectionContext)
+        return self.modify(with: action)
+    }
+
+
+    /// Succeed the promise when the channel to the backend is writable and the backend is ready to receive more data.
+    ///
+    /// The promise may be failed if the backend indicated that it can't handle any more data by sending an
+    /// `ErrorResponse`. This is mostly the case when malformed data is sent to it. In that case, the data transfer
+    /// should be aborted to avoid unnecessary work.
+    mutating func checkBackendCanReceiveCopyData(channelIsWritable: Bool, promise: EventLoopPromise<Void>) -> CheckBackendCanReceiveCopyDataAction {
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
+            preconditionFailure("Copy mode is only supported for extended queries")
+        }
+
+        self.state = .modifying // avoid CoW
+        let action = queryState.checkBackendCanReceiveCopyData(channelIsWritable: channelIsWritable, promise: promise)
+        self.state = .extendedQuery(queryState, connectionContext)
+        return action
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyDone` message to the backend.
+    mutating func sendCopyDone(continuation: CheckedContinuation<Void, any Error>) -> ConnectionAction {
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
+            preconditionFailure("Copy mode is only supported for extended queries")
+        }
+
+        self.state = .modifying // avoid CoW
+        let action = queryState.sendCopyDone(continuation: continuation)
+        self.state = .extendedQuery(queryState, connectionContext)
+        return self.modify(with: action)
+    }
+
+    /// Put the state machine out of the copying mode and send a `CopyFail` message to the backend.
+    mutating func sendCopyFail(message: String, continuation: CheckedContinuation<Void, any Error>) -> ConnectionAction {
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
+            preconditionFailure("Copy mode is only supported for extended queries")
+        }
+
+        self.state = .modifying // avoid CoW
+        let action = queryState.sendCopyFail(message: message, continuation: continuation)
+        self.state = .extendedQuery(queryState, connectionContext)
+        return self.modify(with: action)
+    }
+
     mutating func emptyQueryResponseReceived() -> ConnectionAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
             return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.emptyQueryResponse))
@@ -775,9 +876,10 @@ struct ConnectionStateMachine {
     
     // MARK: Consumer
     
-    mutating func cancelQueryStream() -> ConnectionAction {
+    mutating func cancel() -> ConnectionAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
-            preconditionFailure("Tried to cancel stream without active query")
+            // We are not in a state in which we can cancel. Do nothing.
+            return .wait
         }
 
         self.state = .modifying // avoid CoW
@@ -859,14 +961,22 @@ struct ConnectionStateMachine {
                  .forwardRows,
                  .forwardStreamComplete,
                  .wait,
-                 .read:
+                 .read,
+                 .triggerCopyData,
+                 .sendCopyDoneAndSync,
+                 .sendCopyFail,
+                 .succeedQueryContinuation,
+                 .failPromiseAndCloseConnection:
                 preconditionFailure("Invalid query state machine action in state: \(self.state), action: \(action)")
 
             case .evaluateErrorAtConnectionLevel:
                 return .closeConnectionAndCleanup(cleanupContext)
 
-            case .failQuery(let queryContext, with: let error):
-                return .failQuery(queryContext, with: error, cleanupContext: cleanupContext)
+            case .failQuery(let promise, with: let error):
+                return .failQuery(promise, with: error, cleanupContext: cleanupContext)
+
+            case .failQueryContinuation(let continuation, with: let error, let sync):
+                return .failQueryContinuation(continuation, with: error, sync: sync, cleanupContext: cleanupContext)
 
             case .forwardStreamError(let error, let read):
                 return .forwardStreamError(error, read: read, cleanupContext: cleanupContext)
@@ -985,7 +1095,7 @@ extension ConnectionStateMachine {
             }
             
             return false
-        case .clientClosedConnection:
+        case .clientClosedConnection, .poolClosed:
             preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
         case .serverClosedConnection:
             return true
@@ -1037,8 +1147,22 @@ extension ConnectionStateMachine {
         case .failQuery(let requestContext, with: let error):
             let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
             return .failQuery(requestContext, with: error, cleanupContext: cleanupContext)
+        case .failQueryContinuation(let continuation, with: let error, let sync):
+            let cleanupContext = self.setErrorAndCreateCleanupContextIfNeeded(error)
+            return .failQueryContinuation(continuation, with: error, sync: sync, cleanupContext: cleanupContext)
         case .succeedQuery(let requestContext, with: let result):
             return .succeedQuery(requestContext, with: result)
+        case .succeedQueryContinuation(let continuation, let sync):
+            return .succeedQueryContinuation(continuation, sync: sync)
+        case .triggerCopyData(let triggerCopy):
+            return .triggerCopyData(triggerCopy)
+        case .sendCopyDoneAndSync:
+            return .sendCopyDoneAndSync
+        case .sendCopyFail(message: let message):
+            return .sendCopyFail(message: message)
+        case .failPromiseAndCloseConnection(let promise, error: let error):
+            let cleanupContext = self.setErrorAndCreateCleanupContext(error)
+            return .failPromiseAndCloseConnection(promise, error: error, cleanupContext: cleanupContext)
         case .forwardRows(let buffer):
             return .forwardRows(buffer)
         case .forwardStreamComplete(let buffer, let commandTag):
@@ -1056,8 +1180,8 @@ extension ConnectionStateMachine {
             return .read
         case .wait:
             return .wait
-        case .sendParseDescribeSync(name: let name, query: let query):
-            return .sendParseDescribeSync(name: name, query: query)
+        case .sendParseDescribeSync(name: let name, query: let query, bindingDataTypes: let bindingDataTypes):
+            return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
         case .succeedPreparedStatementCreation(let promise, with: let rowDescription):
             return .succeedPreparedStatementCreation(promise, with: rowDescription)
         case .failPreparedStatementCreation(let promise, with: let error):
@@ -1113,17 +1237,41 @@ struct SendPrepareStatement {
     let query: String
 }
 
-struct AuthContext: Equatable, CustomDebugStringConvertible {
-    let username: String
-    let password: String?
-    let database: String?
-    
+struct AuthContext: CustomDebugStringConvertible {
+    var username: String
+    var password: String?
+    var database: String?
+    var additionalParameters: [(String, String)]
+
+    init(username: String, password: String? = nil, database: String? = nil, additionalParameters: [(String, String)] = []) {
+        self.username = username
+        self.password = password
+        self.database = database
+        self.additionalParameters = additionalParameters
+    }
+
     var debugDescription: String {
         """
         AuthContext(username: \(String(reflecting: self.username)), \
         password: \(self.password != nil ? "********" : "nil"), \
         database: \(self.database != nil ? String(reflecting: self.database!) : "nil"))
         """
+    }
+}
+
+extension AuthContext: Equatable {
+    static func ==(lhs: Self, rhs: Self) -> Bool {
+        guard lhs.username == rhs.username
+                && lhs.password == rhs.password
+                && lhs.database == rhs.database
+                && lhs.additionalParameters.count == rhs.additionalParameters.count
+        else {
+            return false
+        }
+
+        return lhs.additionalParameters.elementsEqual(rhs.additionalParameters) { lhs, rhs in
+            lhs.0 == rhs.0 && lhs.1 == rhs.1
+        }
     }
 }
 
