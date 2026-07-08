@@ -17,7 +17,15 @@ extension PostgresRow {
         file: String = #fileID,
         line: Int = #line
     ) throws -> (Column) {
-        precondition(self.columns.count >= 1)
+        guard self.columns.count >= 1 else {
+            throw PostgresRowDecodingError(
+                code: .columnCountMismatch,
+                expectedColumns: 1,
+                returnedColumns: self.columns.count,
+                file: file,
+                line: line
+            )
+        }
         let columnIndex = 0
         var cellIterator = self.data.makeIterator()
         var cellData = cellIterator.next().unsafelyUnwrapped
@@ -53,7 +61,15 @@ extension PostgresRow {
         line: Int = #line
     ) throws -> (repeat each Column) {
         let packCount = ComputeParameterPackLength.count(ofPack: repeat (each Column).self)
-        precondition(self.columns.count >= packCount)
+        guard self.columns.count >= packCount else {
+            throw PostgresRowDecodingError(
+                code: .columnCountMismatch,
+                expectedColumns: packCount,
+                returnedColumns: self.columns.count,
+                file: file,
+                line: line
+            )
+        }
 
         var columnIndex = 0
         var cellIterator = self.data.makeIterator()
