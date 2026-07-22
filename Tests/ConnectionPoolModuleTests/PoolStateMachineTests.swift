@@ -542,6 +542,183 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerGracefulShutdownWithIdleConnections() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.connection == .scheduleTimers([connection1KeepAliveTimer]))
+        #expect(stateMachine.timerScheduled(connection1KeepAliveTimer, cancelContinuation: MockTimerCancellationToken(connection1KeepAliveTimer)) == .none)
+
+        let shutdownAction = stateMachine.triggerGracefulShutdown()
+        var shutdown = TestPoolStateMachine.ConnectionAction.Shutdown()
+        shutdown.connections = [connection]
+        shutdown.timersToCancel = [MockTimerCancellationToken(connection1KeepAliveTimer)]
+        #expect(shutdownAction.connection == .initiateShutdown(shutdown))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerGracefulShutdownWithLeasedConnections() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.connection == .scheduleTimers([connection1KeepAliveTimer]))
+        #expect(stateMachine.timerScheduled(connection1KeepAliveTimer, cancelContinuation: MockTimerCancellationToken(connection1KeepAliveTimer)) == .none)
+
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseAction = stateMachine.leaseConnection(request)
+        #expect(leaseAction.request == .leaseConnection(.init(element: request), connection))
+        #expect(leaseAction.connection == .cancelTimers([MockTimerCancellationToken(connection1KeepAliveTimer)]))
+
+        let shutdownAction = stateMachine.triggerGracefulShutdown()
+        let shutdown = TestPoolStateMachine.ConnectionAction.Shutdown()
+        #expect(shutdown.connections.isEmpty)
+        #expect(shutdownAction.connection == .initiateShutdown(shutdown))
+        #expect(!stateMachine.isShutdown)
+        
+        let closeConnection = stateMachine.releaseConnection(connection, streams: 1)
+        #expect(closeConnection.connection == .closeConnection(connection, []))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerGracefulShutdownWithInProgessRequest() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        // refill pool
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        let shutdownAction = stateMachine.triggerGracefulShutdown()
+        #expect(shutdownAction.connection ==  .initiateShutdown(.init()))
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        #expect(createdAction.request == .none)
+        #expect(createdAction.connection == .closeConnection(connection, []))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+
+        #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerGracefulShutdownDoesNotInterruptOtherStreams() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+
+        // make connection 1
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 2)
+        #expect(createdAction.request == .none)
+        let connection1KeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.connection == .scheduleTimers([connection1KeepAliveTimer]))
+        #expect(stateMachine.timerScheduled(connection1KeepAliveTimer, cancelContinuation: MockTimerCancellationToken(connection1KeepAliveTimer)) == .none)
+
+        let mockRequest1 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction1 = stateMachine.leaseConnection(mockRequest1)
+        #expect(leaseAction1.request == .leaseConnection(.init(element: mockRequest1), connection))
+        #expect(leaseAction1.connection == .cancelTimers([MockTimerCancellationToken(connection1KeepAliveTimer)]))
+        let mockRequest2 = MockRequest(connectionType: MockConnection.self)
+        let leaseAction2 = stateMachine.leaseConnection(mockRequest2)
+        #expect(leaseAction2.request == .leaseConnection(.init(element: mockRequest2), connection))
+        #expect(leaseAction2.connection == .cancelTimers([]))
+
+        let release1 = stateMachine.releaseConnection(connection, streams: 1)
+        #expect(release1.connection == .none)
+
+        let shutdownAction = stateMachine.triggerGracefulShutdown()
+        #expect(shutdownAction.connection == .initiateShutdown(.init()))
+        #expect(!stateMachine.isShutdown)
+
+        let release2 = stateMachine.releaseConnection(connection, streams: 1)
+        #expect(release2.connection == .closeConnection(connection, []))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+        #expect(stateMachine.isShutdown)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testBackingOffRequests() {
         struct ConnectionFailed: Error, Equatable {}
         let clock = MockClock()

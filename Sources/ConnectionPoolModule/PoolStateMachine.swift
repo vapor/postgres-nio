@@ -698,8 +698,30 @@ struct PoolStateMachine<
         var requests: [Request]
     }
 
+    @usableFromInline
     mutating func triggerGracefulShutdown() -> Action {
-        fatalError("Unimplemented")
+        switch self.poolState {
+        case .running, .connectionCreationFailing, .circuitBreakOpen:
+            self.poolState = .shuttingDown
+            var shutdown = ConnectionAction.Shutdown()
+            self.connections.triggerGracefulShutdown(&shutdown)
+
+            if self.connections.isEmpty, shutdown.connections.isEmpty {
+                self.poolState = .shutDown
+                return .init(
+                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                    connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
+                )
+            }
+
+            return .init(
+                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                connection: .initiateShutdown(shutdown)
+            )
+
+        case .shuttingDown, .shutDown:
+            return .none()
+        }
     }
 
     @usableFromInline
