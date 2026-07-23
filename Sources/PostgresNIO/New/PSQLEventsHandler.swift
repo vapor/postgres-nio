@@ -21,7 +21,7 @@ enum PSQLEvent {
 }
 
 
-final class PSQLEventsHandler: ChannelInboundHandler {
+final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
     typealias InboundIn = Never
     
     let logger: Logger
