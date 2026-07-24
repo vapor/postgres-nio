@@ -497,8 +497,8 @@ struct PoolStateMachine<
                 connectionAction = .cancelEventStreamAndFinalCleanup(timerToCancel.map {[$0]} ?? [])
 
                 if !requestQueue.isEmpty {
-                    // If there's no connections left but there are requests left in the queue, fail them.
-                    // We don't want to open other connections while draining
+                    // If there are no connections left but requests remain in the queue, fail them.
+                    // We don't want to open new connections while draining.
                     return .init(
                         request: .failRequests(self.requestQueue.removeAll(), .poolShutdown),
                         connection: connectionAction
@@ -688,7 +688,7 @@ struct PoolStateMachine<
                 connectionAction = .cancelEventStreamAndFinalCleanup(.init(closedConnectionAction.timersToCancel))
 
                 if !requestQueue.isEmpty {
-                    // If all connections were closed (errored) but there are requests left in the queue, fail them
+                    // If all connections were closed (errored) but there are requests left in the queue, fail them.
                     return .init(
                         request: .failRequests(requestQueue.removeAll(), .poolShutdown),
                         connection: connectionAction
@@ -733,7 +733,7 @@ struct PoolStateMachine<
                 )
             }
 
-            // Don't shut down connections if queue still has requests. We have to drain it
+            // Don't shut down connections if the queue still has requests. We have to drain it.
             if shutdown.connections.isEmpty && shutdown.timersToCancel.isEmpty {
                 return .none()
             }
