@@ -495,6 +495,15 @@ struct PoolStateMachine<
             if self.connections.isEmpty {
                 self.poolState = .shutDown
                 connectionAction = .cancelEventStreamAndFinalCleanup(timerToCancel.map {[$0]} ?? [])
+
+                if !requestQueue.isEmpty {
+                    // If there's no connections left but there are requests left in the queue, fail them.
+                    // We don't want to open other connections while draining
+                    return .init(
+                        request: .failRequests(self.requestQueue.removeAll(), .poolShutdown),
+                        connection: connectionAction
+                    )
+                }
             } else {
                 connectionAction = .cancelTimers(timerToCancel.map {[$0]} ?? [])
             }
@@ -677,6 +686,14 @@ struct PoolStateMachine<
             if self.connections.isEmpty {
                 self.poolState = .shutDown
                 connectionAction = .cancelEventStreamAndFinalCleanup(.init(closedConnectionAction.timersToCancel))
+
+                if !requestQueue.isEmpty {
+                    // If all connections were closed (errored) but there are requests left in the queue, fail them
+                    return .init(
+                        request: .failRequests(requestQueue.removeAll(), .poolShutdown),
+                        connection: connectionAction
+                    )
+                }
             } else {
                 connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
             }
@@ -703,6 +720,8 @@ struct PoolStateMachine<
         switch self.poolState {
         case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.poolState = .shuttingDown
+            self.gracefulShutdownTriggered = true
+
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerGracefulShutdown(&shutdown)
 
@@ -714,10 +733,12 @@ struct PoolStateMachine<
                 )
             }
 
-            return .init(
-                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-                connection: .initiateShutdown(shutdown)
-            )
+            // Don't shut down connections if queue still has requests. We have to drain it
+            if shutdown.connections.isEmpty && shutdown.timersToCancel.isEmpty {
+                return .none()
+            }
+
+            return .init(request: .none, connection: .initiateShutdown(shutdown))
 
         case .shuttingDown, .shutDown:
             return .none()
@@ -763,6 +784,13 @@ struct PoolStateMachine<
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
             let connectionsRequired: Int
+
+            if gracefulShutdownTriggered {
+                return .init(
+                    request: .leaseConnection(requests, leaseResult.connection),
+                    connection: .cancelTimers(.init(leaseResult.timersToCancel))
+                )
+            }
             // if request count is less than available streams and leased streams plus incoming connections then only 
             // ensure we have minimum connections otherwise grow the number of connections
             if (self.requestQueue.count + 1) <= self.connections.stats.availableStreams + self.connections.stats.leasedStreams + self.connections.stats.connecting {
