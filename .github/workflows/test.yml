@@ -20,9 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:6.0-jammy
-          - swift:6.1-noble
+          - swift:6.1-jammy
           - swift:6.2-noble
+          - swift:6.3-noble
           - swiftlang/swift:nightly-main-noble
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -37,12 +37,12 @@ jobs:
       - name: Install curl for Codecov
         run: apt-get update -y -q && apt-get install -y curl
       - name: Check out package
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run unit tests with Thread Sanitizer
         run: |
           swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
       - name: Submit code coverage
-        uses: vapor/swift-codecov-action@v0.3
+        uses: vapor/swift-codecov-action@2f478f2fd22e06ca363967d0fb6c6593a8548cee # v0.3.5
         with:
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -62,7 +62,7 @@ jobs:
           - postgres-image: postgres:14
             postgres-auth: trust
     container:
-      image: swift:6.2-noble
+      image: swift:6.3-noble
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env:
@@ -92,15 +92,15 @@ jobs:
           [[ -z "${SWIFT_VERSION}" ]] && SWIFT_VERSION="$(cat /.swift_tag 2>/dev/null || true)"
           printf 'OS:  %s\nTag: %s\nVersion:\n' "${SWIFT_PLATFORM}-${RUNNER_ARCH}" "${SWIFT_VERSION}" && swift --version
       - name: Check out package
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with: { path: 'postgres-nio' }
       - name: Run integration tests
         run: swift test --package-path postgres-nio --filter=^IntegrationTests
       - name: Check out postgres-kit dependent
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
       - name: Check out fluent-postgres-driver dependent
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with: { repository: 'vapor/fluent-postgres-driver', path: 'fluent-postgres-driver' }
       - name: Use local package in dependents
         run: |
@@ -139,7 +139,7 @@ jobs:
       POSTGRES_FORMULA: ${{ matrix.postgres-formula }}
     steps:
       - name: Select latest available Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: ${{ matrix.xcode-version }}
       - name: Install Postgres, setup DB and auth, and wait for server start
@@ -150,11 +150,11 @@ jobs:
           pg_ctl start --wait
         timeout-minutes: 15
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run all tests
         run: swift test --enable-code-coverage
       - name: Submit code coverage
-        uses: vapor/swift-codecov-action@v0.3
+        uses: vapor/swift-codecov-action@2f478f2fd22e06ca363967d0fb6c6593a8548cee # v0.3.5
         with:
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
           
@@ -164,7 +164,7 @@ jobs:
     container: swift:noble
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # https://github.com/actions/checkout/issues/766

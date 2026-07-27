@@ -1,9 +1,9 @@
-import XCTest
+import Testing
 import NIOEmbedded
 @testable import PostgresNIO
 
-class PreparedStatementStateMachineTests: XCTestCase {
-    func testPrepareAndExecuteStatement() {
+@Suite struct PreparedStatementStateMachineTests {
+    @Test func testPrepareAndExecuteStatement() {
         let eventLoop = EmbeddedEventLoop()
         var stateMachine = PreparedStatementStateMachine()
 
@@ -11,22 +11,22 @@ class PreparedStatementStateMachineTests: XCTestCase {
         // Initial lookup, the statement hasn't been prepared yet
         let lookupAction = stateMachine.lookup(preparedStatement: firstPreparedStatement)
         guard case .preparing = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
         guard case .prepareStatement = lookupAction else {
-            XCTFail("State machine returned the wrong action")
+            Issue.record("State machine returned the wrong action")
             return
         }
 
         // Once preparation is complete we transition to a prepared state
         let preparationCompleteAction = stateMachine.preparationComplete(name: "test", rowDescription: nil)
         guard case .prepared(nil) = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
-        XCTAssertEqual(preparationCompleteAction.statements.count, 1)
-        XCTAssertNil(preparationCompleteAction.rowDescription)
+        #expect(preparationCompleteAction.statements.count == 1)
+        #expect(preparationCompleteAction.rowDescription == nil)
         firstPreparedStatement.promise.succeed(PSQLRowStream(
             source: .noRows(.success(.tag("tag"))),
             eventLoop: eventLoop,
@@ -38,11 +38,11 @@ class PreparedStatementStateMachineTests: XCTestCase {
         // The statement is already preparead, lookups tell us to execute it
         let secondLookupAction = stateMachine.lookup(preparedStatement: secondPreparedStatement)
         guard case .prepared(nil) = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
         guard case .executeStatement(nil) = secondLookupAction else {
-            XCTFail("State machine returned the wrong action")
+            Issue.record("State machine returned the wrong action")
             return
         }
         secondPreparedStatement.promise.succeed(PSQLRowStream(
@@ -52,7 +52,7 @@ class PreparedStatementStateMachineTests: XCTestCase {
         ))
     }
 
-    func testPrepareAndExecuteStatementWithError() {
+    @Test func testPrepareAndExecuteStatementWithError() {
         let eventLoop = EmbeddedEventLoop()
         var stateMachine = PreparedStatementStateMachine()
 
@@ -60,11 +60,11 @@ class PreparedStatementStateMachineTests: XCTestCase {
         // Initial lookup, the statement hasn't been prepared yet
         let lookupAction = stateMachine.lookup(preparedStatement: firstPreparedStatement)
         guard case .preparing = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
         guard case .prepareStatement = lookupAction else {
-            XCTFail("State machine returned the wrong action")
+            Issue.record("State machine returned the wrong action")
             return
         }
 
@@ -75,10 +75,10 @@ class PreparedStatementStateMachineTests: XCTestCase {
             error: error
         )
         guard case .error = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
-        XCTAssertEqual(preparationCompleteAction.statements.count, 1)
+        #expect(preparationCompleteAction.statements.count == 1)
         firstPreparedStatement.promise.fail(error)
 
         // Create a new prepared statement
@@ -86,17 +86,17 @@ class PreparedStatementStateMachineTests: XCTestCase {
         // Ensure that we don't try again to prepare a statement we know will fail
         let secondLookupAction = stateMachine.lookup(preparedStatement: secondPreparedStatement)
         guard case .error = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
         guard case .returnError = secondLookupAction else {
-            XCTFail("State machine returned the wrong action")
+            Issue.record("State machine returned the wrong action")
             return
         }
         secondPreparedStatement.promise.fail(error)
     }
 
-    func testBatchStatementPreparation() {
+    @Test func testBatchStatementPreparation() {
         let eventLoop = EmbeddedEventLoop()
         var stateMachine = PreparedStatementStateMachine()
 
@@ -104,11 +104,11 @@ class PreparedStatementStateMachineTests: XCTestCase {
         // Initial lookup, the statement hasn't been prepared yet
         let lookupAction = stateMachine.lookup(preparedStatement: firstPreparedStatement)
         guard case .preparing = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
         guard case .prepareStatement = lookupAction else {
-            XCTFail("State machine returned the wrong action")
+            Issue.record("State machine returned the wrong action")
             return
         }
 
@@ -116,11 +116,11 @@ class PreparedStatementStateMachineTests: XCTestCase {
         let secondPreparedStatement = self.makePreparedStatementContext(eventLoop: eventLoop)
         let secondLookupAction = stateMachine.lookup(preparedStatement: secondPreparedStatement)
         guard case .preparing = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
         guard case .waitForAlreadyInFlightPreparation = secondLookupAction else {
-            XCTFail("State machine returned the wrong action")
+            Issue.record("State machine returned the wrong action")
             return
         }
 
@@ -128,11 +128,11 @@ class PreparedStatementStateMachineTests: XCTestCase {
         // The action tells us to execute both the pending statements.
         let preparationCompleteAction = stateMachine.preparationComplete(name: "test", rowDescription: nil)
         guard case .prepared(nil) = stateMachine.preparedStatements["test"] else {
-            XCTFail("State machine in the wrong state")
+            Issue.record("State machine in the wrong state")
             return
         }
-        XCTAssertEqual(preparationCompleteAction.statements.count, 2)
-        XCTAssertNil(preparationCompleteAction.rowDescription)
+        #expect(preparationCompleteAction.statements.count == 2)
+        #expect(preparationCompleteAction.rowDescription == nil)
 
         firstPreparedStatement.promise.succeed(PSQLRowStream(
             source: .noRows(.success(.tag("tag"))),

@@ -433,6 +433,61 @@ import Logging
         let emptyRow = try await rowIterator.next()
         #expect(emptyRow == nil)
     }
+
+    @Test func testGettingColumnsReturnsCorrectColumnInformation() {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+
+        let sourceColumns = [
+            RowDescription.Column(
+                name: "id",
+                tableOID: 12345,
+                columnAttributeNumber: 1,
+                dataType: .int8,
+                dataTypeSize: 8,
+                dataTypeModifier: -1,
+                format: .binary
+            ),
+            RowDescription.Column(
+                name: "name",
+                tableOID: 12345,
+                columnAttributeNumber: 2,
+                dataType: .text,
+                dataTypeSize: -1,
+                dataTypeModifier: -1,
+                format: .text
+            )
+        ]
+
+        let expectedColumns = PostgresColumns(underlying: sourceColumns)
+
+        let stream = PSQLRowStream(
+            source: .stream(sourceColumns, dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let rowSequence = stream.asyncSequence()
+        let actualColumns = rowSequence.columns
+
+        #expect(actualColumns == expectedColumns)
+    }
+
+    @Test func testGettingColumnsWithEmptyColumns() {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let rowSequence = stream.asyncSequence()
+        let columns = rowSequence.columns
+
+        #expect(columns.isEmpty)
+    }
 }
 
 final class MockRowDataSource: PSQLRowsDataSource {

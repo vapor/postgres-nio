@@ -31,10 +31,10 @@ public struct PostgresCell: Sendable, Equatable {
 }
 
 extension PostgresCell {
-    /// Decode the cell into a Swift type, that conforms to ``PostgresDecodable``
+    /// Decode the cell into a Swift type that conforms to ``PostgresDecodable``.
     ///
     /// - Parameters:
-    ///   - _: The Swift type, which conforms to ``PostgresDecodable``, to decode from the cell's ``PostgresCell/bytes`` values.
+    ///   - _: The Swift type, which conforms to ``PostgresDecodable``, to decode from the cell's ``PostgresCell/bytes`` value.
     ///   - context: A ``PostgresDecodingContext`` to supply a custom ``PostgresJSONDecoder`` for decoding JSON fields.
     ///   - file: The source file in which this method was called. Used in the error case in ``PostgresDecodingError``.
     ///   - line: The source file line in which this method was called. Used in the error case in ``PostgresDecodingError``.
@@ -70,10 +70,10 @@ extension PostgresCell {
     }
 
 
-    /// Decode the cell into a Swift type, that conforms to ``PostgresDecodable``
+    /// Decode the cell into a Swift type that conforms to ``PostgresDecodable``.
     ///
     /// - Parameters:
-    ///   - _: The Swift type, which conforms to ``PostgresDecodable``, to decode from the cell's ``PostgresCell/bytes`` values.
+    ///   - _: The Swift type, which conforms to ``PostgresDecodable``, to decode from the cell's ``PostgresCell/bytes`` value.
     ///   - file: The source file in which this method was called. Used in the error case in ``PostgresDecodingError``.
     ///   - line: The source file line in which this method was called. Used in the error case in ``PostgresDecodingError``.
     /// - Returns: A decoded Swift type.

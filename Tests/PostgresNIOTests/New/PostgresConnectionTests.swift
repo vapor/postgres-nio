@@ -15,7 +15,7 @@ import Synchronization
         // number we try to connect to is not used by any other process.
         let eventLoopGroup = NIOSingletons.posixEventLoopGroup
 
-        var tempChannel: Channel?
+        var tempChannel: (any Channel)?
         #expect(throws: Never.self) {
             tempChannel = try ServerBootstrap(group: eventLoopGroup)
                 .bind(to: .init(ipAddress: "127.0.0.1", port: 0)).wait()
@@ -85,6 +85,7 @@ import Synchronization
         try await connection.close()
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListen() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
@@ -128,6 +129,7 @@ import Synchronization
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListenDoesNotUnlistenIfThereIsAnotherSubscriber() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
@@ -190,6 +192,7 @@ import Synchronization
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListenConnectionDrops() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
@@ -227,6 +230,96 @@ import Synchronization
                 case .failure(let failure):
                     Issue.record("Unexpected error: \(failure)")
                 }
+            }
+        }
+    }
+
+    @Test func testUnlistenIsSentAfterScopeIsLeft() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    try await connection.listen(on: "foo") { events in
+                        for try await event in events {
+                            #expect(event.payload == "wooohooo")
+                            break
+                        }
+                    }
+                }
+
+                let listenMessage = try await channel.waitForUnpreparedRequest()
+                #expect(listenMessage.parse.query == #"LISTEN "foo";"#)
+
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                try await channel.writeInbound(PostgresBackendMessage.noData)
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+
+                let unlistenMessage = try await channel.waitForUnpreparedRequest()
+                #expect(unlistenMessage.parse.query == #"UNLISTEN "foo";"#)
+
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                try await channel.writeInbound(PostgresBackendMessage.noData)
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("UNLISTEN"))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                switch await taskGroup.nextResult()! {
+                case .success:
+                    break
+                case .failure(let failure):
+                    Issue.record("Unexpected error: \(failure)")
+                }
+            }
+        }
+    }
+
+    /// Verifies that closing the connection while actively listening
+    /// tears down the listener cleanly without crashing.
+    @Test func testListenOnConnectionClose() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                try await confirmation(expectedCount: 1) { confirmation in
+                    taskGroup.addTask {
+                        do {
+                            try await connection.listen(on: "foo") { events in
+                                for try await _ in events {
+                                    // Connection will be closed; iteration should end with an error.
+                                }
+                            }
+                        } catch {
+                            // Expected: the connection was closed while listening.
+                            confirmation.confirm()
+                        }
+                    }
+
+                    let listenMessage = try await channel.waitForUnpreparedRequest()
+                    #expect(listenMessage.parse.query == #"LISTEN "foo";"#)
+
+                    try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                    try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                    try await channel.writeInbound(PostgresBackendMessage.noData)
+                    try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
+                    try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                    // Simulate a connection drop while the listener is active.
+                    struct ConnectionDropped: Error {}
+                    channel.pipeline.fireErrorCaught(ConnectionDropped())
+                    channel.pipeline.fireChannelInactive()
+
+                    switch await taskGroup.nextResult()! {
+                    case .success:
+                        break
+                    case .failure(let failure):
+                        Issue.record("Unexpected error: \(failure)")
+                    }
+                }
+
             }
         }
     }
@@ -1012,6 +1105,34 @@ import Synchronization
         }
     }
     #endif
+
+    @Test(.timeLimit(.minutes(1))) func connectEnforcesDeadlineWithSilentServer() async throws {
+        try await withSilentServer { port in
+            var config = PostgresConnection.Configuration(
+                host: "127.0.0.1",
+                port: port,
+                username: "postgres",
+                password: "irrelevant",
+                database: "test",
+                tls: .disable
+            )
+            config.options.connectTimeout = .milliseconds(500)
+
+            let start = ContinuousClock.now
+
+            await #expect(throws: PSQLError.self) {
+                _ = try await PostgresConnection.connect(
+                    configuration: config,
+                    id: 1,
+                    logger: Logger(label: "test")
+                )
+            }
+
+            let elapsed = ContinuousClock.now - start
+            #expect(elapsed < .seconds(5))
+            #expect(elapsed >= .milliseconds(400))
+        }
+    }
 
     func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()

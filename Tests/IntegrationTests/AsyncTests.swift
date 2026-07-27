@@ -254,6 +254,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenAndNotify() async throws {
         let channelNames = [
             "foo",
@@ -284,6 +285,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenTwiceChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -295,7 +297,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
             async let stream2later = connection.listen("same-channel")
             let (stream1, stream2) = try await (stream1later, stream2later)
 
-            try await self.withTestConnection(on: eventLoop) { other in
+            _ = try await self.withTestConnection(on: eventLoop) { other in
                 try await other.query(#"NOTIFY "\#(unescaped: "same-channel")";"#, logger: .psqlTest)
             }
 
@@ -317,6 +319,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenOnClosedChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -333,6 +336,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenThenCloseChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -352,6 +356,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         }
     }
 
+    @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     func testListenThenClosingChannel() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -375,6 +380,61 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 XCTFail("Expected not to have reached the end of stream")
             } catch is PSQLError {
                 // Expected
+            }
+        }
+    }
+
+    func testListenOnChannelWithClosure() async throws {
+        let channelNames = [
+            "foo",
+            "default"
+        ]
+        
+        let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
+        let eventLoop = eventLoopGroup.next()
+
+        for channelName in channelNames {
+            try await self.withTestConnection(on: eventLoop) { connection in
+                try await connection.listen(on: channelName) { stream in
+                    var iterator = stream.makeAsyncIterator()
+
+                    try await self.withTestConnection(on: eventLoop) { other in
+                        try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'bar';"#, logger: .psqlTest)
+
+                        try await other.query(#"NOTIFY "\#(unescaped: channelName)", 'foo';"#, logger: .psqlTest)
+                    }
+
+                    let first = try await iterator.next()
+                    XCTAssertEqual(first?.payload, "bar")
+
+                    let second = try await iterator.next()
+                    XCTAssertEqual(second?.payload, "foo")
+                }
+            }
+        }
+    }
+
+    func testLeavingTheScopeSecondsAfterCancellationDoesNotCrash() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
+        let eventLoop = eventLoopGroup.next()
+
+        try await self.withTestConnection(on: eventLoop) { connection in
+            await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                let (stream, cont) = AsyncStream.makeStream(of: Void.self)
+
+                taskGroup.addTask {
+                    try await connection.listen(on: "foo") { stream in
+                        cont.yield()
+                        for try await _ in stream {}
+                        _ = await Task {
+                            try? await Task.sleep(for: .seconds(1))
+                        }.result
+                        // scope is left long after task is cancelled
+                    }
+                }
+                // wait until listen has started by using an AsyncStream.
+                await stream.first { _ in true }
+                taskGroup.cancelAll()
             }
         }
     }
@@ -429,8 +489,6 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                         XCTAssertEqual(counter, end)
                     } catch let error as CancellationError {
                         XCTAssertGreaterThanOrEqual(counter, 1)
-                        // Expected
-                        print("\(error)")
                     } catch {
                         XCTFail("Unexpected error: \(error)")
                     }
@@ -657,7 +715,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 extension XCTestCase {
 
     func withTestConnection<Result>(
-        on eventLoop: EventLoop,
+        on eventLoop: any EventLoop,
         options: PostgresConnection.Configuration.Options? = nil,
         file: StaticString = #filePath,
         line: UInt = #line,
