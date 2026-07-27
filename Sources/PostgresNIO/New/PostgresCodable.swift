@@ -7,14 +7,14 @@ import class Foundation.JSONDecoder
 /// For example, custom types created at runtime, such as enums, or extension types whose OID is not stable between
 /// databases.
 public protocol PostgresThrowingDynamicTypeEncodable {
-    /// The data type encoded into the `byteBuffer` in ``encode(into:context:)``
+    /// The data type encoded into the `byteBuffer` in `encode(into:context:)`.
     var psqlType: PostgresDataType { get }
 
-    /// The Postgres encoding format used to encode the value into `byteBuffer` in ``encode(into:context:)``.
+    /// The Postgres encoding format used to encode the value into `byteBuffer` in `encode(into:context:)`.
     var psqlFormat: PostgresFormat { get }
 
-    /// Encode the entity into ``byteBuffer`` in the format specified by ``psqlFormat``,
-    /// using the provided ``context`` as needed, without setting the byte count.
+    /// Encode the entity into `byteBuffer` in the format specified by `psqlFormat`,
+    /// using the provided `context` as needed, without setting the byte count.
     ///
     /// This method is called by ``PostgresBindings``.
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -31,8 +31,8 @@ public protocol PostgresThrowingDynamicTypeEncodable {
 /// This is the non-throwing alternative to ``PostgresThrowingDynamicTypeEncodable``. It allows users
 /// to create ``PostgresQuery``s via `ExpressibleByStringInterpolation` without having to spell `try`.
 public protocol PostgresDynamicTypeEncodable: PostgresThrowingDynamicTypeEncodable {
-    /// Encode the entity into ``byteBuffer`` in the format specified by ``psqlFormat``,
-    /// using the provided ``context`` as needed, without setting the byte count.
+    /// Encode the entity into `byteBuffer` in the format specified by `psqlFormat`,
+    /// using the provided `context` as needed, without setting the byte count.
     ///
     /// This method is called by ``PostgresBindings``.
     func encode<JSONEncoder: PostgresJSONEncoder>(
@@ -41,46 +41,46 @@ public protocol PostgresDynamicTypeEncodable: PostgresThrowingDynamicTypeEncodab
     )
 }
 
-/// A type that can encode itself to a postgres wire binary representation.
+/// A type that can encode itself to a Postgres wire binary representation.
 public protocol PostgresEncodable: PostgresThrowingDynamicTypeEncodable {
     // TODO: Rename to `PostgresThrowingEncodable` with next major release
 
-    /// The data type encoded into the `byteBuffer` in ``encode(into:context:)``.
+    /// The data type encoded into the `byteBuffer` in `encode(into:context:)`.
     static var psqlType: PostgresDataType { get }
 
-    /// The Postgres encoding format used to encode the value into `byteBuffer` in ``encode(into:context:)``.
+    /// The Postgres encoding format used to encode the value into `byteBuffer` in `encode(into:context:)`.
     static var psqlFormat: PostgresFormat { get }
 }
 
-/// A type that can encode itself to a postgres wire binary representation. It enforces that the
-/// ``PostgresEncodable/encode(into:context:)-1jkcp`` does not throw. This allows users
+/// A type that can encode itself to a Postgres wire binary representation. It enforces that the
+/// `encode(into:context:)` does not throw. This allows users
 /// to create ``PostgresQuery``s via `ExpressibleByStringInterpolation` without
 /// having to spell `try`.
 public protocol PostgresNonThrowingEncodable: PostgresEncodable, PostgresDynamicTypeEncodable {
     // TODO: Rename to `PostgresEncodable` with next major release
 }
 
-/// A type that can decode itself from a postgres wire binary representation.
+/// A type that can decode itself from a Postgres wire binary representation.
 ///
-/// If you want to conform a type to PostgresDecodable you must implement the decode method.
+/// If you want to conform a type to PostgresDecodable, you must implement the decode method.
 public protocol PostgresDecodable {
     /// A type definition of the type that actually implements the PostgresDecodable protocol. This is an escape hatch to
-    /// prevent a cycle in the conformace of the Optional type to PostgresDecodable.
+    /// prevent a cycle in the conformance of the Optional type to PostgresDecodable.
     ///
     /// String? should be PostgresDecodable, String?? should not be PostgresDecodable
     associatedtype _DecodableType: PostgresDecodable = Self
 
-    /// Create an entity from the `byteBuffer` in postgres wire format
+    /// Create an entity from the `buffer` in Postgres wire format.
     ///
     /// - Parameters:
-    ///   - byteBuffer: A `ByteBuffer` to decode. The byteBuffer is sliced in such a way that it is expected
-    ///                 that the complete buffer is consumed for decoding
-    ///   - type: The postgres data type. Depending on this type the `byteBuffer`'s bytes need to be interpreted
+    ///   - buffer: A `ByteBuffer` to decode. The buffer is sliced in such a way that it is expected
+    ///             that the complete buffer is consumed for decoding.
+    ///   - type: The Postgres data type. Depending on this type the buffer's bytes need to be interpreted
     ///           in different ways.
-    ///   - format: The postgres wire format. Can be `.text` or `.binary`
-    ///   - context: A `PSQLDecodingContext` providing context for decoding. This includes a `JSONDecoder`
-    ///              to use when decoding json and metadata to create better errors.
-    /// - Returns: A decoded object
+    ///   - format: The Postgres wire format. Can be `.text` or `.binary`.
+    ///   - context: A `PostgresDecodingContext` providing context for decoding. This includes a `JSONDecoder`
+    ///              to use when decoding JSON and metadata to create better errors.
+    /// - Returns: A decoded object.
     init<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer,
         type: PostgresDataType,
@@ -88,8 +88,8 @@ public protocol PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws
 
-    /// Decode an entity from the `byteBuffer` in postgres wire format. This method has a default implementation and
-    /// is only overwritten for `Optional`s. Other than in the
+    /// Decode an entity from the `buffer` in Postgres wire format. This method has a default implementation and
+    /// is only overridden for `Optional`s.
     static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from byteBuffer: inout ByteBuffer?,
         type: PostgresDataType,
@@ -113,7 +113,7 @@ extension PostgresDecodable {
     }
 }
 
-/// A type that can be encoded into and decoded from a postgres binary format
+/// A type that can be encoded into and decoded from a Postgres binary format.
 public typealias PostgresCodable = PostgresEncodable & PostgresDecodable
 
 extension PostgresEncodable {
@@ -167,14 +167,14 @@ extension PostgresDynamicTypeEncodable {
 /// A context that is passed to Swift objects that are encoded into the Postgres wire format. Used
 /// to pass further information to the encoding method.
 public struct PostgresEncodingContext<JSONEncoder: PostgresJSONEncoder>: Sendable {
-    /// A ``PostgresJSONEncoder`` used to encode the object to json.
+    /// A ``PostgresJSONEncoder`` used to encode the object to JSON.
     public var jsonEncoder: JSONEncoder
 
     /// Creates a ``PostgresEncodingContext`` with the given ``PostgresJSONEncoder``. In case you want
-    /// to use the a ``PostgresEncodingContext`` with an unconfigured Foundation `JSONEncoder`
+    /// to use a ``PostgresEncodingContext`` with an unconfigured Foundation `JSONEncoder`
     /// you can use the ``default`` context instead.
     ///
-    /// - Parameter jsonEncoder: A ``PostgresJSONEncoder`` to use when encoding objects to json
+    /// - Parameter jsonEncoder: A ``PostgresJSONEncoder`` to use when encoding objects to JSON.
     public init(jsonEncoder: JSONEncoder) {
         self.jsonEncoder = jsonEncoder
     }
@@ -188,14 +188,14 @@ extension PostgresEncodingContext where JSONEncoder == Foundation.JSONEncoder {
 /// A context that is passed to Swift objects that are decoded from the Postgres wire format. Used
 /// to pass further information to the decoding method.
 public struct PostgresDecodingContext<JSONDecoder: PostgresJSONDecoder>: Sendable {
-    /// A ``PostgresJSONDecoder`` used to decode the object from json.
+    /// A ``PostgresJSONDecoder`` used to decode the object from JSON.
     public var jsonDecoder: JSONDecoder
 
     /// Creates a ``PostgresDecodingContext`` with the given ``PostgresJSONDecoder``. In case you want
-    /// to use the a ``PostgresDecodingContext`` with an unconfigured Foundation `JSONDecoder`
+    /// to use a ``PostgresDecodingContext`` with an unconfigured Foundation `JSONDecoder`
     /// you can use the ``default`` context instead.
     ///
-    /// - Parameter jsonDecoder: A ``PostgresJSONDecoder`` to use when decoding objects from json
+    /// - Parameter jsonDecoder: A ``PostgresJSONDecoder`` to use when decoding objects from JSON.
     public init(jsonDecoder: JSONDecoder) {
         self.jsonDecoder = jsonDecoder
     }

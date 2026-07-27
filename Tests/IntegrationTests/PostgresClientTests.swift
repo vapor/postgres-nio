@@ -199,11 +199,10 @@ final class PostgresClientTests: XCTestCase {
                 await client.run()
             }
 
-            for i in 0..<10000 {
+            for _ in 0..<10000 {
                 taskGroup.addTask {
                     do {
                         try await client.query("SELECT 1", logger: logger)
-                        logger.info("Success", metadata: ["run": "\(i)"])
                     } catch {
                         XCTFail("Unexpected error: \(error)")
                     }

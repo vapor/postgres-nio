@@ -14,13 +14,13 @@ public struct ConnectionAndMetadata<Connection: PooledConnection>: Sendable {
 
 /// A connection that can be pooled in a ``ConnectionPool``
 public protocol PooledConnection: AnyObject, Sendable {
-    /// The connections identifier type.
+    /// The connection's identifier type.
     associatedtype ID: Hashable & Sendable
 
-    /// The connections identifier. The identifier is passed to
+    /// The connection's identifier. The identifier is passed to
     /// the connection factory method and must stay attached to
     /// the connection at all times. It must not change during
-    /// the connections lifetime.
+    /// the connection's lifetime.
     var id: ID { get }
 
     /// A method to register closures that are invoked when the
@@ -45,25 +45,25 @@ public protocol PooledConnection: AnyObject, Sendable {
     func close()
 }
 
-/// A connection id generator. Its returned connection IDs will
-/// be used when creating new ``PooledConnection``s
+/// A connection ID generator. Its returned connection IDs will
+/// be used when creating new ``PooledConnection``s.
 public protocol ConnectionIDGeneratorProtocol: Sendable {
-    /// The connections identifier type.
+    /// The connection's identifier type.
     associatedtype ID: Hashable & Sendable
 
     /// The next connection ID that shall be used.
     func next() -> ID
 }
 
-/// A keep alive behavior for connections maintained by the pool
+/// A keep-alive behavior for connections maintained by the pool.
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public protocol ConnectionKeepAliveBehavior: Sendable {
-    /// the connection type
+    /// The connection type.
     associatedtype Connection: PooledConnection
 
     /// The time after which a keep-alive shall
     /// be triggered.
-    /// If nil is returned, keep-alive is deactivated
+    /// If `nil` is returned, keep-alive is deactivated.
     var keepAliveFrequency: Duration? { get }
 
     /// This method is invoked when the keep-alive shall be
@@ -75,7 +75,7 @@ public protocol ConnectionKeepAliveBehavior: Sendable {
 public protocol ConnectionRequestProtocol: Sendable {
     /// A connection lease request ID type.
     associatedtype ID: Hashable & Sendable
-    /// The leased connection type
+    /// The leased connection type.
     associatedtype Connection: PooledConnection
 
     /// A connection lease request ID. This ID must be generated
@@ -95,7 +95,7 @@ public protocol ConnectionRequestProtocol: Sendable {
 public struct ConnectionPoolConfiguration: Sendable {
     /// The minimum number of connections to preserve in the pool.
     ///
-    /// If the pool is mostly idle and the remote servers closes
+    /// If the pool is mostly idle and the remote server closes
     /// idle connections,
     /// the `ConnectionPool` will initiate new outbound
     /// connections proactively to avoid the number of available
@@ -111,21 +111,30 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// The maximum number of connections for this pool, that can
     /// exist at any point in time. The pool can create _overflow_
     /// connections, if all connections are leased, and the
-    /// `maximumConnectionHardLimit` > `maximumConnectionSoftLimit `
+    /// `maximumConnectionHardLimit` > `maximumConnectionSoftLimit`.
     /// Overflow connections are closed immediately as soon as they
     /// become idle.
     public var maximumConnectionHardLimit: Int
+
+    /// The amount of time after the first failed connection attempt
+    /// before triggering the circuit breaker.
+    public var circuitBreakerTripAfter: Duration
 
     /// The time that a _preserved_ idle connection stays in the
     /// pool before it is closed.
     public var idleTimeout: Duration
 
-    /// initializer
+    /// Maximum number of in-progress new connection requests to run at any one time.
+    public var maximumConcurrentConnectionRequests: Int
+
+    /// Creates a new connection pool configuration.
     public init() {
         self.minimumConnectionCount = 0
         self.maximumConnectionSoftLimit = 16
         self.maximumConnectionHardLimit = 16
+        self.circuitBreakerTripAfter = .seconds(60)
         self.idleTimeout = .seconds(60)
+        self.maximumConcurrentConnectionRequests = 20
     }
 }
 
@@ -151,7 +160,7 @@ public final class ConnectionPool<
     public typealias ConnectionFactory = @Sendable (ConnectionID, ConnectionPool<Connection, ConnectionID, ConnectionIDGenerator, Request, RequestID, KeepAliveBehavior, ObservabilityDelegate, Clock>) async throws -> ConnectionAndMetadata<Connection>
 
     @usableFromInline
-    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>>
+    typealias StateMachine = PoolStateMachine<Connection, ConnectionIDGenerator, ConnectionID, Request, Request.ID, CheckedContinuation<Void, Never>, Clock, Clock.Instant>
 
     @usableFromInline
     let factory: ConnectionFactory
@@ -203,7 +212,8 @@ public final class ConnectionPool<
         var stateMachine = StateMachine(
             configuration: .init(configuration, keepAliveBehavior: keepAliveBehavior),
             generator: idGenerator,
-            timerCancellationTokenType: CheckedContinuation<Void, Never>.self
+            timerCancellationTokenType: CheckedContinuation<Void, Never>.self,
+            clock: clock
         )
 
         let (stream, continuation) = AsyncStream.makeStream(of: NewPoolActions.self)
@@ -260,9 +270,11 @@ public final class ConnectionPool<
     }
 
     /// Mark a connection as going away. Connection implementors have to call this method if the connection
-    /// has received a close intent from the server. For example: an HTTP/2 GOWAY frame.
-    public func connectionWillClose(_ connection: Connection) {
-
+    /// has received a close intent from the server. For example: an HTTP/2 GOAWAY frame.
+    public func connectionWillClose(_ connectionID: ConnectionID) {
+        self.modifyStateAndRunActions { state in
+            state.stateMachine.connectionWillClose(connectionID)
+        }
     }
 
     public func connectionReceivedNewMaxStreamSetting(_ connection: Connection, newMaxStreamSetting maxStreams: UInt16) {
@@ -374,6 +386,15 @@ public final class ConnectionPool<
             self.cancelTimers(timers)
             self.eventContinuation.yield(.makeConnection(request))
 
+        case .makeConnectionsCancelAndScheduleTimers(let requests, let cancelledTimers, let scheduledTimers):
+            self.cancelTimers(cancelledTimers)
+            for request in requests {
+                self.eventContinuation.yield(.makeConnection(request))
+            }
+            for timer in scheduledTimers {
+                self.eventContinuation.yield(.scheduleTimer(timer))
+            }
+
         case .runKeepAlive(let connection, let cancelContinuation):
             cancelContinuation?.resume(returning: ())
             self.eventContinuation.yield(.runKeepAlive(connection))
@@ -390,11 +411,15 @@ public final class ConnectionPool<
             self.closeConnection(connection)
             self.cancelTimers(timers)
 
-        case .shutdown(let cleanup):
+        case .initiateShutdown(let cleanup):
             for connection in cleanup.connections {
                 self.closeConnection(connection)
             }
             self.cancelTimers(cleanup.timersToCancel)
+
+        case .cancelEventStreamAndFinalCleanup(let timersToCancel):
+            self.cancelTimers(timersToCancel)
+            self.eventContinuation.finish()
 
         case .none:
             break
@@ -461,7 +486,7 @@ public final class ConnectionPool<
     }
 
     @inlinable
-    /*private*/ func connectionEstablishFailed(_ error: Error, for request: StateMachine.ConnectionRequest) {
+    /*private*/ func connectionEstablishFailed(_ error: any Error, for request: StateMachine.ConnectionRequest) {
         self.observabilityDelegate.connectFailed(id: request.connectionID, error: error)
 
         self.modifyStateAndRunActions { state in
@@ -570,6 +595,8 @@ extension PoolConfiguration {
         self.maximumConnectionHardLimit = configuration.maximumConnectionHardLimit
         self.keepAliveDuration = keepAliveBehavior.keepAliveFrequency
         self.idleTimeoutDuration = configuration.idleTimeout
+        self.circuitBreakerTripAfter = configuration.circuitBreakerTripAfter
+        self.maximumConcurrentConnectionRequests = configuration.maximumConcurrentConnectionRequests
     }
 }
 
@@ -578,20 +605,20 @@ protocol TaskGroupProtocol {
     // We need to call this `addTask_` because some Swift versions define this
     // under exactly this name and others have different attributes. So let's pick
     // a name that doesn't clash anywhere and implement it using the standard `addTask`.
-    mutating func addTask_(operation: @escaping @Sendable () async -> Void)
+    mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void)
 }
 
 @available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
 extension DiscardingTaskGroup: TaskGroupProtocol {
     @inlinable
-    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
+    mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
 }
 
 extension TaskGroup<Void>: TaskGroupProtocol {
     @inlinable
-    mutating func addTask_(operation: @escaping @Sendable () async -> Void) {
+    mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {
         self.addTask(priority: nil, operation: operation)
     }
 }

@@ -23,6 +23,10 @@ final class Future<Success: Sendable>: Sendable {
         case none
     }
 
+    var isUnfulfilled: Bool {
+        self.stateBox.withLockedValue { $0.result == nil }
+    }
+
     var success: Success {
         get async throws {
             let waiterID = self.waiterID.loadThenWrappingIncrement(ordering: .relaxed)

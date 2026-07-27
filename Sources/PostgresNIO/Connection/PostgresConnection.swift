@@ -1,4 +1,5 @@
 import Atomics
+import NIOConcurrencyHelpers
 import NIOCore
 import NIOPosix
 #if canImport(Network)
@@ -11,16 +12,16 @@ import Logging
 ///
 /// Thread safety is achieved by dispatching all access to shared state onto the underlying EventLoop.
 public final class PostgresConnection: @unchecked Sendable {
-    /// A Postgres connection ID
+    /// A Postgres connection ID.
     public typealias ID = Int
 
     /// The connection's underlying channel
     ///
     /// This should be private, but it is needed for `PostgresConnection` compatibility.
-    internal let channel: Channel
+    internal let channel: any Channel
 
     /// The underlying `EventLoop` of both the connection and its channel.
-    public var eventLoop: EventLoop {
+    public var eventLoop: any EventLoop {
         return self.channel.eventLoop
     }
 
@@ -28,7 +29,7 @@ public final class PostgresConnection: @unchecked Sendable {
         return self.channel.closeFuture
     }
 
-    /// A logger to use in case
+    /// A logger to use for background events.
     public var logger: Logger {
         get {
             self._logger
@@ -48,7 +49,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     private var _logger: Logger
 
-    init(channel: Channel, connectionID: ID, logger: Logger) {
+    init(channel: any Channel, connectionID: ID, logger: Logger) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
@@ -60,7 +61,7 @@ public final class PostgresConnection: @unchecked Sendable {
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
-        let configureSSLCallback: ((Channel, PostgresChannelHandler) throws -> ())?
+        let configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> ())?
         
         switch configuration.tls.base {
         case .prefer(let context), .require(let context):
@@ -118,35 +119,39 @@ public final class PostgresConnection: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - eventLoop: The `EventLoop` the request shall be created on
-    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - configuration: A ``Configuration`` that shall be used for the connection.
     ///   - connectionID: An `Int` id, used for metadata logging
-    ///   - logger: A logger to log background events into
+    ///   - logger: A logger to log background events into.
     /// - Returns: A SwiftNIO `EventLoopFuture` that will provide a ``PostgresConnection``
     ///            at a later point in time.
     public static func connect(
-        on eventLoop: EventLoop,
+        on eventLoop: any EventLoop,
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
     ) -> EventLoopFuture<PostgresConnection> {
-        self.connect(
+        let (future, _) = self.connect(
             connectionID: connectionID,
             configuration: .init(configuration),
             logger: logger,
             on: eventLoop
         )
+        return future
     }
 
     static func connect(
         connectionID: ID,
         configuration: PostgresConnection.InternalConfiguration,
         logger: Logger,
-        on eventLoop: EventLoop
-    ) -> EventLoopFuture<PostgresConnection> {
+        on eventLoop: any EventLoop
+    ) -> (EventLoopFuture<PostgresConnection>, ConnectCancelHandler) {
 
         var mlogger = logger
         mlogger[postgresMetadataKey: .connectionID] = "\(connectionID)"
         let logger = mlogger
+
+        let cancelHandler = ConnectCancelHandler()
+        let deadline = NIODeadline.now() + configuration.options.connectTimeout
 
         // Here we dispatch to the `eventLoop` first before we setup the EventLoopFuture chain, to
         // ensure all `flatMap`s are executed on the EventLoop (this means the enqueuing of the
@@ -155,8 +160,8 @@ public final class PostgresConnection: @unchecked Sendable {
         // This saves us a number of context switches between the thread the Connection is created
         // on and the EventLoop. In addition, it eliminates all potential races between the creating
         // thread and the EventLoop.
-        return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
-            let connectFuture: EventLoopFuture<Channel>
+        let future = eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
+            let connectFuture: EventLoopFuture<any Channel>
 
             switch configuration.connection {
             case .resolved(let address):
@@ -176,23 +181,54 @@ public final class PostgresConnection: @unchecked Sendable {
             }
 
             return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
+                // 1. check if the connection request was cancelled in the mean time.
+                if let closeFuture = cancelHandler.channelConnected(channel) {
+                    return closeFuture.flatMapThrowing { throw CancellationError() }
+                }
+
+                // 2. check if the deadline has elapsed
+                let remaining = deadline - .now()
+                guard remaining > .nanoseconds(0) else {
+                    channel.close(mode: .all, promise: nil)
+                    return channel.closeFuture.flatMapThrowing {
+                        throw PSQLError.connectionError(underlying: ChannelError.connectTimeout(configuration.options.connectTimeout))
+                    }
+                }
+
+                // 3. setup time to enforce connect deadline 
+                let timeoutTask = eventLoop.scheduleTask(deadline: deadline) {
+                    channel.pipeline.fireErrorCaught(
+                        ChannelError.connectTimeout(configuration.options.connectTimeout)
+                    )
+                }
+
                 let connection = PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
-                return connection.start(configuration: configuration).map { _ in connection }
+                return connection.start(configuration: configuration).map { _ in
+                    timeoutTask.cancel()
+                    return connection
+                }.flatMapError { error in
+                    timeoutTask.cancel()
+                    return eventLoop.makeFailedFuture(error)
+                }
             }.flatMapErrorThrowing { error -> PostgresConnection in
                 switch error {
-                case is PSQLError:
+                case is PSQLError, is CancellationError:
                     throw error
                 default:
                     throw PSQLError.connectionError(underlying: error)
                 }
             }
         }
+
+        future.whenComplete { _ in cancelHandler.postgresHandshakeDone() }
+
+        return (future, cancelHandler)
     }
 
     static func makeBootstrap(
-        on eventLoop: EventLoop,
+        on eventLoop: any EventLoop,
         configuration: PostgresConnection.InternalConfiguration
-    ) -> NIOClientTCPBootstrapProtocol {
+    ) -> any NIOClientTCPBootstrapProtocol {
         #if canImport(Network)
         if let tsBootstrap = NIOTSConnectionBootstrap(validatingGroup: eventLoop) {
             return tsBootstrap.connectTimeout(configuration.options.connectTimeout)
@@ -295,7 +331,7 @@ extension PostgresConnection {
         tlsConfiguration: TLSConfiguration? = nil,
         serverHostname: String? = nil,
         logger: Logger = .init(label: "codes.vapor.postgres"),
-        on eventLoop: EventLoop
+        on eventLoop: any EventLoop
     ) -> EventLoopFuture<PostgresConnection> {
         var tlsFuture: EventLoopFuture<PostgresConnection.Configuration.TLS>
 
@@ -319,12 +355,13 @@ extension PostgresConnection {
                 options: options
             )
 
-            return PostgresConnection.connect(
+            let (future, _) = PostgresConnection.connect(
                 connectionID: self.idGenerator.wrappingIncrementThenLoad(ordering: .relaxed),
                 configuration: configuration,
                 logger: logger,
                 on: eventLoop
             )
+            return future
         }.flatMapErrorThrowing { error in
             throw error.asAppropriatePostgresError
         }
@@ -363,22 +400,27 @@ extension PostgresConnection {
     ///
     /// - Parameters:
     ///   - eventLoop: The `EventLoop` the connection shall be created on.
-    ///   - configuration: A ``Configuration`` that shall be used for the connection
+    ///   - configuration: A ``Configuration`` that shall be used for the connection.
     ///   - connectionID: An `Int` id, used for metadata logging
-    ///   - logger: A logger to log background events into
-    /// - Returns: An established  ``PostgresConnection`` asynchronously that can be used to run queries.
+    ///   - logger: A logger to log background events into.
+    /// - Returns: An established ``PostgresConnection`` that can be used to run queries.
     public static func connect(
-        on eventLoop: EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
+        on eventLoop: any EventLoop = PostgresConnection.defaultEventLoopGroup.any(),
         configuration: PostgresConnection.Configuration,
         id connectionID: ID,
         logger: Logger
     ) async throws -> PostgresConnection {
-        try await self.connect(
+        let (future, cancelHandler) = self.connect(
             connectionID: connectionID,
             configuration: .init(configuration),
             logger: logger,
             on: eventLoop
-        ).get()
+        )
+        return try await withTaskCancellationHandler {
+            try await future.get()
+        } onCancel: {
+            cancelHandler.cancel()
+        }
     }
 
     /// Closes the connection to the server.
@@ -402,10 +444,10 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     /// - Returns: A ``PostgresRowSequence`` containing the rows the server sent as the query result.
-    ///            The sequence  be discarded.
+    ///            The sequence can be discarded.
     @discardableResult
     public func query(
         _ query: PostgresQuery,
@@ -438,14 +480,13 @@ extension PostgresConnection {
         }
     }
 
-    /// Start listening for a channel
-    public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
+    private func startListen(channel: String) async throws -> (id: Int, stream: PostgresNotificationSequence) {
         let id = self.internalListenID.loadThenWrappingIncrement(ordering: .relaxed)
 
         return try await withTaskCancellationHandler {
             try Task.checkCancellation()
 
-            return try await withCheckedThrowingContinuation { continuation in
+            let stream = try await withCheckedThrowingContinuation { continuation in
                 let listener = NotificationListener(
                     channel: channel,
                     id: id,
@@ -455,15 +496,48 @@ extension PostgresConnection {
 
                 let task = HandlerTask.startListening(listener)
 
-                self.channel.write(task, promise: nil)
+                let promise = self.channel.eventLoop.makePromise(of: Void.self)
+                promise.futureResult.whenFailure { error in
+                    self.logger.debug("Channel error in listen()",
+                        metadata: [.error: "\(error)"])
+                    listener.failed(PSQLError(code: .listenFailed))
+                }
+
+                self.channel.write(task, promise: promise)
             }
+            return (id: id, stream: stream)
         } onCancel: {
             let task = HandlerTask.cancelListening(channel, id)
             self.channel.write(task, promise: nil)
         }
     }
 
-    /// Execute a prepared statement, taking care of the preparation when necessary
+    /// Start listening for a channel.
+    @available(*, deprecated,
+        message: "Use the new listen method that takes a closure to handle notifications",
+        renamed: "listen(on:consume:)"
+    )
+    public func listen(_ channel: String) async throws -> PostgresNotificationSequence {
+        try await self.startListen(channel: channel).stream
+    }
+
+    /// Listen to a channel and run closure with ``PostgresNotificationSequence``.
+    ///
+    /// When the closure is exited the `UNLISTEN` command is automatically sent for the provided channel.
+    ///
+    /// - Parameters:
+    ///   - channel: The channel to listen on.
+    ///   - consume: Closure that is called with a ``PostgresNotificationSequence``.
+    public func listen<Value>(on channel: String, consume: (PostgresNotificationSequence) async throws -> Value) async throws -> Value {
+        let (id, stream) = try await self.startListen(channel: channel)
+        defer {
+            let task = HandlerTask.cancelListening(channel, id)
+            self.channel.write(task, promise: nil)
+        }
+        return try await consume(stream)
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary.
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
         logger: Logger,
@@ -497,7 +571,7 @@ extension PostgresConnection {
         }
     }
 
-    /// Execute a prepared statement, taking care of the preparation when necessary
+    /// Execute a prepared statement, taking care of the preparation when necessary.
     @_disfavoredOverload
     public func execute<Statement: PostgresPreparedStatement>(
         _ preparedStatement: Statement,
@@ -541,9 +615,10 @@ extension PostgresConnection {
     ///
     /// - Parameters:
     ///   - logger: The `Logger` to log into for the transaction.
-    ///   - file: The file, the transaction was started in. Used for better error reporting.
-    ///   - line: The line, the transaction was started in. Used for better error reporting.
-    ///   - closure: The user provided code to modify the database. Use the provided connection to run queries.
+    ///   - file: The file the transaction was started in. Used for better error reporting.
+    ///   - line: The line the transaction was started in. Used for better error reporting.
+    ///   - isolation: The actor isolation to use for the transaction.
+    ///   - process: The user provided code to modify the database. Use the provided connection to run queries.
     ///              The connection must stay in the transaction mode. Otherwise this method will throw!
     /// - Returns: The closure's return value.
     public func withTransaction<Result>(
@@ -592,8 +667,8 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryResult``.
     public func query(
         _ query: PostgresQuery,
@@ -618,8 +693,8 @@ extension PostgresConnection {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
-    ///   - file: The file, the query was started in. Used for better error reporting.
-    ///   - line: The line, the query was started in. Used for better error reporting.
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
     ///   - onRow: A closure that is invoked for every row.
     /// - Returns: An EventLoopFuture, that allows access to the future ``PostgresQueryMetadata``.
     @preconcurrency
@@ -645,7 +720,7 @@ extension PostgresConnection {
 
 extension PostgresConnection: PostgresDatabase {
     public func send(
-        _ request: PostgresRequest,
+        _ request: any PostgresRequest,
         logger: Logger
     ) -> EventLoopFuture<Void> {
         guard let command = request as? PostgresCommands else {
@@ -800,7 +875,7 @@ extension PostgresConnection {
     /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
     ///
     /// This will select the concrete `EventLoopGroup` depending which platform this is running on.
-    public static var defaultEventLoopGroup: EventLoopGroup {
+    public static var defaultEventLoopGroup: any EventLoopGroup {
 #if canImport(Network)
         if #available(OSX 10.14, iOS 12.0, tvOS 12.0, watchOS 6.0, *) {
             return NIOTSEventLoopGroup.singleton

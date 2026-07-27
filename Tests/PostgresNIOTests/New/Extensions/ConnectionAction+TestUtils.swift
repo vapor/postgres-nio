@@ -18,6 +18,8 @@ extension PostgresNIO.ConnectionStateMachine.ConnectionAction: Swift.Equatable {
             return true
         case (.establishSSLConnection, establishSSLConnection):
             return true
+        case (.closeConnection(let lhs), .closeConnection(let rhs)):
+            return lhs?.futureResult === rhs?.futureResult
         case (.closeConnectionAndCleanup(let lhs), .closeConnectionAndCleanup(let rhs)):
             return lhs == rhs
         case (.sendPasswordMessage(let lhsMethod, let lhsAuthContext), sendPasswordMessage(let rhsMethod, let rhsAuthContext)):
@@ -68,14 +70,73 @@ extension PostgresNIO.ConnectionStateMachine.ConnectionAction.CleanUpContext: Sw
 }
 
 extension ConnectionStateMachine {
-    static func readyForQuery(transactionState: PostgresBackendMessage.TransactionState = .idle) -> Self {
-        let connectionContext = Self.createConnectionContext(transactionState: transactionState)
-        return ConnectionStateMachine(.readyForQuery(connectionContext))
+    struct UnexpectedAction: Error {
+        var actual: ConnectionStateMachine.ConnectionAction
+        var expected: ConnectionStateMachine.ConnectionAction
     }
-    
-    static func createConnectionContext(transactionState: PostgresBackendMessage.TransactionState = .idle) -> ConnectionContext {
-        let backendKeyData = BackendKeyData(processID: 2730, secretKey: 882037977)
-        
+
+    static func makeAuthenticatedIdle(
+        username: String = "test",
+        password: String? = "abc123",
+        database: String = "test",
+        additionalParameters: [(String, String)] = [],
+        salt: UInt32 = 0x00_01_02_03,
+        requireBackendKeyData: Bool = true
+    ) throws(UnexpectedAction) -> ConnectionStateMachine {
+        let authContext = AuthContext(
+            username: username,
+            password: password,
+            database: database,
+            additionalParameters: additionalParameters
+        )
+        var state = ConnectionStateMachine(requireBackendKeyData: requireBackendKeyData)
+        let connectedAction = state.connected(tls: .require)
+        guard connectedAction == .sendSSLRequest else {
+            throw UnexpectedAction(actual: connectedAction, expected: .sendSSLRequest)
+        }
+        let sslSupportedReceivedAction = state.sslSupportedReceived(unprocessedBytes: 0)
+        guard sslSupportedReceivedAction == .establishSSLConnection else {
+            throw UnexpectedAction(actual: sslSupportedReceivedAction, expected: .establishSSLConnection)
+        }
+        let sslHandlerAddedAction = state.sslHandlerAdded()
+        guard sslHandlerAddedAction == .wait else {
+            throw UnexpectedAction(actual: sslHandlerAddedAction, expected: .wait)
+        }
+        let sslEstablishedAction = state.sslEstablished()
+        guard sslEstablishedAction == .provideAuthenticationContext else {
+            throw UnexpectedAction(actual: sslEstablishedAction, expected: .provideAuthenticationContext)
+        }
+        let provideAuthContextAction = state.provideAuthenticationContext(authContext)
+        guard provideAuthContextAction == .sendStartupMessage(authContext) else {
+            throw UnexpectedAction(actual: provideAuthContextAction, expected: .sendStartupMessage(authContext))
+        }
+        let authenticationMessageReceivedAction = state.authenticationMessageReceived(.md5(salt: salt))
+        guard authenticationMessageReceivedAction == .sendPasswordMessage(.md5(salt: salt), authContext) else {
+            throw UnexpectedAction(actual: authenticationMessageReceivedAction, expected: .sendPasswordMessage(.md5(salt: salt), authContext))
+        }
+        let authenticationCompleteAction = state.authenticationMessageReceived(.ok)
+        guard authenticationCompleteAction == .wait else {
+            throw UnexpectedAction(actual: authenticationCompleteAction, expected: .wait)
+        }
+
+        return state
+    }
+
+    static func makeReadyForQuery(
+        username: String = "test",
+        password: String? = "abc123",
+        database: String = "test",
+        additionalParameters: [(String, String)] = [],
+        salt: UInt32 = 0x00_01_02_03
+    ) throws(UnexpectedAction) -> ConnectionStateMachine {
+        var state = try Self.makeAuthenticatedIdle(
+            username: username,
+            password: password,
+            database: database,
+            additionalParameters: additionalParameters,
+            salt: salt
+        )
+
         let paramaters = [
             "DateStyle": "ISO, MDY",
             "application_name": "",
@@ -89,12 +150,25 @@ extension ConnectionStateMachine {
             "IntervalStyle": "postgres",
             "standard_conforming_strings": "on"
         ]
-        
-        return ConnectionContext(
-            backendKeyData: backendKeyData,
-            parameters: paramaters,
-            transactionState: transactionState
-        )
+
+        for (name, value) in paramaters {
+            let parameterStatusReceivedAction = state.parameterStatusReceived(.init(parameter: name, value: value))
+            guard parameterStatusReceivedAction == .wait else {
+                throw UnexpectedAction(actual: parameterStatusReceivedAction, expected: .wait)
+            }
+        }
+
+        let parameterStatusReceivedAction = state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882037977))
+        guard parameterStatusReceivedAction == .wait else {
+            throw UnexpectedAction(actual: parameterStatusReceivedAction, expected: .wait)
+        }
+
+        let readyForQueryReceivedAction = state.readyForQueryReceived(.idle)
+        guard readyForQueryReceivedAction == .fireEventReadyForQuery else {
+            throw UnexpectedAction(actual: readyForQueryReceivedAction, expected: .fireEventReadyForQuery)
+        }
+
+        return state
     }
 }
 

@@ -14,7 +14,7 @@ extension PostgresConnection {
     }
     
     @available(*, deprecated, message: "Test deprecated functionality")
-    static func testUnauthenticated(on eventLoop: EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
+    static func testUnauthenticated(on eventLoop: any EventLoop, logLevel: Logger.Level = .info) -> EventLoopFuture<PostgresConnection> {
         var logger = Logger(label: "postgres.connection.test")
         logger.logLevel = logLevel
         do {
@@ -24,7 +24,7 @@ extension PostgresConnection {
         }
     }
 
-    static func test(on eventLoop: EventLoop, options: Configuration.Options? = nil) -> EventLoopFuture<PostgresConnection> {
+    static func test(on eventLoop: any EventLoop, options: Configuration.Options? = nil) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
         var config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
@@ -41,7 +41,7 @@ extension PostgresConnection {
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
-    static func testUDS(on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+    static func testUDS(on eventLoop: any EventLoop) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
         let config = PostgresConnection.Configuration(
             unixSocketPath: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)",
@@ -53,7 +53,7 @@ extension PostgresConnection {
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
-    static func testChannel(_ channel: Channel, on eventLoop: EventLoop) -> EventLoopFuture<PostgresConnection> {
+    static func testChannel(_ channel: any Channel, on eventLoop: any EventLoop) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
         let config = PostgresConnection.Configuration(
             establishedChannel: channel,

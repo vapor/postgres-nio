@@ -31,8 +31,8 @@ public struct PostgresCopyFromWriter: Sendable {
 
     /// Send data for a `COPY ... FROM STDIN` operation to the backend.
     ///
-    /// - Throws: If an error occurs during the write of if the backend sent an `ErrorResponse` during the copy
-    ///   operation, eg. to indicate that a **previous** `write` call had an invalid format.
+    /// - Throws: If an error occurs during the write or if the backend sent an `ErrorResponse` during the copy
+    ///   operation, e.g. to indicate that a **previous** `write` call had an invalid format.
     public func write(_ byteBuffer: ByteBuffer) async throws {
         // Check for cancellation. This is cheap and makes sure that we regularly check for cancellation in the
         // `writeData` closure. It is likely that the user would forget to do so.
@@ -100,7 +100,7 @@ public struct PostgresCopyFromWriter: Sendable {
 
 /// Specifies the format in which data is transferred to the backend in a COPY operation.
 ///
-/// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the option's meanings
+/// See the Postgres documentation at https://www.postgresql.org/docs/current/sql-copy.html for the options' meanings
 /// and their default values.
 public struct PostgresCopyFromFormat: Sendable {
     /// Options that can be used to modify the `text` format of a COPY operation.
@@ -168,6 +168,9 @@ extension PostgresConnection {
     ///   - table: The name of the table into which to copy the data.
     ///   - columns: The name of the columns to copy. If an empty array is passed, all columns are assumed to be copied.
     ///   - format: Options that specify the format of the data that is produced by `writeData`.
+    ///   - logger: The `Logger` to log into for the operation.
+    ///   - file: The file the operation was started in. Used for better error reporting.
+    ///   - line: The line the operation was started in. Used for better error reporting.
     ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call `write` on the
     ///     writer provided by the closure to send data to the backend and return from the closure once all data is sent.
     ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown

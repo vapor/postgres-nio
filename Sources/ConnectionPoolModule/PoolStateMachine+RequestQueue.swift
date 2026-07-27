@@ -12,10 +12,10 @@ extension PoolStateMachine {
     @usableFromInline
     struct RequestQueue: Sendable {
         @usableFromInline
-        private(set) var queue: Deque<RequestID>
+        var queue: Deque<RequestID>
 
         @usableFromInline
-        private(set) var requests: [RequestID: Request]
+        var requests: [RequestID: Request]
 
         @inlinable
         var count: Int {

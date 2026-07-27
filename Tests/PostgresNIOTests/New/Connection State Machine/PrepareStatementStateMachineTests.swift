@@ -1,11 +1,11 @@
-import XCTest
+import Testing
 import NIOEmbedded
 @testable import PostgresNIO
 
-class PrepareStatementStateMachineTests: XCTestCase {
-    func testCreatePreparedStatementReturningRowDescription() {
-        var state = ConnectionStateMachine.readyForQuery()
-        
+@Suite struct PrepareStatementStateMachineTests {
+    @Test func testCreatePreparedStatementReturningRowDescription() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
         let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         
@@ -15,23 +15,23 @@ class PrepareStatementStateMachineTests: XCTestCase {
             name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
         )
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
+        #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
                        .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
-        XCTAssertEqual(state.parseCompleteReceived(), .wait)
-        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
-        
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+
         let columns: [RowDescription.Column] = [
             .init(name: "id", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: -1, format: .binary)
         ]
         
-        XCTAssertEqual(state.rowDescriptionReceived(.init(columns: columns)),
+        #expect(state.rowDescriptionReceived(.init(columns: columns)) ==
                        .succeedPreparedStatementCreation(promise, with: .init(columns: columns)))
-        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
-    func testCreatePreparedStatementReturningNoData() {
-        var state = ConnectionStateMachine.readyForQuery()
-        
+    @Test func testCreatePreparedStatementReturningNoData() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
         let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
         
@@ -41,18 +41,18 @@ class PrepareStatementStateMachineTests: XCTestCase {
             name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
         )
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
+        #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
                        .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
-        XCTAssertEqual(state.parseCompleteReceived(), .wait)
-        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
-        
-        XCTAssertEqual(state.noDataReceived(),
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+
+        #expect(state.noDataReceived() ==
                        .succeedPreparedStatementCreation(promise, with: nil))
-        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
-    func testErrorReceivedAfter() {
-        var state = ConnectionStateMachine.readyForQuery()
+    @Test func testErrorReceivedAfter() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
 
         let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
         promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
@@ -63,16 +63,16 @@ class PrepareStatementStateMachineTests: XCTestCase {
             name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
         )
 
-        XCTAssertEqual(state.enqueue(task: .extendedQuery(prepareStatementContext)),
+        #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
                        .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
-        XCTAssertEqual(state.parseCompleteReceived(), .wait)
-        XCTAssertEqual(state.parameterDescriptionReceived(.init(dataTypes: [.int8])), .wait)
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
 
-        XCTAssertEqual(state.noDataReceived(),
+        #expect(state.noDataReceived() ==
                        .succeedPreparedStatementCreation(promise, with: nil))
-        XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
 
-        XCTAssertEqual(state.authenticationMessageReceived(.ok),
+        #expect(state.authenticationMessageReceived(.ok) ==
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: .unexpectedBackendMessage(.authentication(.ok)), closePromise: nil)))
     }
 }
