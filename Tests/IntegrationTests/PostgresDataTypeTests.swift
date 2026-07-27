@@ -41,7 +41,26 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
         }
     }
 
-    func testOIDArray() async throws {
+    func testOIDAboveInt32MaxRoundTrips() async throws {
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+
+        let large = PostgresDataType(3_000_000_000)
+
+        try await withTestConnection(on: eventLoopGroup.next()) { connection in
+            let serverSide = try await connection.query("SELECT 3000000000::oid", logger: .psqlTest)
+            var serverSideIterator = serverSide.makeAsyncIterator()
+            let serverSideRow = try await serverSideIterator.next()
+            XCTAssertEqual(try serverSideRow?.decode(PostgresDataType.self), large)
+
+            let roundTrip = try await connection.query("SELECT \(large)::oid", logger: .psqlTest)
+            var roundTripIterator = roundTrip.makeAsyncIterator()
+            let roundTripRow = try await roundTripIterator.next()
+            XCTAssertEqual(try roundTripRow?.decode(PostgresDataType.self), large)
+        }
+    }
+
+    func testOIDArrayRoundTrips() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
 
