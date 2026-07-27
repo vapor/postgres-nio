@@ -110,7 +110,6 @@ extension PostgresDataType: PostgresArrayEncodable {
 
 extension PostgresDataType: PostgresArrayDecodable {}
 
-
 // MARK: Array conformances
 
 extension Array: PostgresEncodable where Element: PostgresArrayEncodable {

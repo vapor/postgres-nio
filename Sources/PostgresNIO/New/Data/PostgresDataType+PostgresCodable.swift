@@ -9,28 +9,28 @@ extension PostgresDataType: PostgresDecodable {
         context: PostgresDecodingContext<JSONDecoder>
     ) throws where JSONDecoder: PostgresJSONDecoder {
         switch (format, type) {
-        case (.binary, .oid), (.binary, .regproc):
-            guard 
+        case (.binary, .oid), (.binary, .regproc), (.binary, .regclass), (.binary, .regtype):
+            guard
                 byteBuffer.readableBytes == 4,
                 let value = byteBuffer.readInteger(as: UInt32.self)
-            else { 
-                throw PostgresDecodingError.Code.failure 
+            else {
+                throw PostgresDecodingError.Code.failure
             }
             self.rawValue = value
         case (.binary, .int4):
-            guard 
+            guard
                 byteBuffer.readableBytes == 4,
                 let value = byteBuffer.readInteger(as: Int32.self).flatMap(UInt32.init(exactly:))
-            else { 
-                throw PostgresDecodingError.Code.failure 
+            else {
+                throw PostgresDecodingError.Code.failure
             }
             self.rawValue = value
         case (.text, .oid), (.text, .int4):
-            guard 
+            guard
                 let string = byteBuffer.readString(length: byteBuffer.readableBytes),
                 let value = UInt32(string)
             else {
-                throw PostgresDecodingError.Code.failure 
+                throw PostgresDecodingError.Code.failure
             }
             self.rawValue = value
         default:
@@ -40,12 +40,12 @@ extension PostgresDataType: PostgresDecodable {
 }
 
 extension PostgresDataType: PostgresNonThrowingEncodable {
-    public static var psqlType: PostgresDataType { 
-        .oid 
+    public static var psqlType: PostgresDataType {
+        .oid
     }
 
-    public static var psqlFormat: PostgresFormat { 
-        .binary 
+    public static var psqlFormat: PostgresFormat {
+        .binary
     }
 
     @inlinable
@@ -53,6 +53,6 @@ extension PostgresDataType: PostgresNonThrowingEncodable {
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
-        byteBuffer.writeInteger(self.rawValue)
+        byteBuffer.writeInteger(self.rawValue, as: UInt32.self)
     }
 }
