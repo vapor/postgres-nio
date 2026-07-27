@@ -748,30 +748,36 @@ struct PoolStateMachine<
     @usableFromInline
     mutating func triggerForceShutdown() -> Action {
         switch self.poolState {
-        case .running, .connectionCreationFailing, .circuitBreakOpen:
-            self.poolState = .shuttingDown
-            var shutdown = ConnectionAction.Shutdown()
-            self.connections.triggerForceShutdown(&shutdown)
-
-            if self.connections.isEmpty, shutdown.connections.isEmpty {
-                self.poolState = .shutDown
-                return .init(
-                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-                    connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
-                )
-            }
-
-            return .init(
-                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-                connection: .initiateShutdown(shutdown)
-            )
+        case .shutDown:
+            return .init(request: .none, connection: .none)
+        
+        case .shuttingDown where self.gracefulShutdownTriggered:
+            // Graceful shutdown is in progress, escalate to force shutdown.
+            self.gracefulShutdownTriggered = false
 
         case .shuttingDown:
             return .none()
 
-        case .shutDown:
-            return .init(request: .none, connection: .none)
+        case .running, .connectionCreationFailing, .circuitBreakOpen:
+            break
         }
+
+        self.poolState = .shuttingDown
+        var shutdown = ConnectionAction.Shutdown()
+        self.connections.triggerForceShutdown(&shutdown)
+
+        if self.connections.isEmpty, shutdown.connections.isEmpty {
+            self.poolState = .shutDown
+            return .init(
+                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
+            )
+        }
+
+        return .init(
+            request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+            connection: .initiateShutdown(shutdown)
+        )
     }
 
     @inlinable

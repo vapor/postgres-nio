@@ -630,6 +630,46 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerForceShutdownOverridesRunningGracefulShutdown() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = .seconds(2)
+        configuration.idleTimeoutDuration = .seconds(4)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        #expect(stateMachine.refillConnections().count == 1)
+
+        let connection = MockConnection(id: 0)
+        let createdAction = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        let keepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
+        #expect(createdAction.connection == .scheduleTimers([keepAliveTimer]))
+        #expect(stateMachine.timerScheduled(keepAliveTimer, cancelContinuation: MockTimerCancellationToken(keepAliveTimer)) == .none)
+
+        let request = MockRequest(connectionType: MockConnection.self)
+        #expect(stateMachine.leaseConnection(request).request == .leaseConnection(.init(element: request), connection))
+
+        #expect(stateMachine.triggerGracefulShutdown().connection == .none)
+        #expect(!stateMachine.isShutdown)
+
+        var shutdown = TestPoolStateMachine.ConnectionAction.Shutdown()
+        shutdown.connections = [connection]
+        #expect(stateMachine.triggerForceShutdown().connection == .initiateShutdown(shutdown))
+
+        let closedAction = stateMachine.connectionClosed(connection)
+        #expect(closedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+        #expect(stateMachine.isShutdown)
+        #expect(stateMachine.connections.stats.active == 0)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testTriggerGracefulShutdownWithInProgessRequest() {
         var configuration = PoolConfiguration()
         configuration.minimumConnectionCount = 1
