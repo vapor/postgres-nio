@@ -11,7 +11,7 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
 
         try await withTestConnection(on: eventLoopGroup.next()) { connection in
             let rows = try await connection.query(
-                "SELECT 'text'::regtype::oid",
+                "SELECT 'text'::regtype",
                 logger: .psqlTest
             )
 

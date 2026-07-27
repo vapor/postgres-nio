@@ -25,6 +25,8 @@ extension PostgresDataType: PostgresDecodable {
                 throw PostgresDecodingError.Code.failure
             }
             self.rawValue = value
+        // The `oid` aliases (`regproc`, `regclass` etc) only carry an id in binary form.
+        // In text form they're a string containing a name and so cannot be decoded into a PostgresDataType.
         case (.text, .oid), (.text, .int4):
             guard
                 let string = byteBuffer.readString(length: byteBuffer.readableBytes),

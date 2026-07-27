@@ -103,12 +103,19 @@ import Testing
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt32(26))
 
-        for type in [PostgresDataType.bool, .int2, .int8, .uuid, .text] {
+        for type in [PostgresDataType.bool, .int2, .int8, .uuid, .text, .oidArray] {
             for format in [PostgresFormat.binary, .text] {
                 var copy = buffer
                 #expect(throws: PostgresDecodingError.Code.typeMismatch) {
                     try PostgresDataType(from: &copy, type: type, format: format, context: .default)
                 }
+            }
+        }
+
+        for type in [PostgresDataType.regproc, .regtype, .regclass] {
+            var copy = buffer
+            #expect(throws: PostgresDecodingError.Code.typeMismatch) {
+                try PostgresDataType(from: &copy, type: type, format: .text, context: .default)
             }
         }
     }
