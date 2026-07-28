@@ -827,6 +827,26 @@ extension PoolStateMachine {
 
         // MARK: Shutdown
 
+        mutating func triggerGracefulShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
+            for index in self.connections.indices {
+                switch self.connections[index].state {
+                case .idle, .backingOff:
+                    switch closeConnection(at: index, deleteConnection: false) {
+                    case .close(let closeAction):
+                        cleanup.connections.append(closeAction.connection)
+                        cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
+                    case .cancelTimers(let timers):
+                        cleanup.timersToCancel.append(contentsOf: timers)
+                    case .doNothing:
+                        break
+                    }
+                default:
+                    break
+                }
+            }
+            self.connections = self.connections.filter { !$0.isClosed }
+        }
+
         mutating func triggerForceShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
             for index in self.connections.indices {
                 switch closeConnection(at: index, deleteConnection: false) {
