@@ -725,6 +725,9 @@ struct PoolStateMachine<
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerGracefulShutdown(&shutdown)
 
+            // `triggerGracefulShutdown` moves closed connections out of `self.connections` into
+            // `shutdown.connections`, so both being empty means there's no more connections,
+            // so queued requests can never be served and we should fail them immediately.
             if self.connections.isEmpty, shutdown.connections.isEmpty {
                 self.poolState = .shutDown
                 return .init(
@@ -733,8 +736,10 @@ struct PoolStateMachine<
                 )
             }
 
-            // Don't shut down connections if the queue still has requests. We have to drain it.
-            if shutdown.connections.isEmpty && shutdown.timersToCancel.isEmpty {
+            // Nothing to close or cancel right now: all remaining connections are leased or
+            // still starting. Shutdown proceeds as they are released, established, or fail,
+            // which also drains the request queue.
+            if shutdown.connections.isEmpty, shutdown.timersToCancel.isEmpty {
                 return .none()
             }
 
