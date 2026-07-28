@@ -28,8 +28,7 @@ import Testing
         let values: [UInt32] = [0, 1, 26, UInt32(UInt16.max), UInt32(Int32.max), UInt32.max]
         for value in values {
             for type in [PostgresDataType.oid, .regproc] {
-                var buffer = ByteBuffer()
-                buffer.writeInteger(value)
+                var buffer = ByteBuffer(integer: value)
 
                 var decoded: PostgresDataType?
                 #expect(throws: Never.self) {
@@ -42,8 +41,7 @@ import Testing
 
     @Test func testDecodeFromBinaryInt4() {
         for value in [Int32(0), 1, 26, Int32(UInt16.max), Int32.max] {
-            var buffer = ByteBuffer()
-            buffer.writeInteger(value)
+            var buffer = ByteBuffer(integer: value)
 
             var decoded: PostgresDataType?
             #expect(throws: Never.self) {
@@ -53,8 +51,7 @@ import Testing
         }
 
         for value in [Int32(-1), -26, Int32.min] {
-            var buffer = ByteBuffer()
-            buffer.writeInteger(value)
+            var buffer = ByteBuffer(integer: value)
 
             #expect(throws: PostgresDecodingError.Code.failure) {
                 try PostgresDataType(from: &buffer, type: .int4, format: .binary, context: .default)
@@ -65,8 +62,7 @@ import Testing
     @Test func testDecodeFromText() {
         for value in [0, 1, 26, UInt32(UInt16.max), UInt32.max] {
             for type in [PostgresDataType.oid, .int4] {
-                var buffer = ByteBuffer()
-                buffer.writeString(String(value))
+                var buffer = ByteBuffer(string: String(value))
 
                 var decoded: PostgresDataType?
                 #expect(throws: Never.self) {
@@ -78,8 +74,7 @@ import Testing
     }
 
     @Test func testDecodeFailureFromInvalidByteCount() {
-        var buffer = ByteBuffer()
-        buffer.writeInteger(UInt32(26))
+        var buffer = ByteBuffer(integer: UInt32(26))
         // Make only three bytes readable
         buffer.moveReaderIndex(forwardBy: 1)
 
@@ -90,8 +85,7 @@ import Testing
 
     @Test func testDecodeFailureFromInvalidText() {
         for string in ["", "notanumber", "-1", "4294967296"] {
-            var buffer = ByteBuffer()
-            buffer.writeString(string)
+            var buffer = ByteBuffer(string: string)
 
             #expect(throws: PostgresDecodingError.Code.failure) {
                 try PostgresDataType(from: &buffer, type: .oid, format: .text, context: .default)
@@ -100,8 +94,7 @@ import Testing
     }
 
     @Test func testDecodeFailureFromInvalidPostgresType() {
-        var buffer = ByteBuffer()
-        buffer.writeInteger(UInt32(26))
+        let buffer = ByteBuffer(integer: UInt32(26))
 
         for type in [PostgresDataType.bool, .int2, .int8, .uuid, .text, .oidArray] {
             for format in [PostgresFormat.binary, .text] {
