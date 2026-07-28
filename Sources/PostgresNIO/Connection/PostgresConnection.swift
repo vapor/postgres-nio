@@ -1,4 +1,5 @@
 import Atomics
+import NIOConcurrencyHelpers
 import NIOCore
 import NIOPosix
 #if canImport(Network)
@@ -129,12 +130,13 @@ public final class PostgresConnection: @unchecked Sendable {
         id connectionID: ID,
         logger: Logger
     ) -> EventLoopFuture<PostgresConnection> {
-        self.connect(
+        let (future, _) = self.connect(
             connectionID: connectionID,
             configuration: .init(configuration),
             logger: logger,
             on: eventLoop
         )
+        return future
     }
 
     static func connect(
@@ -142,11 +144,14 @@ public final class PostgresConnection: @unchecked Sendable {
         configuration: PostgresConnection.InternalConfiguration,
         logger: Logger,
         on eventLoop: any EventLoop
-    ) -> EventLoopFuture<PostgresConnection> {
+    ) -> (EventLoopFuture<PostgresConnection>, ConnectCancelHandler) {
 
         var mlogger = logger
         mlogger[postgresMetadataKey: .connectionID] = "\(connectionID)"
         let logger = mlogger
+
+        let cancelHandler = ConnectCancelHandler()
+        let deadline = NIODeadline.now() + configuration.options.connectTimeout
 
         // Here we dispatch to the `eventLoop` first before we setup the EventLoopFuture chain, to
         // ensure all `flatMap`s are executed on the EventLoop (this means the enqueuing of the
@@ -155,7 +160,7 @@ public final class PostgresConnection: @unchecked Sendable {
         // This saves us a number of context switches between the thread the Connection is created
         // on and the EventLoop. In addition, it eliminates all potential races between the creating
         // thread and the EventLoop.
-        return eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
+        let future = eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
             let connectFuture: EventLoopFuture<any Channel>
 
             switch configuration.connection {
@@ -176,17 +181,48 @@ public final class PostgresConnection: @unchecked Sendable {
             }
 
             return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
+                // 1. check if the connection request was cancelled in the mean time.
+                if let closeFuture = cancelHandler.channelConnected(channel) {
+                    return closeFuture.flatMapThrowing { throw CancellationError() }
+                }
+
+                // 2. check if the deadline has elapsed
+                let remaining = deadline - .now()
+                guard remaining > .nanoseconds(0) else {
+                    channel.close(mode: .all, promise: nil)
+                    return channel.closeFuture.flatMapThrowing {
+                        throw PSQLError.connectionError(underlying: ChannelError.connectTimeout(configuration.options.connectTimeout))
+                    }
+                }
+
+                // 3. setup time to enforce connect deadline 
+                let timeoutTask = eventLoop.scheduleTask(deadline: deadline) {
+                    channel.pipeline.fireErrorCaught(
+                        ChannelError.connectTimeout(configuration.options.connectTimeout)
+                    )
+                }
+
                 let connection = PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
-                return connection.start(configuration: configuration).map { _ in connection }
+                return connection.start(configuration: configuration).map { _ in
+                    timeoutTask.cancel()
+                    return connection
+                }.flatMapError { error in
+                    timeoutTask.cancel()
+                    return eventLoop.makeFailedFuture(error)
+                }
             }.flatMapErrorThrowing { error -> PostgresConnection in
                 switch error {
-                case is PSQLError:
+                case is PSQLError, is CancellationError:
                     throw error
                 default:
                     throw PSQLError.connectionError(underlying: error)
                 }
             }
         }
+
+        future.whenComplete { _ in cancelHandler.postgresHandshakeDone() }
+
+        return (future, cancelHandler)
     }
 
     static func makeBootstrap(
@@ -319,12 +355,13 @@ extension PostgresConnection {
                 options: options
             )
 
-            return PostgresConnection.connect(
+            let (future, _) = PostgresConnection.connect(
                 connectionID: self.idGenerator.wrappingIncrementThenLoad(ordering: .relaxed),
                 configuration: configuration,
                 logger: logger,
                 on: eventLoop
             )
+            return future
         }.flatMapErrorThrowing { error in
             throw error.asAppropriatePostgresError
         }
@@ -373,12 +410,17 @@ extension PostgresConnection {
         id connectionID: ID,
         logger: Logger
     ) async throws -> PostgresConnection {
-        try await self.connect(
+        let (future, cancelHandler) = self.connect(
             connectionID: connectionID,
             configuration: .init(configuration),
             logger: logger,
             on: eventLoop
-        ).get()
+        )
+        return try await withTaskCancellationHandler {
+            try await future.get()
+        } onCancel: {
+            cancelHandler.cancel()
+        }
     }
 
     /// Closes the connection to the server.

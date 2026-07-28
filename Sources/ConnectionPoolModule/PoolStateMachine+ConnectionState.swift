@@ -336,16 +336,16 @@ extension PoolStateMachine {
         }
 
         @inlinable
-        mutating func rescheduleIdleTimer() -> ConnectionTimer? {
+        mutating func rescheduleIdleTimer() -> (ConnectionTimer, TimerCancellationToken?)? {
             switch self.state {
             case .backingOff, .starting:
                 preconditionFailure("Invalid state: \(self.state)")
 
-            case .idle(let connection, let maxStreams, let keepAlive, .some):
+            case .idle(let connection, let maxStreams, let keepAlive, .some(let oldIdleTimer)):
                 let idleTimerState = self._nextTimer()
                 let idleTimer = ConnectionTimer(timerID: idleTimerState.timerID, connectionID: self.id, usecase: .idleTimeout)
                 self.state = .idle(connection, maxStreams: maxStreams, keepAlive: keepAlive, idleTimer: idleTimerState)
-                return idleTimer
+                return (idleTimer, oldIdleTimer.cancellationContinuation)
 
             case .idle(_,_,_, .none):
                 return nil
