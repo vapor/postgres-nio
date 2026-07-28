@@ -1098,7 +1098,7 @@ import Synchronization
         do {
             try await body(connection, channel)
         } catch {
-            try await connection.close()
+            try? await connection.close()
             throw error
         }
 
