@@ -725,25 +725,28 @@ struct PoolStateMachine<
             var shutdown = ConnectionAction.Shutdown()
             self.connections.triggerGracefulShutdown(&shutdown)
 
-            // `triggerGracefulShutdown` moves closed connections out of `self.connections` into
-            // `shutdown.connections`, so both being empty means there's no more connections,
-            // so queued requests can never be served and we should fail them immediately.
+            let requestAction: RequestAction
+            let connectionAction: ConnectionAction
             if self.connections.isEmpty, shutdown.connections.isEmpty {
+                // `triggerGracefulShutdown` moves closed connections out of `self.connections` into
+                // `shutdown.connections`, so both being empty means there's no more connections,
+                // so queued requests can never be served and we should fail them immediately.
                 self.poolState = .shutDown
-                return .init(
-                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-                    connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
-                )
+                requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown)
+                connectionAction = .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
+            } else if shutdown.connections.isEmpty, shutdown.timersToCancel.isEmpty {
+                // Nothing to close or cancel right now: all remaining connections are leased or
+                // still starting. Shutdown proceeds as they are released, established, or fail,
+                // which also drains the request queue.
+                requestAction = .none
+                connectionAction = .none
+            } else {
+                // Close the idle connections and cancel their timers.
+                requestAction = .none
+                connectionAction = .initiateShutdown(shutdown)
             }
 
-            // Nothing to close or cancel right now: all remaining connections are leased or
-            // still starting. Shutdown proceeds as they are released, established, or fail,
-            // which also drains the request queue.
-            if shutdown.connections.isEmpty, shutdown.timersToCancel.isEmpty {
-                return .none()
-            }
-
-            return .init(request: .none, connection: .initiateShutdown(shutdown))
+            return .init(request: requestAction, connection: connectionAction)
 
         case .shuttingDown, .shutDown:
             return .none()
