@@ -97,6 +97,91 @@ final class PostgresQueryTests: XCTestCase {
         XCTAssertEqual(query.binds.bytes, expected)
     }
 
+    func testStringInterpolationWithGroup() throws {
+        let ids = [1, 2, 3]
+
+        let query: PostgresQuery = "SELECT * FROM foo WHERE id IN (\(group: ids));"
+
+        XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE id IN ($1, $2, $3);")
+        XCTAssertEqual(query.binds.count, 3)
+
+        var expected = ByteBuffer()
+        for id in ids {
+            expected.writeInteger(UInt32(8))
+            expected.writeInteger(id)
+        }
+
+        XCTAssertEqual(query.binds.bytes, expected)
+        XCTAssertEqual(
+            query.binds.metadata,
+            ids.map { _ in .init(dataType: .int8, format: .binary, protected: true) }
+        )
+    }
+
+    func testStringInterpolationWithGroupContinuesBindNumbering() throws {
+        let title = "Hello World"
+        let ids = [1, 2]
+        let limit = 10
+
+        let query: PostgresQuery = """
+            SELECT * FROM foo WHERE title = \(title) AND id IN (\(group: ids)) LIMIT \(limit);
+            """
+
+        XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE title = $1 AND id IN ($2, $3) LIMIT $4;")
+        XCTAssertEqual(query.binds.count, 4)
+    }
+
+    func testStringInterpolationWithSingleElementGroup() throws {
+        let query: PostgresQuery = "SELECT * FROM foo WHERE id IN (\(group: [1]));"
+
+        XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE id IN ($1);")
+        XCTAssertEqual(query.binds.count, 1)
+    }
+
+    func testStringInterpolationWithEmptyGroup() throws {
+        let ids: [Int] = []
+
+        let query: PostgresQuery = "SELECT * FROM foo WHERE id IN (\(group: ids));"
+
+        XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE id IN ();")
+        XCTAssertEqual(query.binds.count, 0)
+    }
+
+    func testStringInterpolationWithGroupOfDynamicType() throws {
+        let type = PostgresDataType(16435)
+        let format = PostgresFormat.binary
+        let values = ["foo", "bar"].map { DynamicString(value: $0, psqlType: type, psqlFormat: format) }
+
+        let query: PostgresQuery = "SELECT * FROM foo WHERE bar IN (\(group: values));"
+
+        XCTAssertEqual(query.sql, "SELECT * FROM foo WHERE bar IN ($1, $2);")
+
+        var expected = ByteBuffer()
+        for value in values {
+            expected.writeInteger(Int32(value.value.utf8.count))
+            expected.writeString(value.value)
+        }
+
+        XCTAssertEqual(query.binds.bytes, expected)
+        XCTAssertEqual(
+            query.binds.metadata,
+            values.map { _ in .init(dataType: type, format: format, protected: true) }
+        )
+    }
+
+    func testStringInterpolationWithThrowingGroupRethrows() {
+        let values = [
+            ThrowingDynamicString(value: "foo"),
+            ThrowingDynamicString(value: ""),
+        ]
+
+        var query: PostgresQuery?
+        XCTAssertThrowsError(query = try "SELECT * FROM foo WHERE bar IN (\(group: values));") {
+            XCTAssert($0 is ThrowingDynamicString.EncodingError)
+        }
+        XCTAssertNil(query)
+    }
+
     func testUnescapedSQL() {
         let tableName = UUID().uuidString.uppercased()
         let value = 1
@@ -123,6 +208,23 @@ extension PostgresQueryTests {
             context: PostgresNIO.PostgresEncodingContext<JSONEncoder>
         ) where JSONEncoder: PostgresJSONEncoder {
             byteBuffer.writeString(value)
+        }
+    }
+
+    struct ThrowingDynamicString: PostgresThrowingDynamicTypeEncodable {
+        struct EncodingError: Error {}
+
+        let value: String
+
+        var psqlType: PostgresDataType { .text }
+        var psqlFormat: PostgresFormat { .binary }
+
+        func encode<JSONEncoder>(
+            into byteBuffer: inout ByteBuffer,
+            context: PostgresNIO.PostgresEncodingContext<JSONEncoder>
+        ) throws where JSONEncoder: PostgresJSONEncoder {
+            guard !self.value.isEmpty else { throw EncodingError() }
+            byteBuffer.writeString(self.value)
         }
     }
 }
