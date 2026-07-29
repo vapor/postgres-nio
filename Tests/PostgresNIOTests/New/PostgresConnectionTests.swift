@@ -1085,7 +1085,8 @@ import Synchronization
                     let name: String
                 }
                 var rows: [Row] = []
-                while data.readableBytes > 0 {
+                // Read until we are only left with the trailer
+                while data.readableBytes > 2 {
                     // Number of columns
                     #expect(data.readInteger(as: UInt16.self) == 2)
                     // 'id' column
@@ -1097,6 +1098,9 @@ import Synchronization
                     rows.append(Row(id: try #require(id), name: try #require(name)))
                 }
                 #expect(rows == [Row(id: 1, name: "Alice"), Row(id: 2, name: "Bob")])
+                // Trailer
+                #expect(data.readInteger(as: Int16.self) == -1)
+                
                 try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
 
                 try await channel.waitForPostgresFrontendMessage(\.sync)

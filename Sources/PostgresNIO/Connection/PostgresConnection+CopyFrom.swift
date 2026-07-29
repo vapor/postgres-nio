@@ -139,7 +139,7 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
         /// Serialize a single column to a row.
         ///
         /// - Important: It is critical that that data type encoded here exactly matches the data type in the
-        ///   database. For example, if the database stores an a 4-bit integer the corresponding `writeColumn` must
+        ///   database. For example, if the database stores an a 4-byte integer the corresponding `writeColumn` must
         ///   be called with an `Int32`. Serializing an integer of a different width will cause a deserialization
         ///   failure in the backend.
         @inlinable
@@ -327,7 +327,7 @@ extension PostgresConnection {
         line: Int = #line,
         writeData: (inout PostgresBinaryCopyFromWriter) async throws -> Void
     )  async throws {
-        try await copyFrom(table: table, columns: columns, format: .binary(PostgresCopyFromFormat.BinaryOptions()), logger: logger) { writer in
+        try await copyFrom(table: table, columns: columns, format: .binary(options), logger: logger) { writer in
             var header = ByteBuffer()
             header.reserveCapacity(19)
             header.writeString("PGCOPY\n")
@@ -343,6 +343,7 @@ extension PostgresConnection {
 
             var binaryWriter = PostgresBinaryCopyFromWriter(underlying: writer, bufferSize: bufferSize)
             try await writeData(&binaryWriter)
+            binaryWriter.buffer.writeInteger(Int16(-1))
             try await binaryWriter.flush()
         }
     }
