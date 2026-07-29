@@ -102,19 +102,19 @@ public struct PostgresCopyFromWriter: Sendable {
 #if compiler(>=6.2)
 /// Handle to send binary data for a `COPY ... FROM STDIN` query to the backend.
 ///
-/// It takes care of serializing `PostgresEncodable` column types into the binary format that Postgres expects.
+/// It takes care of serializing ``PostgresEncodable`` column types into the binary format that Postgres expects.
 public struct PostgresBinaryCopyFromWriter: ~Copyable {
-    /// Handle to serialize columns into a row that is being written by `PostgresBinaryCopyFromWriter`.
+    /// Handle to serialize columns into a row that is being written by ``PostgresBinaryCopyFromWriter``.
     public struct ColumnWriter: ~Escapable, ~Copyable {
-        /// Pointer to the `PostgresBinaryCopyFromWriter` that is gathering the serialized data.
+        /// Pointer to the ``PostgresBinaryCopyFromWriter`` that is gathering the serialized data.
         @usableFromInline
         let underlying: UnsafeMutablePointer<PostgresBinaryCopyFromWriter>
 
-        /// The number of columns that have been written by this `ColumnWriter`.
+        /// The number of columns that have been written by this ``ColumnWriter``.
         @usableFromInline
         var columns: UInt16 = 0
 
-        /// - Warning: Do not call directly, call `withColumnWriter` instead
+        /// > Warning: Do not call this directly; call ``ColumnWriter/withColumnWriter(writingTo:body:)`` instead.
         @usableFromInline
         init(_underlying: UnsafeMutablePointer<PostgresBinaryCopyFromWriter>) {
             self.underlying = _underlying
@@ -126,7 +126,7 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
             body: (inout ColumnWriter) throws(E) -> T
         ) throws(E) -> T {
             return try withUnsafeMutablePointer(to: &underlying) { pointerToUnderlying throws(E) in
-                // We can guarantee that `ColumWriter` never outlives `underlying` because `ColumnWriter` is
+                // We can guarantee that `ColumnWriter` never outlives `underlying` because `ColumnWriter` is
                 // `~Escapable` and thus cannot escape the context of the closure to `withUnsafeMutablePointer`.
                 // To model this without resorting to unsafe pointers, we would need to be able to declare an `inout`
                 // reference to `PostgresBinaryCopyFromWriter` as a member of `ColumnWriter`, which isn't possible at
@@ -138,10 +138,10 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
 
         /// Serialize a single column to a row.
         ///
-        /// - Important: It is critical that that data type encoded here exactly matches the data type in the
-        ///   database. For example, if the database stores an a 4-byte integer the corresponding `writeColumn` must
-        ///   be called with an `Int32`. Serializing an integer of a different width will cause a deserialization
-        ///   failure in the backend.
+        /// > Important: It is critical that that data type encoded here exactly matches the data type in the
+        /// > database. For example, if the database stores an a 4-byte integer the corresponding `writeColumn` must
+        /// > be called with an `Int32`. Serializing an integer of a different width will cause a deserialization
+        /// > failure in the backend.
         @inlinable
         #if compiler(<6.3)
         @_lifetime(&self)
@@ -162,7 +162,7 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
         }
     }
 
-    /// The underlying `PostgresCopyFromWriter` that sends the serialized data to the backend.
+    /// The underlying ``PostgresCopyFromWriter`` that sends the serialized data to the backend.
     @usableFromInline let underlying: PostgresCopyFromWriter
 
     /// The buffer in which we accumulate binary data. Once this buffer exceeds `bufferSize`, we flush it to
@@ -179,7 +179,7 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
         self.bufferSize = bufferSize
     }
 
-    /// Serialize a single row to the backend. Call `writeColumn` on `columnWriter` for every column that should be
+    /// Serialize a single row to the backend. Call ``ColumnWriter/writeColumn(_:)`` for every column that should be
     /// included in the row.
     @inlinable
     public mutating func writeRow<Result>(_ body: (_ columnWriter: inout ColumnWriter) throws -> Result) async throws -> Result {
@@ -201,7 +201,7 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
         return bodyResult
     }
 
-    /// Serialize a single column to the buffer. Should only be called by `ColumnWriter`.
+    /// Serialize a single column to the buffer. Should only be called by ``ColumnWriter``.
     @inlinable
     mutating func writeColumn(_ column: (some PostgresEncodable)?) throws {
         guard let column else {
@@ -310,8 +310,9 @@ extension PostgresConnection {
     ///   - columns: The name of the columns to copy. If an empty array is passed, all columns are assumed to be copied.
     ///   - bufferSize: How many bytes to accumulate a local buffer before flushing it to the database. Can affect
     ///     performance characteristics of the copy operation.
-    ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call `write` on the
-    ///     writer provided by the closure to send data to the backend and return from the closure once all data is sent.
+    ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call
+    ///     ``PostgresBinaryCopyFromWriter/writeRow(_:)`` on the writer provided by the closure to send data to the
+    ///     backend and return from the closure once all data is sent.
     ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown
     ///     by the `copyFromBinary` function.
     ///
@@ -358,8 +359,9 @@ extension PostgresConnection {
     ///   - logger: The `Logger` to log into for the operation.
     ///   - file: The file the operation was started in. Used for better error reporting.
     ///   - line: The line the operation was started in. Used for better error reporting.
-    ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call `write` on the
-    ///     writer provided by the closure to send data to the backend and return from the closure once all data is sent.
+    ///   - writeData: Closure that produces the data for the table, to be streamed to the backend. Call
+    ///     ``PostgresCopyFromWriter/write(_:)`` on the writer provided by the closure to send data to the backend and
+    ///     return from the closure once all data is sent.
     ///     Throw an error from the closure to fail the data transfer. The error thrown by the closure will be rethrown
     ///     by the `copyFrom` function.
     ///
