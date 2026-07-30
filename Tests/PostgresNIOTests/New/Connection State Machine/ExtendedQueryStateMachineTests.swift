@@ -295,4 +295,27 @@ class ExtendedQueryStateMachineTests: XCTestCase {
         XCTAssertEqual(state.readyForQueryReceived(.idle), .fireEventReadyForQuery)
     }
 
+    func testCheckBackendCanReceiveCopyDataFailsIfQueryIsNotInCopyMode() {
+        var state = ConnectionStateMachine.readyForQuery()
+
+        let logger = Logger.psqlTest
+        let eventLoop = EmbeddedEventLoop()
+        let queryPromise = eventLoop.makePromise(of: PSQLRowStream.self)
+        queryPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "SELECT version()"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: queryPromise)
+
+        XCTAssertEqual(state.enqueue(task: .extendedQuery(queryContext)), .sendParseDescribeBindExecuteSync(query))
+
+        // A query is in flight but the backend is not in copy mode, so writing copy data must fail.
+        let writePromise = eventLoop.makePromise(of: Void.self)
+        guard case .failPromise(let promise, let error) = state.checkBackendCanReceiveCopyData(channelIsWritable: true, promise: writePromise) else {
+            return XCTFail("Expected checkBackendCanReceiveCopyData to fail the promise")
+        }
+        XCTAssertEqual((error as? PSQLError)?.code, .notInCopyMode)
+        promise.fail(error)
+        XCTAssertThrowsError(try writePromise.futureResult.wait()) { error in
+            XCTAssertEqual((error as? PSQLError)?.code, .notInCopyMode)
+        }
+    }
 }

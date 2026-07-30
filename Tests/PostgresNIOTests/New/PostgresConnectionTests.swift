@@ -945,9 +945,10 @@ import Synchronization
                         escapedWriter = writer
                     }
                     let writer = try #require(escapedWriter)
-                    await #expect(throws: (any Error).self) {
+                    let error = await #expect(throws: PSQLError.self) {
                         try await writer.write(ByteBuffer(string: "oops"))
                     }
+                    #expect(error?.code == .notInCopyMode)
                 }
 
                 _ = try await channel.waitForUnpreparedRequest()

@@ -23,6 +23,7 @@ public struct PSQLError: Error, @unchecked Sendable {
             case serverClosedConnection
             case connectionError
             case uncleanShutdown
+            case notInCopyMode
 
             case listenFailed
             case unlistenFailed
@@ -52,6 +53,7 @@ public struct PSQLError: Error, @unchecked Sendable {
         public static let connectionError = Self(.connectionError)
 
         public static let uncleanShutdown = Self(.uncleanShutdown)
+        public static let notInCopyMode = Self(.notInCopyMode)
         public static let poolClosed = Self(.poolClosed)
 
         public static let listenFailed = Self.init(.listenFailed)
@@ -97,6 +99,8 @@ public struct PSQLError: Error, @unchecked Sendable {
                 return "connectionError"
             case .uncleanShutdown:
                 return "uncleanShutdown"
+            case .notInCopyMode:
+                return "notInCopyMode"
             case .poolClosed:
                 return "poolClosed"
             case .listenFailed:
@@ -409,6 +413,8 @@ public struct PSQLError: Error, @unchecked Sendable {
     static let queryCancelled = PSQLError(code: .queryCancelled)
 
     static let uncleanShutdown = PSQLError(code: .uncleanShutdown)
+
+    static let notInCopyMode = PSQLError(code: .notInCopyMode)
 
     static let receivedUnencryptedDataAfterSSLRequest = PSQLError(code: .receivedUnencryptedDataAfterSSLRequest)
 
