@@ -4,7 +4,7 @@ import struct Foundation.UUID
 
 // MARK: Protocols
 
-/// A type, of which arrays can be encoded into and decoded from a postgres binary format
+/// A type of which arrays can be encoded into and decoded from a Postgres binary format.
 public protocol PostgresArrayEncodable: PostgresEncodable {
     static var psqlArrayType: PostgresDataType { get }
 }
@@ -103,6 +103,12 @@ extension ClosedRange: PostgresArrayDecodable where Bound: PostgresRangeArrayDec
 extension ClosedRange: PostgresArrayEncodable where Bound: PostgresRangeArrayEncodable {
     public static var psqlArrayType: PostgresDataType { Bound.psqlRangeArrayType }
 }
+
+extension PostgresDataType: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .oidArray }
+}
+
+extension PostgresDataType: PostgresArrayDecodable {}
 
 // MARK: Array conformances
 

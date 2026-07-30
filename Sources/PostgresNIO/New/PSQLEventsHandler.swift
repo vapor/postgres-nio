@@ -5,7 +5,7 @@ import Logging
 enum PSQLOutgoingEvent {    
     /// the event we send down the channel to inform the ``PostgresChannelHandler`` to authenticate
     ///
-    /// this shall be removed with the next breaking change and always supplied with `PSQLConnection.Configuration`
+    /// This shall be removed with the next breaking change and always supplied with `PSQLConnection.Configuration`.
     case authenticate(AuthContext)
 
     case gracefulShutdown
@@ -38,6 +38,7 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         case connected
         case readyForStartup
         case authenticated
+        case closed
     }
     
     private var readyForStartupPromise: EventLoopPromise<Void>!
@@ -65,7 +66,7 @@ final class PSQLEventsHandler: ChannelInboundHandler {
                 // successful
                 self.state = .authenticated
                 self.authenticatePromise.succeed(Void())
-            case .authenticated:
+            case .authenticated, .closed:
                 break
             }
         default:
@@ -89,16 +90,37 @@ final class PSQLEventsHandler: ChannelInboundHandler {
         context.fireChannelActive()
     }
     
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
+    func channelInactive(context: ChannelHandlerContext) {
+        switch self.state {
+        case .initialized:
+            self.state = .closed
+            self.readyForStartupPromise?.fail(PSQLError.clientClosedConnection(underlying: nil))
+            self.authenticatePromise?.fail(PSQLError.clientClosedConnection(underlying: nil))
+        case .connected:
+            self.state = .closed
+            self.readyForStartupPromise.fail(PSQLError.clientClosedConnection(underlying: nil))
+            self.authenticatePromise.fail(PSQLError.clientClosedConnection(underlying: nil))
+        case .readyForStartup:
+            self.state = .closed
+            self.authenticatePromise.fail(PSQLError.clientClosedConnection(underlying: nil))
+        case .authenticated, .closed:
+            break
+        }
+        context.fireChannelInactive()
+    }
+
+    func errorCaught(context: ChannelHandlerContext, error: any Error) {
         switch self.state {
         case .initialized:
             preconditionFailure("Unexpected message for state")
         case .connected:
+            self.state = .closed
             self.readyForStartupPromise.fail(error)
             self.authenticatePromise.fail(error)
         case .readyForStartup:
+            self.state = .closed
             self.authenticatePromise.fail(error)
-        case .authenticated:
+        case .authenticated, .closed:
             break
         }
         

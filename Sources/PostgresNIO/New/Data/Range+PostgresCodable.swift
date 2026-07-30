@@ -2,12 +2,12 @@ import NIOCore
 
 // MARK: Protocols
 
-/// A type that can be encoded into a Postgres range type where it is the bound type
+/// A type that can be encoded into a Postgres range type where it is the bound type.
 public protocol PostgresRangeEncodable: PostgresNonThrowingEncodable {
     static var psqlRangeType: PostgresDataType { get }
 }
 
-/// A type that can be decoded into a Swift RangeExpression type from a Postgres range where it is the bound type
+/// A type that can be decoded into a Swift RangeExpression type from a Postgres range where it is the bound type.
 public protocol PostgresRangeDecodable: PostgresDecodable {
     /// If a Postgres range type has a well-defined step,
     /// Postgres automatically converts it to a canonical form.
@@ -21,12 +21,12 @@ public protocol PostgresRangeDecodable: PostgresDecodable {
     static var valueForEmptyRange: Self { get }
 }
 
-/// A type that can be encoded into a Postgres range array type where it is the bound type
+/// A type that can be encoded into a Postgres range array type where it is the bound type.
 public protocol PostgresRangeArrayEncodable: PostgresRangeEncodable {
     static var psqlRangeArrayType: PostgresDataType { get }
 }
 
-/// A type that can be decoded into a Swift RangeExpression array type from a Postgres range array where it is the bound type
+/// A type that can be decoded into a Swift RangeExpression array type from a Postgres range array where it is the bound type.
 public protocol PostgresRangeArrayDecodable: PostgresRangeDecodable {}
 
 // MARK: Bound conformances
@@ -88,7 +88,7 @@ struct PostgresRange<Bound> {
     }
 }
 
-/// Used by Postgres to represent certain range properties
+/// Used by Postgres to represent certain range properties.
 @usableFromInline
 struct PostgresRangeFlag {
     @usableFromInline static let isEmpty: UInt8 = 0x01

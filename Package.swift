@@ -1,15 +1,10 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.1
 import PackageDescription
 
-#if compiler(>=6.1)
-let swiftSettings: [SwiftSetting] = []
-#else
 let swiftSettings: [SwiftSetting] = [
-    // Sadly the 6.0 compiler concurrency checker finds false positives.
-    // To be able to compile, lets reduce the language version down to 5 for 6.0 only.
-    .swiftLanguageMode(.v5)
+    .enableUpcomingFeature("ExistentialAny"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
 ]
-#endif
 
 let package = Package(
     name: "postgres-nio",
@@ -54,7 +49,7 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
-            swiftSettings: swiftSettings
+            swiftSettings: swiftSettings + [.enableExperimentalFeature("Lifetimes")]
         ),
         .target(
             name: "_ConnectionPoolModule",
@@ -80,6 +75,7 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+                .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
             ],
             swiftSettings: swiftSettings
         ),

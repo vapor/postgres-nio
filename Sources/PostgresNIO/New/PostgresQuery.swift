@@ -1,10 +1,10 @@
 import NIOCore
 
-/// A Postgres SQL query, that can be executed on a Postgres server. Contains the raw sql string and bindings.
+/// A Postgres SQL query that can be executed on a Postgres server. Contains the raw SQL string and bindings.
 public struct PostgresQuery: Sendable, Hashable {
-    /// The query string
+    /// The query string.
     public var sql: String
-    /// The query binds
+    /// The query binds.
     public var binds: PostgresBindings
 
     public init(unsafeSQL sql: String, binds: PostgresBindings = PostgresBindings()) {

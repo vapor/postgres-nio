@@ -1,7 +1,7 @@
 import NIOCore
 
 /// An error that is thrown from the PostgresClient.
-/// Sendability enforced through Copy on Write semantics
+/// Sendability enforced through copy-on-write semantics.
 public struct PSQLError: Error, @unchecked Sendable {
 
     public struct Code: Sendable, Hashable, CustomStringConvertible {
@@ -138,7 +138,7 @@ public struct PSQLError: Error, @unchecked Sendable {
     }
 
     /// The underlying error
-    public internal(set) var underlying: Error? {
+    public internal(set) var underlying: (any Error)? {
         get { self.backing.underlying }
         set {
             self.copyBackingStorageIfNecessary()
@@ -217,7 +217,7 @@ public struct PSQLError: Error, @unchecked Sendable {
     private final class Backing {
         fileprivate var code: Code
         fileprivate var serverInfo: ServerInfo?
-        fileprivate var underlying: Error?
+        fileprivate var underlying: (any Error)?
         fileprivate var file: String?
         fileprivate var line: Int?
         fileprivate var query: PostgresQuery?
@@ -394,13 +394,13 @@ public struct PSQLError: Error, @unchecked Sendable {
         return new
     }
 
-    static func clientClosedConnection(underlying: Error?) -> PSQLError {
+    static func clientClosedConnection(underlying: (any Error)?) -> PSQLError {
         var error = PSQLError(code: .clientClosedConnection)
         error.underlying = underlying
         return error
     }
 
-    static func serverClosedConnection(underlying: Error?) -> PSQLError {
+    static func serverClosedConnection(underlying: (any Error)?) -> PSQLError {
         var error = PSQLError(code: .serverClosedConnection)
         error.underlying = underlying
         return error
@@ -424,19 +424,19 @@ public struct PSQLError: Error, @unchecked Sendable {
         return error
     }
 
-    static func sasl(underlying: Error) -> PSQLError {
+    static func sasl(underlying: any Error) -> PSQLError {
         var error = PSQLError(code: .saslError)
         error.underlying = underlying
         return error
     }
 
-    static func failedToAddSSLHandler(underlying: Error) -> PSQLError {
+    static func failedToAddSSLHandler(underlying: any Error) -> PSQLError {
         var error = PSQLError(code: .failedToAddSSLHandler)
         error.underlying = underlying
         return error
     }
 
-    static func connectionError(underlying: Error) -> PSQLError {
+    static func connectionError(underlying: any Error) -> PSQLError {
         var error = PSQLError(code: .connectionError)
         error.underlying = underlying
         return error
@@ -454,7 +454,7 @@ public struct PSQLError: Error, @unchecked Sendable {
         return error
     }
 
-    static func unlistenError(underlying: Error) -> PSQLError {
+    static func unlistenError(underlying: any Error) -> PSQLError {
         var error = PSQLError(code: .unlistenFailed)
         error.underlying = underlying
         return error
@@ -573,7 +573,7 @@ public struct PostgresDecodingError: Error, Equatable {
     public let columnName: String
     /// The cell's column index for which the decoding failed
     public let columnIndex: Int
-    /// The swift type the cell should have been decoded into
+    /// The Swift type the cell should have been decoded into.
     public let targetType: Any.Type
     /// The cell's postgres data type for which the decoding failed
     public let postgresType: PostgresDataType
@@ -582,9 +582,9 @@ public struct PostgresDecodingError: Error, Equatable {
     /// A copy of the cell data which was attempted to be decoded
     public let postgresData: ByteBuffer?
 
-    /// The file the decoding was attempted in
+    /// The file the decoding was attempted in.
     public let file: String
-    /// The line the decoding was attempted in
+    /// The line the decoding was attempted in.
     public let line: Int
 
     @usableFromInline

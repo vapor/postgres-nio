@@ -1,6 +1,6 @@
 /// The format the postgres types are encoded in on the wire.
 ///
-/// Currently there a two wire formats supported:
+/// Currently there are two wire formats supported:
 ///  - text
 ///  - binary
 public enum PostgresFormat: Int16, Sendable {
@@ -173,7 +173,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     /// `1027`
     public static let polygonArray = PostgresDataType(1027)
     /// `1028`
-    public static let oidArray = PostgresDataType(1018)
+    public static let oidArray = PostgresDataType(1028)
     /// `1033`
     public static let aclitem = PostgresDataType(1033)
     /// `1034` _aclitem
@@ -394,7 +394,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     /// The raw data type code recognized by PostgreSQL.
     public var rawValue: UInt32
 
-    /// Returns `true` if the type's raw value is greater than `2^14`.
+    /// Returns `true` if the type's raw value is greater than or equal to `2^14`.
     /// This _appears_ to be true for all user-defined types, but I don't
     /// have any documentation to back this up.
     public var isUserDefined: Bool {

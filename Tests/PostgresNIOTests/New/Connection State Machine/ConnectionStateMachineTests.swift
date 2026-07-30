@@ -59,9 +59,9 @@ import NIOSSL
         #expect(state.sslUnsupportedReceived() == .provideAuthenticationContext)
     }
         
-    @Test func testParameterStatusReceivedAndBackendKeyAfterAuthenticated() {
-        var state = ConnectionStateMachine(.authenticated(nil, [:]))
-        
+    @Test func testParameterStatusReceivedAndBackendKeyAfterAuthenticated() throws {
+        var state = try ConnectionStateMachine.makeAuthenticatedIdle()
+
         #expect(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "application_name", value: "")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "server_encoding", value: "UTF8")) == .wait)
@@ -78,9 +78,9 @@ import NIOSSL
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
-    @Test func testBackendKeyAndParameterStatusReceivedAfterAuthenticated() {
-        var state = ConnectionStateMachine(.authenticated(nil, [:]))
-        
+    @Test func testBackendKeyAndParameterStatusReceivedAfterAuthenticated() throws {
+        var state = try ConnectionStateMachine.makeAuthenticatedIdle()
+
         #expect(state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882037977)) == .wait)
 
         #expect(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")) == .wait)
@@ -98,9 +98,9 @@ import NIOSSL
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
-    @Test func testReadyForQueryReceivedWithoutBackendKeyAfterAuthenticated() {
-        var state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: true)
-        
+    @Test func testReadyForQueryReceivedWithoutBackendKeyAfterAuthenticated() throws {
+        var state = try ConnectionStateMachine.makeAuthenticatedIdle()
+
         #expect(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "application_name", value: "")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "server_encoding", value: "UTF8")) == .wait)
@@ -117,9 +117,9 @@ import NIOSSL
                        .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
     }
     
-    @Test func testReadyForQueryReceivedWithoutUnneededBackendKeyAfterAuthenticated() {
-        var state = ConnectionStateMachine(.authenticated(nil, [:]), requireBackendKeyData: false)
-        
+    @Test func testReadyForQueryReceivedWithoutUnneededBackendKeyAfterAuthenticated() throws {
+        var state = try ConnectionStateMachine.makeAuthenticatedIdle(requireBackendKeyData: false)
+
         #expect(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "application_name", value: "")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "server_encoding", value: "UTF8")) == .wait)
@@ -135,16 +135,18 @@ import NIOSSL
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
-    @Test func testErrorIsIgnoredWhenClosingConnection() {
+    @Test func testErrorIsIgnoredWhenClosingConnection() throws {
         // test ignore unclean shutdown when closing connection
-        var stateIgnoreChannelError = ConnectionStateMachine(.closing(nil))
+        var stateIgnoreChannelError = try ConnectionStateMachine.makeReadyForQuery()
+        #expect(.closeConnection(nil) == stateIgnoreChannelError.gracefulClose(nil))
 
         #expect(stateIgnoreChannelError.errorHappened(.connectionError(underlying: NIOSSLError.uncleanShutdown)) == .wait)
         #expect(stateIgnoreChannelError.closed() == .fireChannelInactive)
 
         // test ignore any other error when closing connection
         
-        var stateIgnoreErrorMessage = ConnectionStateMachine(.closing(nil))
+        var stateIgnoreErrorMessage = try ConnectionStateMachine.makeReadyForQuery()
+        #expect(.closeConnection(nil) == stateIgnoreErrorMessage.gracefulClose(nil))
         #expect(stateIgnoreErrorMessage.errorReceived(.init(fields: [:])) == .wait)
         #expect(stateIgnoreErrorMessage.closed() == .fireChannelInactive)
     }

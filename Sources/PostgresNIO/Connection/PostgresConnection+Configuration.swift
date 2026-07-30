@@ -3,7 +3,7 @@ import NIOPosix // inet_pton() et al.
 import NIOSSL
 
 extension PostgresConnection {
-    /// A configuration object for a connection
+    /// A configuration object for a connection.
     public struct Configuration: Sendable {
 
         // MARK: - TLS
@@ -66,7 +66,7 @@ extension PostgresConnection {
         public struct Options: Sendable {
             /// A timeout for connection attempts. Defaults to ten seconds.
             ///
-            /// Ignored when using a preexisting communcation channel. (See
+            /// Ignored when using a preexisting communication channel. (See
             /// ``PostgresConnection/Configuration/init(establishedChannel:username:password:database:)``.)
             public var connectTimeout: TimeAmount
             
@@ -130,7 +130,7 @@ extension PostgresConnection {
         /// The `Channel` to use in existing-channel configurations.
         ///
         /// Always `nil` for other configurations.
-        public var establishedChannel: Channel? {
+        public var establishedChannel: (any Channel)? {
             if case let .configureChannel(channel) = self.endpointInfo { return channel }
             else { return nil }
         }
@@ -169,6 +169,9 @@ extension PostgresConnection {
         /// - Parameters:
         ///   - host: The hostname to connect to.
         ///   - port: The TCP port to connect to (defaults to 5432).
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         ///   - tls: The TLS mode to use.
         public init(host: String, port: Int = 5432, username: String, password: String?, database: String?, tls: TLS) {
             self.init(endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
@@ -177,8 +180,10 @@ extension PostgresConnection {
         /// Create a configuration for connecting to a server through a UNIX domain socket.
         ///
         /// - Parameters:
-        ///   - path: The filesystem path of the socket to connect to.
-        ///   - tls: The TLS mode to use. Defaults to ``TLS-swift.struct/disable``.
+        ///   - unixSocketPath: The filesystem path of the socket to connect to.
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
         }
@@ -193,7 +198,10 @@ extension PostgresConnection {
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
         ///   - tls: The TLS mode to use.
-        public init(establishedChannel channel: Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?, database: String?) {
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
+        public init(establishedChannel channel: any Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?, database: String?) {
             self.init(endpointInfo: .configureChannel(channel), tls: tls, username: username, password: password, database: database)
         }
         
@@ -206,14 +214,17 @@ extension PostgresConnection {
         /// - Parameters:
         ///   - channel: The `NIOCore/Channel` to use. The channel must already be active and connected to an
         ///     endpoint (i.e. `NIOCore/Channel/isActive` must be `true`).
-        public init(establishedChannel channel: Channel, username: String, password: String?, database: String?) {
+        ///   - username: The username to authenticate with.
+        ///   - password: The password to authenticate with.
+        ///   - database: The database to open. If `nil`, the client connects to the server's default database.
+        public init(establishedChannel channel: any Channel, username: String, password: String?, database: String?) {
             self.init(establishedChannel: channel, tls: .disable, username: username, password: password, database: database)
         }
 
         // MARK: - Implementation details
 
         enum EndpointInfo {
-            case configureChannel(Channel)
+            case configureChannel(any Channel)
             case bindUnixDomainSocket(path: String)
             case connectTCP(host: String, port: Int)
         }
@@ -242,7 +253,7 @@ extension PostgresConnection {
             case unresolvedTCP(host: String, port: Int)
             case unresolvedUDS(path: String)
             case resolved(address: SocketAddress)
-            case bootstrapped(channel: Channel)
+            case bootstrapped(channel: any Channel)
         }
 
         let connection: InternalConfiguration.Connection
