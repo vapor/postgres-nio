@@ -3,6 +3,49 @@ import XCTest
 import NIOCore
 
 final class PostgresRowTests: XCTestCase {
+    func testColumnCountMismatchSingleType() {
+        let rowDescription = [RowDescription.Column]()
+        let row = PostgresRow(
+            data: .makeTestDataRow(),
+            lookupTable: [:],
+            columns: rowDescription
+        )
+
+        XCTAssertThrowsError(try row.decode(String.self)) { error in
+            let error = error as? PostgresRowDecodingError
+            XCTAssertEqual(error?.code, .columnCountMismatch)
+            XCTAssertEqual(error?.expectedColumns, 1)
+            XCTAssertEqual(error?.returnedColumns, 0)
+            XCTAssertEqual(error?.file, #fileID)
+        }
+    }
+
+    func testColumnCountMismatchTuple() {
+        let rowDescription = [
+            RowDescription.Column(
+                name: "name",
+                tableOID: 1,
+                columnAttributeNumber: 1,
+                dataType: .text,
+                dataTypeSize: 0,
+                dataTypeModifier: 0,
+                format: .binary
+            )
+        ]
+        let row = PostgresRow(
+            data: .makeTestDataRow(ByteBuffer(string: "Hello world!")),
+            lookupTable: ["name": 0],
+            columns: rowDescription
+        )
+
+        XCTAssertThrowsError(try row.decode((String, String).self)) { error in
+            let error = error as? PostgresRowDecodingError
+            XCTAssertEqual(error?.code, .columnCountMismatch)
+            XCTAssertEqual(error?.expectedColumns, 2)
+            XCTAssertEqual(error?.returnedColumns, 1)
+            XCTAssertEqual(error?.file, #fileID)
+        }
+    }
 
     func testSequence() {
         let rowDescription = [
