@@ -369,6 +369,139 @@ final class PostgresClientTests: XCTestCase {
         }
     }
 
+    /// Removes the `ltree` extension, so a connection can be established while the type does not exist.
+    ///
+    /// Uses a client that does *not* resolve additional data types, for the same reason as
+    /// ``ensureLTreeExtension(eventLoopGroup:logger:)``.
+    private func dropLTreeExtension(eventLoopGroup: any EventLoopGroup, logger: Logger) async throws {
+        let client = PostgresClient(
+            configuration: .makeTestConfiguration(),
+            eventLoopGroup: eventLoopGroup,
+            backgroundLogger: logger
+        )
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP EXTENSION IF EXISTS ltree CASCADE;")
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    /// A connection established *before* the extension existed resolves the OID lazily, on first use.
+    ///
+    /// Without lazy resolution the connection would cache an empty lookup table at establishment and keep
+    /// using it forever, so `SELECT $1` would send OID `0`, Postgres would infer `text`, and decoding the
+    /// result as an `ltree` would fail on the binary version prefix.
+    ///
+    /// `maximumConnections = 1` is load bearing: it guarantees the query below runs on the very connection
+    /// that was opened while `ltree` did not exist. Without it the pool may hand out a fresh connection
+    /// that resolved the OID eagerly, and the test would pass without exercising lazy resolution at all.
+    func testLTreeResolvesLazilyAfterExtensionIsInstalled() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        try await self.dropLTreeExtension(eventLoopGroup: eventLoopGroup, logger: logger)
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // Deliberately NOT listed in additionalDataTypeNames: listing it makes the type a requirement of
+        // the connection, which would fail establishment here since ltree does not exist yet. Leaving it
+        // out is what selects the lenient, resolve-on-demand path this test is about.
+        clientConfig.options.minimumConnections = 0
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            // Opens the pool's only connection. `ltree` does not exist yet, so eager resolution finds nothing.
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+            let rows = try await client.query("SELECT \(value)")
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            XCTAssertEqual(decoded, [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    /// The same lazy resolution has to work for prepared statements.
+    ///
+    /// Prepared statements declare their parameter OIDs once, in `Parse`, and the server caches the result.
+    /// If the OID were resolved when the task was created rather than when the message is sent, the statement
+    /// would be parsed with OID `0` and stay broken for the life of the connection, even after the lookup
+    /// completed.
+    func testLTreeResolvesLazilyForPreparedStatements() async throws {
+        struct SelectLTree: PostgresPreparedStatement {
+            static let name = "SELECT-ltree-lazy-resolution"
+            static let sql = "SELECT $1"
+            typealias Row = PostgresLTree
+
+            var label: PostgresLTree
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.label)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresRow) throws -> Row {
+                try row.decode(PostgresLTree.self)
+            }
+        }
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        try await self.dropLTreeExtension(eventLoopGroup: eventLoopGroup, logger: logger)
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // Deliberately NOT listed in additionalDataTypeNames: listing it makes the type a requirement of
+        // the connection, which would fail establishment here since ltree does not exist yet. Leaving it
+        // out is what selects the lenient, resolve-on-demand path this test is about.
+        clientConfig.options.minimumConnections = 0
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            var decoded = [PostgresLTree]()
+            for try await label in try await client.execute(SelectLTree(label: value), logger: logger) {
+                decoded.append(label)
+            }
+            XCTAssertEqual(decoded, [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
     func testLTreeBindRoundTrip() async throws {
         let tableName = "test_client_ltree_bind"
 
@@ -460,7 +593,30 @@ final class PostgresClientTests: XCTestCase {
         }
     }
 
-    func testUnknownAdditionalDataTypeName() async throws {
+    /// Listing a type that does not exist in `additionalDataTypeNames` does not break the connection, but
+    /// it does fail any query that binds that type, with an error naming it.
+    ///
+    /// The connection deliberately still establishes. Failing establishment would make the pool retry the
+    /// connection for `circuitBreakerTripAfter` (60s by default) and then fail the caller with
+    /// `ConnectionPoolError.connectionCreationCircuitBreakerTripped`, which does not carry the real cause —
+    /// a minute of waiting to be told nothing useful.
+    ///
+    /// Uses a bespoke type rather than `ltree` to show the mechanism is not extension specific: any type
+    /// that reports a `psqlTypeName` participates.
+    func testUnknownAdditionalDataTypeNameFailsQueriesBindingIt() async throws {
+        struct MissingType: PostgresDynamicTypeEncodable {
+            var psqlType: PostgresDataType { .null }
+            var psqlFormat: PostgresFormat { .text }
+            var psqlTypeName: String? { "this_type_does_not_exist" }
+
+            func encode<JSONEncoder: PostgresJSONEncoder>(
+                into byteBuffer: inout ByteBuffer,
+                context: PostgresEncodingContext<JSONEncoder>
+            ) {
+                byteBuffer.writeString("irrelevant")
+            }
+        }
+
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
         let logger = mlogger
@@ -479,9 +635,23 @@ final class PostgresClientTests: XCTestCase {
             }
 
             do {
+                // A type the server does not have does not make the connection itself unusable.
                 _ = try await client.query("SELECT 1")
             } catch {
-                XCTFail("The connection should continue if the type can't be found")
+                XCTFail("The connection should still work for queries that don't bind the type: \(error)")
+            }
+
+            do {
+                _ = try await client.query("SELECT \(MissingType())")
+                XCTFail("Expected the query to fail because the bound type does not exist")
+            } catch let error as PSQLError {
+                XCTAssertEqual(error.code, .unresolvedDataTypeNames)
+                XCTAssertTrue(
+                    String(reflecting: error).contains("this_type_does_not_exist"),
+                    "The error should name the type that could not be resolved: \(String(reflecting: error))"
+                )
+            } catch {
+                XCTFail("Unexpected error type: \(String(reflecting: error))")
             }
 
             taskGroup.cancelAll()

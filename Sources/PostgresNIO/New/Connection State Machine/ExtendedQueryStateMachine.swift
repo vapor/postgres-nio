@@ -49,7 +49,7 @@ struct ExtendedQueryStateMachine {
     
     enum Action {
         case sendParseDescribeBindExecuteSync(PostgresQuery)
-        case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
+        case sendParseDescribeSync(name: String, query: String, parameterTypes: ExtendedQueryContext.PreparedStatementParameterTypes)
         case sendBindExecuteSync(PSQLExecuteStatement)
         
         // --- general actions
@@ -126,10 +126,10 @@ struct ExtendedQueryStateMachine {
                 return .sendBindExecuteSync(prepared)
             }
 
-        case .prepareStatement(let name, let query, let bindingDataTypes, _):
+        case .prepareStatement(let name, let query, let parameterTypes, _):
             return self.avoidingStateMachineCoW { state -> Action in
                 state = .messagesSent(queryContext)
-                return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
+                return .sendParseDescribeSync(name: name, query: query, parameterTypes: parameterTypes)
             }
         }
     }

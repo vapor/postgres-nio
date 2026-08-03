@@ -122,7 +122,7 @@ struct ConnectionStateMachine {
         case forwardStreamError(PSQLError, read: Bool, cleanupContext: CleanUpContext?)
         
         // Prepare statement actions
-        case sendParseDescribeSync(name: String, query: String, bindingDataTypes: [PostgresDataType])
+        case sendParseDescribeSync(name: String, query: String, parameterTypes: ExtendedQueryContext.PreparedStatementParameterTypes)
         case succeedPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: RowDescription?)
         case failPreparedStatementCreation(EventLoopPromise<RowDescription?>, with: PSQLError, cleanupContext: CleanUpContext?)
 
@@ -1079,7 +1079,10 @@ extension ConnectionStateMachine {
              .invalidCommandTag,
              .connectionError,
              .uncleanShutdown,
-             .unlistenFailed:
+             .unlistenFailed,
+             // A connection that cannot provide the data types the user declared as required is not
+             // fit for purpose, so tear it down rather than hand it back.
+             .unresolvedDataTypeNames:
             return true
         case .queryCancelled:
             return false
@@ -1180,8 +1183,8 @@ extension ConnectionStateMachine {
             return .read
         case .wait:
             return .wait
-        case .sendParseDescribeSync(name: let name, query: let query, bindingDataTypes: let bindingDataTypes):
-            return .sendParseDescribeSync(name: name, query: query, bindingDataTypes: bindingDataTypes)
+        case .sendParseDescribeSync(name: let name, query: let query, parameterTypes: let parameterTypes):
+            return .sendParseDescribeSync(name: name, query: query, parameterTypes: parameterTypes)
         case .succeedPreparedStatementCreation(let promise, with: let rowDescription):
             return .succeedPreparedStatementCreation(promise, with: rowDescription)
         case .failPreparedStatementCreation(let promise, with: let error):

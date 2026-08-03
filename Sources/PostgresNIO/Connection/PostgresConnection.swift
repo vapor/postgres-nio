@@ -270,7 +270,7 @@ public final class PostgresConnection: @unchecked Sendable {
         let context = ExtendedQueryContext(
             name: name,
             query: query,
-            bindingDataTypes: [],
+            parameterTypes: .explicit([]),
             logger: logger,
             promise: promise
         )

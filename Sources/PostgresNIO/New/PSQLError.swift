@@ -27,6 +27,7 @@ public struct PSQLError: Error, @unchecked Sendable {
             case listenFailed
             case unlistenFailed
             case poolClosed
+            case unresolvedDataTypeNames
         }
 
         internal var base: Base
@@ -56,6 +57,11 @@ public struct PSQLError: Error, @unchecked Sendable {
 
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
+
+        /// One or more of the type names in
+        /// ``PostgresConnection/Configuration/Options/additionalDataTypeNames`` does not exist in the
+        /// database, or is not visible on the connection's `search_path`.
+        public static let unresolvedDataTypeNames = Self.init(.unresolvedDataTypeNames)
 
         @available(*, deprecated, renamed: "clientClosedConnection")
         public static let connectionQuiescing = Self.clientClosedConnection
@@ -103,6 +109,8 @@ public struct PSQLError: Error, @unchecked Sendable {
                 return "listenFailed"
             case .unlistenFailed:
                 return "unlistenFailed"
+            case .unresolvedDataTypeNames:
+                return "unresolvedDataTypeNames"
             }
         }
     }
@@ -191,6 +199,16 @@ public struct PSQLError: Error, @unchecked Sendable {
 
     /// the invalid command tag... we should keep this internal but we can use it to print more
     /// advanced debug reasons.
+    /// The configured data type names that could not be resolved to an OID. Internal, but used to
+    /// print a more advanced debug reason.
+    var unresolvedDataTypeNames: [String]? {
+        get { self.backing.unresolvedDataTypeNames }
+        set {
+            self.copyBackingStorageIfNecessary()
+            self.backing.unresolvedDataTypeNames = newValue
+        }
+    }
+
     var invalidCommandTag: String? {
         get { self.backing.invalidCommandTag }
         set {
@@ -220,6 +238,7 @@ public struct PSQLError: Error, @unchecked Sendable {
         fileprivate var backendMessage: PostgresBackendMessage?
         fileprivate var unsupportedAuthScheme: UnsupportedAuthScheme?
         fileprivate var invalidCommandTag: String?
+        fileprivate var unresolvedDataTypeNames: [String]?
 
         init(code: Code) {
             self.code = code
@@ -233,6 +252,9 @@ public struct PSQLError: Error, @unchecked Sendable {
             new.line = self.line
             new.query = self.query
             new.backendMessage = self.backendMessage
+            new.unsupportedAuthScheme = self.unsupportedAuthScheme
+            new.invalidCommandTag = self.invalidCommandTag
+            new.unresolvedDataTypeNames = self.unresolvedDataTypeNames
             return new
         }
     }
@@ -442,6 +464,12 @@ public struct PSQLError: Error, @unchecked Sendable {
         return error
     }
 
+    static func unresolvedDataTypeNames(_ names: [String]) -> PSQLError {
+        var error = PSQLError(code: .unresolvedDataTypeNames)
+        error.unresolvedDataTypeNames = names
+        return error
+    }
+
     static func invalidCommandTag(_ value: String) -> PSQLError {
         var error = PSQLError(code: .invalidCommandTag)
         error.invalidCommandTag = value
@@ -506,6 +534,10 @@ extension PSQLError: CustomDebugStringConvertible {
 
         if let invalidCommandTag = self.invalidCommandTag {
             result.append(", invalidCommandTag: \(invalidCommandTag)")
+        }
+
+        if let unresolvedDataTypeNames = self.unresolvedDataTypeNames {
+            result.append(", unresolvedDataTypeNames: \(unresolvedDataTypeNames)")
         }
 
         if let underlying = self.underlying {

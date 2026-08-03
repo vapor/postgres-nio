@@ -25,6 +25,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private var listenState = ListenStateMachine()
     private var preparedStatementState = PreparedStatementStateMachine()
     private var resolvedDataTypes: [String: PostgresDataType] = [:]
+    private var unresolvableDataTypes: Set<String> = []
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
@@ -46,69 +47,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.handlerContext = context
         self.encoder = PostgresFrontendMessageEncoder(buffer: context.channel.allocator.buffer(capacity: 256))
 
-        self.populateDataTypes(context: context)
+        if !self.configuration.options.additionalDataTypeNames.isEmpty {
+            self.enqueueDataTypePopulation(for: self.configuration.options.additionalDataTypeNames, required: true, on: context)
+        }
 
         if context.channel.isActive {
             self.connected(context: context)
-        }
-    }
-
-    /// Enqueue a query resolving the OIDs of ``PostgresConnection/Configuration/Options/additionalDataTypeNames``.
-    private func populateDataTypes(context: ChannelHandlerContext) {
-        let dataTypeNames = self.configuration.options.additionalDataTypeNames
-        guard !dataTypeNames.isEmpty else { return }
-
-        let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
-        let queryContext = ExtendedQueryContext(
-            query: """
-                SELECT typname, oid FROM pg_type
-                    WHERE typname = ANY (\(dataTypeNames))
-                    AND pg_type_is_visible(oid);
-                """,
-            logger: self.logger,
-            promise: promise
-        )
-
-        let loopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
-        promise.futureResult.flatMap { $0.all() }.whenComplete { result in
-            loopBound.value.populateDataTypesCompleted(result, for: dataTypeNames)
-        }
-
-        self.run(self.state.enqueue(task: .extendedQuery(queryContext)), with: context)
-    }
-
-    private func populateDataTypesCompleted(
-        _ result: Result<[PostgresRow], any Error>,
-        for dataTypeNames: [String]
-    ) {
-        switch result {
-        case .success(let rows):
-            do {
-                let decoded = try rows.map { try $0.decode((String, PostgresDataType).self) }
-                self.resolvedDataTypes = Dictionary(decoded, uniquingKeysWith: { last, _ in last })
-            } catch {
-                self.logger.warning("Failed to decode additional data types", metadata: [
-                    .error: "\(error)", .dataTypeNames: "\(dataTypeNames)"
-                ])
-            }
-
-            let unresolved = dataTypeNames.filter { self.resolvedDataTypes[$0] == nil }
-            if !unresolved.isEmpty {
-                self.logger.warning("Some additional data types could not be resolved", metadata: [
-                    .dataTypeNames: "\(unresolved)"
-                ])
-            }
-
-        case .failure(let error):
-            if let error = error as? PSQLError,
-                [.clientClosedConnection, .serverClosedConnection, .connectionError, .uncleanShutdown].contains(error.code)
-            {
-                // The connection attempt failed so there will be another log somewhere
-            } else {
-                self.logger.warning("Failed to resolve additional data types", metadata: [
-                    .error: "\(error)", .dataTypeNames: "\(dataTypeNames)"
-                ])
-            }
         }
     }
 
@@ -374,8 +318,125 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             }
         }
 
+        self.enqueueDataTypeResolutionIfNeeded(for: psqlTask, context: context)
+
         let action = self.state.enqueue(task: psqlTask)
         self.run(action, with: context)
+    }
+
+    /// Enqueue a query resolving the OIDs of any bindings that name a type we haven't resolved yet.
+    private func enqueueDataTypeResolutionIfNeeded(for task: PSQLTask, context: ChannelHandlerContext) {
+        let bindings: PostgresBindings? =
+            switch task {
+            case .extendedQuery(let queryContext):
+                switch queryContext.query {
+                case .unnamed(let query, _): query.binds
+                case .copyFrom(let query, _): query.binds
+                case .prepareStatement(_, _, let parameterTypes, _):
+                    switch parameterTypes {
+                    case .derived(let binds): binds
+                    case .explicit: nil  // the user declared the OIDs; nothing to resolve
+                    }
+                case .executeStatement: nil  // Bind/Execute carries no OIDs, the Parse already happened
+                }
+            case .closeCommand: nil
+            }
+
+        guard let bindings else { return }
+
+        let hasMissing = bindings.metadata.contains { meta in
+            meta.dataTypeName.map { self.resolvedDataTypes[$0] == nil } ?? false
+        }
+        guard hasMissing else { return }
+
+        let missingDataTypes = bindings.metadata.compactMap { meta in
+            meta.dataTypeName.flatMap { self.resolvedDataTypes[$0] == nil ? $0 : nil }
+        }
+
+        self.enqueueDataTypePopulation(for: missingDataTypes, required: false, on: context)
+    }
+
+    /// Enqueue a query resolving `dataTypeNames` to OIDs.
+    ///
+    /// - Parameter required: Whether failing to resolve a name should fail the connection. This is `true`
+    ///   for names the user listed in ``PostgresConnection/Configuration/Options/additionalDataTypeNames``
+    ///   — those are a declared requirement — and `false` for names discovered from a query's bindings,
+    ///   where an unresolvable name only means that particular type cannot be sent with a concrete OID.
+    private func enqueueDataTypePopulation(
+        for dataTypeNames: [String],
+        required: Bool,
+        on context: ChannelHandlerContext
+    ) {
+        let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
+        let queryContext = ExtendedQueryContext(
+            query: """
+                SELECT typname, oid FROM pg_type
+                    WHERE typname = ANY (\(dataTypeNames))
+                    AND pg_type_is_visible(oid);
+                """,
+            logger: self.logger,
+            promise: promise
+        )
+
+        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
+        promise.futureResult.flatMap { $0.all() }.whenComplete { result in
+            let (handler, context) = loopBound.value
+            handler.onMissingDataTypesPopulated(result, for: dataTypeNames, required: required, context: context)
+        }
+
+        self.run(self.state.enqueue(task: .extendedQuery(queryContext)), with: context)
+    }
+
+    private func onMissingDataTypesPopulated(
+        _ result: Result<[PostgresRow], any Error>,
+        for dataTypeNames: [String],
+        required: Bool,
+        context: ChannelHandlerContext
+    ) {
+        switch result {
+        case .success(let rows):
+            do {
+                let decoded = try rows.map { try $0.decode((String, PostgresDataType).self) }
+                for (name, oid) in decoded { self.resolvedDataTypes[name] = oid }
+            } catch {
+                self.logger.warning("Failed to decode additional data types", metadata: [
+                    .error: "\(error)", .dataTypeNames: "\(dataTypeNames)"
+                ])
+            }
+
+            let unresolved = dataTypeNames.filter { self.resolvedDataTypes[$0] == nil }
+            guard !unresolved.isEmpty else { return }
+
+            if required {
+                // The user declared these types as a requirement, and the server does not have them.
+                // Remember that, so any query binding one fails with an error naming the type instead of
+                // sending OID 0 and failing later inside a decoder.
+                //
+                // Deliberately *not* failing connection establishment: the pool would retry the failing
+                // connection for `circuitBreakerTripAfter` (60s by default) and then fail the caller with
+                // `ConnectionPoolError.connectionCreationCircuitBreakerTripped`, which does not carry this
+                // error. The user would wait a minute to be told nothing useful.
+                self.unresolvableDataTypes.formUnion(unresolved)
+                self.logger.error("Required additional data types do not exist", metadata: [
+                    .dataTypeNames: "\(unresolved)"
+                ])
+            } else {
+                self.logger.warning("Some additional data types could not be resolved", metadata: [
+                    .dataTypeNames: "\(unresolved)"
+                ])
+            }
+
+        case .failure(let error):
+            if let error = error as? PSQLError,
+                [.clientClosedConnection, .serverClosedConnection, .connectionError, .uncleanShutdown].contains(error.code)
+            {
+                // The connection attempt failed so there will be another log somewhere
+            } else {
+                self.logger.warning("Failed to resolve additional data types", metadata: [
+                    .error: "\(error)", .dataTypeNames: "\(dataTypeNames)"
+                ])
+            }
+        }
     }
     
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
@@ -462,8 +523,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             self.closeConnectionAndCleanup(cleanupContext, context: context)
         case .fireChannelInactive:
             context.fireChannelInactive()
-        case .sendParseDescribeSync(let name, let query, let bindingDataTypes):
-            self.sendParseDescribeAndSyncMessage(statementName: name, query: query, bindingDataTypes: bindingDataTypes, context: context)
+        case .sendParseDescribeSync(let name, let query, let parameterTypes):
+            self.sendParseDescribeAndSyncMessage(statementName: name, query: query, parameterTypes: parameterTypes, context: context)
         case .sendBindExecuteSync(let executeStatement):
             self.sendBindExecuteAndSyncMessage(executeStatement: executeStatement, context: context)
         case .sendParseDescribeBindExecuteSync(let query):
@@ -637,11 +698,20 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private func sendParseDescribeAndSyncMessage(
         statementName: String,
         query: String,
-        bindingDataTypes: [PostgresDataType],
+        parameterTypes: ExtendedQueryContext.PreparedStatementParameterTypes,
         context: ChannelHandlerContext
     ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
-        self.encoder.parse(preparedStatementName: statementName, query: query, parameters: bindingDataTypes)
+        switch parameterTypes {
+        case .explicit(let types):
+            self.encoder.parse(preparedStatementName: statementName, query: query, parameters: types)
+        case .derived(let binds):
+            self.encoder.parse(
+                preparedStatementName: statementName,
+                query: query,
+                parameters: binds.metadata.lazy.map(self.resolveDataType)
+            )
+        }
         self.encoder.describePreparedStatement(statementName)
         self.encoder.sync()
         context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
@@ -880,9 +950,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         return .extendedQuery(.init(
             name: preparedStatement.name,
             query: preparedStatement.sql,
-            bindingDataTypes: preparedStatement.bindingDataTypes.isEmpty
-                ? preparedStatement.bindings.metadata.map(self.resolveDataType)
-                : preparedStatement.bindingDataTypes,
+            parameterTypes: preparedStatement.bindingDataTypes.isEmpty
+                ? .derived(preparedStatement.bindings)
+                : .explicit(preparedStatement.bindingDataTypes),
             logger: preparedStatement.logger,
             promise: promise
         ))
