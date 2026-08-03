@@ -49,7 +49,7 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
             ],
-            swiftSettings: swiftSettings
+            swiftSettings: swiftSettings + [.enableExperimentalFeature("Lifetimes")]
         ),
         .target(
             name: "_ConnectionPoolModule",
@@ -75,6 +75,7 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+                .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
             ],
             swiftSettings: swiftSettings
         ),
