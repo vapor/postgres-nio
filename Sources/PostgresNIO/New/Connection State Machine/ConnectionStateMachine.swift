@@ -819,7 +819,7 @@ struct ConnectionStateMachine {
     /// should be aborted to avoid unnecessary work.
     mutating func checkBackendCanReceiveCopyData(channelIsWritable: Bool, promise: EventLoopPromise<Void>) -> CheckBackendCanReceiveCopyDataAction {
         guard case .extendedQuery(var queryState, let connectionContext) = self.state else {
-            preconditionFailure("Copy mode is only supported for extended queries")
+            return .failPromise(promise, error: PSQLError.notInCopyMode)
         }
 
         self.state = .modifying // avoid CoW
@@ -1081,7 +1081,7 @@ extension ConnectionStateMachine {
              .uncleanShutdown,
              .unlistenFailed:
             return true
-        case .queryCancelled:
+        case .queryCancelled, .notInCopyMode:
             return false
         case .server, .listenFailed:
             guard let sqlState = error.serverInfo?[.sqlState] else {

@@ -1042,6 +1042,37 @@ import Synchronization
         }
     }
 
+    @Test func testWritingDataAfterCopyFromHasFinishedThrowsError() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+                taskGroup.addTask {
+                    var escapedWriter: PostgresCopyFromWriter?
+                    try await connection.copyFrom(table: "test", logger: .psqlTest) { writer in
+                        escapedWriter = writer
+                    }
+                    let writer = try #require(escapedWriter)
+                    let error = await #expect(throws: PSQLError.self) {
+                        try await writer.write(ByteBuffer(string: "oops"))
+                    }
+                    #expect(error?.code == .notInCopyMode)
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+
+                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: 2))))
+
+                _ = try await channel.waitForCopyData()
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 0"))
+
+                try await channel.waitForPostgresFrontendMessage(\.sync)
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+                
+                try await taskGroup.waitForAll()
+            }
+        }
+    }
+
     #if compiler(>=6.2) // copyFromBinary is only available in Swift 6.2+
     @Test func testCopyFromBinary() async throws {
         try await self.withAsyncTestingChannel { connection, channel in

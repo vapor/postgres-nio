@@ -46,6 +46,8 @@ extension PSQLError {
             return self.underlying ?? self
         case .uncleanShutdown:
             return PostgresError.protocol("Unexpected connection close")
+        case .notInCopyMode:
+            return PostgresError.protocol("Cannot write into copy writer outside of copy mode")
         case .poolClosed:
             return self
         }
