@@ -41,7 +41,7 @@ import Testing
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func gracefulShutdownWaitsForInFlightRequest() async throws {
+    func gracefulShutdownWaitsForInFlightConnectionAttempt() async throws {
         try await withSilentServer { port in
             var config = PostgresClient.Configuration(
                 host: "127.0.0.1",

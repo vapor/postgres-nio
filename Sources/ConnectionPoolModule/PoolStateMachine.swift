@@ -266,6 +266,14 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func leaseConnection(_ request: Request) -> Action {
+        if self.gracefulShutdownTriggered {
+            // we're in the process of shutting down, reject new requests
+            return .init(
+                request: .failRequest(request, ConnectionPoolError.poolShutdown),
+                connection: .none
+            )
+        }
+
         switch self.poolState {
         case .running:
             // if requestQueue is non-empty and we cannot create more connections add
@@ -441,6 +449,20 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionEstablishFailed(_ error: any Error, for request: ConnectionRequest) -> Action {
+        if self.gracefulShutdownTriggered, self.requestQueue.isEmpty {
+            let timerToCancel = self.connections.destroyFailedConnection(request.connectionID)
+            let connectionAction: ConnectionAction
+
+            if self.connections.isEmpty {
+                self.poolState = .shutDown
+                connectionAction = .cancelEventStreamAndFinalCleanup(timerToCancel.flatMap { [$0] } ?? [])
+            } else {
+                connectionAction = .cancelTimers(timerToCancel.map {[$0]} ?? [])
+            }
+
+            return .init(request: .none, connection: connectionAction)
+        }
+
         switch self.poolState {
         case .running:
             self.poolState = .connectionCreationFailing(
@@ -664,11 +686,40 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func connectionClosed(_ connection: Connection) -> Action {
+        if gracefulShutdownTriggered {
+            self.cacheNoMoreConnectionsAllowed = false
+
+            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: true)
+
+            let connectionAction: ConnectionAction
+            if self.connections.isEmpty {
+                if !requestQueue.isEmpty {
+                    // if the request queue is not empty we need a new connection
+                    guard let newConnection = self.connections.createReplacementConnectionIfPossible() else {
+                        // if we can't make new connections, fail the queue
+                        self.poolState = .shutDown
+                        return .init(
+                            request: .failRequests(requestQueue.removeAll(), .poolShutdown),
+                            connection: .cancelEventStreamAndFinalCleanup(.init(closedConnectionAction.timersToCancel))
+                        )
+                    }
+                    connectionAction = .makeConnection(newConnection, closedConnectionAction.timersToCancel)
+                } else {
+                    self.poolState = .shutDown
+                    connectionAction = .cancelEventStreamAndFinalCleanup(.init(closedConnectionAction.timersToCancel))
+                }
+            } else {
+                connectionAction = .cancelTimers(closedConnectionAction.timersToCancel)
+            }
+
+            return .init(request: .none, connection: connectionAction)
+        }
+
         switch self.poolState {
         case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.cacheNoMoreConnectionsAllowed = false
 
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: self.gracefulShutdownTriggered)
+            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: false)
 
             let connectionAction: ConnectionAction
             if let newRequest = closedConnectionAction.newConnectionRequest {
@@ -717,22 +768,27 @@ struct PoolStateMachine<
 
     @usableFromInline
     mutating func triggerGracefulShutdown() -> Action {
+        if gracefulShutdownTriggered {
+            return .none()
+        }
+
         switch self.poolState {
         case .running, .connectionCreationFailing, .circuitBreakOpen:
-            self.poolState = .shuttingDown
             self.gracefulShutdownTriggered = true
 
-            var shutdown = ConnectionAction.Shutdown()
-            self.connections.triggerGracefulShutdown(&shutdown)
+            if !self.requestQueue.isEmpty {
+                return .init(request: .none, connection: .none)
+            }
 
             let requestAction: RequestAction
             let connectionAction: ConnectionAction
+
+            var shutdown = ConnectionAction.Shutdown()
+            self.connections.triggerGracefulShutdown(&shutdown)
             if self.connections.isEmpty, shutdown.connections.isEmpty {
-                // `triggerGracefulShutdown` moves closed connections out of `self.connections` into
-                // `shutdown.connections`, so both being empty means there's no more connections,
-                // so queued requests can never be served and we should fail them immediately.
+                // no more requests and no more connections. close
                 self.poolState = .shutDown
-                requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown)
+                requestAction = .none
                 connectionAction = .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
             } else if shutdown.connections.isEmpty, shutdown.timersToCancel.isEmpty {
                 // Nothing to close or cancel right now: all remaining connections are leased or
@@ -755,37 +811,36 @@ struct PoolStateMachine<
 
     @usableFromInline
     mutating func triggerForceShutdown() -> Action {
-        switch self.poolState {
-        case .shutDown:
-            return .init(request: .none, connection: .none)
-        
-        case .shuttingDown where self.gracefulShutdownTriggered:
+        if gracefulShutdownTriggered {
             // Graceful shutdown is in progress, escalate to force shutdown.
             self.gracefulShutdownTriggered = false
+        }
+
+        switch self.poolState {
+        case .running, .connectionCreationFailing, .circuitBreakOpen:
+            self.poolState = .shuttingDown
+            var shutdown = ConnectionAction.Shutdown()
+            self.connections.triggerForceShutdown(&shutdown)
+
+            if self.connections.isEmpty, shutdown.connections.isEmpty {
+                self.poolState = .shutDown
+                return .init(
+                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                    connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
+                )
+            }
+
+            return .init(
+                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                connection: .initiateShutdown(shutdown)
+            )
+
+        case .shutDown:
+            return .init(request: .none, connection: .none)
 
         case .shuttingDown:
             return .none()
-
-        case .running, .connectionCreationFailing, .circuitBreakOpen:
-            break
         }
-
-        self.poolState = .shuttingDown
-        var shutdown = ConnectionAction.Shutdown()
-        self.connections.triggerForceShutdown(&shutdown)
-
-        if self.connections.isEmpty, shutdown.connections.isEmpty {
-            self.poolState = .shutDown
-            return .init(
-                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-                connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
-            )
-        }
-
-        return .init(
-            request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
-            connection: .initiateShutdown(shutdown)
-        )
     }
 
     @inlinable
@@ -830,7 +885,7 @@ struct PoolStateMachine<
                 return .none()
 
             case .idle(_, let newIdle):
-                if case .shuttingDown = self.poolState {
+                if gracefulShutdownTriggered || self.isShuttingDown {
                     switch self.connections.closeConnection(at: index, deleteConnection: true) {
                     case .close(let closeAction):
                         return .init(
@@ -916,6 +971,12 @@ struct PoolStateMachine<
     // Is connection pool shutdown.
     public var isShutdown: Bool { 
         if case .shutDown = self.poolState { return true }
+        return false
+    }
+
+    @usableFromInline
+    var isShuttingDown: Bool {
+        if case .shuttingDown = self.poolState { return true }
         return false
     }
 }

@@ -177,6 +177,14 @@ extension PoolStateMachine {
         }
 
         @inlinable
+        mutating func createReplacementConnectionIfPossible() -> ConnectionRequest? {
+            guard self.maximumConcurrentConnectionSoftLimit > self.stats.active else {
+                return nil
+            }
+            return self.createNewConnection()
+        }
+
+        @inlinable
         /*private*/ mutating func createNewConnection() -> ConnectionRequest {
             precondition(self.canGrow)
             self.stats.connecting += 1
