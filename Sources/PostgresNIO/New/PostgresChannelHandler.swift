@@ -3,7 +3,7 @@ import NIOTLS
 import Crypto
 import Logging
 
-final class PostgresChannelHandler: ChannelDuplexHandler {
+final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandler {
     typealias OutboundIn = HandlerTask
     typealias InboundIn = ByteBuffer
     typealias OutboundOut = ByteBuffer

@@ -58,11 +58,61 @@ public final class PostgresConnection: @unchecked Sendable {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
     }
 
+    /// Connect to the Postgres server described by `configuration` — negotiate
+    /// TLS (if configured), send the startup message, and authenticate — then
+    /// remove PostgresNIO's handlers, returning the authenticated channel for the
+    /// caller to drive with its own pipeline. Any TLS handler and the socket are
+    /// left in place; only PostgresNIO's own protocol handlers are removed. This
+    /// lets a caller reuse PostgresNIO's TCP/TLS/startup/authentication (including
+    /// SCRAM-SHA-256) and then speak a protocol PostgresNIO does not implement —
+    /// for example, streaming replication.
+    public static func establishAndAuthChannelWithoutPostgresHandler(
+        using configuration: Configuration,
+        on eventLoop: any EventLoop,
+        logger: Logger
+    ) -> EventLoopFuture<any Channel> {
+        let configuration = InternalConfiguration(configuration)
+        return eventLoop.flatSubmit {
+            Self.makeChannel(on: eventLoop, configuration: configuration).flatMap { channel in
+                Self.installHandlersAndStartup(
+                    on: channel,
+                    configuration: configuration,
+                    logger: logger
+                ).flatMap { () -> EventLoopFuture<any Channel> in
+                    do {
+                        let pipeline = channel.pipeline.syncOperations
+                        let channelHandler = try pipeline.context(handlerType: PostgresChannelHandler.self)
+                        let eventsHandler = try pipeline.context(handlerType: PSQLEventsHandler.self)
+                        return pipeline.removeHandler(context: channelHandler)
+                            .and(pipeline.removeHandler(context: eventsHandler))
+                            .map { _ in channel }
+                    } catch {
+                        return channel.eventLoop.makeFailedFuture(error)
+                    }
+                }
+            }
+        }
+    }
+
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
+        Self.installHandlersAndStartup(on: self.channel, configuration: configuration, logger: self.logger)
+    }
+
+    /// Install PostgresNIO's channel handlers on `channel` (a TLS handler first,
+    /// if configured), send the startup message, and authenticate; the returned
+    /// future succeeds once the connection reaches `ReadyForQuery`.
+    ///
+    /// Must be called on `channel.eventLoop`. Shared bring-up for
+    /// ``start(configuration:)`` and ``establishAndAuthChannelWithoutPostgresHandler(using:on:logger:)``.
+    static func installHandlersAndStartup(
+        on channel: any Channel,
+        configuration: InternalConfiguration,
+        logger: Logger
+    ) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
         let configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> ())?
-        
+
         switch configuration.tls.base {
         case .prefer(let context), .require(let context):
             configureSSLCallback = { channel, postgresChannelHandler in
@@ -90,10 +140,10 @@ public final class PostgresConnection: @unchecked Sendable {
         // 2. add handlers
 
         do {
-            try self.channel.pipeline.syncOperations.addHandler(eventHandler)
-            try self.channel.pipeline.syncOperations.addHandler(channelHandler, position: .before(eventHandler))
+            try channel.pipeline.syncOperations.addHandler(eventHandler)
+            try channel.pipeline.syncOperations.addHandler(channelHandler, position: .before(eventHandler))
         } catch {
-            return self.eventLoop.makeFailedFuture(error)
+            return channel.eventLoop.makeFailedFuture(error)
         }
 
         let startupFuture: EventLoopFuture<Void>
@@ -109,7 +159,7 @@ public final class PostgresConnection: @unchecked Sendable {
             // in case of an startup error, the connection must be closed and after that
             // the originating error should be surfaced
 
-            self.channel.closeFuture.flatMapThrowing { _ in
+            channel.closeFuture.flatMapThrowing { _ in
                 throw error
             }
         }
@@ -161,26 +211,7 @@ public final class PostgresConnection: @unchecked Sendable {
         // on and the EventLoop. In addition, it eliminates all potential races between the creating
         // thread and the EventLoop.
         let future = eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
-            let connectFuture: EventLoopFuture<any Channel>
-
-            switch configuration.connection {
-            case .resolved(let address):
-                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
-                connectFuture = bootstrap.connect(to: address)
-            case .unresolvedTCP(let host, let port):
-                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
-                connectFuture = bootstrap.connect(host: host, port: port)
-            case .unresolvedUDS(let path):
-                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
-                connectFuture = bootstrap.connect(unixDomainSocketPath: path)
-            case .bootstrapped(let channel):
-                guard channel.isActive else {
-                    return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
-                }
-                connectFuture = eventLoop.makeSucceededFuture(channel)
-            }
-
-            return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
+            return self.makeChannel(on: eventLoop, configuration: configuration).flatMap { channel -> EventLoopFuture<PostgresConnection> in
                 // 1. check if the connection request was cancelled in the mean time.
                 if let closeFuture = cancelHandler.channelConnected(channel) {
                     return closeFuture.flatMapThrowing { throw CancellationError() }
@@ -240,6 +271,25 @@ public final class PostgresConnection: @unchecked Sendable {
         }
 
         fatalError("No matching bootstrap found")
+    }
+
+    private static func makeChannel(
+        on eventLoop: any EventLoop,
+        configuration: InternalConfiguration
+    ) -> EventLoopFuture<any Channel> {
+        switch configuration.connection {
+        case .resolved(let address):
+            return self.makeBootstrap(on: eventLoop, configuration: configuration).connect(to: address)
+        case .unresolvedTCP(let host, let port):
+            return self.makeBootstrap(on: eventLoop, configuration: configuration).connect(host: host, port: port)
+        case .unresolvedUDS(let path):
+            return self.makeBootstrap(on: eventLoop, configuration: configuration).connect(unixDomainSocketPath: path)
+        case .bootstrapped(let channel):
+            guard channel.isActive else {
+                return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
+            }
+            return eventLoop.makeSucceededFuture(channel)
+        }
     }
 
     // MARK: Query

@@ -85,6 +85,43 @@ import Synchronization
         try await connection.close()
     }
 
+    @Test func testEstablishAndAuthChannelWithoutPostgresHandlerRemovesPostgresHandlers() async throws {
+        let eventLoop = NIOAsyncTestingEventLoop()
+        let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
+            try channel.pipeline.syncOperations.addHandlers(ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()))
+            try channel.pipeline.syncOperations.addHandlers(ReverseMessageToByteHandler(PSQLBackendMessageEncoder()))
+        }
+        try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
+
+        let configuration = PostgresConnection.Configuration(
+            establishedChannel: channel,
+            username: "username",
+            password: "postgres",
+            database: "database"
+        )
+
+        async let preparedChannelPromise = PostgresConnection.establishAndAuthChannelWithoutPostgresHandler(using: configuration, on: eventLoop, logger: self.logger).get()
+        let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        #expect(message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
+        try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
+        try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
+        try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+        let preparedChannel = try await preparedChannelPromise
+        #expect(preparedChannel === channel)
+
+        // The whole point of `establishAndAuthChannelWithoutPostgresHandler` is to hand back an authenticated channel
+        // with PostgresNIO's own protocol handlers removed, so the caller can drive it with a pipeline of their own.
+        await #expect(throws: (any Error).self) {
+            try await channel.pipeline.context(handlerType: PostgresChannelHandler.self).map { _ in }.get()
+        }
+        await #expect(throws: (any Error).self) {
+            try await channel.pipeline.context(handlerType: PSQLEventsHandler.self).map { _ in }.get()
+        }
+
+        try await channel.close()
+    }
+
     @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListen() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
