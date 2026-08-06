@@ -266,6 +266,14 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func leaseConnection(_ request: Request) -> Action {
+        if gracefulShutdownTriggered {
+            // reject new requests
+            return .init(
+                request: .failRequest(request, .poolShutdown), 
+                connection: .none
+            )
+        }
+
         switch self.poolState {
         case .running:
             // if requestQueue is non-empty and we cannot create more connections add
@@ -698,37 +706,77 @@ struct PoolStateMachine<
         var requests: [Request]
     }
 
-    mutating func triggerGracefulShutdown() -> Action {
-        fatalError("Unimplemented")
-    }
-
     @usableFromInline
-    mutating func triggerForceShutdown() -> Action {
+    mutating func triggerGracefulShutdown() -> Action {
+        if gracefulShutdownTriggered { return .none() }
+
         switch self.poolState {
         case .running, .connectionCreationFailing, .circuitBreakOpen:
+            self.gracefulShutdownTriggered = true
+
+            guard requestQueue.isEmpty else {
+                return .none()
+            }
+
+            // only switch to shutting down if the request queue is empty,
+            // otherwise stay running and simply stop accepting new requests
             self.poolState = .shuttingDown
+
             var shutdown = ConnectionAction.Shutdown()
-            self.connections.triggerForceShutdown(&shutdown)
+            self.connections.triggerGracefulShutdown(&shutdown)
 
             if self.connections.isEmpty, shutdown.connections.isEmpty {
                 self.poolState = .shutDown
                 return .init(
-                    request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                    request: .none,
                     connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
                 )
             }
 
             return .init(
-                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                request: .none,
                 connection: .initiateShutdown(shutdown)
             )
 
-        case .shuttingDown:
+        case .shuttingDown, .shutDown:
             return .none()
+        }
+    }
 
+    @usableFromInline
+    mutating func triggerForceShutdown() -> Action {
+        switch self.poolState {
         case .shutDown:
             return .init(request: .none, connection: .none)
+
+        case .shuttingDown:
+            guard self.gracefulShutdownTriggered else {
+                return .none()
+            }
+            break
+
+        case .running, .connectionCreationFailing, .circuitBreakOpen:
+            break
         }
+
+        self.gracefulShutdownTriggered = false
+
+        self.poolState = .shuttingDown
+        var shutdown = ConnectionAction.Shutdown()
+        self.connections.triggerForceShutdown(&shutdown)
+
+        if self.connections.isEmpty, shutdown.connections.isEmpty {
+            self.poolState = .shutDown
+            return .init(
+                request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+                connection: .cancelEventStreamAndFinalCleanup(shutdown.timersToCancel)
+            )
+        }
+
+        return .init(
+            request: .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.poolShutdown),
+            connection: .initiateShutdown(shutdown)
+        )
     }
 
     @inlinable
@@ -738,6 +786,12 @@ struct PoolStateMachine<
     ) -> Action {
         // this connection was busy before
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
+
+        if self.gracefulShutdownTriggered && self.requestQueue.isEmpty {
+            // no more work to take up, start shutting down
+            self.poolState = .shuttingDown
+        }
+
         if !requests.isEmpty {
             let leaseResult = self.connections.leaseConnection(at: index, streams: UInt16(requests.count))
             let connectionsRequired: Int
