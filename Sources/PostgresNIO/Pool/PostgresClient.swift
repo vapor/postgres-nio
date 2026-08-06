@@ -467,6 +467,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///
     /// Cancelling the task that executes the ``run()`` method is equivalent to closing the client. Once the task
     /// has been cancelled the client is not able to process any new queries or prepared statements.
+    /// 
+    /// Graceful shutdown is different to cancellation. If the client is gracefully shut down, work continues as
+    /// before until the request queue is drained and work is completed.
     ///
     /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
     ///
@@ -477,8 +480,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
 
-        await cancelWhenGracefulShutdown {
+        await withGracefulShutdownHandler {
             await self.pool.run()
+        } onGracefulShutdown: {
+            self.pool.triggerGracefulShutdown()
         }
     }
 
