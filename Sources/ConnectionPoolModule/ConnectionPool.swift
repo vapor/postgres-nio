@@ -299,13 +299,6 @@ public final class ConnectionPool<
         }
     }
 
-    public func triggerGracefulShutdown() {
-        let actions = self.stateBox.withLockedValue { state in
-            state.stateMachine.triggerGracefulShutdown()
-        }
-        self.runStateMachineActions(actions)
-    }
-
     public func triggerForceShutdown() {
         let actions = self.stateBox.withLockedValue { state in
             state.stateMachine.triggerForceShutdown()
