@@ -207,16 +207,18 @@ import Logging
     @Test func testSucceedingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
         let eventLoop = NIOSingletons.posixEventLoopGroup.next()
-        let stream = PSQLRowStream(
-            source: .stream(
-                [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-                ],
-                dataSource
-            ),
-            eventLoop: eventLoop,
-            logger: self.logger
-        )
+        let stream = try await eventLoop.submit {
+            PSQLRowStream(
+                source: .stream(
+                    [
+                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    ],
+                    dataSource
+                ),
+                eventLoop: eventLoop,
+                logger: self.logger
+            )
+        }.get()
 
         let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
@@ -240,16 +242,18 @@ import Logging
     @Test func testFailingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
         let eventLoop = NIOSingletons.posixEventLoopGroup.next()
-        let stream = PSQLRowStream(
-            source: .stream(
-                [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-                ],
-                dataSource
-            ),
-            eventLoop: eventLoop,
-            logger: self.logger
-        )
+        let stream = try await eventLoop.submit {
+            PSQLRowStream(
+                source: .stream(
+                    [
+                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    ],
+                    dataSource
+                ),
+                eventLoop: eventLoop,
+                logger: self.logger
+            )
+        }.get()
 
         let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
@@ -490,7 +494,7 @@ import Logging
     }
 }
 
-final class MockRowDataSource: PSQLRowsDataSource {
+final class MockRowDataSource: PSQLRowsDataSource, Sendable {
     var requestCount: Int {
         self._requestCount.load(ordering: .relaxed)
     }
