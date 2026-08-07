@@ -472,8 +472,26 @@ struct PoolStateMachine<
             // if failing for longer than connection timeout and there are no open connections move to circuit break state
             if creationFailingContext.timeOfFirstFailedAttempt.duration(to: clock.now) > self.configuration.circuitBreakerTripAfter, 
                 self.connections.stats.idle + self.connections.stats.leased == 0 {
-                self.poolState = .circuitBreakOpen(.init(creationFailingContext))
                 requestAction = .failRequests(self.requestQueue.removeAll(), ConnectionPoolError.connectionCreationCircuitBreakerTripped)
+                if gracefulShutdownTriggered {
+                    let timer = self.connections.destroyFailedConnection(request.connectionID)
+                    let connectionAction: ConnectionAction
+                    if self.connections.isEmpty {
+                        // we know we have no more queued requests (we just failed them) and there's no open connections
+                        self.poolState = .shutDown
+                        connectionAction = .cancelEventStreamAndFinalCleanup(timer.flatMap { [$0] } ?? [])
+                    } else {
+                        // there might be starting connections
+                        self.poolState = .shuttingDown
+                        connectionAction = .cancelTimers(timer.flatMap { [$0] } ?? [])
+                    }
+                    return .init(
+                        request: requestAction,
+                        connection: connectionAction
+                    )
+                } else {
+                    self.poolState = .circuitBreakOpen(.init(creationFailingContext))
+                }
             } else {
                 self.poolState = .connectionCreationFailing(creationFailingContext)
             }
@@ -723,7 +741,7 @@ struct PoolStateMachine<
             self.poolState = .shuttingDown
 
             var shutdown = ConnectionAction.Shutdown()
-            self.connections.triggerGracefulShutdown(&shutdown)
+            self.connections.closeAnyNonLeasedConnection(&shutdown)
 
             if self.connections.isEmpty, shutdown.connections.isEmpty {
                 self.poolState = .shutDown

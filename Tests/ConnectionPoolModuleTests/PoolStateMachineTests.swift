@@ -1134,6 +1134,136 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testCircuitBreakerTripDuringGracefulShutdownDrainsQueueAndCompletes() {
+        struct ConnectionFailed: Error {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+
+        // connection creation fails: connectionCreationFailing state
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        guard case .makeConnection(let connectionRequest, _) = stateMachine.leaseConnection(request1).connection else { Issue.record(); return }
+        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: connectionRequest)
+        guard case .scheduleTimers(let timers1) = failedAction.connection, let backoffTimer1 = Array(timers1).first else { Issue.record(); return }
+        let backoffToken1 = MockTimerCancellationToken(backoffTimer1)
+        #expect(stateMachine.timerScheduled(backoffTimer1, cancelContinuation: backoffToken1) == .none)
+
+        // graceful shutdown does not shutdown immediately
+        #expect(stateMachine.triggerGracefulShutdown() == .none())
+        #expect(!stateMachine.isShutdown)
+
+        // circuit breaker trips, the requests fail so we should go directly into shut down
+        clock.advance(to: clock.now.advanced(by: .seconds(16)))
+        let retryAction = stateMachine.timerTriggered(backoffTimer1)
+        guard case .makeConnection(let retryRequest, _) = retryAction.connection else { Issue.record(); return }
+        let trippedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: retryRequest)
+        #expect(trippedAction.request == .failRequests(.init(element: request1), .connectionCreationCircuitBreakerTripped))
+        #expect(trippedAction.connection == .cancelEventStreamAndFinalCleanup([]))
+        #expect(stateMachine.isShutdown)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testTriggerGracefulShutdownWhileCircuitBreakerIsOpen() {
+        struct ConnectionFailed: Error {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = nil
+        configuration.circuitBreakerTripAfter = .seconds(15)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+
+        // trip the circuit breaker
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        guard case .makeConnection(let connectionRequest, _) = stateMachine.leaseConnection(request1).connection else { Issue.record(); return }
+        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: connectionRequest)
+        guard case .scheduleTimers(let timers1) = failedAction.connection, let backoffTimer1 = Array(timers1).first else { Issue.record(); return }
+        #expect(stateMachine.timerScheduled(backoffTimer1, cancelContinuation: MockTimerCancellationToken(backoffTimer1)) == .none)
+
+        clock.advance(to: clock.now.advanced(by: .seconds(16)))
+        let retryAction = stateMachine.timerTriggered(backoffTimer1)
+        guard case .makeConnection(let retryRequest, _) = retryAction.connection else { Issue.record(); return }
+        let trippedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: retryRequest)
+        #expect(trippedAction.request == .failRequests(.init(element: request1), .connectionCreationCircuitBreakerTripped))
+        guard case .scheduleTimers(let timers2) = trippedAction.connection, let backoffTimer2 = Array(timers2).first else { Issue.record(); return }
+        let backoffToken2 = MockTimerCancellationToken(backoffTimer2)
+        #expect(stateMachine.timerScheduled(backoffTimer2, cancelContinuation: backoffToken2) == .none)
+        #expect(!stateMachine.isShutdown)
+
+        // graceful shutdown should complete immediately
+        let shutdownAction = stateMachine.triggerGracefulShutdown()
+        #expect(shutdownAction.request == .none)
+        #expect(shutdownAction.connection == .cancelEventStreamAndFinalCleanup([backoffToken2]))
+        #expect(stateMachine.isShutdown)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testCircuitBreakerTripDuringGracefulShutdownWaitsForStartingConnection() {
+        struct ConnectionFailed: Error {}
+        let clock = MockClock()
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 2
+        configuration.keepAliveDuration = nil
+        configuration.circuitBreakerTripAfter = .seconds(15)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: clock
+        )
+
+        // two inflight connections
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        guard case .makeConnection(let connectionRequest1, _) = stateMachine.leaseConnection(request1).connection else { Issue.record(); return }
+        let request2 = MockRequest(connectionType: MockConnection.self)
+        guard case .makeConnection(let connectionRequest2, _) = stateMachine.leaseConnection(request2).connection else { Issue.record(); return }
+
+        // first one fails, second one is starting
+        let failedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: connectionRequest1)
+        guard case .scheduleTimers(let timers1) = failedAction.connection, let backoffTimer1 = Array(timers1).first else { Issue.record(); return }
+        #expect(stateMachine.timerScheduled(backoffTimer1, cancelContinuation: MockTimerCancellationToken(backoffTimer1)) == .none)
+
+        #expect(stateMachine.triggerGracefulShutdown() == .none())
+        #expect(!stateMachine.isShutdown)
+
+        // circuit breaker trips with starting connections
+        clock.advance(to: clock.now.advanced(by: .seconds(16)))
+        let retryAction = stateMachine.timerTriggered(backoffTimer1)
+        guard case .makeConnection(let retryRequest, _) = retryAction.connection else { Issue.record(); return }
+        let trippedAction = stateMachine.connectionEstablishFailed(ConnectionFailed(), for: retryRequest)
+        #expect(trippedAction.request == .failRequests(.init([request1, request2]), .connectionCreationCircuitBreakerTripped))
+        #expect(trippedAction.connection == .cancelTimers([]))
+        #expect(!stateMachine.isShutdown)
+
+        // complete the shutdown once the starting connection is closed
+        let connection2 = MockConnection(id: connectionRequest2.connectionID)
+        let establishedAction = stateMachine.connectionEstablished(connection2, maxStreams: 1)
+        #expect(establishedAction.request == .none)
+        #expect(establishedAction.connection == .closeConnection(connection2, []))
+
+        #expect(stateMachine.connectionClosed(connection2).connection == .cancelEventStreamAndFinalCleanup([]))
+        #expect(stateMachine.isShutdown)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testTriggerGracefulShutdownCompletesWhenStartingConnectionFailsWithNoQueuedRequests() {
         struct ConnectionFailed: Error {}
         var configuration = PoolConfiguration()
