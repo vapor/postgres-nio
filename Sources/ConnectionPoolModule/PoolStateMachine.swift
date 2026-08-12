@@ -560,11 +560,15 @@ struct PoolStateMachine<
         case .running:
             break
 
+        case .shuttingDown where gracefulShutdownTriggered:
+            // the connection needs to be closed here
+            break
+
         case .shuttingDown, .shutDown:
             return .none()
         }
 
-        switch self.connections.backoffDone(connectionID, retry: true) {
+        switch self.connections.backoffDone(connectionID, retry: !(isShuttingDown && gracefulShutdownTriggered)) {
         case .createConnection(let request, let continuation):
             let timers: TinyFastSequence<TimerCancellationToken>
             if let continuation {
@@ -924,6 +928,12 @@ struct PoolStateMachine<
     // Is connection pool shutdown.
     public var isShutdown: Bool { 
         if case .shutDown = self.poolState { return true }
+        return false
+    }
+
+    // Is connection pool shutting down.
+    public var isShuttingDown: Bool { 
+        if case .shuttingDown = self.poolState { return true }
         return false
     }
 }
