@@ -89,6 +89,26 @@ extension PostgresQuery {
         }
 
         @inlinable
+        public mutating func appendInterpolation<Value: PostgresThrowingDynamicTypeEncodable>(group: some Collection<Value>) throws {
+            var first = true
+            for value in group {
+                if first { first = false } else { self.sql.append(", ") }
+                try self.binds.append(value, context: .default)
+                self.sql.append(contentsOf: "$\(self.binds.count)")
+            }
+        }
+
+        @inlinable
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(group: some Collection<Value>) {
+            var first = true
+            for value in group {
+                if first { first = false } else { self.sql.append(", ") }
+                self.binds.append(value, context: .default)
+                self.sql.append(contentsOf: "$\(self.binds.count)")
+            }
+        }
+
+        @inlinable
         public mutating func appendInterpolation(unescaped interpolated: String) {
             self.sql.append(contentsOf: interpolated)
         }
