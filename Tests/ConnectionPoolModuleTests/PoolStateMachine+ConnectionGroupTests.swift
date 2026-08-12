@@ -850,4 +850,167 @@ import Testing
         #expect(info == nil)
         #expect(connections.stats == statsBeforeMaxStreamChange)
     }
+
+    // MARK: - Stream accounting regressions
+
+    /// A failing keep-alive on an idle connection must return the stream it had
+    /// taken. Before the fix the `.idle` branch of `keepAliveFailed` did not
+    /// subtract it: the connection moved to `.closing`, where `closed()` reports
+    /// `usedStreams == 0`, so `leasedStreams` stayed at 1 forever.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func failingKeepAliveOnIdleConnectionReturnsItsStream() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (index, _) = connections.newConnectionEstablished(connection, maxStreams: 1)
+        _ = connections.parkConnection(at: index, hasBecomeIdle: true)
+
+        #expect(connections.keepAliveIfIdle(connection.id) != nil)
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0, leasedStreams: 1))
+
+        #expect(connections.keepAliveFailed(connection.id) != nil)
+        #expect(connections.stats == .init(closing: 1))
+
+        _ = connections.connectionClosed(connection.id, shuttingDown: false)
+        #expect(connections.isEmpty)
+        #expect(connections.stats == .init())
+    }
+
+    /// Closing a connection whose keep-alive is running must return the keep-alive
+    /// stream too, otherwise it stays counted in `leasedStreams` after the
+    /// connection is gone.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func closingConnectionWithRunningKeepAliveReturnsItsStream() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (index, _) = connections.newConnectionEstablished(connection, maxStreams: 1)
+        _ = connections.parkConnection(at: index, hasBecomeIdle: true)
+        #expect(connections.keepAliveIfIdle(connection.id) != nil)
+        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0, leasedStreams: 1))
+
+        guard case .close = connections.closeConnection(at: index, deleteConnection: false) else {
+            Issue.record("Expected the connection to be closed")
+            return
+        }
+        #expect(connections.stats == .init(closing: 1))
+
+        _ = connections.connectionClosed(connection.id, shuttingDown: true)
+        #expect(connections.isEmpty)
+        #expect(connections.stats == .init())
+    }
+
+    /// A connection closed by the pool while a lease is outstanding, that then dies
+    /// before the lease comes back. The leased stream must be returned by `closed()`:
+    /// once the connection is removed from the group, the late `releaseConnection`
+    /// finds no connection and can subtract nothing.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func connectionDyingWhileClosingReturnsItsLeasedStreams() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (index, _) = connections.newConnectionEstablished(connection, maxStreams: 1)
+
+        guard case .leasedConnection = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease a connection")
+            return
+        }
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // The pool closes the connection while it is still leased (force shutdown).
+        guard case .close = connections.closeConnection(at: index, deleteConnection: false) else {
+            Issue.record("Expected the connection to be closed")
+            return
+        }
+        // The leased stream is still owed: it will be returned on release, or here.
+        #expect(connections.stats == .init(closing: 1, leasedStreams: 1))
+
+        // The connection dies before the lease comes back.
+        _ = connections.connectionClosed(connection.id, shuttingDown: true)
+        #expect(connections.isEmpty)
+        #expect(connections.stats == .init())
+
+        // The late release finds no connection: nothing left to subtract.
+        guard case .none = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected no action for a connection the group no longer knows")
+            return
+        }
+        #expect(connections.stats == .init())
+    }
+
+    /// Parking a connection whose keep-alive is running must schedule an IDLE TIMEOUT
+    /// timer. It used to be built with `usecase: .keepAlive`, which made it run for the
+    /// keep-alive duration, suppressed the idle timeout for that connection, and — if
+    /// it fired — was dispatched to `keepAliveIfIdle` on a connection that already had
+    /// a keep-alive running, tripping a precondition.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func parkingConnectionWithRunningKeepAliveSchedulesAnIdleTimeoutTimer() {
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 0,
+            maximumConcurrentConnectionSoftLimit: 4,
+            maximumConcurrentConnectionHardLimit: 4,
+            keepAlive: true,
+            keepAliveReducesAvailableStreams: true
+        )
+
+        guard let request = connections.createNewDemandConnectionIfPossible() else {
+            Issue.record("Expected a connection request")
+            return
+        }
+        let connection = MockConnection(id: request.connectionID)
+        let (index, _) = connections.newConnectionEstablished(connection, maxStreams: 2)
+
+        // Park it: keep-alive timer + idle timeout timer.
+        _ = connections.parkConnection(at: index, hasBecomeIdle: true)
+        #expect(connections.keepAliveIfIdle(connection.id) != nil)
+
+        // While the keep-alive runs, the connection is leased and released again:
+        // leasing cancels the idle timer, so the connection comes back idle with the
+        // keep-alive still running and no idle timer.
+        guard case .leasedConnection = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease a connection")
+            return
+        }
+        guard case .available(let releasedIndex, _) = connections.releaseConnection(connection.id, streams: 1) else {
+            Issue.record("Expected the connection to be available again")
+            return
+        }
+
+        let timers = connections.parkConnection(at: releasedIndex, hasBecomeIdle: true)
+        #expect(timers.map(\.usecase) == [.idleTimeout])
+    }
 }
