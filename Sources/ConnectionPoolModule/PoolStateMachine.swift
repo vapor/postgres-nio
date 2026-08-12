@@ -371,6 +371,10 @@ struct PoolStateMachine<
             return .none()
         }
 
+        if self.gracefulShutdownTriggered && self.requestQueue.isEmpty {
+            self.poolState = .shuttingDown
+        }
+
         return .init(
             request: .failRequest(request, ConnectionPoolError.requestCancelled),
             connection: .none

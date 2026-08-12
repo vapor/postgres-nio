@@ -41,7 +41,7 @@ import Testing
     }
 
     @Test(.timeLimit(.minutes(1)))
-    func gracefulShutdownWaitsForInFlightConnectionAttempt() async throws {
+    func gracefulShutdownClosesPoolAfterQueuedQueryIsCancelled() async throws {
         try await withSilentServer { port in
             var config = PostgresClient.Configuration(
                 host: "127.0.0.1",
@@ -52,7 +52,7 @@ import Testing
                 tls: .disable
             )
             config.options.connectTimeout = .seconds(2)
-            config.options.minimumConnections = 1
+            config.options.minimumConnections = 0
 
             let client = PostgresClient(
                 configuration: config,
@@ -63,20 +63,28 @@ import Testing
             let elapsed = await ServiceLifecycleTestKit.testGracefulShutdown { gracefulShutdownTrigger in
                 let start = ContinuousClock.now
                 await withTaskGroup(of: Void.self) { group in
-                    // We don't have a server to connect to, so  we'll reach `connectTimeout` (2s).
                     group.addTask { await client.run() }
 
-                    try? await Task.sleep(for: .milliseconds(200))
+                    let queryTask = Task {
+                        do {
+                            _ = try await client.query("SELECT 1")
+                            Issue.record("The query must never succeed against a silent server")
+                        } catch {
+                            // expected: the query is cancelled below while still queued
+                        }
+                    }
 
+                    try? await Task.sleep(for: .milliseconds(200))
                     gracefulShutdownTrigger.triggerGracefulShutdown()
+
+                    try? await Task.sleep(for: .milliseconds(300))
+                    queryTask.cancel()
+                    await queryTask.value
                 }
                 return ContinuousClock.now - start
             }
 
-            // If this took ~200ms (our sleep time) it would mean the connect timeout wasn't reached,
-            // and the client was canceled instead of gracefully shut down.
-            // If the test reached the time limit (1m, and would fail), it would mean there's no graceful shutdown hook.
-            #expect(elapsed > .seconds(1))
+            #expect(elapsed > .seconds(2))
         }
     }
 }
