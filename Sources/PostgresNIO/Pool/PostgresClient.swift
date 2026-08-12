@@ -469,7 +469,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// has been cancelled the client is not able to process any new queries or prepared statements.
     /// 
     /// Graceful shutdown is different to cancellation. If the client is gracefully shut down, work continues as
-    /// before until the request queue is drained and work is completed.
+    /// before until the request queue is drained and work is completed. New incoming requests will be rejected.
     ///
     /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
     ///

@@ -1119,7 +1119,8 @@ import Testing
             pool.triggerForceShutdown()
             #expect(leasedConnection.isClosing)
 
-            pool.releaseConnection(leasedConnection)
+            // this is omitted because we're testing `triggerForceShutdown`
+            // pool.releaseConnection(leasedConnection)
 
             for connection in factory.runningConnections {
                 try await connection.signalToClose

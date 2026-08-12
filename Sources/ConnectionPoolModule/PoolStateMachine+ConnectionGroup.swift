@@ -827,6 +827,7 @@ extension PoolStateMachine {
 
         // MARK: Shutdown
 
+        @usableFromInline
         mutating func closeAnyNonLeasedConnection(_ cleanup: inout ConnectionAction.Shutdown) {
             for index in self.connections.indices {
                 switch self.connections[index].state {
