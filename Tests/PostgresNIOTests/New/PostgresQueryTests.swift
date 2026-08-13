@@ -1,10 +1,10 @@
 @testable import PostgresNIO
-import XCTest
+import Testing
 import NIOCore
+import Foundation
 
-final class PostgresQueryTests: XCTestCase {
-
-    func testStringInterpolationWithOptional() {
+@Suite struct PostgresQueryTests {
+    @Test func stringInterpolationWithOptional() {
         let string = "Hello World"
         let null: UUID? = nil
         let uuid: UUID? = UUID()
@@ -13,7 +13,7 @@ final class PostgresQueryTests: XCTestCase {
             INSERT INTO foo (id, title, something) SET (\(uuid), \(string), \(null));
             """
 
-        XCTAssertEqual(query.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
+        #expect(query.sql == "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
 
         var expected = ByteBuffer()
         expected.writeInteger(Int32(16))
@@ -28,10 +28,10 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeString(string)
         expected.writeInteger(Int32(-1))
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        #expect(query.binds.bytes == expected)
     }
 
-    func testStringInterpolationWithDynamicType() {
+    @Test func stringInterpolationWithDynamicType() {
         let type = PostgresDataType(16435)
         let format = PostgresFormat.binary
         let dynamicString = DynamicString(value: "Hello world", psqlType: type, psqlFormat: format)
@@ -40,7 +40,7 @@ final class PostgresQueryTests: XCTestCase {
         INSERT INTO foo (dynamicType) SET (\(dynamicString));
         """
 
-        XCTAssertEqual(query.sql, "INSERT INTO foo (dynamicType) SET ($1);")
+        #expect(query.sql == "INSERT INTO foo (dynamicType) SET ($1);")
 
         var expectedBindsBytes = ByteBuffer()
         expectedBindsBytes.writeInteger(Int32(dynamicString.value.utf8.count))
@@ -48,11 +48,11 @@ final class PostgresQueryTests: XCTestCase {
 
         let expectedMetadata: [PostgresBindings.Metadata] = [.init(dataType: type, format: format, protected: true)]
 
-        XCTAssertEqual(query.binds.bytes, expectedBindsBytes)
-        XCTAssertEqual(query.binds.metadata, expectedMetadata)
+        #expect(query.binds.bytes == expectedBindsBytes)
+        #expect(query.binds.metadata == expectedMetadata)
     }
 
-    func testStringInterpolationWithCustomJSONEncoder() {
+    @Test func stringInterpolationWithCustomJSONEncoder() {
         struct Foo: Codable, PostgresCodable {
             var helloWorld: String
         }
@@ -61,12 +61,13 @@ final class PostgresQueryTests: XCTestCase {
         jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
 
         var query: PostgresQuery?
-        XCTAssertNoThrow(query = try """
-            INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
-            """
-        )
+        #expect(throws: Never.self) { 
+            query = try """
+                INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
+                """
+        }
 
-        XCTAssertEqual(query?.sql, "INSERT INTO test (foo) SET ($1);")
+        #expect(query?.sql == "INSERT INTO test (foo) SET ($1);")
 
         let expectedJSON = #"{"hello_world":"bar"}"#
 
@@ -75,10 +76,10 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(UInt8(0x01))
         expected.writeString(expectedJSON)
 
-        XCTAssertEqual(query?.binds.bytes, expected)
+        #expect(query?.binds.bytes == expected)
     }
 
-    func testAllowUsersToGenerateLotsOfRows() {
+    @Test func allowUsersToGenerateLotsOfRows() {
         let sql = "INSERT INTO test (id) SET (\((1...5).map({"$\($0)"}).joined(separator: ", ")));"
 
         var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
@@ -86,7 +87,7 @@ final class PostgresQueryTests: XCTestCase {
             query.binds.append(Int(value), context: .default)
         }
 
-        XCTAssertEqual(query.sql, "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")
+        #expect(query.sql == "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")
 
         var expected = ByteBuffer()
         for value in 1...5 {
@@ -94,10 +95,10 @@ final class PostgresQueryTests: XCTestCase {
             expected.writeInteger(value)
         }
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        #expect(query.binds.bytes == expected)
     }
 
-    func testUnescapedSQL() {
+    @Test func unescapedSQL() {
         let tableName = UUID().uuidString.uppercased()
         let value = 1
 
@@ -107,7 +108,7 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(UInt32(8))
         expected.writeInteger(value)
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        #expect(query.binds.bytes == expected)
     }
 }
 
