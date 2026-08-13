@@ -4,7 +4,7 @@ import NIOCore
 import Foundation
 
 @Suite struct PostgresQueryTests {
-    @Test func testStringInterpolationWithOptional() {
+    @Test func stringInterpolationWithOptional() {
         let string = "Hello World"
         let null: UUID? = nil
         let uuid: UUID? = UUID()
@@ -31,7 +31,7 @@ import Foundation
         #expect(query.binds.bytes == expected)
     }
 
-    @Test func testStringInterpolationWithDynamicType() {
+    @Test func stringInterpolationWithDynamicType() {
         let type = PostgresDataType(16435)
         let format = PostgresFormat.binary
         let dynamicString = DynamicString(value: "Hello world", psqlType: type, psqlFormat: format)
@@ -52,7 +52,7 @@ import Foundation
         #expect(query.binds.metadata == expectedMetadata)
     }
 
-    @Test func testStringInterpolationWithCustomJSONEncoder() {
+    @Test func stringInterpolationWithCustomJSONEncoder() {
         struct Foo: Codable, PostgresCodable {
             var helloWorld: String
         }
@@ -79,7 +79,7 @@ import Foundation
         #expect(query?.binds.bytes == expected)
     }
 
-    @Test func testAllowUsersToGenerateLotsOfRows() {
+    @Test func allowUsersToGenerateLotsOfRows() {
         let sql = "INSERT INTO test (id) SET (\((1...5).map({"$\($0)"}).joined(separator: ", ")));"
 
         var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
@@ -98,7 +98,7 @@ import Foundation
         #expect(query.binds.bytes == expected)
     }
 
-    @Test func testUnescapedSQL() {
+    @Test func unescapedSQL() {
         let tableName = UUID().uuidString.uppercased()
         let value = 1
 
