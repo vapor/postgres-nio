@@ -1,10 +1,10 @@
 @testable import PostgresNIO
-import XCTest
+import Testing
 import NIOCore
+import Foundation
 
-final class PostgresQueryTests: XCTestCase {
-
-    func testStringInterpolationWithOptional() {
+@Suite struct PostgresQueryTests {
+    @Test func stringInterpolationWithOptional() {
         let string = "Hello World"
         let null: UUID? = nil
         let uuid: UUID? = UUID()
@@ -13,7 +13,7 @@ final class PostgresQueryTests: XCTestCase {
             INSERT INTO foo (id, title, something) SET (\(uuid), \(string), \(null));
             """
 
-        XCTAssertEqual(query.sql, "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
+        #expect(query.sql == "INSERT INTO foo (id, title, something) SET ($1, $2, $3);")
 
         var expected = ByteBuffer()
         expected.writeInteger(Int32(16))
@@ -28,10 +28,10 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeString(string)
         expected.writeInteger(Int32(-1))
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        #expect(query.binds.bytes == expected)
     }
 
-    func testStringInterpolationWithDynamicType() {
+    @Test func stringInterpolationWithDynamicType() {
         let type = PostgresDataType(16435)
         let format = PostgresFormat.binary
         let dynamicString = DynamicString(value: "Hello world", psqlType: type, psqlFormat: format)
@@ -40,7 +40,7 @@ final class PostgresQueryTests: XCTestCase {
         INSERT INTO foo (dynamicType) SET (\(dynamicString));
         """
 
-        XCTAssertEqual(query.sql, "INSERT INTO foo (dynamicType) SET ($1);")
+        #expect(query.sql == "INSERT INTO foo (dynamicType) SET ($1);")
 
         var expectedBindsBytes = ByteBuffer()
         expectedBindsBytes.writeInteger(Int32(dynamicString.value.utf8.count))
@@ -48,11 +48,11 @@ final class PostgresQueryTests: XCTestCase {
 
         let expectedMetadata: [PostgresBindings.Metadata] = [.init(dataType: type, format: format, protected: true)]
 
-        XCTAssertEqual(query.binds.bytes, expectedBindsBytes)
-        XCTAssertEqual(query.binds.metadata, expectedMetadata)
+        #expect(query.binds.bytes == expectedBindsBytes)
+        #expect(query.binds.metadata == expectedMetadata)
     }
 
-    func testStringInterpolationWithCustomJSONEncoder() {
+    @Test func stringInterpolationWithCustomJSONEncoder() {
         struct Foo: Codable, PostgresCodable {
             var helloWorld: String
         }
@@ -61,12 +61,13 @@ final class PostgresQueryTests: XCTestCase {
         jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
 
         var query: PostgresQuery?
-        XCTAssertNoThrow(query = try """
-            INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
-            """
-        )
+        #expect(throws: Never.self) { 
+            query = try """
+                INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
+                """
+        }
 
-        XCTAssertEqual(query?.sql, "INSERT INTO test (foo) SET ($1);")
+        #expect(query?.sql == "INSERT INTO test (foo) SET ($1);")
 
         let expectedJSON = #"{"hello_world":"bar"}"#
 
@@ -75,10 +76,10 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(UInt8(0x01))
         expected.writeString(expectedJSON)
 
-        XCTAssertEqual(query?.binds.bytes, expected)
+        #expect(query?.binds.bytes == expected)
     }
 
-    func testAllowUsersToGenerateLotsOfRows() {
+    @Test func allowUsersToGenerateLotsOfRows() {
         let sql = "INSERT INTO test (id) SET (\((1...5).map({"$\($0)"}).joined(separator: ", ")));"
 
         var query = PostgresQuery(unsafeSQL: sql, binds: .init(capacity: 5))
@@ -86,7 +87,7 @@ final class PostgresQueryTests: XCTestCase {
             query.binds.append(Int(value), context: .default)
         }
 
-        XCTAssertEqual(query.sql, "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")
+        #expect(query.sql == "INSERT INTO test (id) SET ($1, $2, $3, $4, $5);")
 
         var expected = ByteBuffer()
         for value in 1...5 {
@@ -94,18 +95,18 @@ final class PostgresQueryTests: XCTestCase {
             expected.writeInteger(value)
         }
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        #expect(query.binds.bytes == expected)
     }
 
-    func testQueryInterpolationBeforeParentBinds() {
+    @Test func queryInterpolationBeforeParentBinds() {
         let a = 1
         let b = 2
         let subQuery: PostgresQuery = "SELECT id FROM sub WHERE a = \(a)"
 
         let query: PostgresQuery = "SELECT (\(subQuery)) FROM table WHERE b = \(b)"
 
-        XCTAssertEqual(query.sql, "SELECT (SELECT id FROM sub WHERE a = $1) FROM table WHERE b = $2")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([a, b]))
+        #expect(query.sql == "SELECT (SELECT id FROM sub WHERE a = $1) FROM table WHERE b = $2")
+        #expect(query.binds.bytes == Self.intBinds([a, b]))
     }
 
     func testQueryInterpolationAfterParentBind() {
@@ -115,8 +116,8 @@ final class PostgresQueryTests: XCTestCase {
 
         let query: PostgresQuery = "SELECT * FROM table WHERE b = \(b) AND id IN (\(subQuery))"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM table WHERE b = $1 AND id IN (SELECT id FROM sub WHERE a = $2)")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([b, a]))
+        #expect(query.sql == "SELECT * FROM table WHERE b = $1 AND id IN (SELECT id FROM sub WHERE a = $2)")
+        #expect(query.binds.bytes == Self.intBinds([b, a]))
     }
 
     func testQueryInterpolationBetweenParentBinds() {
@@ -128,8 +129,8 @@ final class PostgresQueryTests: XCTestCase {
 
         let query: PostgresQuery = "SELECT * FROM t WHERE c = \(c) AND (\(fragment)) AND d = \(d)"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t WHERE c = $1 AND (a = $2 AND b = $3) AND d = $4")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([c, a, b, d]))
+        #expect(query.sql == "SELECT * FROM t WHERE c = $1 AND (a = $2 AND b = $3) AND d = $4")
+        #expect(query.binds.bytes == Self.intBinds([c, a, b, d]))
     }
 
     func testQueryInterpolationWithEmptyQuery() {
@@ -137,8 +138,8 @@ final class PostgresQueryTests: XCTestCase {
 
         let query: PostgresQuery = "SELECT * FROM t \(condition)"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t ")
-        XCTAssertEqual(query.binds.count, 0)
+        #expect(query.sql == "SELECT * FROM t ")
+        #expect(query.binds.count == 0)
     }
 
     func testQueryInterpolationWithBindlessQuery() {
@@ -146,8 +147,8 @@ final class PostgresQueryTests: XCTestCase {
 
         let query: PostgresQuery = "SELECT * FROM t \(condition)"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t WHERE deleted_at IS NULL")
-        XCTAssertEqual(query.binds.count, 0)
+        #expect(query.sql == "SELECT * FROM t WHERE deleted_at IS NULL")
+        #expect(query.binds.count == 0)
     }
 
     func testNestedQueryInterpolation() {
@@ -159,8 +160,8 @@ final class PostgresQueryTests: XCTestCase {
 
         let query: PostgresQuery = "SELECT * FROM t WHERE z = \(z) AND (\(middle))"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t WHERE z = $1 AND (y = $2 AND (x = $3))")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([z, y, x]))
+        #expect(query.sql == "SELECT * FROM t WHERE z = $1 AND (y = $2 AND (x = $3))")
+        #expect(query.binds.bytes == Self.intBinds([z, y, x]))
     }
 
     func testQueryInterpolatedTwice() {
@@ -169,35 +170,35 @@ final class PostgresQueryTests: XCTestCase {
 
         let query: PostgresQuery = "SELECT * FROM t WHERE \(fragment) OR \(fragment)"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t WHERE a = $1 OR a = $2")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([a, a]))
+        #expect(query.sql == "SELECT * FROM t WHERE a = $1 OR a = $2")
+        #expect(query.binds.bytes == Self.intBinds([a, a]))
     }
 
     func testQueryInterpolationRenumbersMultiDigitPlaceholders() {
         let ids = Array(1...12)
         let a = 0
         let fragment: PostgresQuery = "ids IN (\(ids[0]), \(ids[1]), \(ids[2]), \(ids[3]), \(ids[4]), \(ids[5]), \(ids[6]), \(ids[7]), \(ids[8]), \(ids[9]), \(ids[10]), \(ids[11]))"
-        XCTAssertEqual(fragment.sql, "ids IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
+        #expect(fragment.sql == "ids IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
 
         let query: PostgresQuery = "SELECT * FROM t WHERE a = \(a) AND \(fragment)"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t WHERE a = $1 AND ids IN ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([a] + ids))
+        #expect(query.sql == "SELECT * FROM t WHERE a = $1 AND ids IN ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)")
+        #expect(query.binds.bytes == Self.intBinds([a] + ids))
     }
 
     func testQueryInterpolationLeavesQuotedPlaceholderTextAlone() {
         let a = 1
         let b = 2
         let fragment: PostgresQuery = "note = 'costs $1' AND a = \(a)"
-        XCTAssertEqual(fragment.sql, "note = 'costs $1' AND a = $1")
+        #expect(fragment.sql == "note = 'costs $1' AND a = $1")
 
         let query: PostgresQuery = "SELECT * FROM t WHERE b = \(b) AND \(fragment)"
 
-        XCTAssertEqual(query.sql, "SELECT * FROM t WHERE b = $1 AND note = 'costs $1' AND a = $2")
-        XCTAssertEqual(query.binds.bytes, Self.intBinds([b, a]))
+        #expect(query.sql == "SELECT * FROM t WHERE b = $1 AND note = 'costs $1' AND a = $2")
+        #expect(query.binds.bytes == Self.intBinds([b, a]))
     }
 
-    func testUnescapedSQL() {
+    @Test func unescapedSQL() {
         let tableName = UUID().uuidString.uppercased()
         let value = 1
 
@@ -207,7 +208,7 @@ final class PostgresQueryTests: XCTestCase {
         expected.writeInteger(UInt32(8))
         expected.writeInteger(value)
 
-        XCTAssertEqual(query.binds.bytes, expected)
+        #expect(query.binds.bytes == expected)
     }
 }
 
