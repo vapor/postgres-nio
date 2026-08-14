@@ -2,12 +2,13 @@ import Logging
 import NIOCore
 import NIOPosix
 import PostgresNIO
-import XCTest
+import Testing
 
-final class PostgresDataTypeIntegrationTests: XCTestCase {
-    func testDecodeOIDFromCatalog() async throws {
+@Suite
+struct PostgresDataTypeIntegrationTests {
+    @Test func decodeOIDFromCatalog() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
 
         try await withTestConnection(on: eventLoopGroup.next()) { connection in
             let rows = try await connection.query(
@@ -17,15 +18,15 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
 
             var iterator = rows.makeAsyncIterator()
             let firstRow = try await iterator.next()
-            XCTAssertEqual(try firstRow?.decode(PostgresDataType.self), .text)
+            #expect(try firstRow?.decode(PostgresDataType.self) == .text)
             let done = try await iterator.next()
-            XCTAssertNil(done)
+            #expect(done == nil)
         }
     }
 
     func testEncodeOIDAsQueryParameter() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
 
         try await withTestConnection(on: eventLoopGroup.next()) { connection in
             let rows = try await connection.query(
@@ -35,15 +36,15 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
 
             var iterator = rows.makeAsyncIterator()
             let firstRow = try await iterator.next()
-            XCTAssertEqual(try firstRow?.decode(String.self), "text")
+            #expect(try firstRow?.decode(String.self) == "text")
             let done = try await iterator.next()
-            XCTAssertNil(done)
+            #expect(done == nil)
         }
     }
 
     func testOIDAboveInt32MaxRoundTrips() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
 
         let large = PostgresDataType(3_000_000_000)
 
@@ -51,18 +52,18 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
             let serverSide = try await connection.query("SELECT 3000000000::oid", logger: .psqlTest)
             var serverSideIterator = serverSide.makeAsyncIterator()
             let serverSideRow = try await serverSideIterator.next()
-            XCTAssertEqual(try serverSideRow?.decode(PostgresDataType.self), large)
+            #expect(try serverSideRow?.decode(PostgresDataType.self) == large)
 
             let roundTrip = try await connection.query("SELECT \(large)::oid", logger: .psqlTest)
             var roundTripIterator = roundTrip.makeAsyncIterator()
             let roundTripRow = try await roundTripIterator.next()
-            XCTAssertEqual(try roundTripRow?.decode(PostgresDataType.self), large)
+            #expect(try roundTripRow?.decode(PostgresDataType.self) == large)
         }
     }
 
     func testOIDArrayRoundTrips() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
 
         try await withTestConnection(on: eventLoopGroup.next()) { connection in
             let wanted: [PostgresDataType] = [.bool, .text]
@@ -75,18 +76,18 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
             for try await row in rows {
                 typeNames.append(try row.decode(String.self))
             }
-            XCTAssertEqual(typeNames, ["bool", "text"])
+            #expect(typeNames == ["bool", "text"])
 
             let arrayRows = try await connection.query("SELECT ARRAY[16, 25]::oid[]", logger: .psqlTest)
             var arrayIterator = arrayRows.makeAsyncIterator()
             let arrayRow = try await arrayIterator.next()
-            XCTAssertEqual(try arrayRow?.decode([PostgresDataType].self), [.bool, .text])
+            #expect(try arrayRow?.decode([PostgresDataType].self) == [.bool, .text])
         }
     }
 
     func testDecodeRegprocFromCatalog() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
 
         try await withTestConnection(on: eventLoopGroup.next()) { connection in
             let rows = try await connection.query(
@@ -96,9 +97,9 @@ final class PostgresDataTypeIntegrationTests: XCTestCase {
 
             var iterator = rows.makeAsyncIterator()
             let firstRow = try await iterator.next()
-            let (asRegproc, asOID) = try XCTUnwrap(firstRow).decode((PostgresDataType, PostgresDataType).self)
-            XCTAssertEqual(asRegproc, asOID)
-            XCTAssertNotEqual(asRegproc.rawValue, 0)
+            let (asRegproc, asOID) = try #require(firstRow).decode((PostgresDataType, PostgresDataType).self)
+            #expect(asRegproc == asOID)
+            #expect(asRegproc.rawValue == 0)
         }
     }
 }

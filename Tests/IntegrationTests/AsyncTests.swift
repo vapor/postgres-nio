@@ -1,5 +1,6 @@
 import Logging
 import XCTest
+import Testing
 import PostgresNIO
 #if canImport(Network)
 import NIOTransportServices
@@ -732,5 +733,24 @@ extension XCTestCase {
             try await connection.close()
             throw error
         }
+    }
+}
+
+func withTestConnection<Result>(
+    on eventLoop: any EventLoop,
+    options: PostgresConnection.Configuration.Options? = nil,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ closure: (PostgresConnection) async throws -> Result
+) async throws -> Result {
+    let connection = try await PostgresConnection.test(on: eventLoop, options: options).get()
+
+    do {
+        let result = try await closure(connection)
+        try await connection.close()
+        return result
+    } catch {
+        Issue.record(error, "Unexpected error: \(String(reflecting: error))", sourceLocation: sourceLocation)
+        try? await connection.close()
+        throw error
     }
 }
