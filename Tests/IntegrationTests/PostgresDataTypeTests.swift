@@ -7,10 +7,7 @@ import Testing
 @Suite
 struct PostgresDataTypeIntegrationTests {
     @Test func decodeOIDFromCatalog() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
-
-        try await withTestConnection(on: eventLoopGroup.next()) { connection in
+        try await withTestConnection(on: NIOSingletons.posixEventLoopGroup.any()) { connection in
             let rows = try await connection.query(
                 "SELECT 'text'::regtype",
                 logger: .psqlTest
@@ -24,11 +21,8 @@ struct PostgresDataTypeIntegrationTests {
         }
     }
 
-    func testEncodeOIDAsQueryParameter() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
-
-        try await withTestConnection(on: eventLoopGroup.next()) { connection in
+    @Test func encodeOIDAsQueryParameter() async throws {
+        try await withTestConnection(on: NIOSingletons.posixEventLoopGroup.any()) { connection in
             let rows = try await connection.query(
                 "SELECT typname FROM pg_type WHERE oid = \(PostgresDataType.text)",
                 logger: .psqlTest
@@ -42,13 +36,10 @@ struct PostgresDataTypeIntegrationTests {
         }
     }
 
-    func testOIDAboveInt32MaxRoundTrips() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
-
+    @Test func oidAboveInt32MaxRoundTrips() async throws {
         let large = PostgresDataType(3_000_000_000)
 
-        try await withTestConnection(on: eventLoopGroup.next()) { connection in
+        try await withTestConnection(on: NIOSingletons.posixEventLoopGroup.any()) { connection in
             let serverSide = try await connection.query("SELECT 3000000000::oid", logger: .psqlTest)
             var serverSideIterator = serverSide.makeAsyncIterator()
             let serverSideRow = try await serverSideIterator.next()
@@ -61,11 +52,8 @@ struct PostgresDataTypeIntegrationTests {
         }
     }
 
-    func testOIDArrayRoundTrips() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
-
-        try await withTestConnection(on: eventLoopGroup.next()) { connection in
+    @Test func oidArrayRoundTrips() async throws {
+        try await withTestConnection(on: NIOSingletons.posixEventLoopGroup.any()) { connection in
             let wanted: [PostgresDataType] = [.bool, .text]
             let rows = try await connection.query(
                 "SELECT typname FROM pg_type WHERE oid = ANY(\(wanted)) ORDER BY oid",
@@ -85,11 +73,8 @@ struct PostgresDataTypeIntegrationTests {
         }
     }
 
-    func testDecodeRegprocFromCatalog() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { #expect(throws: Never.self) { try eventLoopGroup.syncShutdownGracefully() } }
-
-        try await withTestConnection(on: eventLoopGroup.next()) { connection in
+    @Test func decodeRegprocFromCatalog() async throws {
+        try await withTestConnection(on: NIOSingletons.posixEventLoopGroup.any()) { connection in
             let rows = try await connection.query(
                 "SELECT typinput, typinput::oid FROM pg_type WHERE typname = 'bool'",
                 logger: .psqlTest
@@ -99,7 +84,7 @@ struct PostgresDataTypeIntegrationTests {
             let firstRow = try await iterator.next()
             let (asRegproc, asOID) = try #require(firstRow).decode((PostgresDataType, PostgresDataType).self)
             #expect(asRegproc == asOID)
-            #expect(asRegproc.rawValue == 0)
+            #expect(asRegproc.rawValue != 0)
         }
     }
 }
