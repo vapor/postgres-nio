@@ -109,7 +109,7 @@ import Foundation
         #expect(query.binds.bytes == Self.intBinds([a, b]))
     }
 
-    func testQueryInterpolationAfterParentBind() {
+    @Test func queryInterpolationAfterParentBind() {
         let a = 1
         let b = 2
         let subQuery: PostgresQuery = "SELECT id FROM sub WHERE a = \(a)"
@@ -120,7 +120,7 @@ import Foundation
         #expect(query.binds.bytes == Self.intBinds([b, a]))
     }
 
-    func testQueryInterpolationBetweenParentBinds() {
+    @Test func queryInterpolationBetweenParentBinds() {
         let a = 10
         let b = 20
         let c = 1
@@ -133,7 +133,7 @@ import Foundation
         #expect(query.binds.bytes == Self.intBinds([c, a, b, d]))
     }
 
-    func testQueryInterpolationWithEmptyQuery() {
+    @Test func queryInterpolationWithEmptyQuery() {
         let condition: PostgresQuery = ""
 
         let query: PostgresQuery = "SELECT * FROM t \(condition)"
@@ -142,7 +142,7 @@ import Foundation
         #expect(query.binds.count == 0)
     }
 
-    func testQueryInterpolationWithBindlessQuery() {
+    @Test func queryInterpolationWithBindlessQuery() {
         let condition: PostgresQuery = "WHERE deleted_at IS NULL"
 
         let query: PostgresQuery = "SELECT * FROM t \(condition)"
@@ -151,7 +151,7 @@ import Foundation
         #expect(query.binds.count == 0)
     }
 
-    func testNestedQueryInterpolation() {
+    @Test func nestedQueryInterpolation() {
         let x = 1
         let y = 2
         let z = 3
@@ -164,7 +164,7 @@ import Foundation
         #expect(query.binds.bytes == Self.intBinds([z, y, x]))
     }
 
-    func testQueryInterpolatedTwice() {
+    @Test func queryInterpolatedTwice() {
         let a = 1
         let fragment: PostgresQuery = "a = \(a)"
 
@@ -174,7 +174,7 @@ import Foundation
         #expect(query.binds.bytes == Self.intBinds([a, a]))
     }
 
-    func testQueryInterpolationRenumbersMultiDigitPlaceholders() {
+    @Test func queryInterpolationRenumbersMultiDigitPlaceholders() {
         let ids = Array(1...12)
         let a = 0
         let fragment: PostgresQuery = "ids IN (\(ids[0]), \(ids[1]), \(ids[2]), \(ids[3]), \(ids[4]), \(ids[5]), \(ids[6]), \(ids[7]), \(ids[8]), \(ids[9]), \(ids[10]), \(ids[11]))"
@@ -186,7 +186,7 @@ import Foundation
         #expect(query.binds.bytes == Self.intBinds([a] + ids))
     }
 
-    func testQueryInterpolationLeavesQuotedPlaceholderTextAlone() {
+    @Test func queryInterpolationLeavesQuotedPlaceholderTextAlone() {
         let a = 1
         let b = 2
         let fragment: PostgresQuery = "note = 'costs $1' AND a = \(a)"

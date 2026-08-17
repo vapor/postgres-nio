@@ -6,14 +6,10 @@ public struct PostgresQuery: Sendable, Hashable {
     public var sql: String
     /// The query binds.
     public var binds: PostgresBindings
-    // UTF-8 offsets of the `$` of each interpolation-written placeholder in `sql`.
-    @usableFromInline
-    var placeHolderPositions: [Int]
 
     public init(unsafeSQL sql: String, binds: PostgresBindings = PostgresBindings()) {
         self.sql = sql
         self.binds = binds
-        self.placeHolderPositions = []
     }
 }
 
@@ -21,13 +17,11 @@ extension PostgresQuery: ExpressibleByStringInterpolation {
     public init(stringInterpolation: StringInterpolation) {
         self.sql = stringInterpolation.sql
         self.binds = stringInterpolation.binds
-        self.placeHolderPositions = stringInterpolation.placeHolderPositions
     }
 
     public init(stringLiteral value: String) {
         self.sql = value
         self.binds = PostgresBindings()
-        self.placeHolderPositions = []
     }
 }
 
@@ -39,13 +33,10 @@ extension PostgresQuery {
         var sql: String
         @usableFromInline
         var binds: PostgresBindings
-        @usableFromInline
-        var placeHolderPositions: [Int]
 
         public init(literalCapacity: Int, interpolationCount: Int) {
             self.sql = ""
             self.binds = PostgresBindings(capacity: interpolationCount)
-            self.placeHolderPositions = []
         }
 
         public mutating func appendLiteral(_ literal: String) {
@@ -55,7 +46,6 @@ extension PostgresQuery {
         @inlinable
         public mutating func appendInterpolation<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Value) throws {
             try self.binds.append(value, context: .default)
-            self.placeHolderPositions.append(self.sql.utf8.count)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
@@ -68,14 +58,12 @@ extension PostgresQuery {
                 try self.binds.append(value, context: .default)
             }
 
-            self.placeHolderPositions.append(self.sql.utf8.count)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
         @inlinable
         public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value) {
             self.binds.append(value, context: .default)
-            self.placeHolderPositions.append(self.sql.utf8.count)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
@@ -88,7 +76,6 @@ extension PostgresQuery {
                 self.binds.append(value, context: .default)
             }
 
-            self.placeHolderPositions.append(self.sql.utf8.count)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
@@ -98,37 +85,11 @@ extension PostgresQuery {
             context: PostgresEncodingContext<JSONEncoder>
         ) throws {
             try self.binds.append(value, context: context)
-            self.placeHolderPositions.append(self.sql.utf8.count)
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
-        @inlinable
         public mutating func appendInterpolation(_ query: PostgresQuery) {
-            let offset = self.binds.count
-            let utf8 = query.sql.utf8
-            self.sql.reserveCapacity(self.sql.utf8.count + utf8.count)
-            var consumed = utf8.startIndex
-            var consumedOffset = 0
-            for (i, position) in query.placeHolderPositions.enumerated() {
-                let dollar = utf8.index(consumed, offsetBy: position - consumedOffset)
-                // copy everything since the last placeholder up to the '$'
-                self.sql.append(contentsOf: query.sql[consumed..<dollar])
-                self.placeHolderPositions.append(self.sql.utf8.count)
-                self.sql.append(contentsOf: "$\(offset + i + 1)")
-                // skip the '$' and the old digits in the source
-                var index = utf8.index(after: dollar)
-                var skipped = 1
-                while 
-                    index < utf8.endIndex, 
-                    UInt8(ascii: "0") <= utf8[index], utf8[index] <= UInt8(ascii: "9") // is a number
-                {
-                    index = utf8.index(after: index)
-                    skipped += 1
-                }
-                consumed = index
-                consumedOffset = position + skipped
-            }
-            self.sql.append(contentsOf: query.sql[consumed...])
+            self.sql.append(contentsOf: PostgresQuery.renumberPlaceholders(in: query.sql, by: self.binds.count))
             self.binds.metadata.append(contentsOf: query.binds.metadata)
             var bytes = query.binds.bytes
             self.binds.bytes.writeBuffer(&bytes)
