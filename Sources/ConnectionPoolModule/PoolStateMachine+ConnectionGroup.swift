@@ -782,7 +782,11 @@ extension PoolStateMachine {
         ///            supplied index after this. If nil is returned the connection was closed by the state machine and was
         ///            therefore already removed.
         @inlinable
-        mutating func connectionClosed(_ connectionID: Connection.ID, shuttingDown: Bool) -> ClosedAction {
+        mutating func connectionClosed(
+            _ connectionID: Connection.ID,
+            shuttingDown: Bool,
+            createConnectionForQueuedRequest: Bool
+        ) -> ClosedAction {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
                 preconditionFailure("All connections that have been created should say goodbye exactly once!")
             }
@@ -814,6 +818,9 @@ extension PoolStateMachine {
             let newConnectionRequest: ConnectionRequest?
             if !shuttingDown, self.connections.count < self.minimumConcurrentConnections {
                 newConnectionRequest = self.createNewConnection()
+            } else if !shuttingDown, createConnectionForQueuedRequest {
+                newConnectionRequest = self.createNewDemandConnectionIfPossible()
+                    ?? self.createNewOverflowConnectionIfPossible()
             } else {
                 newConnectionRequest = .none
             }
