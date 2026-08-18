@@ -98,6 +98,106 @@ import Foundation
         #expect(query.binds.bytes == expected)
     }
 
+    @Test func queryInterpolationBeforeParentBinds() {
+        let a = 1
+        let b = 2
+        let subQuery: PostgresQuery = "SELECT id FROM sub WHERE a = \(a)"
+
+        let query: PostgresQuery = "SELECT (\(subQuery)) FROM table WHERE b = \(b)"
+
+        #expect(query.sql == "SELECT (SELECT id FROM sub WHERE a = $1) FROM table WHERE b = $2")
+        #expect(query.binds.bytes == Self.intBinds([a, b]))
+    }
+
+    @Test func queryInterpolationAfterParentBind() {
+        let a = 1
+        let b = 2
+        let subQuery: PostgresQuery = "SELECT id FROM sub WHERE a = \(a)"
+
+        let query: PostgresQuery = "SELECT * FROM table WHERE b = \(b) AND id IN (\(subQuery))"
+
+        #expect(query.sql == "SELECT * FROM table WHERE b = $1 AND id IN (SELECT id FROM sub WHERE a = $2)")
+        #expect(query.binds.bytes == Self.intBinds([b, a]))
+    }
+
+    @Test func queryInterpolationBetweenParentBinds() {
+        let a = 10
+        let b = 20
+        let c = 1
+        let d = 2
+        let fragment: PostgresQuery = "a = \(a) AND b = \(b)"
+
+        let query: PostgresQuery = "SELECT * FROM t WHERE c = \(c) AND (\(fragment)) AND d = \(d)"
+
+        #expect(query.sql == "SELECT * FROM t WHERE c = $1 AND (a = $2 AND b = $3) AND d = $4")
+        #expect(query.binds.bytes == Self.intBinds([c, a, b, d]))
+    }
+
+    @Test func queryInterpolationWithEmptyQuery() {
+        let condition: PostgresQuery = ""
+
+        let query: PostgresQuery = "SELECT * FROM t \(condition)"
+
+        #expect(query.sql == "SELECT * FROM t ")
+        #expect(query.binds.count == 0)
+    }
+
+    @Test func queryInterpolationWithBindlessQuery() {
+        let condition: PostgresQuery = "WHERE deleted_at IS NULL"
+
+        let query: PostgresQuery = "SELECT * FROM t \(condition)"
+
+        #expect(query.sql == "SELECT * FROM t WHERE deleted_at IS NULL")
+        #expect(query.binds.count == 0)
+    }
+
+    @Test func nestedQueryInterpolation() {
+        let x = 1
+        let y = 2
+        let z = 3
+        let inner: PostgresQuery = "x = \(x)"
+        let middle: PostgresQuery = "y = \(y) AND (\(inner))"
+
+        let query: PostgresQuery = "SELECT * FROM t WHERE z = \(z) AND (\(middle))"
+
+        #expect(query.sql == "SELECT * FROM t WHERE z = $1 AND (y = $2 AND (x = $3))")
+        #expect(query.binds.bytes == Self.intBinds([z, y, x]))
+    }
+
+    @Test func queryInterpolatedTwice() {
+        let a = 1
+        let fragment: PostgresQuery = "a = \(a)"
+
+        let query: PostgresQuery = "SELECT * FROM t WHERE \(fragment) OR \(fragment)"
+
+        #expect(query.sql == "SELECT * FROM t WHERE a = $1 OR a = $2")
+        #expect(query.binds.bytes == Self.intBinds([a, a]))
+    }
+
+    @Test func queryInterpolationRenumbersMultiDigitPlaceholders() {
+        let ids = Array(1...12)
+        let a = 0
+        let fragment: PostgresQuery = "ids IN (\(ids[0]), \(ids[1]), \(ids[2]), \(ids[3]), \(ids[4]), \(ids[5]), \(ids[6]), \(ids[7]), \(ids[8]), \(ids[9]), \(ids[10]), \(ids[11]))"
+        #expect(fragment.sql == "ids IN ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)")
+
+        let query: PostgresQuery = "SELECT * FROM t WHERE a = \(a) AND \(fragment)"
+
+        #expect(query.sql == "SELECT * FROM t WHERE a = $1 AND ids IN ($2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)")
+        #expect(query.binds.bytes == Self.intBinds([a] + ids))
+    }
+
+    @Test func queryInterpolationLeavesQuotedPlaceholderTextAlone() {
+        let a = 1
+        let b = 2
+        let fragment: PostgresQuery = "note = 'costs $1' AND a = \(a)"
+        #expect(fragment.sql == "note = 'costs $1' AND a = $1")
+
+        let query: PostgresQuery = "SELECT * FROM t WHERE b = \(b) AND \(fragment)"
+
+        #expect(query.sql == "SELECT * FROM t WHERE b = $1 AND note = 'costs $1' AND a = $2")
+        #expect(query.binds.bytes == Self.intBinds([b, a]))
+    }
+
     @Test func unescapedSQL() {
         let tableName = UUID().uuidString.uppercased()
         let value = 1
@@ -113,6 +213,15 @@ import Foundation
 }
 
 extension PostgresQueryTests {
+    private static func intBinds(_ values: [Int]) -> ByteBuffer {
+        var buffer = ByteBuffer()
+        for value in values {
+            buffer.writeInteger(UInt32(8))
+            buffer.writeInteger(value)
+        }
+        return buffer
+    }
+
     struct DynamicString: PostgresDynamicTypeEncodable {
         let value: String
 
