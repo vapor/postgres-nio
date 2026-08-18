@@ -5,6 +5,10 @@ extension PostgresQuery {
     }
 
     enum PlaceholderLexer {
+        /// Finds every top-level bind placeholder (`$1`, `$2`, ...) in the query,
+        /// returning the UTF-8 offset of each placeholder's `$` and its number
+        /// in order of finding. Placeholder-like text inside string literals, quoted
+        /// identifiers, comments, and dollar-quoted strings is not matched.
         static func placeholders(in query: String) -> [Placeholder] {
             let utf8 = query.utf8
             var placeholders: [Placeholder] = []
