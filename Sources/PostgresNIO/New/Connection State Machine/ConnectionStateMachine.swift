@@ -1088,12 +1088,6 @@ extension ConnectionStateMachine {
                 // any error message that doesn't have a sql state field, is unexpected by default.
                 return true
             }
-            
-            if sqlState.starts(with: "28") {
-                // these are authentication errors
-                return true
-            }
-            
             return false
         case .clientClosedConnection, .poolClosed:
             preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
