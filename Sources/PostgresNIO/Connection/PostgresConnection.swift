@@ -11,7 +11,7 @@ import Logging
 /// A Postgres connection. Use it to run queries against a Postgres server.
 ///
 /// Thread safety is achieved by dispatching all access to shared state onto the underlying EventLoop.
-public final class PostgresConnection: @unchecked Sendable {
+public final class PostgresConnection: Sendable {
     /// A Postgres connection ID.
     public typealias ID = Int
 
@@ -47,7 +47,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     public let id: ID
 
-    private var _logger: Logger
+    private let _logger: Logger
 
     init(channel: any Channel, connectionID: ID, logger: Logger) {
         self.channel = channel

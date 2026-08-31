@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v7
       - name: Run unit tests with Thread Sanitizer
         run: |
-          swift test --filter='^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
+          swift test --filter '^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
       - name: Submit code coverage
         uses: vapor/swift-codecov-action@2f478f2fd22e06ca363967d0fb6c6593a8548cee # v0.3.5
         with:
@@ -77,7 +77,7 @@ jobs:
         uses: actions/checkout@v7
         with: { path: 'postgres-nio' }
       - name: Run integration tests
-        run: swift test --package-path postgres-nio --filter=^IntegrationTests
+        run: swift test --package-path postgres-nio --filter ^IntegrationTests
       - name: Check out postgres-kit dependent
         uses: actions/checkout@v7
         with: { repository: 'vapor/postgres-kit', path: 'postgres-kit' }
