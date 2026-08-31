@@ -258,7 +258,7 @@ struct PoolStateMachine<
     /*private*/ var requestQueue: RequestQueue
     @usableFromInline
     /*private*/ var poolState: PoolState = .running(.init(gracefulShutdownTriggered: false))
-    @usableFromInline
+    @inlinable
     /*private*/ var gracefulShutdownTriggered: Bool {
         switch self.poolState {
         case .running(let context): context.gracefulShutdownTriggered
@@ -299,7 +299,7 @@ struct PoolStateMachine<
 
     @inlinable
     mutating func leaseConnection(_ request: Request) -> Action {
-        if gracefulShutdownTriggered {
+        if self.gracefulShutdownTriggered {
             // reject new requests
             return .init(
                 request: .failRequest(request, .poolShutdown), 
@@ -781,6 +781,7 @@ struct PoolStateMachine<
         case .connectionCreationFailing(var context):
             context.gracefulShutdownTriggered = true
             self.poolState = .connectionCreationFailing(context)
+
         case .circuitBreakOpen:
             self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: true))
 

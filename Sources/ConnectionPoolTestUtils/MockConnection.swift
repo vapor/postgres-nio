@@ -21,8 +21,10 @@ public final class MockConnection: PooledConnection, Sendable {
 
     public var isRunning: Bool {
         self.lock.withLockedValue { state in
-            if case .running = state { return true }
-            return false
+            switch state {
+            case .running: return true
+            case .closing, .closed: return false
+            }
         }
     }
 
