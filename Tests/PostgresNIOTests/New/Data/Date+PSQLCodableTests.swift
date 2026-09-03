@@ -81,15 +81,17 @@ struct Date_PSQLCodableTests {
     @Test(
         .bug("https://github.com/vapor/postgres-nio/issues/632"),
         arguments: [
-            (Date(timeIntervalSince1970: .greatestFiniteMagnitude), Date._endTimestamp),
-            (Date(timeIntervalSince1970: -.greatestFiniteMagnitude), Date._minTimestamp - 1),
-            (Date(timeIntervalSince1970: .infinity), Date._endTimestamp),
-            (Date(timeIntervalSince1970: -.infinity), Date._minTimestamp - 1),
-            (Date(timeIntervalSince1970: .nan), Date._endTimestamp),
-            (Date(timeInterval: 9_300_000_000_000, since: Date(timeIntervalSince1970: 946_684_800)), Date._endTimestamp),
-            (Date(timeInterval: -9_300_000_000_000, since: Date(timeIntervalSince1970: 946_684_800)), Date._minTimestamp - 1)
+            (Double.greatestFiniteMagnitude, Date._endTimestamp),
+            (-.greatestFiniteMagnitude, Date._minTimestamp - 1),
+            (.infinity, Date._endTimestamp),
+            (-.infinity, Date._minTimestamp - 1),
+            (.nan, Date._endTimestamp),
+            (9_300_000_000_000, Date._endTimestamp),
+            (-9_300_000_000_000, Date._minTimestamp - 1)
         ])
-    func encodeDatesOutsideOfInt64MicrosecondRange(value: Date, expected: Int64) {
+    func encodeDatesOutsideOfInt64MicrosecondRange(secondsSincePSQLDateStart: Double, expected: Int64) {
+        let value = Date(timeInterval: secondsSincePSQLDateStart, since: Date(timeIntervalSince1970: 946_684_800))
+
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
         #expect(buffer.readInteger(as: Int64.self) == expected)

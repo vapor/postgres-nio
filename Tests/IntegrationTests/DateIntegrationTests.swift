@@ -10,16 +10,18 @@ struct DateIntegrationTests {
     @Test(
         .bug("https://github.com/vapor/postgres-nio/issues/632"),
         arguments: [
-            Date(timeIntervalSince1970: .greatestFiniteMagnitude),
-            Date(timeIntervalSince1970: -.greatestFiniteMagnitude),
-            Date(timeIntervalSince1970: .infinity),
-            Date(timeIntervalSince1970: -.infinity),
-            Date(timeIntervalSince1970: .nan),
+            Double.greatestFiniteMagnitude,
+            -.greatestFiniteMagnitude,
+            .infinity,
+            -.infinity,
+            .nan,
             // Int64.min, which would become -infinity
-            Date(timeInterval: -9_223_372_036_854.775390625, since: Date(timeIntervalSince1970: 946_684_800)),
+            -9_223_372_036_854.775390625,
         ]
     )
-    func outOfRangeDatesAreRejectedByTheServer(date: Date) async throws {
+    func outOfRangeDatesAreRejectedByTheServer(secondsSincePSQLDateStart: Double) async throws {
+        let date = Date(timeInterval: secondsSincePSQLDateStart, since: Date(timeIntervalSince1970: 946_684_800))
+
         try await withTestConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
             do {
                 let rows = try await connection.query("SELECT \(date)::timestamptz", logger: .psqlTest)
