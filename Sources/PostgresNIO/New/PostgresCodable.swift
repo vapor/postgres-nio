@@ -82,7 +82,7 @@ public protocol PostgresDecodable {
     ///              to use when decoding JSON and metadata to create better errors.
     /// - Returns: A decoded object.
     init<JSONDecoder: PostgresJSONDecoder>(
-        from byteBuffer: inout ByteBuffer,
+        from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
@@ -91,7 +91,7 @@ public protocol PostgresDecodable {
     /// Decode an entity from the `buffer` in Postgres wire format. This method has a default implementation and
     /// is only overridden for `Optional`s.
     static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
-        from byteBuffer: inout ByteBuffer?,
+        from buffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
@@ -101,12 +101,12 @@ public protocol PostgresDecodable {
 extension PostgresDecodable {
     @inlinable
     public static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
-        from byteBuffer: inout ByteBuffer?,
+        from buffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Self {
-        guard var buffer = byteBuffer else {
+        guard var buffer = buffer else {
             throw PostgresDecodingError.Code.missingData
         }
         return try self.init(from: &buffer, type: type, format: format, context: context)
@@ -210,7 +210,7 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
     public typealias _DecodableType = Wrapped
 
     public init<JSONDecoder: PostgresJSONDecoder>(
-        from byteBuffer: inout ByteBuffer,
+        from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
@@ -220,12 +220,12 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
 
     @inlinable
     public static func _decodeRaw<JSONDecoder : PostgresJSONDecoder>(
-        from byteBuffer: inout ByteBuffer?,
+        from buffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
     ) throws -> Optional<Wrapped> {
-        switch byteBuffer {
+        switch buffer {
         case .some(var buffer):
             return try Wrapped(from: &buffer, type: type, format: format, context: context)
         case .none:
