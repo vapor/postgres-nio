@@ -124,20 +124,23 @@ public struct PostgresBindings: Sendable, Hashable {
         @usableFromInline
         var dataType: PostgresDataType
         @usableFromInline
+        var dataTypeName: String?
+        @usableFromInline
         var format: PostgresFormat
         @usableFromInline
         var protected: Bool
 
         @inlinable
-        init(dataType: PostgresDataType, format: PostgresFormat, protected: Bool) {
+        init(dataType: PostgresDataType, format: PostgresFormat, protected: Bool, dataTypeName: String? = nil) {
             self.dataType = dataType
             self.format = format
             self.protected = protected
+            self.dataTypeName = dataTypeName
         }
 
         @inlinable
         init<Value: PostgresThrowingDynamicTypeEncodable>(value: Value, protected: Bool) {
-            self.init(dataType: value.psqlType, format: value.psqlFormat, protected: protected)
+            self.init(dataType: value.psqlType, format: value.psqlFormat, protected: protected, dataTypeName: value.psqlTypeName)
         }
     }
 

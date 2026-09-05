@@ -110,6 +110,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// startup message that the client sends to the server.
             public var additionalStartupParameters: [(String, String)] = []
 
+            /// The names of additional Postgres data types whose object identifiers (OIDs) shall be resolved while
+            /// a connection is established.
+            public var additionalDataTypeNames: [String] = []
+
             /// The minimum number of connections that the client shall keep open at any time, even if there is no
             /// demand. Defaults to `0`.
             ///

@@ -21,6 +21,17 @@ public protocol PostgresThrowingDynamicTypeEncodable {
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws
+
+    /// The Postgres name for this type. This is used for types that don't have a static OID.
+    /// Setting this on a type, combined with adding it to ``PostgresConnection/Configuration/Options/additionalDataTypeNames``,
+    /// will allow usage of this type through its dynamically constructed OID, by querying the OID
+    /// at connection startup.
+    var psqlTypeName: String? { get }
+}
+
+extension PostgresThrowingDynamicTypeEncodable {
+    @inlinable
+    public var psqlTypeName: String? { nil }
 }
 
 /// A type that can encode itself to a Postgres wire binary representation.

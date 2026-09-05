@@ -24,6 +24,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
 
     private var listenState = ListenStateMachine()
     private var preparedStatementState = PreparedStatementStateMachine()
+    private var resolvedDataTypes: [String: PostgresDataType] = [:]
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
@@ -44,12 +45,73 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
     func handlerAdded(context: ChannelHandlerContext) {
         self.handlerContext = context
         self.encoder = PostgresFrontendMessageEncoder(buffer: context.channel.allocator.buffer(capacity: 256))
-        
+
+        self.populateDataTypes(context: context)
+
         if context.channel.isActive {
             self.connected(context: context)
         }
     }
-    
+
+    /// Enqueue a query resolving the OIDs of ``PostgresConnection/Configuration/Options/additionalDataTypeNames``.
+    private func populateDataTypes(context: ChannelHandlerContext) {
+        let dataTypeNames = self.configuration.options.additionalDataTypeNames
+        guard !dataTypeNames.isEmpty else { return }
+
+        let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
+        let queryContext = ExtendedQueryContext(
+            query: """
+                SELECT typname, oid FROM pg_type
+                    WHERE typname = ANY (\(dataTypeNames))
+                    AND pg_type_is_visible(oid);
+                """,
+            logger: self.logger,
+            promise: promise
+        )
+
+        let loopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
+        promise.futureResult.flatMap { $0.all() }.whenComplete { result in
+            loopBound.value.populateDataTypesCompleted(result, for: dataTypeNames)
+        }
+
+        self.run(self.state.enqueue(task: .extendedQuery(queryContext)), with: context)
+    }
+
+    private func populateDataTypesCompleted(
+        _ result: Result<[PostgresRow], any Error>,
+        for dataTypeNames: [String]
+    ) {
+        switch result {
+        case .success(let rows):
+            do {
+                let decoded = try rows.map { try $0.decode((String, PostgresDataType).self) }
+                self.resolvedDataTypes = Dictionary(decoded, uniquingKeysWith: { last, _ in last })
+            } catch {
+                self.logger.warning("Failed to decode additional data types", metadata: [
+                    .error: "\(error)", .dataTypeNames: "\(dataTypeNames)"
+                ])
+            }
+
+            let unresolved = dataTypeNames.filter { self.resolvedDataTypes[$0] == nil }
+            if !unresolved.isEmpty {
+                self.logger.warning("Some additional data types could not be resolved", metadata: [
+                    .dataTypeNames: "\(unresolved)"
+                ])
+            }
+
+        case .failure(let error):
+            if let error = error as? PSQLError,
+                [.clientClosedConnection, .serverClosedConnection, .connectionError, .uncleanShutdown].contains(error.code)
+            {
+                // The connection attempt failed so there will be another log somewhere
+            } else {
+                self.logger.warning("Failed to resolve additional data types", metadata: [
+                    .error: "\(error)", .dataTypeNames: "\(dataTypeNames)"
+                ])
+            }
+        }
+    }
+
     func handlerRemoved(context: ChannelHandlerContext) {
         self.handlerContext = nil
     }
@@ -605,16 +667,21 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
     ) {
         precondition(self.rowStream == nil, "Expected to not have an open stream at this point")
         let unnamedStatementName = ""
+
         self.encoder.parse(
             preparedStatementName: unnamedStatementName,
             query: query.sql,
-            parameters: query.binds.metadata.lazy.map(\.dataType)
+            parameters: query.binds.metadata.lazy.map { self.resolveDataType($0) }
         )
         self.encoder.describePreparedStatement(unnamedStatementName)
         self.encoder.bind(portalName: "", preparedStatementName: unnamedStatementName, bind: query.binds)
         self.encoder.execute(portalName: "")
         self.encoder.sync()
         context.writeAndFlush(self.wrapOutboundOut(self.encoder.flushBuffer()), promise: nil)
+    }
+
+    private func resolveDataType(_ metadata: PostgresBindings.Metadata) -> PostgresDataType {
+        metadata.dataTypeName.flatMap { self.resolvedDataTypes[$0] } ?? metadata.dataType
     }
     
     private func succeedQuery(
@@ -813,7 +880,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
         return .extendedQuery(.init(
             name: preparedStatement.name,
             query: preparedStatement.sql,
-            bindingDataTypes: preparedStatement.bindingDataTypes,
+            bindingDataTypes: preparedStatement.bindingDataTypes.isEmpty
+                ? preparedStatement.bindings.metadata.map(self.resolveDataType)
+                : preparedStatement.bindingDataTypes,
             logger: preparedStatement.logger,
             promise: promise
         ))

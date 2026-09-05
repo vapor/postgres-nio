@@ -13,6 +13,7 @@ extension PSQLConnection {
         case notice = "psql_notice"
         case binds = "psql_binds"
         case commandTag = "psql_command_tag"
+        case dataTypeNames = "psql_data_type_names"
         
         case connectionState = "psql_connection_state"
         case connectionAction = "psql_connection_action"
