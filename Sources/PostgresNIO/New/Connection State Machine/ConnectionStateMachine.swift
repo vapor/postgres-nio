@@ -1081,7 +1081,7 @@ extension ConnectionStateMachine {
              .uncleanShutdown,
              .unlistenFailed:
             return true
-        case .queryCancelled:
+        case .queryCancelled, .notEnoughColumns:
             return false
         case .server, .listenFailed:
             guard let sqlState = error.serverInfo?[.sqlState] else {

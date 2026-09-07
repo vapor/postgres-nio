@@ -117,7 +117,7 @@ import NIOCore
         #expect(correctType)
     }
 
-    @Test func columnCountMismatchSingleType() {
+    @Test func notEnoughColumnsSingleType() {
         let rowDescription = [RowDescription.Column]()
         let row = PostgresRow(
             data: .makeTestDataRow(),
@@ -129,13 +129,13 @@ import NIOCore
             try row.decode(String.self)
         }
         
-        #expect(error?.code == .columnCountMismatch)
+        #expect(error?.code == .notEnoughColumns)
         #expect(error?.expectedColumns == 1)
         #expect(error?.returnedColumns == 0)
         #expect(error?.file == #fileID)
     }
 
-    @Test func columnCountMismatchTuple() {
+    @Test func notEnoughColumnsTuple() {
         let rowDescription = [
             RowDescription.Column(
                 name: "name",
@@ -157,7 +157,7 @@ import NIOCore
             try row.decode((String, String).self)
         }
         
-        #expect(error?.code == .columnCountMismatch)
+        #expect(error?.code == .notEnoughColumns)
         #expect(error?.expectedColumns == 2)
         #expect(error?.returnedColumns == 1)
         #expect(error?.file == #fileID)

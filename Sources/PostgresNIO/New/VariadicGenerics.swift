@@ -18,8 +18,7 @@ extension PostgresRow {
         line: Int = #line
     ) throws -> (Column) {
         guard self.columns.count >= 1 else {
-            throw PostgresRowDecodingError(
-                code: .columnCountMismatch,
+            throw PSQLError.notEnoughColumns(
                 expectedColumns: 1,
                 returnedColumns: self.columns.count,
                 file: file,
@@ -62,8 +61,7 @@ extension PostgresRow {
     ) throws -> (repeat each Column) {
         let packCount = ComputeParameterPackLength.count(ofPack: repeat (each Column).self)
         guard self.columns.count >= packCount else {
-            throw PostgresRowDecodingError(
-                code: .columnCountMismatch,
+            throw PSQLError.notEnoughColumns(
                 expectedColumns: packCount,
                 returnedColumns: self.columns.count,
                 file: file,
