@@ -2,7 +2,7 @@
 <img src="https://design.vapor.codes/images/vapor-postgresnio.svg" height="96" alt="PostgresNIO">
 <br>
 <br>
-<a href="https://api.vapor.codes/postgresnio/documentation/postgresnio/">
+<a href="https://api.vapor.codes/postgresnio/">
     <img src="https://design.vapor.codes/images/readthedocs.svg" alt="Documentation">
 </a>
 <a href="LICENSE">
@@ -159,22 +159,22 @@ Some queries do not receive any rows from the server (most often `INSERT`, `UPDA
 Please see [SECURITY.md] for details on the security process.
 
 [SSWG Incubation]: https://github.com/swift-server/sswg/blob/main/process/incubation.md#graduated-level
-[Documentation]: https://api.vapor.codes/postgresnio/documentation/postgresnio
+[Documentation]: https://api.vapor.codes/postgresnio/
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
 [Swift 6.0]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
-[`PostgresConnection`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection
-[`PostgresClient`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresclient
-[`run()`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresclient/run()
-[`query(_:logger:)`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
-[`PostgresQuery`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresquery
-[`PostgresRow`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrow
-[`PostgresRowSequence`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresrowsequence
-[`PostgresDecodable`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresdecodable
-[`PostgresEncodable`]: https://api.vapor.codes/postgresnio/documentation/postgresnio/postgresencodable
+[`PostgresConnection`]: https://api.vapor.codes/postgresnio/postgresconnection
+[`PostgresClient`]: https://api.vapor.codes/postgresnio/postgresclient
+[`run()`]: https://api.vapor.codes/postgresnio/postgresclient/run()
+[`query(_:logger:)`]: https://api.vapor.codes/postgresnio/postgresconnection/query(_:logger:file:line:)-9mkfn
+[`PostgresQuery`]: https://api.vapor.codes/postgresnio/postgresquery
+[`PostgresRow`]: https://api.vapor.codes/postgresnio/postgresrow
+[`PostgresRowSequence`]: https://api.vapor.codes/postgresnio/postgresrowsequence
+[`PostgresDecodable`]: https://api.vapor.codes/postgresnio/postgresdecodable
+[`PostgresEncodable`]: https://api.vapor.codes/postgresnio/postgresencodable
 [SwiftNIO]: https://github.com/apple/swift-nio
 [PostgresKit]: https://github.com/vapor/postgres-kit
 [SwiftLog]: https://github.com/apple/swift-log

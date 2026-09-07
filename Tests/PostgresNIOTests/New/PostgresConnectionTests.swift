@@ -85,6 +85,43 @@ import Synchronization
         try await connection.close()
     }
 
+    @Test func testEstablishAndAuthChannelWithoutPostgresHandlerRemovesPostgresHandlers() async throws {
+        let eventLoop = NIOAsyncTestingEventLoop()
+        let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
+            try channel.pipeline.syncOperations.addHandlers(ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()))
+            try channel.pipeline.syncOperations.addHandlers(ReverseMessageToByteHandler(PSQLBackendMessageEncoder()))
+        }
+        try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
+
+        let configuration = PostgresConnection.Configuration(
+            establishedChannel: channel,
+            username: "username",
+            password: "postgres",
+            database: "database"
+        )
+
+        async let preparedChannelPromise = PostgresConnection.establishAndAuthChannelWithoutPostgresHandler(using: configuration, on: eventLoop, logger: self.logger).get()
+        let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+        #expect(message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
+        try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
+        try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
+        try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+        let preparedChannel = try await preparedChannelPromise
+        #expect(preparedChannel === channel)
+
+        // The whole point of `establishAndAuthChannelWithoutPostgresHandler` is to hand back an authenticated channel
+        // with PostgresNIO's own protocol handlers removed, so the caller can drive it with a pipeline of their own.
+        await #expect(throws: (any Error).self) {
+            try await channel.pipeline.context(handlerType: PostgresChannelHandler.self).map { _ in }.get()
+        }
+        await #expect(throws: (any Error).self) {
+            try await channel.pipeline.context(handlerType: PSQLEventsHandler.self).map { _ in }.get()
+        }
+
+        try await channel.close()
+    }
+
     @available(*, deprecated, message: "Deprecated, as it tests a deprecated method.")
     @Test func testSimpleListen() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
@@ -1042,6 +1079,74 @@ import Synchronization
         }
     }
 
+    #if compiler(>=6.2) // copyFromBinary is only available in Swift 6.2+
+    @Test func testCopyFromBinary() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
+                taskGroup.addTask {
+                    try await connection.copyFromBinary(table: "copy_table", logger: .psqlTest) {
+                        writer in
+                        try await writer.writeRow { columnWriter in
+                            try columnWriter.writeColumn(Int32(1))
+                            try columnWriter.writeColumn("Alice")
+                        }
+                        try await writer.writeRow { columnWriter in
+                            try columnWriter.writeColumn(Int32(2))
+                            try columnWriter.writeColumn("Bob")
+                        }
+                    }
+                }
+
+                let copyRequest = try await channel.waitForUnpreparedRequest()
+                #expect(copyRequest.parse.query == #"COPY "copy_table" FROM STDIN WITH (FORMAT binary)"#)
+
+                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                try await channel.writeInbound(
+                    PostgresBackendMessage.copyInResponse(
+                        .init(format: .binary, columnFormats: [.binary, .binary])))
+
+                let copyData = try await channel.waitForCopyData()
+                #expect(copyData.result == .done)
+                var data = copyData.data
+                // Signature
+                #expect(data.readString(length: 7) == "PGCOPY\n")
+                #expect(data.readInteger(as: UInt8.self) == 0xff)
+                #expect(data.readString(length: 3) == "\r\n\0")
+                // Flags
+                #expect(data.readInteger(as: UInt32.self) == 0)
+                // Header extension area length
+                #expect(data.readInteger(as: UInt32.self) == 0)
+
+                struct Row: Equatable {
+                    let id: Int32
+                    let name: String
+                }
+                var rows: [Row] = []
+                // Read until we are only left with the trailer
+                while data.readableBytes > 2 {
+                    // Number of columns
+                    #expect(data.readInteger(as: UInt16.self) == 2)
+                    // 'id' column
+                    #expect(data.readInteger(as: UInt32.self) == 4)
+                    let id = data.readInteger(as: Int32.self)
+                    // 'name' column length
+                    let nameLength = data.readInteger(as: UInt32.self)
+                    let name = data.readString(length: Int(try #require(nameLength)))
+                    rows.append(Row(id: try #require(id), name: try #require(name)))
+                }
+                #expect(rows == [Row(id: 1, name: "Alice"), Row(id: 2, name: "Bob")])
+                // Trailer
+                #expect(data.readInteger(as: Int16.self) == -1)
+                
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+
+                try await channel.waitForPostgresFrontendMessage(\.sync)
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            }
+        }
+    }
+    #endif
+
     @Test(.timeLimit(.minutes(1))) func connectEnforcesDeadlineWithSilentServer() async throws {
         try await withSilentServer { port in
             var config = PostgresConnection.Configuration(
@@ -1098,7 +1203,8 @@ import Synchronization
         do {
             try await body(connection, channel)
         } catch {
-
+            try? await connection.close()
+            throw error
         }
 
         try await connection.close()

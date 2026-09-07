@@ -104,6 +104,12 @@ extension ClosedRange: PostgresArrayEncodable where Bound: PostgresRangeArrayEnc
     public static var psqlArrayType: PostgresDataType { Bound.psqlRangeArrayType }
 }
 
+extension PostgresDataType: PostgresArrayEncodable {
+    public static var psqlArrayType: PostgresDataType { .oidArray }
+}
+
+extension PostgresDataType: PostgresArrayDecodable {}
+
 // MARK: Array conformances
 
 extension Array: PostgresEncodable where Element: PostgresArrayEncodable {

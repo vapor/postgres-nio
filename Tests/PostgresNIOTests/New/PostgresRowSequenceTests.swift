@@ -207,16 +207,18 @@ import Logging
     @Test func testSucceedingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
         let eventLoop = NIOSingletons.posixEventLoopGroup.next()
-        let stream = PSQLRowStream(
-            source: .stream(
-                [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-                ],
-                dataSource
-            ),
-            eventLoop: eventLoop,
-            logger: self.logger
-        )
+        let stream = try await eventLoop.submit {
+            PSQLRowStream(
+                source: .stream(
+                    [
+                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    ],
+                    dataSource
+                ),
+                eventLoop: eventLoop,
+                logger: self.logger
+            )
+        }.get()
 
         let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
@@ -240,16 +242,18 @@ import Logging
     @Test func testFailingRowContinuationsWorks() async throws {
         let dataSource = MockRowDataSource()
         let eventLoop = NIOSingletons.posixEventLoopGroup.next()
-        let stream = PSQLRowStream(
-            source: .stream(
-                [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-                ],
-                dataSource
-            ),
-            eventLoop: eventLoop,
-            logger: self.logger
-        )
+        let stream = try await eventLoop.submit {
+            PSQLRowStream(
+                source: .stream(
+                    [
+                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    ],
+                    dataSource
+                ),
+                eventLoop: eventLoop,
+                logger: self.logger
+            )
+        }.get()
 
         let rowSequence = try await eventLoop.submit { stream.asyncSequence() }.get()
         var rowIterator = rowSequence.makeAsyncIterator()
@@ -488,9 +492,245 @@ import Logging
 
         #expect(columns.isEmpty)
     }
+
+    @Test func testOnFinishIsCalledIfTheStreamSucceeds() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        let rowSequence = stream.asyncSequence { onFinishCalls.wrappingIncrement(ordering: .relaxed) }
+        #expect(onFinishCalls.load(ordering: .relaxed) == 0)
+
+        stream.receive(completion: .success("SELECT 0"))
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+
+        var iterator = rowSequence.makeAsyncIterator()
+        #expect(try await iterator.next() == nil)
+        #expect(dataSource.cancelCount == 0)
+    }
+
+    @Test func testOnFinishIsCalledIfTheStreamFails() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        let rowSequence = stream.asyncSequence { onFinishCalls.wrappingIncrement(ordering: .relaxed) }
+        #expect(onFinishCalls.load(ordering: .relaxed) == 0)
+
+        stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+
+        var iterator = rowSequence.makeAsyncIterator()
+        await #expect(throws: PSQLError.serverClosedConnection(underlying: nil)) {
+            try await iterator.next()
+        }
+    }
+
+    @Test func testOnFinishIsCalledIfTheStreamIsCancelled() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        var rowSequence: PostgresRowSequence? = stream.asyncSequence {
+            onFinishCalls.wrappingIncrement(ordering: .relaxed)
+        }
+        #expect(onFinishCalls.load(ordering: .relaxed) == 0)
+
+        rowSequence = nil
+        #expect(rowSequence == nil, "Surpress warning")
+        #expect(dataSource.cancelCount == 1)
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+    }
+
+    @Test func testOnFinishIsCalledIfTheStreamWasAlreadyFinished() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream([], dataSource),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+        stream.receive(completion: .success("SELECT 0"))
+
+        let onFinishCalls = ManagedAtomic(0)
+        let rowSequence = stream.asyncSequence { onFinishCalls.wrappingIncrement(ordering: .relaxed) }
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1, "Expected onFinish to be called while creating the sequence")
+
+        var iterator = rowSequence.makeAsyncIterator()
+        #expect(try await iterator.next() == nil)
+        #expect(dataSource.cancelCount == 0)
+    }
+
+    @Test func testStreamCreatedWithoutRowsFails() async throws {
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .noRows(.failure(PSQLError.serverClosedConnection(underlying: nil))),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        let rowSequence = stream.asyncSequence { onFinishCalls.wrappingIncrement(ordering: .relaxed) }
+        // the stream never had a data source, therefore there is nothing to finish
+        #expect(onFinishCalls.load(ordering: .relaxed) == 0)
+
+        var iterator = rowSequence.makeAsyncIterator()
+        await #expect(throws: PSQLError.serverClosedConnection(underlying: nil)) {
+            try await iterator.next()
+        }
+    }
+
+    @Test func testStreamCreatedWithoutRowsSucceeds() async throws {
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .noRows(.success(.emptyResponse)),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        let rowSequence = stream.asyncSequence { onFinishCalls.wrappingIncrement(ordering: .relaxed) }
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+
+        var iterator = rowSequence.makeAsyncIterator()
+        #expect(try await iterator.next() == nil)
+        #expect(stream.commandTag == "")
+    }
+
+    @Test func testCancellationAfterTheStreamHasFinishedIsIgnored() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        var rowSequence: PostgresRowSequence? = stream.asyncSequence {
+            onFinishCalls.wrappingIncrement(ordering: .relaxed)
+        }
+        stream.receive([[ByteBuffer(integer: Int64(0))]])
+        stream.receive(completion: .success("SELECT 1"))
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+
+        // dropping the sequence triggers a cancellation, which must be a no-op at this point
+        rowSequence = nil
+        #expect(rowSequence == nil, "Surpress warning")
+        #expect(dataSource.cancelCount == 0)
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+        #expect(stream.commandTag == "SELECT 1")
+    }
+
+    @Test func testDemandAfterCancellationIsIgnored() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        var rowSequence: PostgresRowSequence? = stream.asyncSequence()
+        rowSequence = nil
+        #expect(rowSequence == nil, "Surpress warning")
+        #expect(dataSource.cancelCount == 1)
+
+        let requestCountAfterCancel = dataSource.requestCount
+        stream.produceMore()
+        #expect(dataSource.requestCount == requestCountAfterCancel)
+
+        // rows and completions that are still in flight must be dropped
+        stream.receive([[ByteBuffer(integer: Int64(0))]])
+        stream.receive(completion: .success("SELECT 1"))
+        #expect(dataSource.requestCount == requestCountAfterCancel)
+        #expect(dataSource.cancelCount == 1)
+    }
+
+    @Test func testCancellationIsIdempotent() async throws {
+        let dataSource = MockRowDataSource()
+        let embeddedEventLoop = EmbeddedEventLoop()
+        let stream = PSQLRowStream(
+            source: .stream(
+                [
+                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                ],
+                dataSource
+            ),
+            eventLoop: embeddedEventLoop,
+            logger: self.logger
+        )
+
+        let onFinishCalls = ManagedAtomic(0)
+        var rowSequence: PostgresRowSequence? = stream.asyncSequence {
+            onFinishCalls.wrappingIncrement(ordering: .relaxed)
+        }
+        rowSequence = nil
+        #expect(rowSequence == nil, "Surpress warning")
+        #expect(dataSource.cancelCount == 1)
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+
+        stream.didTerminate()
+        #expect(dataSource.cancelCount == 1)
+        #expect(onFinishCalls.load(ordering: .relaxed) == 1)
+    }
+
+    @Test func testDemandAndCancellationFromOffTheEventLoop() async throws {
+        let dataSource = MockRowDataSource()
+        let eventLoop = NIOSingletons.posixEventLoopGroup.next()
+        let stream = try await eventLoop.submit {
+            PSQLRowStream(
+                source: .stream(
+                    [
+                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    ],
+                    dataSource
+                ),
+                eventLoop: eventLoop,
+                logger: self.logger
+            )
+        }.get()
+
+        var rowSequence: PostgresRowSequence? = try await eventLoop.submit { stream.asyncSequence() }.get()
+
+        #expect(!eventLoop.inEventLoop)
+        stream.produceMore()
+        try await eventLoop.submit { }.get() // wait for the hop to complete
+        #expect(dataSource.requestCount == 1)
+
+        rowSequence = nil // triggers `didTerminate` from off the event loop
+        #expect(rowSequence == nil, "Surpress warning")
+        try await eventLoop.submit { }.get() // wait for the hop to complete
+        #expect(dataSource.cancelCount == 1)
+    }
 }
 
-final class MockRowDataSource: PSQLRowsDataSource {
+final class MockRowDataSource: PSQLRowsDataSource, Sendable {
     var requestCount: Int {
         self._requestCount.load(ordering: .relaxed)
     }

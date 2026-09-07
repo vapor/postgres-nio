@@ -616,6 +616,7 @@ extension DiscardingTaskGroup: TaskGroupProtocol {
     }
 }
 
+@available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension TaskGroup<Void>: TaskGroupProtocol {
     @inlinable
     mutating func addTask_(operation: @isolated(any) @escaping @Sendable () async -> Void) {

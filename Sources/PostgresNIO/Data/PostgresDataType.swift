@@ -173,7 +173,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
     /// `1027`
     public static let polygonArray = PostgresDataType(1027)
     /// `1028`
-    public static let oidArray = PostgresDataType(1018)
+    public static let oidArray = PostgresDataType(1028)
     /// `1033`
     public static let aclitem = PostgresDataType(1033)
     /// `1034` _aclitem

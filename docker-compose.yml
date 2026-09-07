@@ -10,6 +10,12 @@ x-shared-config: &shared_config
     - 5432:5432
 
 services:
+  psql-18:
+    image: postgres:18
+    <<: *shared_config
+  psql-17:
+    image: postgres:17
+    <<: *shared_config
   psql-16:
     image: postgres:16
     <<: *shared_config
