@@ -1084,7 +1084,7 @@ extension ConnectionStateMachine {
         case .queryCancelled:
             return false
         case .server, .listenFailed:
-            guard let sqlState = error.serverInfo?[.sqlState] else {
+            guard error.serverInfo?[.sqlState] != nil else {
                 // any error message that doesn't have a sql state field, is unexpected by default.
                 return true
             }
