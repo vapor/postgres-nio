@@ -467,6 +467,106 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(decodedClosedRangeArray, [0...0, 10...10])
     }
 
+    func testInetIPv4() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        let results1: PostgresQueryResult = try await conn.query("""
+        SELECT
+            '192.0.2.1/24'::inet AS inet
+        """).get()
+        XCTAssertEqual(results1.count, 1)
+        var row = results1.first?.makeRandomAccess()
+        let expected: PostgresInet = .ipv4(PostgresIPv4(value: (192, 0, 2, 1)), networkMask: 24)
+        let decoded = try row?.decode(column: "inet", as: PostgresInet.self, context: .default)
+        XCTAssertEqual(decoded, expected)
+
+        let results2: PostgresQueryResult = try await conn.query("""
+        SELECT
+            ARRAY[
+                '192.0.2.1/24'::inet,
+                '198.51.100.2/32'::inet
+            ] AS inets
+        """).get()
+        XCTAssertEqual(results2.count, 1)
+        row = results2.first?.makeRandomAccess()
+        let decodedArray = try row?.decode(column: "inets", as: [PostgresInet].self, context: .default)
+        XCTAssertEqual(decodedArray, [
+            .ipv4(PostgresIPv4(value: (192, 0, 2, 1)), networkMask: 24),
+            .ipv4(PostgresIPv4(value: (198, 51, 100, 2)), networkMask: 32),
+        ])
+    }
+
+    func testInetIPv6() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        let results1: PostgresQueryResult = try await conn.query("""
+        SELECT
+            '2001:db8::1/64'::inet AS inet
+        """).get()
+        XCTAssertEqual(results1.count, 1)
+        var row = results1.first?.makeRandomAccess()
+        let expected: PostgresInet = .ipv6(PostgresIPv6(value: (0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x0001)), networkMask: 64)
+        let decoded = try row?.decode(column: "inet", as: PostgresInet.self, context: .default)
+        XCTAssertEqual(decoded, expected)
+
+        let results2: PostgresQueryResult = try await conn.query("""
+        SELECT
+            ARRAY[
+                '2001:db8::1/64'::inet,
+                '2001:db8::2/128'::inet
+            ] AS inets
+        """).get()
+        XCTAssertEqual(results2.count, 1)
+        row = results2.first?.makeRandomAccess()
+        let decodedArray = try row?.decode(column: "inets", as: [PostgresInet].self, context: .default)
+        XCTAssertEqual(decodedArray, [
+            .ipv6(PostgresIPv6(value: (0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x0001)), networkMask: 64),
+            .ipv6(PostgresIPv6(value: (0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x0002)), networkMask: 128),
+        ])
+    }
+
+    func testInetIPv4Serialize() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        let value: PostgresInet = .ipv4(PostgresIPv4(value: (192, 0, 2, 1)), networkMask: 24)
+        var binds = PostgresBindings()
+        binds.append(value, context: .default)
+        let query = PostgresQuery(
+            unsafeSQL: "select $1::inet as inet",
+            binds: binds
+        )
+        let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+        var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+        let row: PostgresRow? = try await rowIterator?.next()
+        let decoded: PostgresInet? = try row?.decode(PostgresInet.self, context: .default)
+        XCTAssertEqual(value, decoded)
+    }
+
+    func testInetIPv6Serialize() async throws {
+        let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
+        self.addTeardownBlock {
+            try await conn.close()
+        }
+        let value: PostgresInet = .ipv6(PostgresIPv6(value: (0x2001, 0x0db8, 0, 0, 0, 0, 0, 0x0001)), networkMask: 64)
+        var binds = PostgresBindings()
+        binds.append(value, context: .default)
+        let query = PostgresQuery(
+            unsafeSQL: "select $1::inet as inet",
+            binds: binds
+        )
+        let rowSequence: PostgresRowSequence? = try await conn.query(query, logger: .psqlTest)
+        var rowIterator: PostgresRowSequence.AsyncIterator? = rowSequence?.makeAsyncIterator()
+        let row: PostgresRow? = try await rowIterator?.next()
+        let decoded: PostgresInet? = try row?.decode(PostgresInet.self, context: .default)
+        XCTAssertEqual(value, decoded)
+    }
+
     func testEmptyInt8Range() async throws {
         let conn: PostgresConnection = try await PostgresConnection.test(on: eventLoop).get()
         self.addTeardownBlock {
