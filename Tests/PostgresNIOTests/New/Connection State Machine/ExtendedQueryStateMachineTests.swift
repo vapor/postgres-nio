@@ -274,6 +274,29 @@ import Logging
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
+    @Test func test28xxxSQLStateQueryErrorDoesNotKillConnection() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "SELECT raises_invalid_authorization()"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        #expect(state.enqueue(task: .extendedQuery(queryContext)) == .sendParseDescribeBindExecuteSync(query))
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+
+        // a stored procedure may RAISE an exception with a 28xxx sql state, without the
+        // connection itself having become invalid.
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "ERROR", .sqlState: "28000"])
+        #expect(
+            state.errorReceived(serverError) == .failQuery(promise, with: .server(serverError), cleanupContext: .none)
+        )
+
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
+    }
+
     @Test func testQueryErrorAfterCancelDoesNotKillConnection() throws {
         var state = try ConnectionStateMachine.makeReadyForQuery()
 
