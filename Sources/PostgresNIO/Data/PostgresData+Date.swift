@@ -4,8 +4,7 @@ import NIOCore
 extension PostgresData {
     public init(date: Date) {
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
-        let seconds = date.timeIntervalSince(_psqlDateStart) * Double(_microsecondsPerSecond)
-        buffer.writeInteger(Int64(seconds))
+        buffer.writeInteger(date._psqlMicroseconds)
         self.init(type: .timestamptz, value: buffer)
     }
     
