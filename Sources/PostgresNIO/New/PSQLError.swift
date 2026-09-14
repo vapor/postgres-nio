@@ -23,6 +23,7 @@ public struct PSQLError: Error, @unchecked Sendable {
             case serverClosedConnection
             case connectionError
             case uncleanShutdown
+            case notEnoughColumns
 
             case listenFailed
             case unlistenFailed
@@ -53,6 +54,7 @@ public struct PSQLError: Error, @unchecked Sendable {
 
         public static let uncleanShutdown = Self(.uncleanShutdown)
         public static let poolClosed = Self(.poolClosed)
+        public static let notEnoughColumns = Self(.notEnoughColumns)
 
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
@@ -103,6 +105,8 @@ public struct PSQLError: Error, @unchecked Sendable {
                 return "listenFailed"
             case .unlistenFailed:
                 return "unlistenFailed"
+            case .notEnoughColumns:
+                return "notEnoughColumns"
             }
         }
     }
@@ -169,6 +173,28 @@ public struct PSQLError: Error, @unchecked Sendable {
         }
     }
 
+    /// The number of columns that was expected to be returned.
+    ///
+    /// This field is set if the backing error is `notEnoughColumns`.
+    public internal(set) var expectedColumns: Int? {
+        get { self.backing.expectedColumns }
+        set {
+            self.copyBackingStorageIfNecessary()
+            self.backing.expectedColumns = newValue
+        }
+    }
+
+    /// The number of columns that was actually returned.
+    ///
+    /// This field is set if the backing error is `notEnoughColumns`.
+    public internal(set) var returnedColumns: Int? {
+        get { self.backing.returnedColumns }
+        set {
+            self.copyBackingStorageIfNecessary()
+            self.backing.returnedColumns = newValue
+        }
+    }
+
     /// the backend message... we should keep this internal but we can use it to print more
     /// advanced debug reasons.
     var backendMessage: PostgresBackendMessage? {
@@ -220,6 +246,8 @@ public struct PSQLError: Error, @unchecked Sendable {
         fileprivate var backendMessage: PostgresBackendMessage?
         fileprivate var unsupportedAuthScheme: UnsupportedAuthScheme?
         fileprivate var invalidCommandTag: String?
+        fileprivate var expectedColumns: Int?
+        fileprivate var returnedColumns: Int?
 
         init(code: Code) {
             self.code = code
@@ -233,6 +261,10 @@ public struct PSQLError: Error, @unchecked Sendable {
             new.line = self.line
             new.query = self.query
             new.backendMessage = self.backendMessage
+            new.unsupportedAuthScheme = self.unsupportedAuthScheme
+            new.invalidCommandTag = self.invalidCommandTag
+            new.expectedColumns = self.expectedColumns
+            new.returnedColumns = self.returnedColumns
             return new
         }
     }
@@ -448,6 +480,21 @@ public struct PSQLError: Error, @unchecked Sendable {
         return error
     }
 
+    @usableFromInline
+    static func notEnoughColumns(
+        expectedColumns: Int,
+        returnedColumns: Int,
+        file: String,
+        line: Int
+    ) -> PSQLError {
+        var error = PSQLError(code: .notEnoughColumns)
+        error.expectedColumns = expectedColumns
+        error.returnedColumns = returnedColumns
+        error.file = file
+        error.line = line
+        return error
+    }
+
     static func unlistenError(underlying: any Error) -> PSQLError {
         var error = PSQLError(code: .unlistenFailed)
         error.underlying = underlying
@@ -506,6 +553,14 @@ extension PSQLError: CustomDebugStringConvertible {
 
         if let invalidCommandTag = self.invalidCommandTag {
             result.append(", invalidCommandTag: \(invalidCommandTag)")
+        }
+
+        if let expectedColumns = self.expectedColumns {
+            result.append(", expectedColumns: \(expectedColumns)")
+        }
+
+        if let returnedColumns = self.returnedColumns {
+            result.append(", returnedColumns: \(returnedColumns)")
         }
 
         if let underlying = self.underlying {
