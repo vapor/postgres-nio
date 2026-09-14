@@ -99,7 +99,7 @@ struct PostgresRangeFlag {
 extension PostgresRange: PostgresDecodable where Bound: PostgresRangeDecodable {
     @inlinable
     init<JSONDecoder: PostgresJSONDecoder>(
-        from byteBuffer: inout ByteBuffer,
+        from buffer: inout ByteBuffer,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
@@ -113,7 +113,7 @@ extension PostgresRange: PostgresDecodable where Bound: PostgresRangeDecodable {
         }
 
         // flags byte contains certain properties of the range
-        guard let flags: UInt8 = byteBuffer.readInteger(as: UInt8.self) else {
+        guard let flags: UInt8 = buffer.readInteger(as: UInt8.self) else {
             throw PostgresDecodingError.Code.failure
         }
 
@@ -128,18 +128,18 @@ extension PostgresRange: PostgresDecodable where Bound: PostgresRangeDecodable {
             return
         }
 
-        guard let lowerBoundSize: Int32 = byteBuffer.readInteger(as: Int32.self),
+        guard let lowerBoundSize: Int32 = buffer.readInteger(as: Int32.self),
             Int(lowerBoundSize) == MemoryLayout<Bound>.size,
-            var lowerBoundBytes: ByteBuffer = byteBuffer.readSlice(length: Int(lowerBoundSize))
+            var lowerBoundBytes: ByteBuffer = buffer.readSlice(length: Int(lowerBoundSize))
         else {
             throw PostgresDecodingError.Code.failure
         }
 
         let lowerBound = try Bound(from: &lowerBoundBytes, type: boundType, format: format, context: context)
 
-        guard let upperBoundSize = byteBuffer.readInteger(as: Int32.self),
+        guard let upperBoundSize = buffer.readInteger(as: Int32.self),
             Int(upperBoundSize) == MemoryLayout<Bound>.size,
-            var upperBoundBytes: ByteBuffer = byteBuffer.readSlice(length: Int(upperBoundSize))
+            var upperBoundBytes: ByteBuffer = buffer.readSlice(length: Int(upperBoundSize))
         else {
             throw PostgresDecodingError.Code.failure
         }
