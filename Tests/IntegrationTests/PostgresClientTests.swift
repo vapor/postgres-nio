@@ -346,6 +346,148 @@ final class PostgresClientTests: XCTestCase {
         }
     }
 
+    /// Ensures the `ltree` extension exists, using a client that does *not* resolve additional data types.
+    ///
+    /// A client configured with `additionalDataTypeNames = ["ltree"]` cannot be used for this: the OID is
+    /// resolved while the connection is being established, so a connection opened before the extension
+    /// exists caches an empty lookup table and keeps using it for every later query on that connection.
+    private func ensureLTreeExtension(eventLoopGroup: any EventLoopGroup, logger: Logger) async throws {
+        let client = PostgresClient(
+            configuration: .makeTestConfiguration(),
+            eventLoopGroup: eventLoopGroup,
+            backgroundLogger: logger
+        )
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    func testLTreeBindRoundTrip() async throws {
+        let tableName = "test_client_ltree_bind"
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        try await self.ensureLTreeExtension(eventLoopGroup: eventLoopGroup, logger: logger)
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        clientConfig.options.additionalDataTypeNames = ["ltree"]
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP TABLE IF EXISTS \"\(unescaped: tableName)\";")
+
+            try await client.query(
+                """
+                CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
+                    id SERIAL PRIMARY KEY,
+                    label ltree NOT NULL
+                );
+                """
+            )
+
+            let inserted = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            try await client.query(
+                """
+                INSERT INTO "\(unescaped: tableName)" (label) VALUES (\(inserted))
+                """
+            )
+
+            let rows = try await client.query(
+                """
+                SELECT label FROM "\(unescaped: tableName)" WHERE label ~ 'foo.*'
+                """
+            )
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            XCTAssertEqual(decoded, [inserted])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    func testLTreeBindInTypeAmbiguousContext() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        try await self.ensureLTreeExtension(eventLoopGroup: eventLoopGroup, logger: logger)
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        clientConfig.options.additionalDataTypeNames = ["ltree"]
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            let rows = try await client.query("SELECT \(value)")
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            XCTAssertEqual(decoded, [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    func testUnknownAdditionalDataTypeName() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
+        self.addTeardownBlock {
+            try await eventLoopGroup.shutdownGracefully()
+        }
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        clientConfig.options.additionalDataTypeNames = ["this_type_does_not_exist"]
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+
+        await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            do {
+                _ = try await client.query("SELECT 1")
+            } catch {
+                XCTFail("The connection should continue if the type can't be found")
+            }
+
+            taskGroup.cancelAll()
+        }
+    }
+
 }
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
