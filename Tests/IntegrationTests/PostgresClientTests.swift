@@ -97,8 +97,7 @@ struct PostgresClientTests {
             
             /// Test roll back
             taskGroup.addTask {
-                
-                do {
+                let error = try await #require(throws: PostgresTransactionError.self) {
                     let _ = try await client.withTransaction(logger: logger) { transaction in
                         /// insert valid data
                         try await transaction.query(
@@ -116,15 +115,10 @@ struct PostgresClientTests {
                             logger: logger
                         )
                     }
-                } catch {
-                    guard let error = error as? PostgresTransactionError else { 
-                        Issue.record("Unexpected error type: \(error)") 
-                        return
-                    }
-
-                    #expect((error.closureError as? PSQLError)?.code == .server)
-                    #expect((error.closureError as? PSQLError)?.serverInfo?[.severity] == "ERROR")
                 }
+
+                #expect((error.closureError as? PSQLError)?.code == .server)
+                #expect((error.closureError as? PSQLError)?.serverInfo?[.severity] == "ERROR")
             }
             try await taskGroup.next()
             
@@ -197,10 +191,8 @@ struct PostgresClientTests {
 
             for _ in 0..<10000 {
                 taskGroup.addTask {
-                    do {
-                        try await client.query("SELECT 1", logger: logger)
-                    } catch {
-                        Issue.record("Unexpected error: \(error)")
+                    await #expect(throws: Never.self) { 
+                        try await client.query("SELECT 1", logger: logger) 
                     }
                 }
             }
