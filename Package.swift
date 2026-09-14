@@ -75,6 +75,7 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+                .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
             ],
             swiftSettings: swiftSettings
         ),
