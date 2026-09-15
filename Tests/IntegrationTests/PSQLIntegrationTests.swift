@@ -1,11 +1,15 @@
-import Atomics
-import Foundation
 import Logging
 import NIOCore
 import NIOPosix
 import NIOTestUtils
 import PostgresNIO
 import Testing
+
+#if canImport(FoundationEssentials)
+    import FoundationEssentials
+#else
+    import Foundation
+#endif
 
 @Suite(.serialized)
 struct IntegrationTests {
@@ -14,7 +18,7 @@ struct IntegrationTests {
         let conn = try await PostgresConnection.test(
             on: MultiThreadedEventLoopGroup.singleton.any()
         ).get()
-        try await conn.close().get()
+        try await conn.close()
     }
 
     // If the postgres server trusts every connection, it is really hard to create an
@@ -37,40 +41,36 @@ struct IntegrationTests {
             let connection = try await PostgresConnection.connect(
                 on: MultiThreadedEventLoopGroup.singleton.any(), configuration: config, id: 1,
                 logger: logger
-            ).get()
+            )
             // In case of a test failure the created connection must be closed.
-            try await connection.close().get()
+            try await connection.close()
         }
     }
 
     @Test func queryVersion() async throws {
         try await withConnection { connection in
-            let result = try await connection.query("SELECT version()", logger: .psqlTest).get()
-            let version = try #require(result.rows.first).decode(String.self, context: .default)
+            let rows = try await connection.query("SELECT version()", logger: .psqlTest).collect()
+            let version = try #require(rows.first).decode(String.self, context: .default)
             #expect(version.contains("PostgreSQL"))
         }
     }
 
     @Test func query10kItems() async throws {
         try await withConnection { connection in
-            let received = ManagedAtomic<Int64>(0)
-            let metadata = try await connection.query("SELECT generate_series(1, 10000);", logger: .psqlTest) { row in
-                let expected = received.wrappingIncrementThenLoad(ordering: .relaxed)
-                let value = try row.decode(Int64.self, context: .default)
-                #expect(expected == value)
-            }.get()
-
-            #expect(received.load(ordering: .relaxed) == 10000)
-            #expect(metadata.command == "SELECT")
-            #expect(metadata.rows == 10000)
+            var expected: Int64 = 0
+            for try await row in try await connection.query("SELECT generate_series(1, 10000);", logger: .psqlTest) {
+                expected += 1
+                #expect(try row.decode(Int64.self, context: .default) == expected)
+            }
+            #expect(expected == 10000)
         }
     }
 
     @Test func oneThousandRoundTrips() async throws {
         try await withConnection { connection in
             for _ in 0..<1_000 {
-                let result = try await connection.query("SELECT version()", logger: .psqlTest).get()
-                let version = try #require(result.rows.first).decode(String.self, context: .default)
+                let rows = try await connection.query("SELECT version()", logger: .psqlTest).collect()
+                let version = try #require(rows.first).decode(String.self, context: .default)
                 #expect(version.contains("PostgreSQL"))
             }
         }
@@ -78,8 +78,8 @@ struct IntegrationTests {
 
     @Test func querySelectParameter() async throws {
         try await withConnection { connection in
-            let result = try await connection.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).get()
-            let foo = try #require(result.rows.first).decode(String.self, context: .default)
+            let rows = try await connection.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).collect()
+            let foo = try #require(rows.first).decode(String.self, context: .default)
             #expect(foo == "hello")
         }
     }
@@ -99,7 +99,7 @@ struct IntegrationTests {
 
     @Test func decodeIntegers() async throws {
         try await withConnection { connection in
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 """
                 SELECT
                     1::SMALLINT                   as smallint,
@@ -112,10 +112,10 @@ struct IntegrationTests {
                     -9223372036854775807::BIGINT  as bigint_min,
                     9223372036854775807::BIGINT   as bigint_max
                 """, logger: .psqlTest
-            ).get()
+            ).collect()
 
-            #expect(result.rows.count == 1)
-            let cells = try #require(result.rows.first).decode(
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode(
                 (Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64).self,
                 context: .default
             )
@@ -135,48 +135,48 @@ struct IntegrationTests {
     @Test func encodeAndDecodeIntArray() async throws {
         try await withConnection { connection in
             let array: [Int64] = [1, 2, 3]
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 "SELECT \(array)::int8[] as array", logger: .psqlTest
-            ).get()
-            #expect(result.rows.count == 1)
-            #expect(try #require(result.rows.first).decode([Int64].self, context: .default) == array)
+            ).collect()
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode([Int64].self, context: .default) == array)
         }
     }
 
     @Test func decodeEmptyIntegerArray() async throws {
         try await withConnection { connection in
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 "SELECT '{}'::int[] as array", logger: .psqlTest
-            ).get()
-            #expect(result.rows.count == 1)
-            #expect(try #require(result.rows.first).decode([Int64].self, context: .default) == [])
+            ).collect()
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode([Int64].self, context: .default) == [])
         }
     }
 
     @Test func doubleArraySerialization() async throws {
         try await withConnection { connection in
             let doubles: [Double] = [3.14, 42]
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 "SELECT \(doubles)::double precision[] as doubles", logger: .psqlTest
-            ).get()
-            #expect(result.rows.count == 1)
-            #expect(try #require(result.rows.first).decode([Double].self, context: .default) == doubles)
+            ).collect()
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode([Double].self, context: .default) == doubles)
         }
     }
 
     @Test func decodeDates() async throws {
         try await withConnection { connection in
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 """
                 SELECT
                     '2016-01-18 01:02:03 +0042'::DATE         as date,
                     '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
                     '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
                 """, logger: .psqlTest
-            ).get()
+            ).collect()
 
-            #expect(result.rows.count == 1)
-            let cells = try #require(result.rows.first).decode((Date, Date, Date).self, context: .default)
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode((Date, Date, Date).self, context: .default)
 
             #expect(cells.0.description == "2016-01-18 00:00:00 +0000")
             #expect(cells.1.description == "2016-01-18 01:02:03 +0000")
@@ -186,16 +186,16 @@ struct IntegrationTests {
 
     @Test func decodeDecimals() async throws {
         try await withConnection { connection in
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 """
                 SELECT
                     \(Decimal(string: "123456.789123")!)::numeric     as numeric,
                     \(Decimal(string: "-123456.789123")!)::numeric    as numeric_negative
                 """, logger: .psqlTest
-            ).get()
+            ).collect()
 
-            #expect(result.rows.count == 1)
-            let cells = try #require(result.rows.first).decode((Decimal, Decimal).self, context: .default)
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode((Decimal, Decimal).self, context: .default)
 
             #expect(cells.0 == Decimal(string: "123456.789123"))
             #expect(cells.1 == Decimal(string: "-123456.789123"))
@@ -215,16 +215,16 @@ struct IntegrationTests {
         let intValue = IntRR.b
 
         try await withConnection { connection in
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 """
                 SELECT
                     \(stringValue.rawValue)::varchar     as string,
                     \(intValue.rawValue)::int8           as int
                 """, logger: .psqlTest
-            ).get()
+            ).collect()
 
-            #expect(result.rows.count == 1)
-            let cells = try #require(result.rows.first).decode((StringRR, IntRR).self, context: .default)
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode((StringRR, IntRR).self, context: .default)
 
             #expect(cells.0 == stringValue)
             #expect(cells.1 == intValue)
@@ -234,15 +234,15 @@ struct IntegrationTests {
     @Test func roundTripUUID() async throws {
         try await withConnection { connection in
             let uuidString = "2c68f645-9ca6-468b-b193-ee97f241c2f8"
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 """
                 SELECT \(uuidString)::UUID as uuid
                 """,
                 logger: .psqlTest
-            ).get()
+            ).collect()
 
-            #expect(result.rows.count == 1)
-            #expect(try #require(result.rows.first).decode(UUID.self, context: .default) == UUID(uuidString: uuidString))
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode(UUID.self, context: .default) == UUID(uuidString: uuidString))
         }
     }
 
@@ -254,14 +254,14 @@ struct IntegrationTests {
         }
 
         try await withConnection { connection in
-            let result = try await connection.query(
+            let rows = try await connection.query(
                 """
                 select \(Object(foo: 1, bar: 2))::\(unescaped: type) as \(unescaped: type)
                 """, logger: .psqlTest
-            ).get()
+            ).collect()
 
-            #expect(result.rows.count == 1)
-            let obj = try #require(result.rows.first).decode(Object.self, context: .default)
+            #expect(rows.count == 1)
+            let obj = try #require(rows.first).decode(Object.self, context: .default)
             #expect(obj.foo == 1)
             #expect(obj.bar == 2)
         }
@@ -269,15 +269,15 @@ struct IntegrationTests {
 
     /// Creates an empty `copy_table` for the COPY tests.
     private func createCopyTable(on connection: PostgresConnection) async throws {
-        _ = try? await connection.query("DROP TABLE copy_table", logger: .psqlTest).get()
-        _ = try await connection.query(
+        _ = try? await connection.query("DROP TABLE copy_table", logger: .psqlTest)
+        try await connection.query(
             "CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest
-        ).get()
+        )
     }
 
     @Test func copyIntoFrom() async throws {
         try await withConnection { connection in
-            try await createCopyTable(on: connection)
+            try await self.createCopyTable(on: connection)
 
             var options = PostgresCopyFromFormat.TextOptions()
             options.delimiter = ","
@@ -295,9 +295,8 @@ struct IntegrationTests {
                     try await writer.write(buffer)
                 }
             }
-            let rows = try await connection.query("SELECT id, name FROM copy_table").get().rows.map {
-                try $0.decode((Int, String).self)
-            }
+            let rows = try await connection.query("SELECT id, name FROM copy_table", logger: .psqlTest)
+                .collect().map { try $0.decode((Int, String).self) }
             try #require(rows.count == 2)
             #expect(rows[0].0 == 1)
             #expect(rows[0].1 == "Alice")
@@ -312,7 +311,7 @@ struct IntegrationTests {
         }
 
         try await withConnection { connection in
-            try await createCopyTable(on: connection)
+            try await self.createCopyTable(on: connection)
 
             await #expect(throws: MyError.self) {
                 try await connection.copyFrom(
@@ -326,7 +325,7 @@ struct IntegrationTests {
 
     @Test func copyIntoFromHasBadFormat() async throws {
         try await withConnection { connection in
-            try await createCopyTable(on: connection)
+            try await self.createCopyTable(on: connection)
 
             let error = await #expect(throws: PSQLError.self) {
                 try await connection.copyFrom(
@@ -354,7 +353,7 @@ struct IntegrationTests {
     #if compiler(>=6.2)  // copyFromBinary is only available in Swift 6.2+
         @Test func copyFromBinary() async throws {
             try await withConnection { connection in
-                try await createCopyTable(on: connection)
+                try await self.createCopyTable(on: connection)
 
                 try await connection.copyFromBinary(
                     table: "copy_table", columns: ["id", "name"], logger: .psqlTest
@@ -370,10 +369,8 @@ struct IntegrationTests {
                         }
                     }
                 }
-                let rows = try await connection.query("SELECT id, name FROM copy_table").get()
-                    .rows.map {
-                        try $0.decode((Int, String).self)
-                    }
+                let rows = try await connection.query("SELECT id, name FROM copy_table", logger: .psqlTest)
+                    .collect().map { try $0.decode((Int, String).self) }
                 try #require(rows.count == 2)
                 #expect(rows[0].0 == 1)
                 #expect(rows[0].1 == "Alice")
@@ -382,18 +379,4 @@ struct IntegrationTests {
             }
         }
     #endif
-
-    func withConnection<Result>(_ body: (PostgresConnection) async throws -> Result) async throws -> Result {
-        let connection = try await PostgresConnection.test(
-            on: MultiThreadedEventLoopGroup.singleton.any()
-        ).get()
-        do {
-            let result = try await body(connection)
-            try await connection.close().get()
-            return result
-        } catch {
-            try? await connection.close().get()
-            throw error
-        }
-    }
 }
