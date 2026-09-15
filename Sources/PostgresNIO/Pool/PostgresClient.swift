@@ -435,49 +435,11 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         isolation: isolated (any Actor)? = #isolation,
         _ body: (PostgresRowSequence) async throws -> sending Result
     ) async throws -> sending Result {
-        let logger = logger ?? Self.loggingDisabled
-        let stream: PSQLRowStream
-        let sequence: PostgresRowSequence
-
-        do {
-            guard query.binds.count <= Int(UInt16.max) else {
-                throw PSQLError(code: .tooManyParameters, query: query, file: file, line: line)
-            }
-
-            let lease = try await self.leaseConnection()
-            let connection = lease.connection
-
-            var logger = logger
-            logger[postgresMetadataKey: .connectionID] = "\(connection.id)"
-
-            let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
-            let context = ExtendedQueryContext(
-                query: query,
-                logger: logger,
-                promise: promise
+        try await self.withConnection { connection in
+            try await connection.query(
+                query, logger: logger ?? Self.loggingDisabled, file: file, line: line, isolation: isolation, body
             )
-
-            connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
-
-            promise.futureResult.whenFailure { _ in
-                lease.release()
-            }
-
-            (stream, sequence) = try await promise.futureResult.map { stream in
-                (stream, stream.asyncSequence(onFinish: {
-                    lease.release()
-                }))
-            }.get()
-        }  catch var error as PSQLError {
-            error.file = file
-            error.line = line
-            error.query = query
-            throw error // rethrow with more metadata
         }
-
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
-
-        return try await body(sequence)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary.
