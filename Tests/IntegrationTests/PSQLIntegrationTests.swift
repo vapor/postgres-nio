@@ -488,7 +488,6 @@ final class IntegrationTests: XCTestCase {
         }
     }
 
-    #if compiler(>=6.2) // copyFromBinary is only available in Swift 6.2+
     func testCopyFromBinary() async throws {
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
@@ -522,5 +521,4 @@ final class IntegrationTests: XCTestCase {
         XCTAssertEqual(rows[1].0, 42)
         XCTAssertEqual(rows[1].1, "Bob")
     }
-    #endif
 }
