@@ -44,7 +44,6 @@ extension PostgresRowSequence {
             self.columns = columns
         }
 
-        #if compiler(>=6.2)
         @concurrent
         public mutating func next() async throws -> Element? {
             if let dataRow = try await self.backing.next() {
@@ -56,18 +55,6 @@ extension PostgresRowSequence {
             }
             return nil
         }
-        #else
-        public mutating func next() async throws -> Element? {
-            if let dataRow = try await self.backing.next() {
-                return PostgresRow(
-                    data: dataRow,
-                    lookupTable: self.lookupTable,
-                    columns: self.columns
-                )
-            }
-            return nil
-        }
-        #endif
 
         @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
         public mutating func next(isolation actor: isolated (any Actor)?) async throws(Self.Failure) -> PostgresRow? {
