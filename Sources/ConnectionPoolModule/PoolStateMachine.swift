@@ -659,7 +659,19 @@ struct PoolStateMachine<
         case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.cacheNoMoreConnectionsAllowed = false
 
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: self.gracefulShutdownTriggered)
+            let createConnectionForQueuedRequest: Bool
+            if case .running = self.poolState {
+                createConnectionForQueuedRequest = !self.requestQueue.isEmpty
+                    && self.connections.stats.connecting < self.configuration.maximumConcurrentConnectionRequests
+            } else {
+                createConnectionForQueuedRequest = false
+            }
+
+            let closedConnectionAction = self.connections.connectionClosed(
+                connection.id,
+                shuttingDown: self.gracefulShutdownTriggered,
+                createConnectionForQueuedRequest: createConnectionForQueuedRequest
+            )
 
             let connectionAction: ConnectionAction
             if let newRequest = closedConnectionAction.newConnectionRequest {
@@ -671,7 +683,11 @@ struct PoolStateMachine<
             return .init(request: .none, connection: connectionAction)
 
         case .shuttingDown:
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: true)
+            let closedConnectionAction = self.connections.connectionClosed(
+                connection.id,
+                shuttingDown: true,
+                createConnectionForQueuedRequest: false
+            )
 
             let connectionAction: ConnectionAction
             if self.connections.isEmpty {
