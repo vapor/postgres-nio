@@ -27,6 +27,8 @@ public struct PSQLError: Error, @unchecked Sendable {
             case listenFailed
             case unlistenFailed
             case poolClosed
+            
+            case rowSequenceUsedOutsideScope
         }
 
         internal var base: Base
@@ -56,6 +58,8 @@ public struct PSQLError: Error, @unchecked Sendable {
 
         public static let listenFailed = Self.init(.listenFailed)
         public static let unlistenFailed = Self.init(.unlistenFailed)
+
+        public static let rowSequenceUsedOutsideScope = Self.init(.rowSequenceUsedOutsideScope)
 
         @available(*, deprecated, renamed: "clientClosedConnection")
         public static let connectionQuiescing = Self.clientClosedConnection
@@ -103,6 +107,8 @@ public struct PSQLError: Error, @unchecked Sendable {
                 return "listenFailed"
             case .unlistenFailed:
                 return "unlistenFailed"
+            case .rowSequenceUsedOutsideScope:
+                return "rowSequenceUsedOutsideScope"
             }
         }
     }
@@ -411,6 +417,8 @@ public struct PSQLError: Error, @unchecked Sendable {
     static let uncleanShutdown = PSQLError(code: .uncleanShutdown)
 
     static let receivedUnencryptedDataAfterSSLRequest = PSQLError(code: .receivedUnencryptedDataAfterSSLRequest)
+
+    static let rowSequenceUsedOutsideScope = PSQLError(code: .rowSequenceUsedOutsideScope)
 
     static func server(_ response: PostgresBackendMessage.ErrorResponse) -> PSQLError {
         var error = PSQLError(code: .server)

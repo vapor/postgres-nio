@@ -708,6 +708,49 @@ extension PostgresConnection {
     }
 }
 
+extension PostgresConnection {
+    /// Run a query on the Postgres server the connection is connected to.
+    /// 
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result.
+    /// - Returns: The result of the `body` closure.
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        isolation: isolated (any Actor)? = #isolation,
+        _ body: (PostgresRowSequence) async throws -> sending Result
+    ) async throws -> sending Result {
+        let stream: PSQLRowStream
+        let sequence: PostgresRowSequence
+
+        do {
+            let streamFuture = self.queryStream(query, logger: logger)
+            (stream, sequence) = try await streamFuture.map { stream in
+                (stream, stream.asyncSequence())
+            }.get()
+        }  catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+
+        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+
+        return try await body(sequence)
+    }
+}
+
 // MARK: EventLoopFuture interface
 
 extension PostgresConnection {

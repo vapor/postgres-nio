@@ -414,6 +414,34 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         }
     }
 
+    /// Run a query on the Postgres server the client is connected to.
+    /// 
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result.
+    /// - Returns: The result of the `body` closure.
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        isolation: isolated (any Actor)? = #isolation,
+        _ body: (PostgresRowSequence) async throws -> sending Result
+    ) async throws -> sending Result {
+        try await self.withConnection { connection in
+            try await connection.query(
+                query, logger: logger ?? Self.loggingDisabled, file: file, line: line, isolation: isolation, body
+            )
+        }
+    }
+
     /// Execute a prepared statement, taking care of the preparation when necessary.
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
