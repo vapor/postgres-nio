@@ -15,9 +15,7 @@ import Testing
 struct IntegrationTests {
 
     @Test func connectAndClose() async throws {
-        let conn = try await PostgresConnection.test(
-            on: MultiThreadedEventLoopGroup.singleton.any()
-        ).get()
+        let conn = try await PostgresConnection.test(on: MultiThreadedEventLoopGroup.singleton.any())
         try await conn.close()
     }
 
