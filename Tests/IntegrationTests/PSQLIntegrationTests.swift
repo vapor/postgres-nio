@@ -312,8 +312,7 @@ struct IntegrationTests {
             options.quote = "'"
             options.escape = "\\"
             options.header = .bool(true)
-            try await connection.copyFrom(table: "copy_table", columns: ["id", "name"], format: .csv(options), logger: .psqlTest) {
-                writer in
+            try await connection.copyFrom(table: "copy_table", columns: ["id", "name"], format: .csv(options), logger: .psqlTest) { writer in
                 var buffer = ByteBuffer()
                 // Header line, skipped by the backend because of `HEADER true`.
                 buffer.writeString("id;name\n")
