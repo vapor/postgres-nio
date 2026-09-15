@@ -4,6 +4,7 @@ import Atomics
 import Logging
 import ServiceLifecycle
 import _ConnectionPoolModule
+import Tracing
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
@@ -134,6 +135,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// for idle connections. `Nil` means that the client shall not run keep alive queries to the server. Defaults to a
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
+
+            /// Tracing configuration.
+            public var tracing: TracingConfiguration = .default
 
             /// Create an options structure with default values.
             ///
@@ -430,6 +434,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
+        summary: String? = nil,
         file: String = #fileID,
         line: Int = #line,
         isolation: isolated (any Actor)? = #isolation,
@@ -437,7 +442,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ) async throws -> sending Result {
         try await self.withConnection { connection in
             try await connection.query(
-                query, logger: logger ?? Self.loggingDisabled, file: file, line: line, isolation: isolation, body
+                query, logger: logger ?? Self.loggingDisabled, summary: summary, file: file, line: line, isolation: isolation, body
             )
         }
     }
