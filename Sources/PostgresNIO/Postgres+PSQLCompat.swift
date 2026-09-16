@@ -48,7 +48,7 @@ extension PSQLError {
             return PostgresError.protocol("Unexpected connection close")
         case .poolClosed:
             return self
-        case .rowSequenceUsedOutsideScope:
+        case .rowSequenceUsedOutsideScope, .rowSequenceNotFullyConsumed:
             return self
         }
     }

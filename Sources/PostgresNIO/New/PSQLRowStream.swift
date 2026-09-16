@@ -691,7 +691,43 @@ final class PSQLRowStream: Sendable {
             }
             return consumed
         }
-        switch consumed {
+        return Self.commandTag(for: consumed)
+    }
+
+    /// The command tag of the finished query, or `nil` if the consumer has not run the stream to its end
+    /// (still streaming, never consumed, or invalidated). If the stream finished with an error, the returned
+    /// future fails with that error.
+    func consumedCommandTag() -> EventLoopFuture<String?> {
+        if self.eventLoop.inEventLoop {
+            return self.eventLoop.makeCompletedFuture(self.consumedCommandTag0())
+        } else {
+            return self.eventLoop.flatSubmit {
+                self.eventLoop.makeCompletedFuture(self.consumedCommandTag0())
+            }
+        }
+    }
+
+    private func consumedCommandTag0() -> Result<String?, any Error> {
+        self.downstreamStateBox.withValue { state in
+            switch state {
+            case .consumed(.success(let summary)):
+                return .success(Self.commandTag(for: summary))
+
+            case .consumed(.failure(is CancellationError)):
+                // The consumer dropped the iterator before the end, so there is no tag to report.
+                return .success(nil)
+
+            case .consumed(.failure(let error)):
+                return .failure(error)
+            
+            case .waitingForConsumer, .iteratingRows, .waitingForAll, .asyncSequence, .invalidated:
+                return .success(nil)
+            }
+        }
+    }
+
+    private static func commandTag(for summary: StatementSummary) -> String {
+        switch summary {
         case .tag(let tag):
             return tag
         case .emptyResponse:

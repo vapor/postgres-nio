@@ -29,6 +29,7 @@ public struct PSQLError: Error, @unchecked Sendable {
             case poolClosed
             
             case rowSequenceUsedOutsideScope
+            case rowSequenceNotFullyConsumed
         }
 
         internal var base: Base
@@ -60,6 +61,7 @@ public struct PSQLError: Error, @unchecked Sendable {
         public static let unlistenFailed = Self.init(.unlistenFailed)
 
         public static let rowSequenceUsedOutsideScope = Self.init(.rowSequenceUsedOutsideScope)
+        public static let rowSequenceNotFullyConsumed = Self.init(.rowSequenceNotFullyConsumed)
 
         @available(*, deprecated, renamed: "clientClosedConnection")
         public static let connectionQuiescing = Self.clientClosedConnection
@@ -109,6 +111,8 @@ public struct PSQLError: Error, @unchecked Sendable {
                 return "unlistenFailed"
             case .rowSequenceUsedOutsideScope:
                 return "rowSequenceUsedOutsideScope"
+            case .rowSequenceNotFullyConsumed:
+                return "rowSequenceNotFullyConsumed"
             }
         }
     }
@@ -419,6 +423,8 @@ public struct PSQLError: Error, @unchecked Sendable {
     static let receivedUnencryptedDataAfterSSLRequest = PSQLError(code: .receivedUnencryptedDataAfterSSLRequest)
 
     static let rowSequenceUsedOutsideScope = PSQLError(code: .rowSequenceUsedOutsideScope)
+
+    static let rowSequenceNotFullyConsumed = PSQLError(code: .rowSequenceNotFullyConsumed)
 
     static func server(_ response: PostgresBackendMessage.ErrorResponse) -> PSQLError {
         var error = PSQLError(code: .server)

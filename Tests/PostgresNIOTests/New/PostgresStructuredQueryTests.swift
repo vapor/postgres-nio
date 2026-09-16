@@ -70,11 +70,8 @@ import Logging
                 #expect(request.parse.query == "DELETE FROM users")
 
                 try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
-                try await channel.testingEventLoop.executeInContext { channel.read() }
                 try await channel.writeInbound(PostgresBackendMessage.commandComplete("DELETE 0"))
-                try await channel.testingEventLoop.executeInContext { channel.read() }
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
-                try await channel.testingEventLoop.executeInContext { channel.read() }
 
                 try await taskGroup.waitForAll()
             }
@@ -254,6 +251,133 @@ import Logging
                 try await channel.testingEventLoop.executeInContext { channel.read() }
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
                 try await channel.testingEventLoop.executeInContext { channel.read() }
+
+                try await taskGroup.waitForAll()
+            }
+
+            try await self.runSimpleSelect(on: connection, channel: channel)
+        }
+    }
+
+    @Test func metadataIsReturnedAlongsideBodyResult() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    let (names, metadata) = try await connection.queryWithMetadata("SELECT name FROM users", logger: .psqlTest) { rows in
+                        var names = [String]()
+                        for try await row in rows {
+                            names.append(try row.decode(String.self, context: .default))
+                        }
+                        return names
+                    }
+                    #expect(names == ["alice", "bob", "carol"])
+                    #expect(metadata.command == "SELECT")
+                    #expect(metadata.rows == 3)
+                    #expect(metadata.oid == nil)
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
+                try await channel.sendUnpreparedQueryEnd(dataRows: [["alice"], ["bob"], ["carol"]], commandTag: "SELECT 3")
+
+                try await taskGroup.waitForAll()
+            }
+        }
+    }
+
+    @Test func metadataForInsertCarriesOID() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    let (_, metadata) = try await connection.queryWithMetadata("INSERT INTO users (name) VALUES ('dave')", logger: .psqlTest) { rows in
+                        for try await _ in rows {}
+                    }
+                    #expect(metadata.command == "INSERT")
+                    #expect(metadata.oid == 0)
+                    #expect(metadata.rows == 1)
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("INSERT 0 1"))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                try await taskGroup.waitForAll()
+            }
+        }
+    }
+
+    @Test func metadataThrowsWhenBodyDoesNotConsumeToTheEnd() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                let scopeExited = Signal()
+
+                taskGroup.addTask {
+                    defer { scopeExited.signal() }
+                    do {
+                        _ = try await connection.queryWithMetadata("SELECT name FROM users", logger: .psqlTest) { rows -> String? in
+                            for try await row in rows {
+                                return try row.decode(String.self, context: .default)
+                            }
+                            return nil
+                        }
+                        Issue.record("Expected queryWithMetadata to throw")
+                    } catch let error as PSQLError {
+                        #expect(error.code == .rowSequenceNotFullyConsumed)
+                        #expect(error.query == "SELECT name FROM users")
+                        #expect(error.file == #fileID)
+                    }
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
+                try await channel.writeInbound(PostgresBackendMessage.dataRow(["alice"]))
+                // Only complete the query once the body has returned, so the stream is guaranteed to still be
+                // streaming when `queryWithMetadata` asks for the command tag.
+                await scopeExited.wait()
+                try await channel.sendUnpreparedQueryEnd(dataRows: [["bob"], ["carol"]], commandTag: "SELECT 3")
+
+                try await taskGroup.waitForAll()
+            }
+
+            try await self.runSimpleSelect(on: connection, channel: channel)
+        }
+    }
+
+    @Test func metadataRethrowsServerErrorSwallowedByBody() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    do {
+                        _ = try await connection.queryWithMetadata("SELECT name FROM users", logger: .psqlTest) { rows in
+                            var seen = [String]()
+                            do {
+                                for try await row in rows {
+                                    seen.append(try row.decode(String.self, context: .default))
+                                }
+                                Issue.record("Expected iteration to throw")
+                            } catch {
+                                // Swallow the error: the stream is now `.consumed(.failure)` and the body
+                                // returns normally, so `queryWithMetadata` has no command tag to work with.
+                            }
+                            return seen
+                        }
+                        Issue.record("Expected queryWithMetadata to throw")
+                    } catch let error as PSQLError {
+                        #expect(error.code == .server)
+                        #expect(error.serverInfo?[.sqlState] == "57014")
+                        #expect(error.query == "SELECT name FROM users")
+                        #expect(error.file == #fileID)
+                    }
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
+                try await channel.writeInbound(PostgresBackendMessage.dataRow(["alice"]))
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                    .sqlState: "57014" // query_canceled
+                ])))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
                 try await taskGroup.waitForAll()
             }

@@ -527,6 +527,115 @@ extension PostgresClientTests {
         }
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataReturnsSelectRowCount() async throws {
+        try await self.withClient { client, logger in
+            let (sum, metadata) = try await client.queryWithMetadata("SELECT generate_series(1, 100)", logger: logger) { rows in
+                var sum = 0
+                for try await (value) in rows.decode(Int.self) {
+                    sum += value
+                }
+                return sum
+            }
+            #expect(sum == 5050)
+            #expect(metadata.command == "SELECT")
+            #expect(metadata.rows == 100)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataReportsAffectedRowsForWrites() async throws {
+        let tableName = "test_client_query_with_metadata"
+
+        try await self.withClient { client, logger in
+            try await client.query("DROP TABLE IF EXISTS \"\(unescaped: tableName)\";", logger: logger)
+            try await client.query(
+                """
+                CREATE TABLE "\(unescaped: tableName)" (
+                    id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                    value INT NOT NULL
+                );
+                """,
+                logger: logger
+            )
+
+            let (_, insert) = try await client.queryWithMetadata(
+                #"INSERT INTO "\#(unescaped: tableName)" (value) SELECT generate_series(1, 25);"#,
+                logger: logger
+            ) { rows in
+                for try await _ in rows {}
+            }
+            #expect(insert.command == "INSERT")
+            #expect(insert.oid == 0)
+            #expect(insert.rows == 25)
+
+            let (doubled, update) = try await client.queryWithMetadata(
+                #"UPDATE "\#(unescaped: tableName)" SET value = value * 2 WHERE value > 20 RETURNING value;"#,
+                logger: logger
+            ) { rows in
+                var doubled = [Int]()
+                for try await (value) in rows.decode(Int.self) {
+                    doubled.append(value)
+                }
+                return doubled.sorted()
+            }
+            #expect(doubled == [42, 44, 46, 48, 50])
+            #expect(update.command == "UPDATE")
+            #expect(update.rows == 5)
+
+            let (_, delete) = try await client.queryWithMetadata(
+                #"DELETE FROM "\#(unescaped: tableName)";"#,
+                logger: logger
+            ) { rows in
+                for try await _ in rows {}
+            }
+            #expect(delete.command == "DELETE")
+            #expect(delete.rows == 25)
+
+            try await client.query("DROP TABLE \"\(unescaped: tableName)\";", logger: logger)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataReleasesLeaseAfterBodyReturns() async throws {
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            for i in 1...10 {
+                let (count, metadata) = try await client.queryWithMetadata("SELECT generate_series(1, \(i))", logger: logger) { rows in
+                    var count = 0
+                    for try await _ in rows { count += 1 }
+                    return count
+                }
+                #expect(count == i)
+                #expect(metadata.rows == i)
+            }
+
+            let rows = try await client.query("SELECT 1", logger: logger)
+            for try await (value) in rows.decode(Int.self) {
+                #expect(value == 1)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataBodyThrowsReleasesLease() async throws {
+        struct MyError: Error {}
+
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            await #expect(throws: MyError.self) {
+                try await client.queryWithMetadata("SELECT generate_series(1, 1000000)", logger: logger) { rows in
+                    for try await _ in rows {
+                        throw MyError()
+                    }
+                }
+            }
+
+            let (_, metadata) = try await client.queryWithMetadata("SELECT 3", logger: logger) { rows in
+                for try await _ in rows {}
+            }
+            #expect(metadata.rows == 1)
+        }
+    }
+
     // MARK: Helpers
 
     private func withClient(

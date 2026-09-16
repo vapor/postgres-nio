@@ -727,9 +727,8 @@ extension PostgresConnection {
         logger: Logger,
         file: String = #fileID,
         line: Int = #line,
-        isolation: isolated (any Actor)? = #isolation,
-        _ body: (PostgresRowSequence) async throws -> sending Result
-    ) async throws -> sending Result {
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> Result {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
 
@@ -748,6 +747,65 @@ extension PostgresConnection {
         defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
 
         return try await body(sequence)
+    }
+
+    /// Run a query on the Postgres server the connection is connected to and return the query's metadata
+    /// alongside the `body` closure's result.
+    ///
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// The metadata is derived from the command tag the server sends after the last row, so `body` must
+    /// iterate the sequence to its end. If it returns early the query is cancelled and the method throws
+    /// `PSQLError.rowSequenceNotFullyConsumed`.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result. Must consume the sequence to its end.
+    /// - Returns: The result of the `body` closure and the query metadata.
+    public func queryWithMetadata<Result>(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
+        let stream: PSQLRowStream
+        let sequence: PostgresRowSequence
+
+        do {
+            (stream, sequence) = try await self.queryStream(query, logger: logger).map { stream in
+                (stream, stream.asyncSequence())
+            }.get()
+        }  catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+
+        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+
+        let result = try await body(sequence)
+
+        do {
+            guard let consumedCommandTag = try await stream.consumedCommandTag().get() else {
+                throw PSQLError.rowSequenceNotFullyConsumed
+            }
+            guard let metadata = PostgresQueryMetadata(string: consumedCommandTag) else {
+                throw PSQLError.invalidCommandTag(consumedCommandTag)
+            }
+            return (result, metadata)
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
     }
 }
 
