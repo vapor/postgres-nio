@@ -122,7 +122,11 @@ import Testing
         #expect(closeAction.connection === newConnection)
         #expect(connections.stats == .init(closing: 1, availableStreams: 0))
 
-        let closeContext = connections.connectionClosed(newConnection.id, shuttingDown: false)
+        let closeContext = connections.connectionClosed(
+            newConnection.id,
+            shuttingDown: false,
+            createConnectionForQueuedRequest: false
+        )
         #expect(closeContext.connectionsStarting == 0)
         #expect(connections.isEmpty)
         #expect(connections.stats == .init())
@@ -727,7 +731,11 @@ import Testing
 
         // When the draining connection closes, it's in the overflow slot,
         // so no replacement connection should be created.
-        let closedAction = connections.connectionClosed(persistedConn.id, shuttingDown: false)
+        let closedAction = connections.connectionClosed(
+            persistedConn.id,
+            shuttingDown: false,
+            createConnectionForQueuedRequest: false
+        )
         #expect(closedAction.newConnectionRequest == nil)
         #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
 

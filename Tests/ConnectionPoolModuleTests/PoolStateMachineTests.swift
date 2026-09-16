@@ -247,6 +247,49 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testLastConnectionDyingWithQueuedRequestCreatesReplacement() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 0
+        configuration.maximumConnectionSoftLimit = 1
+        configuration.maximumConnectionHardLimit = 1
+        configuration.keepAliveDuration = nil
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        guard case .makeConnection = stateMachine.leaseConnection(request1).connection else {
+            Issue.record()
+            return
+        }
+        let connection1 = MockConnection(id: 0)
+        #expect(
+            stateMachine.connectionEstablished(connection1, maxStreams: 1).request
+                == .leaseConnection(.init(element: request1), connection1)
+        )
+
+        let request2 = MockRequest(connectionType: MockConnection.self)
+        #expect(stateMachine.leaseConnection(request2) == .none())
+
+        let closedAction = stateMachine.connectionClosed(connection1)
+        #expect(closedAction.request == .none)
+        guard case .makeConnection(let replacementRequest, _) = closedAction.connection else {
+            Issue.record("Expected a replacement connection for the queued request, got \(closedAction.connection)")
+            return
+        }
+
+        let connection2 = MockConnection(id: replacementRequest.connectionID)
+        #expect(
+            stateMachine.connectionEstablished(connection2, maxStreams: 1).request
+                == .leaseConnection(.init(element: request2), connection2)
+        )
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testReleaseLoosesRaceAgainstClosed() {
         var configuration = PoolConfiguration()
         configuration.minimumConnectionCount = 0
