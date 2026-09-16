@@ -120,28 +120,6 @@ struct PoolStateMachine<
     @usableFromInline
     enum PoolState: Sendable {
         @usableFromInline
-        struct RunningContext: Sendable {
-            @usableFromInline
-            init(gracefulShutdownTriggered: Bool) {
-                self.gracefulShutdownTriggered = gracefulShutdownTriggered
-            }
-
-            @usableFromInline
-            var gracefulShutdownTriggered: Bool
-        }
-
-        @usableFromInline
-        struct ShuttingDownContext: Sendable {
-            @usableFromInline
-            init(gracefulShutdownTriggered: Bool) {
-                self.gracefulShutdownTriggered = gracefulShutdownTriggered
-            }
-
-            @usableFromInline
-            var gracefulShutdownTriggered: Bool
-        }
-
-        @usableFromInline
         struct ConnectionCreationFailingContext: Sendable {
             @usableFromInline
             init(
@@ -195,9 +173,9 @@ struct PoolStateMachine<
 
         /// Everything is awesome. Connections are created as they are needed.
         /// Can transition to:
-        ///   - `shuttingDown` if the pool is being shut down (graceful shutdown behavior is managed by an external flag),
+        ///   - `shuttingDown` if the pool is being shut down,
         ///   - `connectionCreationFailing` if a connection creation failed.
-        case running(RunningContext)
+        case running(gracefulShutdownTriggered: Bool)
         /// The last connection creation attempt failed. In this state, the pool attempts to establish 
         /// only one connection to the server at a time. New connection attempts are not initiated based 
         /// on incoming requests. Retries to establish a connection continue even if all requests have 
@@ -219,12 +197,10 @@ struct PoolStateMachine<
         ///   - `shuttingDown` if the pool is shut down.
         case circuitBreakOpen(CircuitBreakerOpenContext)
 
-        /// The pool is in the process of shutting down. Graceful shutdown behavior (e.g., waiting for
-        /// in-flight requests to complete) is managed by an external `gracefulShutdownTriggered` flag,
-        /// rather than being part of the state itself.
+        /// The pool is in the process of shutting down.
         /// Can transition to:
         ///   - `shutDown` once all resources are released and outstanding requests are handled (if graceful shutdown was triggered).
-        case shuttingDown(ShuttingDownContext)
+        case shuttingDown(gracefulShutdownTriggered: Bool)
         /// The pool has fully shut down and released all its resources. No further operations are possible.
         case shutDown
     }
@@ -257,13 +233,13 @@ struct PoolStateMachine<
     @usableFromInline
     /*private*/ var requestQueue: RequestQueue
     @usableFromInline
-    /*private*/ var poolState: PoolState = .running(.init(gracefulShutdownTriggered: false))
+    /*private*/ var poolState: PoolState = .running(gracefulShutdownTriggered: false)
     @inlinable
     /*private*/ var gracefulShutdownTriggered: Bool {
         switch self.poolState {
-        case .running(let context): context.gracefulShutdownTriggered
+        case .running(let gracefulShutdownTriggered): gracefulShutdownTriggered
         case .connectionCreationFailing(let context): context.gracefulShutdownTriggered
-        case .shuttingDown(let context): context.gracefulShutdownTriggered
+        case .shuttingDown(let gracefulShutdownTriggered): gracefulShutdownTriggered
         case .circuitBreakOpen, .shutDown: false
         }
     }
@@ -405,7 +381,7 @@ struct PoolStateMachine<
         }
 
         if self.gracefulShutdownTriggered && self.requestQueue.isEmpty {
-            self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: true))
+            self.poolState = .shuttingDown(gracefulShutdownTriggered: true)
         }
 
         return .init(
@@ -424,10 +400,10 @@ struct PoolStateMachine<
             break
 
         case .connectionCreationFailing(let context):
-            self.poolState = .running(.init(gracefulShutdownTriggered: context.gracefulShutdownTriggered))
+            self.poolState = .running(gracefulShutdownTriggered: context.gracefulShutdownTriggered)
 
         case .circuitBreakOpen:
-            self.poolState = .running(.init(gracefulShutdownTriggered: false))
+            self.poolState = .running(gracefulShutdownTriggered: false)
 
         case .shutDown:
             fatalError("Connection pool is not running")
@@ -496,7 +472,7 @@ struct PoolStateMachine<
                     timeOfFirstFailedAttempt: clock.now, 
                     error: error, 
                     connectionIDToRetry: request.connectionID,
-                    gracefulShutdownTriggered: context.gracefulShutdownTriggered
+                    gracefulShutdownTriggered: gracefulShutdownTriggered
                 )
             )
             let timer = self.backoffNextConnectionAttempt(connectionID: request.connectionID, numberOfFailedAttempts: 1)
@@ -523,7 +499,7 @@ struct PoolStateMachine<
                         connectionAction = .cancelEventStreamAndFinalCleanup(timer.flatMap { [$0] } ?? [])
                     } else {
                         // there might be starting connections
-                        self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: true))
+                        self.poolState = .shuttingDown(gracefulShutdownTriggered: true)
                         connectionAction = .cancelTimers(timer.flatMap { [$0] } ?? [])
                     }
                     return .init(
@@ -601,7 +577,7 @@ struct PoolStateMachine<
         case .running:
             break
 
-        case .shuttingDown(let context) where context.gracefulShutdownTriggered:
+        case .shuttingDown(let gracefulShutdownTriggered) where gracefulShutdownTriggered:
             // the connection needs to be closed here
             break
 
@@ -609,7 +585,7 @@ struct PoolStateMachine<
             return .none()
         }
 
-        switch self.connections.backoffDone(connectionID, retry: !(isShuttingDown && gracefulShutdownTriggered)) {
+        switch self.connections.backoffDone(connectionID, retry: !(self.isShuttingDown && self.gracefulShutdownTriggered)) {
         case .createConnection(let request, let continuation):
             let timers: TinyFastSequence<TimerCancellationToken>
             if let continuation {
@@ -730,7 +706,7 @@ struct PoolStateMachine<
         case .running, .connectionCreationFailing, .circuitBreakOpen:
             self.cacheNoMoreConnectionsAllowed = false
 
-            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: self.gracefulShutdownTriggered)
+            let closedConnectionAction = self.connections.connectionClosed(connection.id, shuttingDown: false)
 
             let connectionAction: ConnectionAction
             if let newRequest = closedConnectionAction.newConnectionRequest {
@@ -771,34 +747,33 @@ struct PoolStateMachine<
 
     @usableFromInline
     mutating func triggerGracefulShutdown() -> Action {
-        if gracefulShutdownTriggered { return .none() }
+        if self.gracefulShutdownTriggered { return .none() }
 
         switch self.poolState {
-        case .running(var context):
-            context.gracefulShutdownTriggered = true
-            self.poolState = .running(context)
+        case .running:
+            self.poolState = .running(gracefulShutdownTriggered: true)
 
         case .connectionCreationFailing(var context):
             context.gracefulShutdownTriggered = true
             self.poolState = .connectionCreationFailing(context)
 
         case .circuitBreakOpen:
-            self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: true))
+            self.poolState = .shuttingDown(gracefulShutdownTriggered: true)
 
         case .shuttingDown, .shutDown:
             return .none()
         }
 
-        guard requestQueue.isEmpty else {
+        guard self.requestQueue.isEmpty else {
             return .none()
         }
 
         // only switch to shutting down if the request queue is empty,
         // otherwise stay running and simply stop accepting new requests
-        self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: true))
+        self.poolState = .shuttingDown(gracefulShutdownTriggered: true)
 
         var shutdown = ConnectionAction.Shutdown()
-        self.connections.closeAnyNonLeasedConnection(&shutdown)
+        self.connections.closeConnections(onlyNonLeased: true, cleanup: &shutdown)
 
         if self.connections.isEmpty, shutdown.connections.isEmpty {
             self.poolState = .shutDown
@@ -820,8 +795,8 @@ struct PoolStateMachine<
         case .shutDown:
             return .init(request: .none, connection: .none)
 
-        case .shuttingDown(let context):
-            guard context.gracefulShutdownTriggered else {
+        case .shuttingDown(let gracefulShutdownTriggered):
+            guard gracefulShutdownTriggered else {
                 return .none()
             }
             break
@@ -830,9 +805,9 @@ struct PoolStateMachine<
             break
         }
 
-        self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: false))
+        self.poolState = .shuttingDown(gracefulShutdownTriggered: false)
         var shutdown = ConnectionAction.Shutdown()
-        self.connections.triggerForceShutdown(&shutdown)
+        self.connections.closeConnections(onlyNonLeased: false, cleanup: &shutdown)
 
         if self.connections.isEmpty, shutdown.connections.isEmpty {
             self.poolState = .shutDown
@@ -858,7 +833,7 @@ struct PoolStateMachine<
 
         if self.gracefulShutdownTriggered && self.requestQueue.isEmpty {
             // no more work to take up, start shutting down
-            self.poolState = .shuttingDown(.init(gracefulShutdownTriggered: true))
+            self.poolState = .shuttingDown(gracefulShutdownTriggered: true)
         }
 
         if !requests.isEmpty {
