@@ -1,28 +1,27 @@
-import Atomics
-import XCTest
 import Logging
-import PostgresNIO
 import NIOCore
 import NIOPosix
-import NIOTestUtils
+import PostgresNIO
+import Testing
 
-final class IntegrationTests: XCTestCase {
+#if canImport(FoundationEssentials)
+    import FoundationEssentials
+#else
+    import Foundation
+#endif
 
-    func testConnectAndClose() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+@Suite(.serialized)
+struct IntegrationTests {
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        XCTAssertNoThrow(try conn?.close().wait())
+    @Test func connectAndClose() async throws {
+        let conn = try await PostgresConnection.test(on: MultiThreadedEventLoopGroup.singleton.any())
+        try await conn.close()
     }
 
-    func testAuthenticationFailure() throws {
-        // If the postgres server trusts every connection, it is really hard to create an
-        // authentication failure.
-        try XCTSkipIf(env("POSTGRES_HOST_AUTH_METHOD") == "trust")
-
+    // If the postgres server trusts every connection, it is really hard to create an
+    // authentication failure.
+    @Test(.disabled(if: env("POSTGRES_HOST_AUTH_METHOD") == "trust"))
+    func authenticationFailure() async throws {
         let config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
             port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
@@ -32,264 +31,175 @@ final class IntegrationTests: XCTestCase {
             tls: .disable
         )
 
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-
         var logger = Logger.psqlTest
         logger.logLevel = .info
 
-        var connection: PostgresConnection?
-        XCTAssertThrowsError(connection = try PostgresConnection.connect(on: eventLoopGroup.next(), configuration: config, id: 1, logger: logger).wait()) {
-            XCTAssertTrue($0 is PSQLError)
+        await #expect(throws: PSQLError.self) {
+            let connection = try await PostgresConnection.connect(
+                on: MultiThreadedEventLoopGroup.singleton.any(), configuration: config, id: 1,
+                logger: logger
+            )
+            // In case of a test failure the created connection must be closed.
+            try await connection.close()
         }
-
-        // In case of a test failure the created connection must be closed.
-        XCTAssertNoThrow(try connection?.close().wait())
     }
 
-    func testQueryVersion() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-        let rows = result?.rows
-        var version: String?
-        XCTAssertNoThrow(version = try rows?.first?.decode(String.self, context: .default))
-        XCTAssertEqual(version?.contains("PostgreSQL"), true)
+    @Test func queryVersion() async throws {
+        try await withConnection { connection in
+            let rows = try await connection.query("SELECT version()", logger: .psqlTest).collect()
+            let version = try #require(rows.first).decode(String.self, context: .default)
+            #expect(version.contains("PostgreSQL"))
+        }
     }
 
-    func testQuery10kItems() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var metadata: PostgresQueryMetadata?
-        let received = ManagedAtomic<Int64>(0)
-        XCTAssertNoThrow(metadata = try conn?.query("SELECT generate_series(1, 10000);", logger: .psqlTest) { row in
-            func workaround() {
-                let expected = received.wrappingIncrementThenLoad(ordering: .relaxed)
-                XCTAssertEqual(expected, try row.decode(Int64.self, context: .default))
+    @Test func query10kItems() async throws {
+        try await withConnection { connection in
+            var expected: Int64 = 0
+            for try await row in try await connection.query("SELECT generate_series(1, 10000);", logger: .psqlTest) {
+                expected += 1
+                #expect(try row.decode(Int64.self, context: .default) == expected)
             }
-
-            workaround()
-        }.wait())
-
-        XCTAssertEqual(received.load(ordering: .relaxed), 10000)
-        XCTAssertEqual(metadata?.command, "SELECT")
-        XCTAssertEqual(metadata?.rows, 10000)
-    }
-
-    func test1kRoundTrips() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        for _ in 0..<1_000 {
-            var result: PostgresQueryResult?
-            XCTAssertNoThrow(result = try conn?.query("SELECT version()", logger: .psqlTest).wait())
-            var version: String?
-            XCTAssertNoThrow(version = try result?.rows.first?.decode(String.self, context: .default))
-            XCTAssertEqual(version?.contains("PostgreSQL"), true)
+            #expect(expected == 10000)
         }
     }
 
-    func testQuerySelectParameter() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).wait())
-        var foo: String?
-        XCTAssertNoThrow(foo = try result?.rows.first?.decode(String.self, context: .default))
-        XCTAssertEqual(foo, "hello")
+    @Test func oneThousandRoundTrips() async throws {
+        try await withConnection { connection in
+            for _ in 0..<1_000 {
+                let rows = try await connection.query("SELECT version()", logger: .psqlTest).collect()
+                let version = try #require(rows.first).decode(String.self, context: .default)
+                #expect(version.contains("PostgreSQL"))
+            }
+        }
     }
 
-    func testQueryNothing() throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var _result: PostgresQueryResult?
-        XCTAssertNoThrow(_result = try conn?.query("""
-            -- Some comments
-            """, logger: .psqlTest).wait())
-
-        let result = try XCTUnwrap(_result)
-        XCTAssertEqual(result.rows, [])
-        XCTAssertEqual(result.metadata.command, "")
+    @Test func querySelectParameter() async throws {
+        try await withConnection { connection in
+            let rows = try await connection.query("SELECT \("hello")::TEXT as foo", logger: .psqlTest).collect()
+            let foo = try #require(rows.first).decode(String.self, context: .default)
+            #expect(foo == "hello")
+        }
     }
 
-    func testDecodeIntegers() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+    @Test func queryNothing() async throws {
+        try await withConnection { connection in
+            let result = try await connection.query(
+                """
+                -- Some comments
+                """, logger: .psqlTest
+            ).get()
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("""
-        SELECT
-            1::SMALLINT                   as smallint,
-            -32767::SMALLINT              as smallint_min,
-            32767::SMALLINT               as smallint_max,
-            1::INT                        as int,
-            -2147483647::INT              as int_min,
-            2147483647::INT               as int_max,
-            1::BIGINT                     as bigint,
-            -9223372036854775807::BIGINT  as bigint_min,
-            9223372036854775807::BIGINT   as bigint_max
-        """, logger: .psqlTest).wait())
-
-        XCTAssertEqual(result?.rows.count, 1)
-        let row = result?.rows.first
-
-        var cells: (Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64)?
-        XCTAssertNoThrow(cells = try row?.decode((Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64).self, context: .default))
-
-        XCTAssertEqual(cells?.0, 1)
-        XCTAssertEqual(cells?.1, -32_767)
-        XCTAssertEqual(cells?.2, 32_767)
-        XCTAssertEqual(cells?.3, 1)
-        XCTAssertEqual(cells?.4, -2_147_483_647)
-        XCTAssertEqual(cells?.5, 2_147_483_647)
-        XCTAssertEqual(cells?.6, 1)
-        XCTAssertEqual(cells?.7, -9_223_372_036_854_775_807)
-        XCTAssertEqual(cells?.8, 9_223_372_036_854_775_807)
+            #expect(result.rows == [])
+            #expect(result.metadata.command == "")
+        }
     }
 
-    func testEncodeAndDecodeIntArray() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+    @Test func decodeIntegers() async throws {
+        try await withConnection { connection in
+            let rows = try await connection.query(
+                """
+                SELECT
+                    1::SMALLINT                   as smallint,
+                    -32767::SMALLINT              as smallint_min,
+                    32767::SMALLINT               as smallint_max,
+                    1::INT                        as int,
+                    -2147483647::INT              as int_min,
+                    2147483647::INT               as int_max,
+                    1::BIGINT                     as bigint,
+                    -9223372036854775807::BIGINT  as bigint_min,
+                    9223372036854775807::BIGINT   as bigint_max
+                """, logger: .psqlTest
+            ).collect()
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode(
+                (Int16, Int16, Int16, Int32, Int32, Int32, Int64, Int64, Int64).self,
+                context: .default
+            )
 
-        var result: PostgresQueryResult?
-        let array: [Int64] = [1, 2, 3]
-        XCTAssertNoThrow(result = try conn?.query("SELECT \(array)::int8[] as array", logger: .psqlTest).wait())
-        XCTAssertEqual(result?.rows.count, 1)
-        XCTAssertEqual(try result?.rows.first?.decode([Int64].self, context: .default), array)
+            #expect(cells.0 == 1)
+            #expect(cells.1 == -32_767)
+            #expect(cells.2 == 32_767)
+            #expect(cells.3 == 1)
+            #expect(cells.4 == -2_147_483_647)
+            #expect(cells.5 == 2_147_483_647)
+            #expect(cells.6 == 1)
+            #expect(cells.7 == -9_223_372_036_854_775_807)
+            #expect(cells.8 == 9_223_372_036_854_775_807)
+        }
     }
 
-    func testDecodeEmptyIntegerArray() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("SELECT '{}'::int[] as array", logger: .psqlTest).wait())
-
-        XCTAssertEqual(result?.rows.count, 1)
-        XCTAssertEqual(try result?.rows.first?.decode([Int64].self, context: .default), [])
+    @Test func encodeAndDecodeIntArray() async throws {
+        try await withConnection { connection in
+            let array: [Int64] = [1, 2, 3]
+            let rows = try await connection.query(
+                "SELECT \(array)::int8[] as array", logger: .psqlTest
+            ).collect()
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode([Int64].self, context: .default) == array)
+        }
     }
 
-    func testDoubleArraySerialization() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var result: PostgresQueryResult?
-        let doubles: [Double] = [3.14, 42]
-        XCTAssertNoThrow(result = try conn?.query("SELECT \(doubles)::double precision[] as doubles", logger: .psqlTest).wait())
-        XCTAssertEqual(result?.rows.count, 1)
-        XCTAssertEqual(try result?.rows.first?.decode([Double].self, context: .default), doubles)
+    @Test func decodeEmptyIntegerArray() async throws {
+        try await withConnection { connection in
+            let rows = try await connection.query(
+                "SELECT '{}'::int[] as array", logger: .psqlTest
+            ).collect()
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode([Int64].self, context: .default) == [])
+        }
     }
 
-    func testDecodeDates() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("""
-            SELECT
-                '2016-01-18 01:02:03 +0042'::DATE         as date,
-                '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
-                '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
-            """, logger: .psqlTest).wait())
-
-        XCTAssertEqual(result?.rows.count, 1)
-
-        var cells: (Date, Date, Date)?
-        XCTAssertNoThrow(cells = try result?.rows.first?.decode((Date, Date, Date).self, context: .default))
-
-        XCTAssertEqual(cells?.0.description, "2016-01-18 00:00:00 +0000")
-        XCTAssertEqual(cells?.1.description, "2016-01-18 01:02:03 +0000")
-        XCTAssertEqual(cells?.2.description, "2016-01-18 00:20:03 +0000")
+    @Test func doubleArraySerialization() async throws {
+        try await withConnection { connection in
+            let doubles: [Double] = [3.14, 42]
+            let rows = try await connection.query(
+                "SELECT \(doubles)::double precision[] as doubles", logger: .psqlTest
+            ).collect()
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode([Double].self, context: .default) == doubles)
+        }
     }
 
-    func testDecodeDecimals() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+    @Test func decodeDates() async throws {
+        try await withConnection { connection in
+            let rows = try await connection.query(
+                """
+                SELECT
+                    '2016-01-18 01:02:03 +0042'::DATE         as date,
+                    '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
+                    '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
+                """, logger: .psqlTest
+            ).collect()
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode((Date, Date, Date).self, context: .default)
 
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("""
-            SELECT
-                \(Decimal(string: "123456.789123")!)::numeric     as numeric,
-                \(Decimal(string: "-123456.789123")!)::numeric    as numeric_negative
-            """, logger: .psqlTest).wait())
-        XCTAssertEqual(result?.rows.count, 1)
-
-        var cells: (Decimal, Decimal)?
-        XCTAssertNoThrow(cells = try result?.rows.first?.decode((Decimal, Decimal).self, context: .default))
-
-        XCTAssertEqual(cells?.0, Decimal(string: "123456.789123"))
-        XCTAssertEqual(cells?.1, Decimal(string: "-123456.789123"))
+            #expect(cells.0.description == "2016-01-18 00:00:00 +0000")
+            #expect(cells.1.description == "2016-01-18 01:02:03 +0000")
+            #expect(cells.2.description == "2016-01-18 00:20:03 +0000")
+        }
     }
 
-    func testDecodeRawRepresentables() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+    @Test func decodeDecimals() async throws {
+        try await withConnection { connection in
+            let rows = try await connection.query(
+                """
+                SELECT
+                    \(Decimal(string: "123456.789123")!)::numeric     as numeric,
+                    \(Decimal(string: "-123456.789123")!)::numeric    as numeric_negative
+                """, logger: .psqlTest
+            ).collect()
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode((Decimal, Decimal).self, context: .default)
 
+            #expect(cells.0 == Decimal(string: "123456.789123"))
+            #expect(cells.1 == Decimal(string: "-123456.789123"))
+        }
+    }
+
+    @Test func decodeRawRepresentables() async throws {
         enum StringRR: String, PostgresDecodable {
             case a
         }
@@ -301,224 +211,167 @@ final class IntegrationTests: XCTestCase {
         let stringValue = StringRR.a
         let intValue = IntRR.b
 
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("""
-            SELECT
-                \(stringValue.rawValue)::varchar     as string,
-                \(intValue.rawValue)::int8           as int
-            """, logger: .psqlTest).wait())
-        XCTAssertEqual(result?.rows.count, 1)
+        try await withConnection { connection in
+            let rows = try await connection.query(
+                """
+                SELECT
+                    \(stringValue.rawValue)::varchar     as string,
+                    \(intValue.rawValue)::int8           as int
+                """, logger: .psqlTest
+            ).collect()
 
-        var cells: (StringRR, IntRR)?
-        XCTAssertNoThrow(cells = try result?.rows.first?.decode((StringRR, IntRR).self, context: .default))
+            #expect(rows.count == 1)
+            let cells = try #require(rows.first).decode((StringRR, IntRR).self, context: .default)
 
-        XCTAssertEqual(cells?.0, stringValue)
-        XCTAssertEqual(cells?.1, intValue)
+            #expect(cells.0 == stringValue)
+            #expect(cells.1 == intValue)
+        }
     }
 
-    func testRoundTripUUID() {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+    @Test func roundTripUUID() async throws {
+        try await withConnection { connection in
+            let uuidString = "2c68f645-9ca6-468b-b193-ee97f241c2f8"
+            let rows = try await connection.query(
+                """
+                SELECT \(uuidString)::UUID as uuid
+                """,
+                logger: .psqlTest
+            ).collect()
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        let uuidString = "2c68f645-9ca6-468b-b193-ee97f241c2f8"
-
-        var result: PostgresQueryResult?
-        XCTAssertNoThrow(result = try conn?.query("""
-            SELECT \(uuidString)::UUID as uuid
-            """,
-            logger: .psqlTest
-        ).wait())
-
-        XCTAssertEqual(result?.rows.count, 1)
-        XCTAssertEqual(try result?.rows.first?.decode(UUID.self, context: .default), UUID(uuidString: uuidString))
+            #expect(rows.count == 1)
+            #expect(try #require(rows.first).decode(UUID.self, context: .default) == UUID(uuidString: uuidString))
+        }
     }
 
-    func testRoundTripJSONB() {
+    @Test(arguments: ["jsonb", "json"])
+    func roundTripJSON(type: String) async throws {
         struct Object: Codable, PostgresCodable {
             let foo: Int
             let bar: Int
         }
 
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+        try await withConnection { connection in
+            let rows = try await connection.query(
+                """
+                select \(Object(foo: 1, bar: 2))::\(unescaped: type) as \(unescaped: type)
+                """, logger: .psqlTest
+            ).collect()
 
-        var conn: PostgresConnection?
-        XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow(try conn?.close().wait()) }
-
-        do {
-            var result: PostgresQueryResult?
-            XCTAssertNoThrow(result = try conn?.query("""
-                select \(Object(foo: 1, bar: 2))::jsonb as jsonb
-                """, logger: .psqlTest).wait())
-
-            XCTAssertEqual(result?.rows.count, 1)
-            var obj: Object?
-            XCTAssertNoThrow(obj = try result?.rows.first?.decode(Object.self, context: .default))
-            XCTAssertEqual(obj?.foo, 1)
-            XCTAssertEqual(obj?.bar, 2)
-        }
-
-        do {
-            var result: PostgresQueryResult?
-            XCTAssertNoThrow(result = try conn?.query("""
-                select \(Object(foo: 1, bar: 2))::json as json
-                """, logger: .psqlTest).wait())
-
-            XCTAssertEqual(result?.rows.count, 1)
-            var obj: Object?
-            XCTAssertNoThrow(obj = try result?.rows.first?.decode(Object.self, context: .default))
-            XCTAssertEqual(obj?.foo, 1)
-            XCTAssertEqual(obj?.bar, 2)
+            #expect(rows.count == 1)
+            let obj = try #require(rows.first).decode(Object.self, context: .default)
+            #expect(obj.foo == 1)
+            #expect(obj.bar == 2)
         }
     }
-    
-    func testCopyIntoFrom() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
 
-        let conn = try await PostgresConnection.test(on: eventLoop).get()
-        defer { XCTAssertNoThrow(try conn.close().wait()) }
+    /// Creates an empty `copy_table` for the COPY tests.
+    private func createCopyTable(on connection: PostgresConnection) async throws {
+        _ = try? await connection.query("DROP TABLE copy_table", logger: .psqlTest)
+        try await connection.query(
+            "CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest
+        )
+    }
 
-        _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
-        _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
+    @Test func copyIntoFrom() async throws {
+        try await withConnection { connection in
+            try await self.createCopyTable(on: connection)
 
-        var options = PostgresCopyFromFormat.TextOptions()
-        options.delimiter = ","
-        try await conn.copyFrom(table: "copy_table", columns: ["id", "name"], format: .text(options), logger: .psqlTest) { writer in
-            let records: [(id: Int, name: String)] = [
-                (1, "Alice"),
-                (42, "Bob")
-            ]
-            for record in records {
-                var buffer = ByteBuffer()
-                buffer.writeString("\(record.id),\(record.name)\n")
-                try await writer.write(buffer)
+            var options = PostgresCopyFromFormat.TextOptions()
+            options.delimiter = ","
+            try await connection.copyFrom(
+                table: "copy_table", columns: ["id", "name"], format: .text(options),
+                logger: .psqlTest
+            ) { writer in
+                let records: [(id: Int, name: String)] = [
+                    (1, "Alice"),
+                    (42, "Bob"),
+                ]
+                for record in records {
+                    var buffer = ByteBuffer()
+                    buffer.writeString("\(record.id),\(record.name)\n")
+                    try await writer.write(buffer)
+                }
             }
+            let rows = try await connection.query("SELECT id, name FROM copy_table", logger: .psqlTest)
+                .collect().map { try $0.decode((Int, String).self) }
+            try #require(rows.count == 2)
+            #expect(rows[0].0 == 1)
+            #expect(rows[0].1 == "Alice")
+            #expect(rows[1].0 == 42)
+            #expect(rows[1].1 == "Bob")
         }
-        let rows = try await conn.query("SELECT id, name FROM copy_table").get().rows.map { try $0.decode((Int, String).self) }
-        guard rows.count == 2 else {
-            XCTFail("Expected 2 columns, received \(rows.count)")
-            return
-        }
-        XCTAssertEqual(rows[0].0, 1)
-        XCTAssertEqual(rows[0].1, "Alice")
-        XCTAssertEqual(rows[1].0, 42)
-        XCTAssertEqual(rows[1].1, "Bob")
     }
 
-    func testCopyIntoFromIsTerminatedByThrowingErrorFromClosure() async throws {
+    @Test func copyIntoFromIsTerminatedByThrowingErrorFromClosure() async throws {
         struct MyError: Error, CustomStringConvertible {
             var description: String { "My error" }
         }
 
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+        try await withConnection { connection in
+            try await self.createCopyTable(on: connection)
 
-        let conn = try await PostgresConnection.test(on: eventLoop).get()
-        defer { XCTAssertNoThrow(try conn.close().wait()) }
-
-        _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
-        _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
-
-        do {
-            try await conn.copyFrom(table: "copy_table", columns: ["id", "name"], logger: .psqlTest) { writer in
-                throw MyError()
-            }
-            XCTFail("Expected error to be thrown")
-        } catch {
-            XCTAssert(error is MyError, "Expected error of type MyError, got \(String(reflecting: error))")
-        }
-    }
-
-
-    func testCopyIntoFromHasBadFormat() async throws {
-        struct MyError: Error, CustomStringConvertible {
-            var description: String { "My error" }
-        }
-
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        let conn = try await PostgresConnection.test(on: eventLoop).get()
-        defer { XCTAssertNoThrow(try conn.close().wait()) }
-
-        _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
-        _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
-
-        do {
-            try await conn.copyFrom(table: "copy_table", columns: ["id", "name"], logger: .psqlTest) { writer in
-                try await writer.write(ByteBuffer(staticString: "1Alice\n"))
-            }
-            XCTFail("Expected error to be thrown")
-        } catch {
-            XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "22P02") // invalid_text_representation
-        }
-    }
-
-    func testSyntaxErrorInGeneratedQuery() async throws {
-        struct MyError: Error, CustomStringConvertible {
-            var description: String { "My error" }
-        }
-
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        let conn = try await PostgresConnection.test(on: eventLoop).get()
-        defer { XCTAssertNoThrow(try conn.close().wait()) }
-
-        do {
-            // Use some form of input that generates an invalid query, the exact manner of its invalidness doesn't matter
-            try await conn.copyFrom(table: "", logger: .psqlTest) { writer in
-                XCTFail("Did not expect to call writeData")
-            }
-            XCTFail("Expected error to be thrown")
-        } catch {
-            XCTAssertEqual((error as? PSQLError)?.serverInfo?[.sqlState], "42601") // scanner_yyerror
-        }
-    }
-
-    func testCopyFromBinary() async throws {
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 2)
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
-
-        let conn = try await PostgresConnection.test(on: eventLoop).get()
-        defer { XCTAssertNoThrow(try conn.close().wait()) }
-
-        _ = try? await conn.query("DROP TABLE copy_table", logger: .psqlTest).get()
-        _ = try await conn.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest).get()
-
-        try await conn.copyFromBinary(table: "copy_table", columns: ["id", "name"], logger: .psqlTest) { writer in
-            let records: [(id: Int, name: String)] = [
-                (1, "Alice"),
-                (42, "Bob")
-            ]
-            for record in records {
-                try await writer.writeRow { columnWriter in
-                    try columnWriter.writeColumn(Int32(record.id))
-                    try columnWriter.writeColumn(record.name)
+            await #expect(throws: MyError.self) {
+                try await connection.copyFrom(
+                    table: "copy_table", columns: ["id", "name"], logger: .psqlTest
+                ) { writer in
+                    throw MyError()
                 }
             }
         }
-        let rows = try await conn.query("SELECT id, name FROM copy_table").get().rows.map { try $0.decode((Int, String).self) }
-        guard rows.count == 2 else {
-            XCTFail("Expected 2 columns, received \(rows.count)")
-            return
+    }
+
+    @Test func copyIntoFromHasBadFormat() async throws {
+        try await withConnection { connection in
+            try await self.createCopyTable(on: connection)
+
+            let error = await #expect(throws: PSQLError.self) {
+                try await connection.copyFrom(
+                    table: "copy_table", columns: ["id", "name"], logger: .psqlTest
+                ) { writer in
+                    try await writer.write(ByteBuffer(staticString: "1Alice\n"))
+                }
+            }
+            #expect(error?.serverInfo?[.sqlState] == "22P02")  // invalid_text_representation
         }
-        XCTAssertEqual(rows[0].0, 1)
-        XCTAssertEqual(rows[0].1, "Alice")
-        XCTAssertEqual(rows[1].0, 42)
-        XCTAssertEqual(rows[1].1, "Bob")
+    }
+
+    @Test func syntaxErrorInGeneratedQuery() async throws {
+        try await withConnection { connection in
+            let error = await #expect(throws: PSQLError.self) {
+                // Use some form of input that generates an invalid query, the exact manner of its invalidness doesn't matter
+                try await connection.copyFrom(table: "", logger: .psqlTest) { writer in
+                    Issue.record("Did not expect to call writeData")
+                }
+            }
+            #expect(error?.serverInfo?[.sqlState] == "42601")  // scanner_yyerror
+        }
+    }
+
+    @Test func copyFromBinary() async throws {
+        try await withConnection { connection in
+            try await self.createCopyTable(on: connection)
+
+            try await connection.copyFromBinary(
+                table: "copy_table", columns: ["id", "name"], logger: .psqlTest
+            ) { writer in
+                let records: [(id: Int, name: String)] = [
+                    (1, "Alice"),
+                    (42, "Bob"),
+                ]
+                for record in records {
+                    try await writer.writeRow { columnWriter in
+                        try columnWriter.writeColumn(Int32(record.id))
+                        try columnWriter.writeColumn(record.name)
+                    }
+                }
+            }
+            let rows = try await connection.query("SELECT id, name FROM copy_table", logger: .psqlTest)
+                .collect().map { try $0.decode((Int, String).self) }
+            try #require(rows.count == 2)
+            #expect(rows[0].0 == 1)
+            #expect(rows[0].1 == "Alice")
+            #expect(rows[1].0 == 42)
+            #expect(rows[1].1 == "Bob")
+        }
     }
 }

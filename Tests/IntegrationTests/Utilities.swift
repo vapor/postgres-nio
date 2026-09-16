@@ -40,6 +40,23 @@ extension PostgresConnection {
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
+
+    static func test(on eventLoop: any EventLoop, options: Configuration.Options? = nil) async throws -> PostgresConnection {
+        let logger = Logger(label: "postgres.connection.test")
+        var config = PostgresConnection.Configuration(
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database",
+            tls: .disable
+        )
+        if let options {
+            config.options = options
+        }
+        
+        return try await PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
     
     static func testUDS(on eventLoop: any EventLoop) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
@@ -63,6 +80,18 @@ extension PostgresConnection {
         )
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
+}
+
+func withConnection<Result>(_ body: (PostgresConnection) async throws -> Result) async throws -> Result {
+    let connection = try await PostgresConnection.test(on: MultiThreadedEventLoopGroup.singleton.any())
+    do {
+        let result = try await body(connection)
+        try await connection.close()
+        return result
+    } catch {
+        try? await connection.close()
+        throw error
     }
 }
 
