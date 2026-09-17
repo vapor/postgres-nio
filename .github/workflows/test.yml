@@ -170,8 +170,6 @@ jobs:
           key: api-breakage-${{ github.sha }}
 
   lint:
-    permissions:
-      contents: read
     runs-on: ubuntu-latest
     container: swift:noble
     timeout-minutes: 5
@@ -180,8 +178,13 @@ jobs:
         run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
       - name: Check out code
         uses: actions/checkout@v7
+      - name: Install curl
+        run: apt-get update -yq && apt-get install -y curl
+      - name: Fetch shared swift-format config
+        run: curl -sfLO https://raw.githubusercontent.com/vapor/contributing/refs/heads/main/.swift-format
       - name: Lint
-        run: swift format lint --recursive .
+        run: curl -sfL https://raw.githubusercontent.com/swiftlang/github-workflows/refs/heads/main/.github/workflows/scripts/check-swift-format.sh | bash
+
   
   musl:
     permissions:
