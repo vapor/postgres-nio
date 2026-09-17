@@ -1,4 +1,5 @@
 import XCTest
+import Testing
 import PostgresNIO
 import NIOCore
 import Logging
@@ -95,6 +96,7 @@ func withConnection<Result>(
         try await connection.close()
         return result
     } catch {
+        Issue.record(error, "Unexpected error: \(String(reflecting: error))", sourceLocation: sourceLocation)
         try? await connection.close()
         throw error
     }
