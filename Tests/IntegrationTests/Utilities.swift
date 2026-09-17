@@ -41,7 +41,7 @@ extension PostgresConnection {
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
 
-    static func test(on eventLoop: any EventLoop, options: Configuration.Options? = nil) async throws -> PostgresConnection {
+    static func test(on eventLoop: any EventLoop = MultiThreadedEventLoopGroup.singleton.any(), options: Configuration.Options? = nil) async throws -> PostgresConnection {
         let logger = Logger(label: "postgres.connection.test")
         var config = PostgresConnection.Configuration(
             host: env("POSTGRES_HOSTNAME") ?? "localhost",
@@ -83,8 +83,13 @@ extension PostgresConnection {
     }
 }
 
-func withConnection<Result>(_ body: (PostgresConnection) async throws -> Result) async throws -> Result {
-    let connection = try await PostgresConnection.test(on: MultiThreadedEventLoopGroup.singleton.any())
+func withConnection<Result>(
+    on eventLoop: any EventLoop = MultiThreadedEventLoopGroup.singleton.any(),
+    options: PostgresConnection.Configuration.Options? = nil,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ body: (PostgresConnection) async throws -> Result
+) async throws -> Result {
+    let connection = try await PostgresConnection.test(on: eventLoop, options: options)
     do {
         let result = try await body(connection)
         try await connection.close()
