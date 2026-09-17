@@ -75,6 +75,10 @@ import NIOCore
         #expect(ClosedRange<Int64>.psqlArrayType == .int8RangeArray)
         #expect(ClosedRange<Int64>.psqlType == .int8Range)
         #expect([ClosedRange<Int64>].psqlType == .int8RangeArray)
+
+        #expect(PostgresInet.psqlArrayType == .inetArray)
+        #expect(PostgresInet.psqlType == .inet)
+        #expect([PostgresInet].psqlType == .inetArray)
     }
 
     @Test func testStringArrayRoundTrip() {
