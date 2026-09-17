@@ -1,6 +1,6 @@
-import NIOCore
-import NIOConcurrencyHelpers
 import Logging
+import NIOConcurrencyHelpers
+import NIOCore
 
 extension PostgresDatabase {
     public func simpleQuery(_ string: String) -> EventLoopFuture<[PostgresRow]> {
@@ -11,9 +11,9 @@ extension PostgresDatabase {
             }
         }.map { rowsBoxed.withLockedValue { $0 } }
     }
-    
+
     @preconcurrency
-    public func simpleQuery(_ string: String, _ onRow: @Sendable @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    public func simpleQuery(_ string: String, _ onRow: @Sendable @escaping (PostgresRow) throws -> Void) -> EventLoopFuture<Void> {
         self.query(string, onRow: onRow)
     }
 }

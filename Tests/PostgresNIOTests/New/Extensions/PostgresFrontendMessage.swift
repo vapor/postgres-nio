@@ -27,7 +27,7 @@ enum PostgresFrontendMessage: Equatable {
         /// The cancel request code. The value is chosen to contain 1234 in the most significant 16 bits,
         /// and 5678 in the least significant 16 bits. (To avoid confusion, this code must not be the same
         /// as any protocol version number.)
-        static let requestCode: Int32 = 80877102
+        static let requestCode: Int32 = 80_877_102
 
         /// The process ID of the target backend.
         let processID: Int32
@@ -86,21 +86,10 @@ enum PostgresFrontendMessage: Equatable {
 
         let saslMechanism: String
         let initialData: [UInt8]
-
-        /// Creates a new `SSLRequest`.
-        init(saslMechanism: String, initialData: [UInt8]) {
-            self.saslMechanism = saslMechanism
-            self.initialData = initialData
-        }
     }
 
     struct SASLResponse: Hashable {
         var data: [UInt8]
-
-        /// Creates a new `SSLRequest`.
-        init(data: [UInt8]) {
-            self.data = data
-        }
     }
 
     /// A message asking the PostgreSQL server if TLS is supported
@@ -108,7 +97,7 @@ enum PostgresFrontendMessage: Equatable {
     struct SSLRequest: Hashable {
         /// The SSL request code. The value is chosen to contain 1234 in the most significant 16 bits,
         /// and 5679 in the least significant 16 bits.
-        static let requestCode: Int32 = 80877103
+        static let requestCode: Int32 = 80_877_103
     }
 
     struct Startup: Equatable {
@@ -151,8 +140,9 @@ enum PostgresFrontendMessage: Equatable {
             /// can be true, false, or database, and the default is false.
             var replication: Replication
 
-            static func ==(lhs: Self, rhs: Self) -> Bool {
-                guard lhs.user == rhs.user
+            static func == (lhs: Self, rhs: Self) -> Bool {
+                guard
+                    lhs.user == rhs.user
                         && lhs.database == rhs.database
                         && lhs.replication == rhs.replication
                         && lhs.options.count == rhs.options.count
@@ -193,9 +183,9 @@ enum PostgresFrontendMessage: Equatable {
     case sync
     case startup(Startup)
     case terminate
-    
+
     enum ID: UInt8, Equatable {
-        
+
         case bind
         case copyData
         case copyDone
@@ -210,7 +200,7 @@ enum PostgresFrontendMessage: Equatable {
         case saslResponse
         case sync
         case terminate
-        
+
         init?(rawValue: UInt8) {
             switch rawValue {
             case UInt8(ascii: "B"):
@@ -282,7 +272,7 @@ enum PostgresFrontendMessage: Equatable {
 }
 
 extension PostgresFrontendMessage {
-    
+
     var id: ID {
         switch self {
         case .bind:

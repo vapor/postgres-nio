@@ -7,13 +7,13 @@ extension PostgresMessage {
         public static var identifier: PostgresMessage.Identifier {
             return .sync
         }
-        
+
         public var description: String {
             return "Sync"
         }
-        
+
         public func serialize(into buffer: inout ByteBuffer) {
-            
+
         }
     }
 }

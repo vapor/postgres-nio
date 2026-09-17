@@ -91,13 +91,13 @@ extension ListenStateMachine {
             case stopping([Int: NotificationListener])
             case failed(any Error)
         }
-        
+
         private var state: State
-        
+
         init() {
             self.state = .initialized
         }
-        
+
         mutating func start(_ new: NotificationListener) -> StartListeningAction {
             switch self.state {
             case .initialized:
@@ -113,7 +113,7 @@ extension ListenStateMachine {
                 listeners[new.id] = new
                 self.state = .listening(listeners)
                 return .succeedListenStart(new)
-                
+
             case .stopping(var listeners):
                 listeners[new.id] = new
                 self.state = .stopping(listeners)
@@ -128,7 +128,7 @@ extension ListenStateMachine {
             switch self.state {
             case .initialized, .listening, .stopping:
                 fatalError("Invalid state: \(self.state)")
-                
+
             case .starting(let listeners):
                 if listeners.isEmpty {
                     self.state = .stopping(listeners)
@@ -137,31 +137,31 @@ extension ListenStateMachine {
                     self.state = .listening(listeners)
                     return .activateListeners(listeners.values)
                 }
-                
+
             case .failed:
                 fatalError("Invalid state: \(self.state)")
             }
         }
-        
+
         mutating func startListeningFailed(_ error: any Error) -> Dictionary<Int, NotificationListener>.Values {
             switch self.state {
             case .initialized, .listening, .stopping:
                 fatalError("Invalid state: \(self.state)")
-                
+
             case .starting(let listeners):
                 self.state = .initialized
                 return listeners.values
-                
+
             case .failed:
                 fatalError("Invalid state: \(self.state)")
             }
         }
-        
+
         mutating func stopListeningSucceeded() -> StopListeningSuccessAction {
             switch self.state {
             case .initialized, .listening, .starting:
                 fatalError("Invalid state: \(self.state)")
-                
+
             case .stopping(let listeners):
                 if listeners.isEmpty {
                     self.state = .initialized
@@ -170,12 +170,12 @@ extension ListenStateMachine {
                     self.state = .starting(listeners)
                     return .startListening
                 }
-                
+
             case .failed:
                 return .none
             }
         }
-        
+
         mutating func cancelListening(id: Int) -> CancelAction {
             switch self.state {
             case .initialized:
@@ -184,7 +184,7 @@ extension ListenStateMachine {
                 // handler fires after the start error path completes). This is
                 // a benign race — there is nothing left to cancel.
                 return .none
-                
+
             case .starting(var listeners):
                 let removed = listeners.removeValue(forKey: id)
                 self.state = .starting(listeners)
@@ -206,7 +206,7 @@ extension ListenStateMachine {
                     }
                     return .none
                 }
-                
+
             case .stopping(var listeners):
                 let removed = listeners.removeValue(forKey: id)
                 self.state = .stopping(listeners)
@@ -219,37 +219,37 @@ extension ListenStateMachine {
                 return .none
             }
         }
-        
+
         enum FailAction {
             case failListeners(Dictionary<Int, NotificationListener>.Values)
             case none
         }
-        
+
         mutating func fail(_ error: any Error) -> FailAction {
             switch self.state {
             case .initialized:
                 return .none
-                
+
             case .starting(let listeners), .listening(let listeners), .stopping(let listeners):
                 self.state = .failed(error)
                 return .failListeners(listeners.values)
-                
+
             case .failed:
                 return .none
             }
         }
-        
+
         func notificationReceived() -> ReceivedAction {
             switch self.state {
             case .initialized, .starting:
                 fatalError("Invalid state: \(self.state)")
-                
+
             case .listening(let listeners):
                 return .notify(listeners.values)
-                
+
             case .stopping:
                 return .none
-                
+
             default:
                 preconditionFailure("TODO: Not yet implemented")
             }

@@ -8,17 +8,17 @@ extension PostgresMessage {
         /// The SSL request code. The value is chosen to contain 1234 in the most significant 16 bits,
         /// and 5679 in the least significant 16 bits.
         public let code: Int32
-        
+
         /// See `CustomStringConvertible`.
         public var description: String {
             return "SSLRequest"
         }
-        
+
         /// Creates a new `SSLRequest`.
         public init() {
-            self.code = 80877103
+            self.code = 80_877_103
         }
-        
+
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
             buffer.writeInteger(self.code)

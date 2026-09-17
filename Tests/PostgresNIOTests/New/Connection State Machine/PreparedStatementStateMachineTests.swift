@@ -1,5 +1,6 @@
-import Testing
 import NIOEmbedded
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct PreparedStatementStateMachineTests {
@@ -27,11 +28,12 @@ import NIOEmbedded
         }
         #expect(preparationCompleteAction.statements.count == 1)
         #expect(preparationCompleteAction.rowDescription == nil)
-        firstPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success(.tag("tag"))),
-            eventLoop: eventLoop,
-            logger: .psqlTest
-        ))
+        firstPreparedStatement.promise.succeed(
+            PSQLRowStream(
+                source: .noRows(.success(.tag("tag"))),
+                eventLoop: eventLoop,
+                logger: .psqlTest
+            ))
 
         // Create a new prepared statement
         let secondPreparedStatement = self.makePreparedStatementContext(eventLoop: eventLoop)
@@ -45,11 +47,12 @@ import NIOEmbedded
             Issue.record("State machine returned the wrong action")
             return
         }
-        secondPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success(.tag("tag"))),
-            eventLoop: eventLoop,
-            logger: .psqlTest
-        ))
+        secondPreparedStatement.promise.succeed(
+            PSQLRowStream(
+                source: .noRows(.success(.tag("tag"))),
+                eventLoop: eventLoop,
+                logger: .psqlTest
+            ))
     }
 
     @Test func testPrepareAndExecuteStatementWithError() {
@@ -134,16 +137,18 @@ import NIOEmbedded
         #expect(preparationCompleteAction.statements.count == 2)
         #expect(preparationCompleteAction.rowDescription == nil)
 
-        firstPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success(.tag("tag"))),
-            eventLoop: eventLoop,
-            logger: .psqlTest
-        ))
-        secondPreparedStatement.promise.succeed(PSQLRowStream(
-            source: .noRows(.success(.tag("tag"))),
-            eventLoop: eventLoop,
-            logger: .psqlTest
-        ))
+        firstPreparedStatement.promise.succeed(
+            PSQLRowStream(
+                source: .noRows(.success(.tag("tag"))),
+                eventLoop: eventLoop,
+                logger: .psqlTest
+            ))
+        secondPreparedStatement.promise.succeed(
+            PSQLRowStream(
+                source: .noRows(.success(.tag("tag"))),
+                eventLoop: eventLoop,
+                logger: .psqlTest
+            ))
     }
 
     private func makePreparedStatementContext(eventLoop: EmbeddedEventLoop) -> PreparedStatementContext {

@@ -1,15 +1,16 @@
-import XCTest
 import Logging
 import NIOCore
 import NIOPosix
-@testable import PostgresNIO
 import NIOTestUtils
+import XCTest
+
+@testable import PostgresNIO
 
 final class PerformanceTests: XCTestCase {
     private var group: (any EventLoopGroup)!
 
     private var eventLoop: any EventLoop { self.group.next() }
-    
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         try XCTSkipUnless(Self.shouldRunPerformanceTests)
@@ -17,21 +18,20 @@ final class PerformanceTests: XCTestCase {
         XCTAssertTrue(isLoggingConfigured)
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
-    
+
     override func tearDownWithError() throws {
         try self.group?.syncShutdownGracefully()
         self.group = nil
         try super.tearDownWithError()
     }
-    
 
     // MARK: Performance
-    
+
     func testPerformanceRangeSelectDecodePerformance() throws {
         struct Series: Decodable {
             var num: Int
         }
-        
+
         let conn = try PostgresConnection.test(on: eventLoop).wait()
         defer { try! conn.close().wait() }
         measure {
@@ -54,9 +54,9 @@ final class PerformanceTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 300_000, batchSize: 5_000,
             schema:
-            """
-                "int" int8,
-            """,
+                """
+                    "int" int8,
+                """,
             fixtureData: [PostgresData(int: 1234)],
             on: self.eventLoop
         )
@@ -83,18 +83,18 @@ final class PerformanceTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 300_000,
             schema:
-            // TODO: Also add a `Double` and a `Data` field to this performance test.
-            """
-                "string" text,
-                "int" int8,
-                "date" timestamptz,
-                "uuid" uuid,
-            """,
+                // TODO: Also add a `Double` and a `Data` field to this performance test.
+                """
+                    "string" text,
+                    "int" int8,
+                    "date" timestamptz,
+                    "uuid" uuid,
+                """,
             fixtureData: [
                 PostgresData(string: "foo"),
                 PostgresData(int: 0),
                 now.postgresData!,
-                PostgresData(uuid: uuid)
+                PostgresData(uuid: uuid),
             ],
             on: self.eventLoop
         )
@@ -109,7 +109,7 @@ final class PerformanceTests: XCTestCase {
                     _ = row[data: "int"].int
                     _ = row[data: "date"].date
                     _ = row[data: "uuid"].uuid
-                    }.wait()
+                }.wait()
             } catch {
                 XCTFail("\(error)")
             }
@@ -126,29 +126,29 @@ final class PerformanceTests: XCTestCase {
         try prepareTableToMeasureSelectPerformance(
             rowCount: 100_000,
             schema:
-            // TODO: Also add `Double` and `Data` fields to this performance test.
-            """
-                "string1" text,
-                "string2" text,
-                "string3" text,
-                "string4" text,
-                "string5" text,
-                "int1" int8,
-                "int2" int8,
-                "int3" int8,
-                "int4" int8,
-                "int5" int8,
-                "date1" timestamptz,
-                "date2" timestamptz,
-                "date3" timestamptz,
-                "date4" timestamptz,
-                "date5" timestamptz,
-                "uuid1" uuid,
-                "uuid2" uuid,
-                "uuid3" uuid,
-                "uuid4" uuid,
-                "uuid5" uuid,
-            """,
+                // TODO: Also add `Double` and `Data` fields to this performance test.
+                """
+                    "string1" text,
+                    "string2" text,
+                    "string3" text,
+                    "string4" text,
+                    "string5" text,
+                    "int1" int8,
+                    "int2" int8,
+                    "int3" int8,
+                    "int4" int8,
+                    "int5" int8,
+                    "date1" timestamptz,
+                    "date2" timestamptz,
+                    "date3" timestamptz,
+                    "date4" timestamptz,
+                    "date5" timestamptz,
+                    "uuid1" uuid,
+                    "uuid2" uuid,
+                    "uuid3" uuid,
+                    "uuid4" uuid,
+                    "uuid5" uuid,
+                """,
             fixtureData: [
                 PostgresData(string: "string1"),
                 PostgresData(string: "string2"),
@@ -169,7 +169,7 @@ final class PerformanceTests: XCTestCase {
                 PostgresData(uuid: uuid),
                 PostgresData(uuid: uuid),
                 PostgresData(uuid: uuid),
-                PostgresData(uuid: uuid)
+                PostgresData(uuid: uuid),
             ],
             on: self.eventLoop
         )
@@ -279,24 +279,26 @@ private func prepareTableToMeasureSelectPerformance(
     XCTAssertEqual(rowCount % batchSize, 0, "`rowCount` must be a multiple of `batchSize`", file: (file), line: line)
     let conn = try PostgresConnection.test(on: eventLoop).wait()
     defer { try! conn.close().wait() }
-    
+
     _ = try conn.simpleQuery("DROP TABLE IF EXISTS \"measureSelectPerformance\"").wait()
-    _ = try conn.simpleQuery("""
+    _ = try conn.simpleQuery(
+        """
         CREATE TABLE "measureSelectPerformance" (
         "id" int8 NOT NULL,
         \(schema)
         PRIMARY KEY ("id")
         );
-        """).wait()
-    
+        """
+    ).wait()
+
     // Batch `batchSize` inserts into one for better insert performance.
     let totalArgumentsPerRow = fixtureData.count + 1
     let insertArgumentsPlaceholder = (0..<batchSize).map { indexInBatch in
         "("
             + (0..<totalArgumentsPerRow).map { argumentIndex in "$\(indexInBatch * totalArgumentsPerRow + argumentIndex + 1)" }
-                .joined(separator: ", ")
+            .joined(separator: ", ")
             + ")"
-        }.joined(separator: ", ")
+    }.joined(separator: ", ")
     let insertQuery = "INSERT INTO \"measureSelectPerformance\" VALUES \(insertArgumentsPlaceholder)"
     var batchedFixtureData = Array(repeating: [PostgresData(int: 0)] + fixtureData, count: batchSize).flatMap { $0 }
     for batchIndex in 0..<(rowCount / batchSize) {
@@ -307,4 +309,3 @@ private func prepareTableToMeasureSelectPerformance(
         _ = try conn.query(insertQuery, batchedFixtureData).wait()
     }
 }
-

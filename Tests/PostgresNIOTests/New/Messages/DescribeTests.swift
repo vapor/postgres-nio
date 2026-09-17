@@ -1,5 +1,6 @@
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct DescribeTests {

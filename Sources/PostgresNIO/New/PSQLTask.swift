@@ -45,10 +45,10 @@ final class ExtendedQueryContext: Sendable {
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
         case prepareStatement(name: String, query: String, bindingDataTypes: [PostgresDataType], EventLoopPromise<RowDescription?>)
     }
-    
+
     let query: Query
     let logger: Logger
-    
+
     init(
         query: PostgresQuery,
         logger: Logger,
@@ -57,8 +57,8 @@ final class ExtendedQueryContext: Sendable {
         self.query = .unnamed(query, promise)
         self.logger = logger
     }
-    
-   init(
+
+    init(
         copyFromQuery query: PostgresQuery,
         triggerCopy: CheckedContinuation<PostgresCopyFromWriter, any Error>,
         logger: Logger
@@ -121,7 +121,7 @@ final class CloseCommandContext: Sendable {
     let target: CloseTarget
     let logger: Logger
     let promise: EventLoopPromise<Void>
-    
+
     init(
         target: CloseTarget,
         logger: Logger,
@@ -132,4 +132,3 @@ final class CloseCommandContext: Sendable {
         self.promise = promise
     }
 }
-

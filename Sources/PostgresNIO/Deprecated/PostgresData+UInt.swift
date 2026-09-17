@@ -2,21 +2,22 @@ private func warn(
     _ old: Any.Type, mustBeConvertedTo new: Any.Type,
     file: StaticString = #file, line: UInt = #line
 ) {
-    assertionFailure("""
-    Integer conversion unsafe.
-    Postgres does not support storing \(old) natively.
+    assertionFailure(
+        """
+        Integer conversion unsafe.
+        Postgres does not support storing \(old) natively.
 
-    To bypass this assertion, compile in release mode.
+        To bypass this assertion, compile in release mode.
 
-        swift build -c release
+            swift build -c release
 
-    Unsigned integers were previously allowed by PostgresNIO
-    but may cause overflow. To avoid overflow errors, update
-    your code to use \(new) instead.
+        Unsigned integers were previously allowed by PostgresNIO
+        but may cause overflow. To avoid overflow errors, update
+        your code to use \(new) instead.
 
-    See https://github.com/vapor/postgres-nio/pull/120
+        See https://github.com/vapor/postgres-nio/pull/120
 
-    """, file: file, line: line)
+        """, file: file, line: line)
 }
 
 extension PostgresData {
@@ -125,7 +126,7 @@ extension UInt16: PostgresDataConvertible {
     }
 
     public var postgresData: PostgresData? {
-        .init(uint16:  self)
+        .init(uint16: self)
     }
 }
 

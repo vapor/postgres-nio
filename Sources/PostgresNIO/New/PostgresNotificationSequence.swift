@@ -1,4 +1,3 @@
-
 public struct PostgresNotification: Sendable {
     public let payload: String
 }
@@ -16,14 +15,14 @@ public struct PostgresNotificationSequence: AsyncSequence, Sendable {
         var base: AsyncThrowingStream<PostgresNotification, any Error>.AsyncIterator
 
         #if compiler(>=6.2)
-        @concurrent
-        public mutating func next() async throws -> Element? {
-            try await self.base.next()
-        }
+            @concurrent
+            public mutating func next() async throws -> Element? {
+                try await self.base.next()
+            }
         #else
-        public mutating func next() async throws -> Element? {
-            try await self.base.next()
-        }
+            public mutating func next() async throws -> Element? {
+                try await self.base.next()
+            }
         #endif
 
         @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)

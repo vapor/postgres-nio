@@ -1,10 +1,11 @@
-import NIOCore
-import NIOPosix
-import NIOEmbedded
-import Testing
 import Logging
-@testable import PostgresNIO
+import NIOCore
+import NIOEmbedded
+import NIOPosix
 import Synchronization
+import Testing
+
+@testable import PostgresNIO
 
 @Suite struct PostgresConnectionTests {
 
@@ -69,14 +70,20 @@ import Synchronization
                 ("server_version", "13.1 (Debian 13.1-1.pgdg100+1)"),
                 ("session_authorization", "postgres"),
                 ("IntervalStyle", "postgres"),
-                ("standard_conforming_strings", "on")
+                ("standard_conforming_strings", "on"),
             ]
             return config
         }()
 
         async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: .psqlTest)
         let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        #expect(message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: configuration.options.additionalStartupParameters, replication: .false))))
+        #expect(
+            message
+                == .startup(
+                    .versionThree(
+                        parameters: .init(
+                            user: "username", database: "database", options: configuration.options.additionalStartupParameters,
+                            replication: .false))))
         try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
         try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
         try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
@@ -100,9 +107,12 @@ import Synchronization
             database: "database"
         )
 
-        async let preparedChannelPromise = PostgresConnection.establishAndAuthChannelWithoutPostgresHandler(using: configuration, on: eventLoop, logger: self.logger).get()
+        async let preparedChannelPromise = PostgresConnection.establishAndAuthChannelWithoutPostgresHandler(
+            using: configuration, on: eventLoop, logger: self.logger
+        ).get()
         let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        #expect(message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
+        #expect(
+            message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
         try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
         try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
         try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
@@ -144,7 +154,8 @@ import Synchronization
                 try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
-                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
 
                 let unlistenMessage = try await channel.waitForUnpreparedRequest()
                 #expect(unlistenMessage.parse.query == #"UNLISTEN "foo";"#)
@@ -206,8 +217,10 @@ import Synchronization
                 try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
-                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
-                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo2")))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo2")))
 
                 let unlistenMessage = try await channel.waitForUnpreparedRequest()
                 #expect(unlistenMessage.parse.query == #"UNLISTEN "foo";"#)
@@ -257,7 +270,8 @@ import Synchronization
                 try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
-                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
                 struct MyWeirdError: Error {}
                 channel.pipeline.fireErrorCaught(MyWeirdError())
 
@@ -293,7 +307,8 @@ import Synchronization
                 try await channel.writeInbound(PostgresBackendMessage.commandComplete("LISTEN"))
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
-                try await channel.writeInbound(PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.notification(.init(backendPID: 12, channel: "foo", payload: "wooohooo")))
 
                 let unlistenMessage = try await channel.waitForUnpreparedRequest()
                 #expect(unlistenMessage.parse.query == #"UNLISTEN "foo";"#)
@@ -363,7 +378,7 @@ import Synchronization
 
     @Test func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> Void in
                 for _ in 1...2 {
                     taskGroup.addTask {
                         let rows = try await connection.query("SELECT 1;", logger: logger)
@@ -424,7 +439,7 @@ import Synchronization
     @Test func testCloseClosesImmediately() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
-            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> Void in
                 for _ in 1...2 {
                     taskGroup.addTask {
                         try await connection.query("SELECT 1;", logger: logger)
@@ -507,7 +522,7 @@ import Synchronization
     @Test func testPreparedStatement() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 taskGroup.addTask {
                     let preparedStatement = TestPrepareStatement(state: "active")
                     let result = try await connection.execute(preparedStatement, logger: .psqlTest)
@@ -573,7 +588,7 @@ import Synchronization
     @Test func testSerialExecutionOfSamePreparedStatement() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 // Send the same prepared statement twice, but with different parameters.
                 // Send one first and wait to send the other request until preparation is complete
                 taskGroup.addTask {
@@ -657,7 +672,7 @@ import Synchronization
     @Test func testStatementPreparationOnlyHappensOnceWithConcurrentRequests() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 // Send the same prepared statement twice, but with different parameters.
                 // Let them race to tests that requests and responses aren't mixed up
                 taskGroup.addTask {
@@ -738,7 +753,7 @@ import Synchronization
     @Test func testStatementPreparationFailure() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
 
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 // Send the same prepared statement twice, but with different parameters.
                 // Send one first and wait to send the other request until preparation is complete
                 taskGroup.addTask {
@@ -761,13 +776,14 @@ import Synchronization
 
                 // Respond with an error taking care to return a SQLSTATE that isn't
                 // going to get the connection closed.
-                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                    .sqlState : "26000" // invalid_sql_statement_name
-                ])))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.error(
+                        .init(fields: [
+                            .sqlState: "26000"  // invalid_sql_statement_name
+                        ])))
                 try await channel.testingEventLoop.executeInContext { channel.read() }
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
                 try await channel.testingEventLoop.executeInContext { channel.read() }
-
 
                 // Send another requests with the same prepared statement, which should fail straight
                 // away without any interaction with the server
@@ -798,7 +814,6 @@ import Synchronization
         }
     }
 
-
     @Test func testCopyFromWithOptions() async throws {
         var options = PostgresCopyFromFormat.TextOptions()
         options.delimiter = ","
@@ -825,10 +840,12 @@ import Synchronization
         } mockBackend: { channel, _ in
             let data = try await channel.waitForCopyData()
             #expect(data.result == .failed(message: "Client failed copy"))
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: "COPY from stdin failed: Client failed copy",
-                .sqlState : "57014" // query_canceled
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: "COPY from stdin failed: Client failed copy",
+                        .sqlState: "57014",  // query_canceled
+                    ])))
         }
     }
 
@@ -846,10 +863,12 @@ import Synchronization
             let copyDataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             #expect(copyDataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: #"invalid input syntax for type integer: "1Alice""#,
-                .sqlState : "22P02" // invalid_text_representation
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: #"invalid input syntax for type integer: "1Alice""#,
+                        .sqlState: "22P02",  // invalid_text_representation
+                    ])))
             signalContinuation.yield()
         }
     }
@@ -861,10 +880,12 @@ import Synchronization
             #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "22P02")
         } mockBackend: { channel, _ in
             _ = try await channel.waitForCopyData()
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: #"invalid input syntax for type integer: "1Alice""#,
-                .sqlState : "22P02" // invalid_text_representation
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: #"invalid input syntax for type integer: "1Alice""#,
+                        .sqlState: "22P02",  // invalid_text_representation
+                    ])))
         }
     }
 
@@ -889,10 +910,12 @@ import Synchronization
             let copyDataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             #expect(copyDataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: #"invalid input syntax for type integer: "1Alice""#,
-                .sqlState : "22P02" // invalid_text_representation
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: #"invalid input syntax for type integer: "1Alice""#,
+                        .sqlState: "22P02",  // invalid_text_representation
+                    ])))
             signalContinuation.yield()
         }
     }
@@ -918,10 +941,12 @@ import Synchronization
             let dataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             #expect(dataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: #"invalid input syntax for type integer: "1Alice""#,
-                .sqlState : "22P02" // invalid_text_representation
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: #"invalid input syntax for type integer: "1Alice""#,
+                        .sqlState: "22P02",  // invalid_text_representation
+                    ])))
             signalContinuation.yield()
         }
     }
@@ -951,17 +976,19 @@ import Synchronization
             let dataMessage = try await channel.waitForPostgresFrontendMessage(\.copyData)
             #expect(dataMessage == PostgresFrontendMessage.CopyData(data: ByteBuffer(staticString: "1Alice\n")))
 
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: #"invalid input syntax for type integer: "1Alice""#,
-                .sqlState : "22P02" // invalid_text_representation
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: #"invalid input syntax for type integer: "1Alice""#,
+                        .sqlState: "22P02",  // invalid_text_representation
+                    ])))
             signalContinuation.yield()
         }
     }
 
     @Test func testCopyFromQueryHasSyntaxError() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 taskGroup.addTask {
                     do {
                         try await connection.copyFrom(table: "", logger: .psqlTest) { _ in
@@ -978,14 +1005,16 @@ import Synchronization
                 }
 
                 _ = try await channel.waitForUnpreparedRequest()
-                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                    .message: #"syntax error"#,
-                    .sqlState : "42601" // scanner_yyerror
-                ])))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.error(
+                        .init(fields: [
+                            .message: #"syntax error"#,
+                            .sqlState: "42601",  // scanner_yyerror
+                        ])))
 
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
-                _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
+                _ = try await channel.waitForUnpreparedRequest()  // Await the dummy query messages
             }
         }
     }
@@ -1013,11 +1042,11 @@ import Synchronization
             let isWriting = isWriting.load(ordering: .sequentiallyConsistent)
             #expect(isWriting)
 
-            // Wait for another 10ms to ensure the `writer.write` call did indeed start and tried to write data, just 
+            // Wait for another 10ms to ensure the `writer.write` call did indeed start and tried to write data, just
             // being blocked on the backpressure.
             try await Task.sleep(for: .milliseconds(10))
 
-            // Now that we know `writeData` is blocked, relieve the write backpressure and check that the copy operation 
+            // Now that we know `writeData` is blocked, relieve the write backpressure and check that the copy operation
             // finishes.
             channel.isWritable = true
             channel.pipeline.fireChannelWritabilityChanged()
@@ -1042,16 +1071,18 @@ import Synchronization
             let data = try await channel.waitForCopyData()
             #expect(data.result == .failed(message: "Client failed copy"))
 
-            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
-                .message: "COPY from stdin failed: Client failed copy",
-                .sqlState : "57014" // query_canceled
-            ])))
+            try await channel.writeInbound(
+                PostgresBackendMessage.error(
+                    .init(fields: [
+                        .message: "COPY from stdin failed: Client failed copy",
+                        .sqlState: "57014",  // query_canceled
+                    ])))
         }
     }
 
     @Test func testCopyFromCancelledWhileWaitingForBackpressureRelieve() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 taskGroup.addTask {
                     do {
                         try await connection.copyFrom(table: "test", logger: .psqlTest) { writer in
@@ -1067,7 +1098,8 @@ import Synchronization
 
                 try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
                 channel.isWritable = false
-                try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: 2))))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: 2))))
 
                 // Wait for the `PostgresCopyFromWriter.write` call to execute and hit the write backpressure before we cancel the task.
                 try await Task.sleep(for: .milliseconds(200))
@@ -1079,72 +1111,72 @@ import Synchronization
         }
     }
 
-    #if compiler(>=6.2) // copyFromBinary is only available in Swift 6.2+
-    @Test func testCopyFromBinary() async throws {
-        try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
-                taskGroup.addTask {
-                    try await connection.copyFromBinary(table: "copy_table", logger: .psqlTest) {
-                        writer in
-                        try await writer.writeRow { columnWriter in
-                            try columnWriter.writeColumn(Int32(1))
-                            try columnWriter.writeColumn("Alice")
-                        }
-                        try await writer.writeRow { columnWriter in
-                            try columnWriter.writeColumn(Int32(2))
-                            try columnWriter.writeColumn("Bob")
+    #if compiler(>=6.2)  // copyFromBinary is only available in Swift 6.2+
+        @Test func testCopyFromBinary() async throws {
+            try await self.withAsyncTestingChannel { connection, channel in
+                try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
+                    taskGroup.addTask {
+                        try await connection.copyFromBinary(table: "copy_table", logger: .psqlTest) {
+                            writer in
+                            try await writer.writeRow { columnWriter in
+                                try columnWriter.writeColumn(Int32(1))
+                                try columnWriter.writeColumn("Alice")
+                            }
+                            try await writer.writeRow { columnWriter in
+                                try columnWriter.writeColumn(Int32(2))
+                                try columnWriter.writeColumn("Bob")
+                            }
                         }
                     }
+
+                    let copyRequest = try await channel.waitForUnpreparedRequest()
+                    #expect(copyRequest.parse.query == #"COPY "copy_table" FROM STDIN WITH (FORMAT binary)"#)
+
+                    try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                    try await channel.writeInbound(
+                        PostgresBackendMessage.copyInResponse(
+                            .init(format: .binary, columnFormats: [.binary, .binary])))
+
+                    let copyData = try await channel.waitForCopyData()
+                    #expect(copyData.result == .done)
+                    var data = copyData.data
+                    // Signature
+                    #expect(data.readString(length: 7) == "PGCOPY\n")
+                    #expect(data.readInteger(as: UInt8.self) == 0xff)
+                    #expect(data.readString(length: 3) == "\r\n\0")
+                    // Flags
+                    #expect(data.readInteger(as: UInt32.self) == 0)
+                    // Header extension area length
+                    #expect(data.readInteger(as: UInt32.self) == 0)
+
+                    struct Row: Equatable {
+                        let id: Int32
+                        let name: String
+                    }
+                    var rows: [Row] = []
+                    // Read until we are only left with the trailer
+                    while data.readableBytes > 2 {
+                        // Number of columns
+                        #expect(data.readInteger(as: UInt16.self) == 2)
+                        // 'id' column
+                        #expect(data.readInteger(as: UInt32.self) == 4)
+                        let id = data.readInteger(as: Int32.self)
+                        // 'name' column length
+                        let nameLength = data.readInteger(as: UInt32.self)
+                        let name = data.readString(length: Int(try #require(nameLength)))
+                        rows.append(Row(id: try #require(id), name: try #require(name)))
+                    }
+                    #expect(rows == [Row(id: 1, name: "Alice"), Row(id: 2, name: "Bob")])
+                    // Trailer
+                    #expect(data.readInteger(as: Int16.self) == -1)
+
+                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+
+                    try await channel.waitForPostgresFrontendMessage(\.sync)
+                    try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
                 }
-
-                let copyRequest = try await channel.waitForUnpreparedRequest()
-                #expect(copyRequest.parse.query == #"COPY "copy_table" FROM STDIN WITH (FORMAT binary)"#)
-
-                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
-                try await channel.writeInbound(
-                    PostgresBackendMessage.copyInResponse(
-                        .init(format: .binary, columnFormats: [.binary, .binary])))
-
-                let copyData = try await channel.waitForCopyData()
-                #expect(copyData.result == .done)
-                var data = copyData.data
-                // Signature
-                #expect(data.readString(length: 7) == "PGCOPY\n")
-                #expect(data.readInteger(as: UInt8.self) == 0xff)
-                #expect(data.readString(length: 3) == "\r\n\0")
-                // Flags
-                #expect(data.readInteger(as: UInt32.self) == 0)
-                // Header extension area length
-                #expect(data.readInteger(as: UInt32.self) == 0)
-
-                struct Row: Equatable {
-                    let id: Int32
-                    let name: String
-                }
-                var rows: [Row] = []
-                // Read until we are only left with the trailer
-                while data.readableBytes > 2 {
-                    // Number of columns
-                    #expect(data.readInteger(as: UInt16.self) == 2)
-                    // 'id' column
-                    #expect(data.readInteger(as: UInt32.self) == 4)
-                    let id = data.readInteger(as: Int32.self)
-                    // 'name' column length
-                    let nameLength = data.readInteger(as: UInt32.self)
-                    let name = data.readString(length: Int(try #require(nameLength)))
-                    rows.append(Row(id: try #require(id), name: try #require(name)))
-                }
-                #expect(rows == [Row(id: 1, name: "Alice"), Row(id: 2, name: "Bob")])
-                // Trailer
-                #expect(data.readInteger(as: Int16.self) == -1)
-                
-                try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
-
-                try await channel.waitForPostgresFrontendMessage(\.sync)
-                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
             }
         }
-    }
     #endif
 
     @Test(.timeLimit(.minutes(1))) func connectEnforcesDeadlineWithSilentServer() async throws {
@@ -1175,7 +1207,7 @@ import Synchronization
         }
     }
 
-    func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
+    func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> Void) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
             try channel.pipeline.syncOperations.addHandlers(ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()))
@@ -1193,7 +1225,8 @@ import Synchronization
         let logger = self.logger
         async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: logger)
         let message = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-        #expect(message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
+        #expect(
+            message == .startup(.versionThree(parameters: .init(user: "username", database: "database", options: [], replication: .false))))
         try await channel.writeInbound(PostgresBackendMessage.authentication(.ok))
         try await channel.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678)))
         try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
@@ -1240,7 +1273,7 @@ import Synchronization
         sourceLocation: SourceLocation = #_sourceLocation
     ) async throws {
         try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> Void in
                 taskGroup.addTask {
                     do {
                         try await connection.copyFrom(table: table, columns: columns, format: format, logger: logger, writeData: writeData)
@@ -1265,14 +1298,16 @@ import Synchronization
 
                 try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
                 preCopyInResponse(channel)
-                try await channel.writeInbound(PostgresBackendMessage.copyInResponse(.init(format: .textual, columnFormats: Array(repeating: .textual, count: columns.count))))
+                try await channel.writeInbound(
+                    PostgresBackendMessage.copyInResponse(
+                        .init(format: .textual, columnFormats: Array(repeating: .textual, count: columns.count))))
 
                 try await mockBackend(channel, { taskGroup.cancelAll() })
 
                 try await channel.waitForPostgresFrontendMessage(\.sync)
                 try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
-                _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
+                _ = try await channel.waitForUnpreparedRequest()  // Await the dummy query messages
             }
         }
     }

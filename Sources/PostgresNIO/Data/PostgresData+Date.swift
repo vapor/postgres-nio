@@ -1,5 +1,6 @@
-import struct Foundation.Date
 import NIOCore
+
+import struct Foundation.Date
 
 extension PostgresData {
     public init(date: Date) {
@@ -7,12 +8,12 @@ extension PostgresData {
         buffer.writeInteger(date._psqlMicroseconds)
         self.init(type: .timestamptz, value: buffer)
     }
-    
+
     public var date: Date? {
         guard var value = self.value else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .text:
             return nil
@@ -47,7 +48,7 @@ extension Date: PostgresDataConvertible {
         }
         self = date
     }
-    
+
     public var postgresData: PostgresData? {
         return .init(date: self)
     }
@@ -56,4 +57,4 @@ extension Date: PostgresDataConvertible {
 // MARK: Private
 private let _microsecondsPerSecond: Int64 = 1_000_000
 private let _secondsInDay: Int64 = 24 * 60 * 60
-private let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800) // values are stored as seconds before or after midnight 2000-01-01
+private let _psqlDateStart = Date(timeIntervalSince1970: 946_684_800)  // values are stored as seconds before or after midnight 2000-01-01

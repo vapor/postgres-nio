@@ -1,30 +1,36 @@
-import XCTest
 import NIOCore
 import NIOTestUtils
+import XCTest
+
 @testable import PostgresNIO
 
 class RowDescriptionTests: XCTestCase {
-    
+
     func testDecode() {
         let columns: [RowDescription.Column] = [
-            .init(name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary),
-            .init(name: "Second", tableOID: 123, columnAttributeNumber: 456, dataType: .uuidArray, dataTypeSize: 567, dataTypeModifier: 123, format: .text),
+            .init(
+                name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8,
+                format: .binary),
+            .init(
+                name: "Second", tableOID: 123, columnAttributeNumber: 456, dataType: .uuidArray, dataTypeSize: 567, dataTypeModifier: 123,
+                format: .text),
         ]
-        
+
         let expected: [PostgresBackendMessage] = [
             .rowDescription(.init(columns: columns))
         ]
-        
+
         var buffer = ByteBuffer()
-        expected.forEach { message in
+        for message in expected {
             guard case .rowDescription(let description) = message else {
-                return XCTFail("Expected only to get row descriptions here!")
+                XCTFail("Expected only to get row descriptions here!")
+                return
             }
-            
+
             buffer.writeBackendMessage(id: .rowDescription) { buffer in
                 buffer.writeInteger(Int16(description.columns.count))
-                
-                description.columns.forEach { column in
+
+                for column in description.columns {
                     buffer.writeNullTerminatedString(column.name)
                     buffer.writeInteger(column.tableOID)
                     buffer.writeInteger(column.columnAttributeNumber)
@@ -35,16 +41,18 @@ class RowDescriptionTests: XCTestCase {
                 }
             }
         }
-        
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }))
+
+        XCTAssertNoThrow(
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, expected)],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }))
     }
-    
+
     func testDecodeFailureBecauseOfMissingNullTerminationInColumnName() {
         let column = RowDescription.Column(
-            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
-        
+            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary
+        )
+
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
             buffer.writeInteger(Int16(1))
@@ -56,18 +64,21 @@ class RowDescriptionTests: XCTestCase {
             buffer.writeInteger(column.dataTypeModifier)
             buffer.writeInteger(column.format.rawValue)
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
+
+        XCTAssertThrowsError(
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })
+        ) {
             XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
-    
+
     func testDecodeFailureBecauseOfMissingColumnCount() {
         let column = RowDescription.Column(
-            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
-        
+            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary
+        )
+
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
             buffer.writeNullTerminatedString(column.name)
@@ -78,18 +89,21 @@ class RowDescriptionTests: XCTestCase {
             buffer.writeInteger(column.dataTypeModifier)
             buffer.writeInteger(column.format.rawValue)
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
+
+        XCTAssertThrowsError(
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })
+        ) {
             XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
-    
+
     func testDecodeFailureBecauseInvalidFormatCode() {
         let column = RowDescription.Column(
-            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
-        
+            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary
+        )
+
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
             buffer.writeInteger(Int16(1))
@@ -101,18 +115,21 @@ class RowDescriptionTests: XCTestCase {
             buffer.writeInteger(column.dataTypeModifier)
             buffer.writeInteger(UInt16(2))
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
+
+        XCTAssertThrowsError(
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })
+        ) {
             XCTAssert($0 is PostgresMessageDecodingError)
         }
     }
-    
+
     func testDecodeFailureBecauseNegativeColumnCount() {
         let column = RowDescription.Column(
-            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary)
-        
+            name: "First", tableOID: 123, columnAttributeNumber: 123, dataType: .bool, dataTypeSize: 2, dataTypeModifier: 8, format: .binary
+        )
+
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .rowDescription) { buffer in
             buffer.writeInteger(Int16(-1))
@@ -124,10 +141,12 @@ class RowDescriptionTests: XCTestCase {
             buffer.writeInteger(column.dataTypeModifier)
             buffer.writeInteger(column.format.rawValue)
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
+
+        XCTAssertThrowsError(
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })
+        ) {
             XCTAssert($0 is PostgresMessageDecodingError)
         }
     }

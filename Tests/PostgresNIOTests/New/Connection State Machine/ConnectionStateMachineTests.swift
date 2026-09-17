@@ -1,8 +1,9 @@
-import Testing
-@testable import PostgresNIO
-@testable import NIOCore
 import NIOPosix
 import NIOSSL
+import Testing
+
+@testable import NIOCore
+@testable import PostgresNIO
 
 @Suite struct ConnectionStateMachineTests {
 
@@ -14,7 +15,7 @@ import NIOSSL
         #expect(state.authenticationMessageReceived(.plaintext) == .sendPasswordMessage(.cleartext, authContext))
         #expect(state.authenticationMessageReceived(.ok) == .wait)
     }
-    
+
     @Test func testSSLStartupSuccess() {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         var state = ConnectionStateMachine(requireBackendKeyData: true)
@@ -31,25 +32,30 @@ import NIOSSL
         var state = ConnectionStateMachine(requireBackendKeyData: true)
         #expect(state.connected(tls: .require) == .sendSSLRequest)
         let failError = PSQLError.receivedUnencryptedDataAfterSSLRequest
-        #expect(state.sslSupportedReceived(unprocessedBytes: 1) == .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
+        #expect(
+            state.sslSupportedReceived(unprocessedBytes: 1)
+                == .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }
 
     @Test func testSSLStartupFailHandler() {
         struct SSLHandlerAddError: Error, Equatable {}
-        
+
         var state = ConnectionStateMachine(requireBackendKeyData: true)
         #expect(state.connected(tls: .require) == .sendSSLRequest)
         #expect(state.sslSupportedReceived(unprocessedBytes: 0) == .establishSSLConnection)
         let failError = PSQLError.failedToAddSSLHandler(underlying: SSLHandlerAddError())
-        #expect(state.errorHappened(failError) == .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
+        #expect(
+            state.errorHappened(failError)
+                == .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: failError, closePromise: nil)))
     }
-    
+
     @Test func testTLSRequiredStartupSSLUnsupported() {
         var state = ConnectionStateMachine(requireBackendKeyData: true)
-        
+
         #expect(state.connected(tls: .require) == .sendSSLRequest)
-        #expect(state.sslUnsupportedReceived() ==
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.sslUnsupported, closePromise: nil)))
+        #expect(
+            state.sslUnsupportedReceived()
+                == .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.sslUnsupported, closePromise: nil)))
     }
 
     @Test func testTLSPreferredStartupSSLUnsupported() {
@@ -58,7 +64,7 @@ import NIOSSL
         #expect(state.connected(tls: .prefer) == .sendSSLRequest)
         #expect(state.sslUnsupportedReceived() == .provideAuthenticationContext)
     }
-        
+
     @Test func testParameterStatusReceivedAndBackendKeyAfterAuthenticated() throws {
         var state = try ConnectionStateMachine.makeAuthenticatedIdle()
 
@@ -74,14 +80,14 @@ import NIOSSL
         #expect(state.parameterStatusReceived(.init(parameter: "IntervalStyle", value: "postgres")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "standard_conforming_strings", value: "on")) == .wait)
 
-        #expect(state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882037977)) == .wait)
+        #expect(state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882_037_977)) == .wait)
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
-    
+
     @Test func testBackendKeyAndParameterStatusReceivedAfterAuthenticated() throws {
         var state = try ConnectionStateMachine.makeAuthenticatedIdle()
 
-        #expect(state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882037977)) == .wait)
+        #expect(state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882_037_977)) == .wait)
 
         #expect(state.parameterStatusReceived(.init(parameter: "DateStyle", value: "ISO, MDY")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "application_name", value: "")) == .wait)
@@ -97,7 +103,7 @@ import NIOSSL
 
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
-    
+
     @Test func testReadyForQueryReceivedWithoutBackendKeyAfterAuthenticated() throws {
         var state = try ConnectionStateMachine.makeAuthenticatedIdle()
 
@@ -113,10 +119,12 @@ import NIOSSL
         #expect(state.parameterStatusReceived(.init(parameter: "IntervalStyle", value: "postgres")) == .wait)
         #expect(state.parameterStatusReceived(.init(parameter: "standard_conforming_strings", value: "on")) == .wait)
 
-        #expect(state.readyForQueryReceived(.idle) ==
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
+        #expect(
+            state.readyForQueryReceived(.idle)
+                == .closeConnectionAndCleanup(
+                    .init(action: .close, tasks: [], error: PSQLError.unexpectedBackendMessage(.readyForQuery(.idle)), closePromise: nil)))
     }
-    
+
     @Test func testReadyForQueryReceivedWithoutUnneededBackendKeyAfterAuthenticated() throws {
         var state = try ConnectionStateMachine.makeAuthenticatedIdle(requireBackendKeyData: false)
 
@@ -134,7 +142,7 @@ import NIOSSL
 
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
-    
+
     @Test func testErrorIsIgnoredWhenClosingConnection() throws {
         // test ignore unclean shutdown when closing connection
         var stateIgnoreChannelError = try ConnectionStateMachine.makeReadyForQuery()
@@ -144,13 +152,13 @@ import NIOSSL
         #expect(stateIgnoreChannelError.closed() == .fireChannelInactive)
 
         // test ignore any other error when closing connection
-        
+
         var stateIgnoreErrorMessage = try ConnectionStateMachine.makeReadyForQuery()
         #expect(.closeConnection(nil) == stateIgnoreErrorMessage.gracefulClose(nil))
         #expect(stateIgnoreErrorMessage.errorReceived(.init(fields: [:])) == .wait)
         #expect(stateIgnoreErrorMessage.closed() == .fireChannelInactive)
     }
-    
+
     @Test func testFailQueuedQueriesOnAuthenticationFailure() throws {
         let authContext = AuthContext(username: "test", password: "abc123", database: "test")
         let salt: UInt32 = 0x00_01_02_03
@@ -174,11 +182,15 @@ import NIOSSL
             .localizedSeverity: "FATAL",
             .routine: "auth_failed",
             .line: "334",
-            .file: "auth.c"
+            .file: "auth.c",
         ]
-        #expect(state.errorReceived(.init(fields: fields)) ==
-                       .closeConnectionAndCleanup(.init(action: .close, tasks: [.extendedQuery(extendedQueryContext)], error: .server(.init(fields: fields)), closePromise: nil)))
-        
+        #expect(
+            state.errorReceived(.init(fields: fields))
+                == .closeConnectionAndCleanup(
+                    .init(
+                        action: .close, tasks: [.extendedQuery(extendedQueryContext)], error: .server(.init(fields: fields)),
+                        closePromise: nil)))
+
         #expect(queryPromise.futureResult._value == nil)
 
         // make sure we don't crash

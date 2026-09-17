@@ -1,10 +1,11 @@
 import Atomics
+import Logging
+import NIOCore
 import NIOEmbedded
 import NIOPosix
 import Testing
+
 @testable import PostgresNIO
-import NIOCore
-import Logging
 
 @Suite struct PostgresRowSequenceTests {
     let logger = Logger(label: "PSQLRowStreamTests")
@@ -15,8 +16,10 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
-                ], 
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
+                ],
                 dataSource
             ),
             eventLoop: embeddedEventLoop,
@@ -38,14 +41,15 @@ import Logging
         #expect(empty == nil)
     }
 
-
     @Test func testCancellationWorksWhileIterating() async throws {
         let dataSource = MockRowDataSource()
         let embeddedEventLoop = EmbeddedEventLoop()
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -77,7 +81,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -103,7 +109,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -124,7 +132,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -152,7 +162,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -181,7 +193,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -211,7 +225,9 @@ import Logging
             PSQLRowStream(
                 source: .stream(
                     [
-                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                        .init(
+                            name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                            format: .binary)
                     ],
                     dataSource
                 ),
@@ -246,7 +262,9 @@ import Logging
             PSQLRowStream(
                 source: .stream(
                     [
-                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                        .init(
+                            name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                            format: .binary)
                     ],
                     dataSource
                 ),
@@ -284,7 +302,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -299,9 +319,9 @@ import Logging
         var rowIterator = rowSequence.makeAsyncIterator()
 
         #expect(dataSource.requestCount == 0)
-        _ = try await rowIterator.next() // new buffer size will be target -> don't ask for more
+        _ = try await rowIterator.next()  // new buffer size will be target -> don't ask for more
         #expect(dataSource.requestCount == 0)
-        _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
+        _ = try await rowIterator.next()  // new buffer will be (target - 1) -> ask for more
         #expect(dataSource.requestCount == 1)
 
         // if the buffer gets new rows so that it has equal or more than target (the target size
@@ -310,26 +330,26 @@ import Logging
         let addDataRows1: [DataRow] = [[ByteBuffer(integer: Int64(0))]]
         stream.receive(addDataRows1)
         #expect(dataSource.requestCount == 1)
-        _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
+        _ = try await rowIterator.next()  // new buffer will be (target - 1) -> ask for more
         #expect(dataSource.requestCount == 2)
 
         // if the buffer gets new rows so that it has equal or more than target (the target size
         // should be halved)
         let addDataRows2: [DataRow] = [[ByteBuffer(integer: Int64(0))], [ByteBuffer(integer: Int64(0))]]
-        stream.receive(addDataRows2) // this should to target being halved.
-        _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
+        stream.receive(addDataRows2)  // this should to target being halved.
+        _ = try await rowIterator.next()  // new buffer will be (target - 1) -> ask for more
         for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget / 2) {
-            _ = try await rowIterator.next() // Remove all rows until we are back at target
+            _ = try await rowIterator.next()  // Remove all rows until we are back at target
             #expect(dataSource.requestCount == 2)
         }
 
         // if we remove another row we should trigger getting new rows.
-        _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
+        _ = try await rowIterator.next()  // new buffer will be (target - 1) -> ask for more
         #expect(dataSource.requestCount == 3)
 
         // remove all remaining rows... this will trigger a target size double
-        for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget/2 - 1) {
-            _ = try await rowIterator.next() // Remove all rows until we are back at target
+        for _ in 0..<(AdaptiveRowBuffer.defaultBufferTarget / 2 - 1) {
+            _ = try await rowIterator.next()  // Remove all rows until we are back at target
             #expect(dataSource.requestCount == 3)
         }
 
@@ -337,9 +357,9 @@ import Logging
         stream.receive(fillBufferDataRows)
 
         #expect(dataSource.requestCount == 3)
-        _ = try await rowIterator.next() // new buffer size will be target -> don't ask for more
+        _ = try await rowIterator.next()  // new buffer size will be target -> don't ask for more
         #expect(dataSource.requestCount == 3)
-        _ = try await rowIterator.next() // new buffer will be (target - 1) -> ask for more
+        _ = try await rowIterator.next()  // new buffer will be (target - 1) -> ask for more
         #expect(dataSource.requestCount == 4)
     }
 
@@ -349,7 +369,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -404,7 +426,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -460,7 +484,7 @@ import Logging
                 dataTypeSize: -1,
                 dataTypeModifier: -1,
                 format: .text
-            )
+            ),
         ]
 
         let expectedColumns = PostgresColumns(underlying: sourceColumns)
@@ -618,7 +642,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -648,7 +674,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -678,7 +706,9 @@ import Logging
         let stream = PSQLRowStream(
             source: .stream(
                 [
-                    .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                    .init(
+                        name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                        format: .binary)
                 ],
                 dataSource
             ),
@@ -707,7 +737,9 @@ import Logging
             PSQLRowStream(
                 source: .stream(
                     [
-                        .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                        .init(
+                            name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0,
+                            format: .binary)
                     ],
                     dataSource
                 ),
@@ -720,12 +752,12 @@ import Logging
 
         #expect(!eventLoop.inEventLoop)
         stream.produceMore()
-        try await eventLoop.submit { }.get() // wait for the hop to complete
+        try await eventLoop.submit {}.get()  // wait for the hop to complete
         #expect(dataSource.requestCount == 1)
 
-        rowSequence = nil // triggers `didTerminate` from off the event loop
+        rowSequence = nil  // triggers `didTerminate` from off the event loop
         #expect(rowSequence == nil, "Surpress warning")
-        try await eventLoop.submit { }.get() // wait for the hop to complete
+        try await eventLoop.submit {}.get()  // wait for the hop to complete
         #expect(dataSource.cancelCount == 1)
     }
 }

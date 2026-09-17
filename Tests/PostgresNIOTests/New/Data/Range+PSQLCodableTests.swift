@@ -1,5 +1,6 @@
-import XCTest
 import NIOCore
+import XCTest
+
 @testable import PostgresNIO
 
 class Range_PSQLCodableTests: XCTestCase {

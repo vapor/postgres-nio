@@ -1,25 +1,26 @@
 import NIOCore
+
 import struct Foundation.UUID
 
 public struct PostgresData: Sendable {
     public static var null: PostgresData {
         return .init(type: .null)
     }
-    
+
     /// The object ID of the field's data type.
     public var type: PostgresDataType
-    
+
     /// The type modifier (see pg_attribute.atttypmod). The meaning of the modifier is type-specific.
     public var typeModifier: Int32?
-    
+
     /// The format code being used for the field.
     /// Currently will be zero (text) or one (binary).
     /// In a RowDescription returned from the statement variant of Describe,
     /// the format code is not yet known and will always be zero.
     public var formatCode: PostgresFormat
-    
+
     public var value: ByteBuffer?
-    
+
     public init(type: PostgresDataType, typeModifier: Int32? = nil, formatCode: PostgresFormat = .binary, value: ByteBuffer? = nil) {
         self.type = type
         self.typeModifier = typeModifier
@@ -28,7 +29,11 @@ public struct PostgresData: Sendable {
     }
 }
 
-@available(*, deprecated, message: "Deprecating conformance to `CustomStringConvertible` as a first step of deprecating `PostgresData`. Please use `PostgresBindings` or `PostgresCell` instead.")
+@available(
+    *, deprecated,
+    message:
+        "Deprecating conformance to `CustomStringConvertible` as a first step of deprecating `PostgresData`. Please use `PostgresBindings` or `PostgresCell` instead."
+)
 extension PostgresData: CustomStringConvertible {
     public var description: String {
         guard var value = self.value else {
@@ -88,7 +93,8 @@ extension PostgresData: CustomStringConvertible {
             let raw: String
             switch self.formatCode {
             case .text:
-                raw = (value.readString(length: value.readableBytes) ?? "")
+                raw =
+                    (value.readString(length: value.readableBytes) ?? "")
                     .debugDescription
             case .binary:
                 raw = "0x" + value.readableBytesView.hexdigest()
@@ -98,7 +104,11 @@ extension PostgresData: CustomStringConvertible {
     }
 }
 
-@available(*, deprecated, message: "Deprecating conformance to `CustomDebugStringConvertible` as a first step of deprecating `PostgresData`. Please use `PostgresBindings` or `PostgresCell` instead.")
+@available(
+    *, deprecated,
+    message:
+        "Deprecating conformance to `CustomDebugStringConvertible` as a first step of deprecating `PostgresData`. Please use `PostgresBindings` or `PostgresCell` instead."
+)
 extension PostgresData: CustomDebugStringConvertible {
     public var debugDescription: String {
         return self.description

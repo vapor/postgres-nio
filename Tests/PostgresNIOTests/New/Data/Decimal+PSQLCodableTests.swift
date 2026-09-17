@@ -1,5 +1,6 @@
-import XCTest
 import NIOCore
+import XCTest
+
 @testable import PostgresNIO
 
 class Decimal_PSQLCodableTests: XCTestCase {

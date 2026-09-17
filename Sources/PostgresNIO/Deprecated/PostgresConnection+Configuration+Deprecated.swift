@@ -44,7 +44,7 @@ extension PostgresConnection.Configuration {
             self.database = database
             self.password = password
         }
-     }
+    }
 
     /// Accessor for legacy connection parameters. Replaced by ``PostgresConnection/Configuration/host`` etc.
     @available(*, deprecated, message: "Use `Configuration.host` etc. instead.")
@@ -55,7 +55,7 @@ extension PostgresConnection.Configuration {
             case .connectTCP(let host, let port):
                 conn = .init(host: host, port: port)
             case .bindUnixDomainSocket(_), .configureChannel(_):
-                conn = .init(host: "!invalid!", port: 0) // best we can do, really
+                conn = .init(host: "!invalid!", port: 0)  // best we can do, really
             }
             conn.requireBackendKeyData = self.options.requireBackendKeyData
             conn.connectTimeout = self.options.connectTimeout
@@ -67,7 +67,7 @@ extension PostgresConnection.Configuration {
             self.options.requireBackendKeyData = newValue.requireBackendKeyData
         }
     }
-    
+
     @available(*, deprecated, message: "Use `Configuration.username` etc. instead.")
     public var authentication: Authentication {
         get {
@@ -79,7 +79,7 @@ extension PostgresConnection.Configuration {
             self.database = newValue.database
         }
     }
-    
+
     /// Legacy initializer.
     /// Replaced by ``PostgresConnection/Configuration/init(host:port:username:password:database:tls:)`` etc.
     @available(*, deprecated, message: "Use `init(host:port:username:password:database:tls:)` instead.")

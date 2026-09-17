@@ -1,10 +1,10 @@
-@_spi(ConnectionPool) import PostgresNIO
-import Testing
-import NIOPosix
-import NIOSSL
-import Logging
 import Atomics
 import Foundation
+import Logging
+import NIOPosix
+import NIOSSL
+@_spi(ConnectionPool) import PostgresNIO
+import Testing
 
 @Suite(.serialized)
 struct PostgresClientTests {
@@ -29,7 +29,7 @@ struct PostgresClientTests {
 
             for _ in 0..<iterations {
                 taskGroup.addTask {
-                    try await client.withConnection() { connection in
+                    try await client.withConnection { connection in
                         _ = try await connection.query("SELECT 1", logger: logger)
                     }
                 }
@@ -42,25 +42,25 @@ struct PostgresClientTests {
             taskGroup.cancelAll()
         }
     }
-    
+
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func transaction() async throws {
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
         let logger = mlogger
-        
+
         let tableName = "test_client_transactions"
-        
+
         let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
         let client = PostgresClient(
             configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger
         )
-        
+
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
                 await client.run()
             }
-            
+
             try await client.query(
                 """
                 CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
@@ -70,31 +70,32 @@ struct PostgresClientTests {
                 """,
                 logger: logger
             )
-            
+
             let iterations = 1000
-            
+
             for _ in 0..<iterations {
                 taskGroup.addTask {
                     let _ = try await client.withTransaction(logger: logger) { transaction in
                         try await transaction.query(
-                        """
-                        INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(UUID()));
-                        """,
-                        logger: logger
+                            """
+                            INSERT INTO "\(unescaped: tableName)" (uuid) VALUES (\(UUID()));
+                            """,
+                            logger: logger
                         )
                     }
                 }
             }
-            
+
             for _ in 0..<iterations {
                 try await taskGroup.next()
             }
-            
-            let rows = try await client.query(#"SELECT COUNT(1)::INT AS table_size FROM "\#(unescaped: tableName)";"#, logger: logger).decode(Int.self)
+
+            let rows = try await client.query(#"SELECT COUNT(1)::INT AS table_size FROM "\#(unescaped: tableName)";"#, logger: logger)
+                .decode(Int.self)
             for try await (count) in rows {
                 #expect(count == iterations)
             }
-            
+
             /// Test roll back
             taskGroup.addTask {
                 let error = try await #require(throws: PostgresTransactionError.self) {
@@ -106,7 +107,7 @@ struct PostgresClientTests {
                             """,
                             logger: logger
                         )
-                        
+
                         /// insert invalid data
                         try await transaction.query(
                             """
@@ -121,20 +122,21 @@ struct PostgresClientTests {
                 #expect((error.closureError as? PSQLError)?.serverInfo?[.severity] == "ERROR")
             }
             try await taskGroup.next()
-            
-            let row = try await client.query(#"SELECT COUNT(1)::INT AS table_size FROM "\#(unescaped: tableName)";"#, logger: logger).decode(Int.self)
-            
+
+            let row = try await client.query(#"SELECT COUNT(1)::INT AS table_size FROM "\#(unescaped: tableName)";"#, logger: logger)
+                .decode(Int.self)
+
             for try await (count) in row {
                 #expect(count == iterations)
             }
-            
+
             try await client.query(
                 """
                 DROP TABLE "\(unescaped: tableName)";
                 """,
                 logger: logger
             )
-            
+
             taskGroup.cancelAll()
         }
     }
@@ -157,7 +159,7 @@ struct PostgresClientTests {
                 await client.run()
             }
 
-            let rows = try await client.query("select * from pg_stat_activity;");
+            let rows = try await client.query("select * from pg_stat_activity;")
             var applicationNameFound = 0
             for try await row in rows {
                 let randomAccessRow = row.makeRandomAccess()
@@ -171,7 +173,6 @@ struct PostgresClientTests {
             taskGroup.cancelAll()
         }
     }
-
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func queryDirectly() async throws {
@@ -191,8 +192,8 @@ struct PostgresClientTests {
 
             for _ in 0..<10000 {
                 taskGroup.addTask {
-                    await #expect(throws: Never.self) { 
-                        try await client.query("SELECT 1", logger: logger) 
+                    await #expect(throws: Never.self) {
+                        try await client.query("SELECT 1", logger: logger)
                     }
                 }
             }
@@ -345,7 +346,7 @@ extension PostgresClient.Configuration {
             tls: .prefer(tlsConfiguration)
         )
         clientConfig.options.minimumConnections = 0
-        clientConfig.options.maximumConnections = 12*4
+        clientConfig.options.maximumConnections = 12 * 4
         clientConfig.options.keepAliveBehavior = .init(frequency: .seconds(5))
         clientConfig.options.connectionIdleTimeout = .seconds(15)
 

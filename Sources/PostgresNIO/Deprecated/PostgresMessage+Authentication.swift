@@ -7,7 +7,7 @@ extension PostgresMessage {
         public static var identifier: PostgresMessage.Identifier {
             return .authentication
         }
-        
+
         /// Parses an instance of this message type from a byte buffer.
         public static func parse(from buffer: inout ByteBuffer) throws -> Authentication {
             guard let type = buffer.readInteger(as: Int32.self) else {
@@ -46,7 +46,7 @@ extension PostgresMessage {
                     throw PostgresError.protocol("Could not parse SASL final data from authentication message")
                 }
                 return .saslFinal(finalData)
-            
+
             case 2, 7...9:
                 throw PostgresError.protocol("Support for KRBv5, GSSAPI, and SSPI authentication are not implemented")
             case 6:
@@ -68,8 +68,8 @@ extension PostgresMessage {
                 buffer.writeBytes(salt)
             case .saslMechanisms(let mechanisms):
                 buffer.writeInteger(10, as: Int32.self)
-                mechanisms.forEach {
-                    buffer.writeNullTerminatedString($0)
+                for mechanism in mechanisms {
+                    buffer.writeNullTerminatedString(mechanism)
                 }
             case .saslContinue(let challenge):
                 buffer.writeInteger(11, as: Int32.self)
@@ -79,31 +79,31 @@ extension PostgresMessage {
                 buffer.writeBytes(data)
             }
         }
-        
+
         /// AuthenticationOk
         /// Specifies that the authentication was successful.
         case ok
-        
+
         /// AuthenticationCleartextPassword
         /// Specifies that a clear-text password is required.
         case plaintext
-        
+
         /// AuthenticationMD5Password
         /// Specifies that an MD5-encrypted password is required.
         case md5([UInt8])
-        
+
         /// AuthenticationSASL
         /// Specifies the start of SASL mechanism negotiation.
         case saslMechanisms([String])
-        
+
         /// AuthenticationSASLContinue
         /// Specifies SASL mechanism-specific challenge data.
         case saslContinue([UInt8])
-        
+
         /// AuthenticationSASLFinal
         /// Specifies mechanism-specific post-authentication client data.
         case saslFinal([UInt8])
-        
+
         /// See `CustomStringConvertible`.
         public var description: String {
             switch self {

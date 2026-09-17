@@ -1,6 +1,8 @@
-import struct Foundation.UUID
-import Testing
 import NIOCore
+import Testing
+
+import struct Foundation.UUID
+
 @testable import PostgresNIO
 
 @Suite struct UUID_PSQLCodableTests {

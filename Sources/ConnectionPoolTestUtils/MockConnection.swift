@@ -1,6 +1,6 @@
-import _ConnectionPoolModule
 import DequeModule
 import NIOConcurrencyHelpers
+import _ConnectionPoolModule
 
 public final class MockConnection: PooledConnection, Sendable {
     public typealias ID = Int
@@ -8,8 +8,8 @@ public final class MockConnection: PooledConnection, Sendable {
     public let id: ID
 
     private enum State {
-        case running([CheckedContinuation<Void, any Error>], [@Sendable ((any Error)?) -> ()])
-        case closing([@Sendable ((any Error)?) -> ()])
+        case running([CheckedContinuation<Void, any Error>], [@Sendable ((any Error)?) -> Void])
+        case closing([@Sendable ((any Error)?) -> Void])
         case closed
     }
 
@@ -59,7 +59,7 @@ public final class MockConnection: PooledConnection, Sendable {
         }
     }
 
-    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
+    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> Void) {
         let enqueued = self.lock.withLockedValue { state -> Bool in
             switch state {
             case .closed:
@@ -100,7 +100,7 @@ public final class MockConnection: PooledConnection, Sendable {
     }
 
     public func closeIfClosing() {
-        let callbacks = self.lock.withLockedValue { state -> [@Sendable ((any Error)?) -> ()] in
+        let callbacks = self.lock.withLockedValue { state -> [@Sendable ((any Error)?) -> Void] in
             switch state {
             case .running, .closed:
                 return []

@@ -1,10 +1,12 @@
 // A `Sequence` that can contain at most two elements. However it does not heap allocate.
 @usableFromInline
 struct Max2Sequence<Element>: Sequence {
+    // private
     @usableFromInline
-    /*private*/ var first: Element?
+    var first: Element?
+    // private
     @usableFromInline
-    /*private*/ var second: Element?
+    var second: Element?
 
     @inlinable
     var count: Int {
@@ -47,8 +49,9 @@ struct Max2Sequence<Element>: Sequence {
         @usableFromInline
         let second: Element?
 
+        // private
         @usableFromInline
-        /*private*/ var index: UInt8 = 0
+        var index: UInt8 = 0
 
         @inlinable
         init(first: Element?, second: Element?) {

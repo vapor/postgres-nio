@@ -1,5 +1,6 @@
-import XCTest
 import NIOCore
+import XCTest
+
 @testable import PostgresNIO
 
 class RawRepresentable_PSQLCodableTests: XCTestCase {
@@ -27,7 +28,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
 
     func testDecodeInvalidRawTypeValue() {
         var buffer = ByteBuffer()
-        buffer.writeInteger(Int16(4)) // out of bounds
+        buffer.writeInteger(Int16(4))  // out of bounds
 
         XCTAssertThrowsError(try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
@@ -36,7 +37,7 @@ class RawRepresentable_PSQLCodableTests: XCTestCase {
 
     func testDecodeInvalidUnderlyingTypeValue() {
         var buffer = ByteBuffer()
-        buffer.writeInteger(Int32(1)) // out of bounds
+        buffer.writeInteger(Int32(1))  // out of bounds
 
         XCTAssertThrowsError(try MyRawRepresentable(from: &buffer, type: Int32.psqlType, format: .binary, context: .default)) {
             XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)

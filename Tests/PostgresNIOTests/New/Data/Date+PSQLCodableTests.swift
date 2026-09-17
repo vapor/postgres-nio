@@ -24,8 +24,8 @@ struct Date_PSQLCodableTests {
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
         var result: Date?
-        #expect(throws: Never.self) { 
-            result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default) 
+        #expect(throws: Never.self) {
+            result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default)
         }
         #expect(result != nil)
     }
@@ -35,8 +35,8 @@ struct Date_PSQLCodableTests {
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
-        #expect(throws: PostgresDecodingError.Code.failure) { 
-            try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default) 
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default)
         }
     }
 
@@ -45,8 +45,8 @@ struct Date_PSQLCodableTests {
         firstDateBuffer.writeInteger(Int32.min)
 
         var firstDate: Date?
-        #expect(throws: Never.self) { 
-            firstDate = try Date(from: &firstDateBuffer, type: .date, format: .binary, context: .default) 
+        #expect(throws: Never.self) {
+            firstDate = try Date(from: &firstDateBuffer, type: .date, format: .binary, context: .default)
         }
         #expect(firstDate != nil)
 
@@ -54,8 +54,8 @@ struct Date_PSQLCodableTests {
         lastDateBuffer.writeInteger(Int32.max)
 
         var lastDate: Date?
-        #expect(throws: Never.self) { 
-            lastDate = try Date(from: &lastDateBuffer, type: .date, format: .binary, context: .default) 
+        #expect(throws: Never.self) {
+            lastDate = try Date(from: &lastDateBuffer, type: .date, format: .binary, context: .default)
         }
         #expect(lastDate != nil)
     }
@@ -87,7 +87,7 @@ struct Date_PSQLCodableTests {
             (-.infinity, Date._minTimestamp - 1),
             (.nan, Date._endTimestamp),
             (9_300_000_000_000, Date._endTimestamp),
-            (-9_300_000_000_000, Date._minTimestamp - 1)
+            (-9_300_000_000_000, Date._minTimestamp - 1),
         ])
     func encodeDatesOutsideOfInt64MicrosecondRange(secondsSincePSQLDateStart: Double, expected: Int64) {
         let value = Date(timeInterval: secondsSincePSQLDateStart, since: Date(timeIntervalSince1970: 946_684_800))

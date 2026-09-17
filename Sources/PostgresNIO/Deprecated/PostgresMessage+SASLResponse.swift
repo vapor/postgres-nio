@@ -7,21 +7,21 @@ extension PostgresMessage {
         public static var identifier: PostgresMessage.Identifier {
             return .saslResponse
         }
-        
+
         public let responseData: [UInt8]
-        
+
         public static func parse(from buffer: inout ByteBuffer) throws -> SASLResponse {
             guard let data = buffer.readBytes(length: buffer.readableBytes) else {
                 throw PostgresError.protocol("Could not parse SASL response from response message")
             }
-            
+
             return SASLResponse(responseData: data)
         }
-        
+
         public func serialize(into buffer: inout ByteBuffer) throws {
             buffer.writeBytes(responseData)
         }
-        
+
         public var description: String {
             return "SASLResponse(\(responseData))"
         }
@@ -34,17 +34,17 @@ extension PostgresMessage {
     public struct SASLInitialResponse {
         public let mechanism: String
         public let initialData: [UInt8]
-        
+
         public func serialize(into buffer: inout ByteBuffer) throws {
             buffer.writeNullTerminatedString(self.mechanism)
             if initialData.count > 0 {
-                buffer.writeInteger(Int32(initialData.count), as: Int32.self) // write(array:) writes Int16, which is incorrect here
+                buffer.writeInteger(Int32(initialData.count), as: Int32.self)  // write(array:) writes Int16, which is incorrect here
                 buffer.writeBytes(initialData)
             } else {
                 buffer.writeInteger(-1, as: Int32.self)
             }
         }
-        
+
         public var description: String {
             return "SASLInitialResponse(\(mechanism), data: \(initialData))"
         }

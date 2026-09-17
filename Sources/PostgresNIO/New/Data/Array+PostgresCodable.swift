@@ -1,4 +1,5 @@
 import NIOCore
+
 import struct Foundation.Date
 import struct Foundation.UUID
 
@@ -31,7 +32,6 @@ extension UInt8: PostgresArrayDecodable {}
 extension UInt8: PostgresArrayEncodable {
     public static var psqlArrayType: PostgresDataType { .charArray }
 }
-
 
 extension Int16: PostgresArrayDecodable {}
 
@@ -143,7 +143,7 @@ extension Array: PostgresEncodable where Element: PostgresArrayEncodable {
         // dimensions
         buffer.writeInteger(1, as: Int32.self)
 
-        try self.forEach { element in
+        for element in self {
             try element.encodeRaw(into: &buffer, context: context)
         }
     }
@@ -184,7 +184,7 @@ extension Array: PostgresNonThrowingEncodable where Element: PostgresArrayEncoda
         // dimensions
         buffer.writeInteger(1, as: Int32.self)
 
-        self.forEach { element in
+        for element in self {
             element.encodeRaw(into: &buffer, context: context)
         }
     }
@@ -207,7 +207,7 @@ extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Elemen
         }
 
         guard let (isNotEmpty, b, element) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32, UInt32).self),
-              0 <= isNotEmpty, isNotEmpty <= 1, b == 0
+            0 <= isNotEmpty, isNotEmpty <= 1, b == 0
         else {
             throw PostgresDecodingError.Code.failure
         }
@@ -220,16 +220,16 @@ extension Array: PostgresDecodable where Element: PostgresArrayDecodable, Elemen
         }
 
         guard let (expectedArrayCount, dimensions) = buffer.readMultipleIntegers(endianness: .big, as: (Int32, Int32).self),
-              expectedArrayCount > 0,
-              dimensions == 1
+            expectedArrayCount > 0,
+            dimensions == 1
         else {
             throw PostgresDecodingError.Code.failure
         }
 
-        var result = Array<Element>()
+        var result = [Element]()
         result.reserveCapacity(Int(expectedArrayCount))
 
-        for _ in 0 ..< expectedArrayCount {
+        for _ in 0..<expectedArrayCount {
             guard let elementLength = buffer.readInteger(as: Int32.self), elementLength >= 0 else {
                 throw PostgresDecodingError.Code.failure
             }

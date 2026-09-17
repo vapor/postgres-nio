@@ -1,6 +1,7 @@
-@testable import _ConnectionPoolModule
-import _ConnectionPoolTestUtils
 import Testing
+import _ConnectionPoolTestUtils
+
+@testable import _ConnectionPoolModule
 
 @Suite struct ConnectionRequestTests {
 

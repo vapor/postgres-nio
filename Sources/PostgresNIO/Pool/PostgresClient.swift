@@ -1,7 +1,7 @@
-import NIOCore
-import NIOSSL
 import Atomics
 import Logging
+import NIOCore
+import NIOSSL
 import ServiceLifecycle
 import _ConnectionPoolModule
 
@@ -147,24 +147,21 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         ///
         /// Always `nil` for other configurations.
         public var host: String? {
-            if case let .connectTCP(host, _) = self.endpointInfo { return host }
-            else { return nil }
+            if case .connectTCP(let host, _) = self.endpointInfo { return host } else { return nil }
         }
 
         /// The port to connect to for TCP configurations.
         ///
         /// Always `nil` for other configurations.
         public var port: Int? {
-            if case let .connectTCP(_, port) = self.endpointInfo { return port }
-            else { return nil }
+            if case .connectTCP(_, let port) = self.endpointInfo { return port } else { return nil }
         }
 
         /// The socket path to connect to for Unix domain socket connections.
         ///
         /// Always `nil` for other configurations.
         public var unixSocketPath: String? {
-            if case let .bindUnixDomainSocket(path) = self.endpointInfo { return path }
-            else { return nil }
+            if case .bindUnixDomainSocket(let path) = self.endpointInfo { return path } else { return nil }
         }
 
         /// The TLS mode to use for the connection. Valid for all configurations.
@@ -206,7 +203,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         ///   - tls: The TLS mode to use.
         public init(host: String, port: Int = 5432, username: String, password: String?, database: String?, tls: TLS) {
-            self.init(endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
+            self.init(
+                endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
         }
 
         /// Create a configuration for connecting to a server through a UNIX domain socket.
@@ -217,7 +215,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         ///   - password: The password to authenticate with.
         ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
-            self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
+            self.init(
+                endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password,
+                database: database)
         }
 
         // MARK: - Implementation details
@@ -298,7 +298,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
         }
     }
-    
+
     /// Lease a connection for the provided `closure`'s lifetime.
     ///
     /// - Parameter closure: A closure that uses the passed `PostgresConnection`. The closure **must not** capture
@@ -410,7 +410,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             error.file = file
             error.line = line
             error.query = query
-            throw error // rethrow with more metadata
+            throw error  // rethrow with more metadata
         }
     }
 
@@ -429,14 +429,15 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             let connection = lease.connection
 
             let promise = connection.channel.eventLoop.makePromise(of: PSQLRowStream.self)
-            let task = HandlerTask.executePreparedStatement(.init(
-                name: Statement.name,
-                sql: Statement.sql,
-                bindings: bindings,
-                bindingDataTypes: Statement.bindingDataTypes,
-                logger: logger,
-                promise: promise
-            ))
+            let task = HandlerTask.executePreparedStatement(
+                .init(
+                    name: Statement.name,
+                    sql: Statement.sql,
+                    bindings: bindings,
+                    bindingDataTypes: Statement.bindingDataTypes,
+                    logger: logger,
+                    promise: promise
+                ))
             connection.channel.write(task, promise: nil)
 
             promise.futureResult.whenFailure { _ in
@@ -454,7 +455,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                 unsafeSQL: Statement.sql,
                 binds: bindings
             )
-            throw error // rethrow with more metadata
+            throw error  // rethrow with more metadata
         }
     }
 
@@ -467,7 +468,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///
     /// Cancelling the task that executes the ``run()`` method is equivalent to closing the client. Once the task
     /// has been cancelled the client is not able to process any new queries or prepared statements.
-    /// 
+    ///
     /// Graceful shutdown is different to cancellation. If the client is gracefully shut down, work continues as
     /// before until the request queue is drained and work is completed. New incoming requests will be rejected.
     ///
@@ -491,7 +492,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     private func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
         if !self.runningAtomic.load(ordering: .relaxed) {
-            self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
+            self.backgroundLogger.warning(
+                "Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }
         return try await self.pool.leaseConnection()
     }
@@ -541,7 +543,7 @@ extension PostgresConnection: PooledConnection {
         self.channel.close(mode: .all, promise: nil)
     }
 
-    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> ()) {
+    public func onClose(_ closure: @escaping @Sendable ((any Error)?) -> Void) {
         self.closeFuture.whenComplete { _ in closure(nil) }
     }
 }

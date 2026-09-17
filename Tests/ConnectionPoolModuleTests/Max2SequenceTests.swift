@@ -1,5 +1,6 @@
-@testable import _ConnectionPoolModule
 import Testing
+
+@testable import _ConnectionPoolModule
 
 @Suite struct Max2SequenceTests {
 

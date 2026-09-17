@@ -9,18 +9,18 @@ extension PostgresMessage {
         public static var identifier: PostgresMessage.Identifier {
             return .passwordMessage
         }
-        
+
         public init(string: String) {
             self.string = string
         }
-        
+
         /// The password (encrypted, if requested).
         public var string: String
-        
+
         public var description: String {
             return "Password(\(string))"
         }
-        
+
         /// Serializes this message into a byte buffer.
         public func serialize(into buffer: inout ByteBuffer) {
             buffer.writeString(self.string + "\0")

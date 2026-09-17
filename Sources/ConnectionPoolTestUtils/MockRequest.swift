@@ -13,7 +13,7 @@ public final class MockRequest<Connection: PooledConnection>: ConnectionRequestP
 
     public var id: ID { ID(self) }
 
-    public static func ==(lhs: MockRequest, rhs: MockRequest) -> Bool {
+    public static func == (lhs: MockRequest, rhs: MockRequest) -> Bool {
         lhs.id == rhs.id
     }
 

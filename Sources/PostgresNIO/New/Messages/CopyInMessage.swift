@@ -15,7 +15,7 @@ extension PostgresBackendMessage {
             guard let format = Format(rawValue: rawFormat) else {
                 throw PSQLPartialDecodingError.unexpectedValue(value: rawFormat)
             }
-            
+
             guard let numColumns = buffer.readInteger(endianness: .big, as: Int16.self) else {
                 throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(2, actual: buffer.readableBytes)
             }
@@ -26,12 +26,13 @@ extension PostgresBackendMessage {
                 guard let rawColumnFormat = buffer.readInteger(endianness: .big, as: Int16.self) else {
                     throw PSQLPartialDecodingError.expectedAtLeastNRemainingBytes(2, actual: buffer.readableBytes)
                 }
-                guard Int8.min <= rawColumnFormat, rawColumnFormat <= Int8.max, let columnFormat = Format(rawValue: Int8(rawColumnFormat)) else {
+                guard Int8.min <= rawColumnFormat, rawColumnFormat <= Int8.max, let columnFormat = Format(rawValue: Int8(rawColumnFormat))
+                else {
                     throw PSQLPartialDecodingError.unexpectedValue(value: rawColumnFormat)
                 }
                 columnFormatCodes.append(columnFormat)
             }
-            
+
             return CopyInResponse(format: format, columnFormats: columnFormatCodes)
         }
     }

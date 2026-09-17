@@ -1,6 +1,7 @@
 import Foundation
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct Array_PSQLCodableTests {
@@ -31,13 +32,13 @@ import NIOCore
         #expect([Int64].psqlType == .int8Array)
 
         #if (arch(i386) || arch(arm))
-        #expect(Int.psqlArrayType == .int4Array)
-        #expect(Int.psqlType == .int4)
-        #expect([Int].psqlType == .int4Array)
+            #expect(Int.psqlArrayType == .int4Array)
+            #expect(Int.psqlType == .int4)
+            #expect([Int].psqlType == .int4Array)
         #else
-        #expect(Int.psqlArrayType == .int8Array)
-        #expect(Int.psqlType == .int8)
-        #expect([Int].psqlType == .int8Array)
+            #expect(Int.psqlArrayType == .int8Array)
+            #expect(Int.psqlType == .int8)
+            #expect([Int].psqlType == .int8Array)
         #endif
 
         #expect(Float.psqlArrayType == .float4Array)
@@ -105,7 +106,7 @@ import NIOCore
 
     @Test func testDecodeFailureIsNotEmptyOutOfScope() {
         var buffer = ByteBuffer()
-        buffer.writeInteger(Int32(2)) // invalid value
+        buffer.writeInteger(Int32(2))  // invalid value
         buffer.writeInteger(Int32(0))
         buffer.writeInteger(String.psqlType.rawValue)
 
@@ -116,8 +117,8 @@ import NIOCore
 
     @Test func testDecodeFailureSecondValueIsUnexpected() {
         var buffer = ByteBuffer()
-        buffer.writeInteger(Int32(0)) // is empty
-        buffer.writeInteger(Int32(1)) // invalid value, must always be 0
+        buffer.writeInteger(Int32(0))  // is empty
+        buffer.writeInteger(Int32(1))  // invalid value, must always be 0
         buffer.writeInteger(String.psqlType.rawValue)
 
         #expect(throws: PostgresDecodingError.Code.failure) {
@@ -137,11 +138,11 @@ import NIOCore
 
     @Test func testDecodeFailureInvalidNumberOfArrayElements() {
         var buffer = ByteBuffer()
-        buffer.writeInteger(Int32(1)) // invalid value
+        buffer.writeInteger(Int32(1))  // invalid value
         buffer.writeInteger(Int32(0))
         buffer.writeInteger(String.psqlType.rawValue)
-        buffer.writeInteger(Int32(-123)) // expected element count
-        buffer.writeInteger(Int32(1)) // dimensions... must be one
+        buffer.writeInteger(Int32(-123))  // expected element count
+        buffer.writeInteger(Int32(1))  // dimensions... must be one
 
         #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
@@ -150,11 +151,11 @@ import NIOCore
 
     @Test func testDecodeFailureInvalidNumberOfDimensions() {
         var buffer = ByteBuffer()
-        buffer.writeInteger(Int32(1)) // invalid value
+        buffer.writeInteger(Int32(1))  // invalid value
         buffer.writeInteger(Int32(0))
         buffer.writeInteger(String.psqlType.rawValue)
-        buffer.writeInteger(Int32(1)) // expected element count
-        buffer.writeInteger(Int32(2)) // dimensions... must be one
+        buffer.writeInteger(Int32(1))  // expected element count
+        buffer.writeInteger(Int32(2))  // dimensions... must be one
 
         #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &buffer, type: .textArray, format: .binary, context: .default)
@@ -163,25 +164,25 @@ import NIOCore
 
     @Test func testDecodeUnexpectedEnd() {
         var unexpectedEndInElementLengthBuffer = ByteBuffer()
-        unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // invalid value
+        unexpectedEndInElementLengthBuffer.writeInteger(Int32(1))  // invalid value
         unexpectedEndInElementLengthBuffer.writeInteger(Int32(0))
         unexpectedEndInElementLengthBuffer.writeInteger(String.psqlType.rawValue)
-        unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // expected element count
-        unexpectedEndInElementLengthBuffer.writeInteger(Int32(1)) // dimensions
-        unexpectedEndInElementLengthBuffer.writeInteger(Int16(1)) // length of element, must be Int32
+        unexpectedEndInElementLengthBuffer.writeInteger(Int32(1))  // expected element count
+        unexpectedEndInElementLengthBuffer.writeInteger(Int32(1))  // dimensions
+        unexpectedEndInElementLengthBuffer.writeInteger(Int16(1))  // length of element, must be Int32
 
         #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &unexpectedEndInElementLengthBuffer, type: .textArray, format: .binary, context: .default)
         }
 
         var unexpectedEndInElementBuffer = ByteBuffer()
-        unexpectedEndInElementBuffer.writeInteger(Int32(1)) // invalid value
+        unexpectedEndInElementBuffer.writeInteger(Int32(1))  // invalid value
         unexpectedEndInElementBuffer.writeInteger(Int32(0))
         unexpectedEndInElementBuffer.writeInteger(String.psqlType.rawValue)
-        unexpectedEndInElementBuffer.writeInteger(Int32(1)) // expected element count
-        unexpectedEndInElementBuffer.writeInteger(Int32(1)) // dimensions
-        unexpectedEndInElementBuffer.writeInteger(Int32(12)) // length of element, must be Int32
-        unexpectedEndInElementBuffer.writeString("Hello World") // only 11 bytes, 12 needed!
+        unexpectedEndInElementBuffer.writeInteger(Int32(1))  // expected element count
+        unexpectedEndInElementBuffer.writeInteger(Int32(1))  // dimensions
+        unexpectedEndInElementBuffer.writeInteger(Int32(12))  // length of element, must be Int32
+        unexpectedEndInElementBuffer.writeString("Hello World")  // only 11 bytes, 12 needed!
 
         #expect(throws: PostgresDecodingError.Code.failure) {
             try [String](from: &unexpectedEndInElementBuffer, type: .textArray, format: .binary, context: .default)

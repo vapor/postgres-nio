@@ -1,5 +1,6 @@
 import NIOCore
 import XCTest
+
 @testable import PostgresNIO
 
 class PSQLMetadataTests: XCTestCase {

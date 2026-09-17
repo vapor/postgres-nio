@@ -1,15 +1,16 @@
-import class Foundation.JSONDecoder
-import struct Foundation.Data
-import NIOFoundationCompat
-import NIOCore
 import NIOConcurrencyHelpers
+import NIOCore
+import NIOFoundationCompat
+
+import struct Foundation.Data
+import class Foundation.JSONDecoder
 
 /// A protocol that mimics the Foundation `JSONDecoder.decode(_:from:)` function.
 /// Conform a non-Foundation JSON decoder to this protocol if you want PostgresNIO to be
 /// able to use it when decoding JSON & JSONB values (see `PostgresNIO._defaultJSONDecoder`).
 @preconcurrency
 public protocol PostgresJSONDecoder: Sendable {
-    func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable
+    func decode<T>(_ type: T.Type, from data: Data) throws -> T where T: Decodable
 
     func decode<T: Decodable>(_ type: T.Type, from buffer: ByteBuffer) throws -> T
 }

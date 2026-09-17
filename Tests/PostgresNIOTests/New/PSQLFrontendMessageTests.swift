@@ -1,11 +1,12 @@
-import XCTest
 import NIOCore
+import XCTest
+
 @testable import PostgresNIO
 
 class PSQLFrontendMessageTests: XCTestCase {
-    
+
     // MARK: ID
-    
+
     func testMessageIDs() {
         XCTAssertEqual(PostgresFrontendMessage.ID.bind.rawValue, UInt8(ascii: "B"))
         XCTAssertEqual(PostgresFrontendMessage.ID.close.rawValue, UInt8(ascii: "C"))
@@ -19,9 +20,9 @@ class PSQLFrontendMessageTests: XCTestCase {
         XCTAssertEqual(PostgresFrontendMessage.ID.sync.rawValue, UInt8(ascii: "S"))
         XCTAssertEqual(PostgresFrontendMessage.ID.terminate.rawValue, UInt8(ascii: "X"))
     }
-    
+
     // MARK: Encoder
-    
+
     func testEncodeFlush() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.flush()
@@ -29,9 +30,9 @@ class PSQLFrontendMessageTests: XCTestCase {
 
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PostgresFrontendMessage.ID.flush.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
+        XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self))  // payload length
     }
-    
+
     func testEncodeSync() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.sync()
@@ -39,9 +40,9 @@ class PSQLFrontendMessageTests: XCTestCase {
 
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PostgresFrontendMessage.ID.sync.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
+        XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self))  // payload length
     }
-    
+
     func testEncodeTerminate() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.terminate()
@@ -49,7 +50,7 @@ class PSQLFrontendMessageTests: XCTestCase {
 
         XCTAssertEqual(byteBuffer.readableBytes, 5)
         XCTAssertEqual(PostgresFrontendMessage.ID.terminate.rawValue, byteBuffer.readInteger(as: UInt8.self))
-        XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self)) // payload length
+        XCTAssertEqual(4, byteBuffer.readInteger(as: Int32.self))  // payload length
     }
 
 }

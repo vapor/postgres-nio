@@ -1,17 +1,18 @@
 import NIOCore
+
 import struct Foundation.Data
 
-fileprivate let jsonBVersionBytes: [UInt8] = [0x01]
+private let jsonBVersionBytes: [UInt8] = [0x01]
 
 extension PostgresData {
     public init(jsonb jsonData: Data) {
         let jsonBData = [UInt8](jsonData)
-        
+
         var buffer = ByteBufferAllocator()
             .buffer(capacity: jsonBVersionBytes.count + jsonBData.count)
         buffer.writeBytes(jsonBVersionBytes)
         buffer.writeBytes(jsonBData)
-        
+
         self.init(type: .jsonb, formatCode: .binary, value: buffer)
     }
 
@@ -48,19 +49,23 @@ extension PostgresData {
     }
 }
 
-@available(*, deprecated, message: "This protocol is going to be replaced with ``PostgresEncodable`` and ``PostgresDecodable`` and conforming to ``Codable`` at the same time")
-public protocol PostgresJSONBCodable: Codable, PostgresDataConvertible { }
+@available(
+    *, deprecated,
+    message:
+        "This protocol is going to be replaced with ``PostgresEncodable`` and ``PostgresDecodable`` and conforming to ``Codable`` at the same time"
+)
+public protocol PostgresJSONBCodable: Codable, PostgresDataConvertible {}
 
 @available(*, deprecated, message: "Deprecating conformance to `PostgresDataConvertible`, since it is deprecated.")
 extension PostgresJSONBCodable {
     public static var postgresDataType: PostgresDataType {
         return .jsonb
     }
-    
+
     public var postgresData: PostgresData? {
         return try? .init(jsonb: self)
     }
-    
+
     public init?(postgresData: PostgresData) {
         guard let value = try? postgresData.jsonb(as: Self.self) else {
             return nil

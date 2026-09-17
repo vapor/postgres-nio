@@ -1,5 +1,5 @@
 import NIOCore
-import NIOPosix // inet_pton() et al.
+import NIOPosix  // inet_pton() et al.
 import NIOSSL
 
 extension PostgresConnection {
@@ -7,11 +7,11 @@ extension PostgresConnection {
     public struct Configuration: Sendable {
 
         // MARK: - TLS
-        
+
         /// The possible modes of operation for TLS encapsulation of a connection.
         public struct TLS: Sendable {
             // MARK: Initializers
-            
+
             /// Do not try to create a TLS connection to the server.
             public static var disable: Self { .init(base: .disable) }
 
@@ -26,21 +26,19 @@ extension PostgresConnection {
             public static func require(_ sslContext: NIOSSLContext) -> Self {
                 self.init(base: .require(sslContext))
             }
-            
+
             // MARK: Accessors
-            
+
             /// Whether TLS will be attempted on the connection (`false` only when mode is ``disable``).
             public var isAllowed: Bool {
-                if case .disable = self.base { return false }
-                else { return true }
+                if case .disable = self.base { return false } else { return true }
             }
-            
+
             /// Whether TLS will be enforced on the connection (`true` only when mode is ``require(_:)``).
             public var isEnforced: Bool {
-                if case .require(_) = self.base { return true }
-                else { return false }
+                if case .require(_) = self.base { return true } else { return false }
             }
-            
+
             /// The `NIOSSLContext` that will be used. `nil` when TLS is disabled.
             public var sslContext: NIOSSLContext? {
                 switch self.base {
@@ -50,7 +48,7 @@ extension PostgresConnection {
             }
 
             // MARK: Implementation details
-            
+
             enum Base {
                 case disable
                 case prefer(NIOSSLContext)
@@ -59,9 +57,9 @@ extension PostgresConnection {
             let base: Base
             private init(base: Base) { self.base = base }
         }
-        
+
         // MARK: - Connection options
-        
+
         /// Describes options affecting how the underlying connection is made.
         public struct Options: Sendable {
             /// A timeout for connection attempts. Defaults to ten seconds.
@@ -69,7 +67,7 @@ extension PostgresConnection {
             /// Ignored when using a preexisting communication channel. (See
             /// ``PostgresConnection/Configuration/init(establishedChannel:username:password:database:)``.)
             public var connectTimeout: TimeAmount
-            
+
             /// The server name to use for certificate validation and SNI (Server Name Indication) when TLS is enabled.
             /// Defaults to none (but see below).
             ///
@@ -79,7 +77,7 @@ extension PostgresConnection {
             /// is used, unless it was an IP address string. If it _was_ an IP, or the connection is made by any other
             /// method, SNI is disabled.
             public var tlsServerName: String?
-            
+
             /// Whether the connection is required to provide backend key data (internal Postgres stuff).
             ///
             /// This property is provided for compatibility with Amazon RDS Proxy, which requires it to be `false`.
@@ -100,51 +98,47 @@ extension PostgresConnection {
                 self.additionalStartupParameters = []
             }
         }
-        
+
         // MARK: - Accessors
 
         /// The hostname to connect to for TCP configurations.
         ///
         /// Always `nil` for other configurations.
         public var host: String? {
-            if case let .connectTCP(host, _) = self.endpointInfo { return host }
-            else { return nil }
+            if case .connectTCP(let host, _) = self.endpointInfo { return host } else { return nil }
         }
-        
+
         /// The port to connect to for TCP configurations.
         ///
         /// Always `nil` for other configurations.
         public var port: Int? {
-            if case let .connectTCP(_, port) = self.endpointInfo { return port }
-            else { return nil }
+            if case .connectTCP(_, let port) = self.endpointInfo { return port } else { return nil }
         }
-        
+
         /// The socket path to connect to for Unix domain socket connections.
         ///
         /// Always `nil` for other configurations.
         public var unixSocketPath: String? {
-            if case let .bindUnixDomainSocket(path) = self.endpointInfo { return path }
-            else { return nil }
+            if case .bindUnixDomainSocket(let path) = self.endpointInfo { return path } else { return nil }
         }
-        
+
         /// The `Channel` to use in existing-channel configurations.
         ///
         /// Always `nil` for other configurations.
         public var establishedChannel: (any Channel)? {
-            if case let .configureChannel(channel) = self.endpointInfo { return channel }
-            else { return nil }
+            if case .configureChannel(let channel) = self.endpointInfo { return channel } else { return nil }
         }
-        
+
         /// The TLS mode to use for the connection. Valid for all configurations.
         ///
         /// See ``TLS-swift.struct``.
         public var tls: TLS
-        
+
         /// Options for handling the communication channel. Most users don't need to change these.
         ///
         /// See ``Options-swift.struct``.
         public var options: Options = .init()
-        
+
         /// The username to connect with.
         public var username: String
 
@@ -174,9 +168,10 @@ extension PostgresConnection {
         ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         ///   - tls: The TLS mode to use.
         public init(host: String, port: Int = 5432, username: String, password: String?, database: String?, tls: TLS) {
-            self.init(endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
+            self.init(
+                endpointInfo: .connectTCP(host: host, port: port), tls: tls, username: username, password: password, database: database)
         }
-            
+
         /// Create a configuration for connecting to a server through a UNIX domain socket.
         ///
         /// - Parameters:
@@ -185,9 +180,11 @@ extension PostgresConnection {
         ///   - password: The password to authenticate with.
         ///   - database: The database to open. If `nil`, the client connects to the server's default database.
         public init(unixSocketPath: String, username: String, password: String?, database: String?) {
-            self.init(endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password, database: database)
+            self.init(
+                endpointInfo: .bindUnixDomainSocket(path: unixSocketPath), tls: .disable, username: username, password: password,
+                database: database)
         }
-            
+
         /// Create a configuration for establishing a connection to a Postgres server over a preestablished
         /// `NIOCore/Channel`.
         ///
@@ -201,10 +198,13 @@ extension PostgresConnection {
         ///   - username: The username to authenticate with.
         ///   - password: The password to authenticate with.
         ///   - database: The database to open. If `nil`, the client connects to the server's default database.
-        public init(establishedChannel channel: any Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?, database: String?) {
+        public init(
+            establishedChannel channel: any Channel, tls: PostgresConnection.Configuration.TLS, username: String, password: String?,
+            database: String?
+        ) {
             self.init(endpointInfo: .configureChannel(channel), tls: tls, username: username, password: password, database: database)
         }
-        
+
         /// Create a configuration for establishing a connection to a Postgres server over a preestablished
         /// `NIOCore/Channel`.
         ///
@@ -278,25 +278,26 @@ extension PostgresConnection.InternalConfiguration {
         self.tls = config.tls
         self.options = config.options
     }
-    
+
     var serverNameForTLS: String? {
         // If a name was explicitly configured, always use it.
         if let tlsServerName = self.options.tlsServerName { return tlsServerName }
-        
+
         // Otherwise, if the connection is TCP and the hostname wasn't an IP (not valid in SNI), use that.
         if case .unresolvedTCP(let host, _) = self.connection, !host.isIPAddress() { return host }
-        
+
         // Otherwise, disable SNI
         return nil
     }
 }
 
 // originally taken from NIOSSL
-private extension String {
-    func isIPAddress() -> Bool {
+extension String {
+    fileprivate func isIPAddress() -> Bool {
         // We need some scratch space to let inet_pton write into.
-        var ipv4Addr = in_addr(), ipv6Addr = in6_addr() // inet_pton() assumes the provided address buffer is non-NULL
-        
+        var ipv4Addr = in_addr()
+        var ipv6Addr = in6_addr()  // inet_pton() assumes the provided address buffer is non-NULL
+
         /// N.B.: ``String/withCString(_:)`` is much more efficient than directly passing `self`, especially twice.
         return self.withCString { ptr in
             inet_pton(AF_INET, ptr, &ipv4Addr) == 1 || inet_pton(AF_INET6, ptr, &ipv6Addr) == 1

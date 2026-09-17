@@ -1,9 +1,9 @@
-@testable import _ConnectionPoolModule
-import _ConnectionPoolTestUtils
 import Atomics
 import NIOEmbedded
 import Testing
+import _ConnectionPoolTestUtils
 
+@testable import _ConnectionPoolModule
 
 @Suite struct ConnectionPoolTests {
 
@@ -28,7 +28,7 @@ import Testing
         // the same connection is reused 1000 times
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 await pool.run()
             }
 
@@ -82,14 +82,14 @@ import Testing
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 await pool.run()
             }
 
             let (blockCancelStream, blockCancelContinuation) = AsyncStream.makeStream(of: Void.self)
             let (blockConnCreationStream, blockConnCreationContinuation) = AsyncStream.makeStream(of: Void.self)
 
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 _ = try? await factory.nextConnectAttempt { _ in
                     blockCancelContinuation.yield()
                     var iterator = blockConnCreationStream.makeAsyncIterator()
@@ -128,7 +128,7 @@ import Testing
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 await pool.run()
             }
 
@@ -172,12 +172,12 @@ import Testing
         // the same connection is reused 1000 times
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 await pool.run()
                 #expect(hasFinished.compareExchange(expected: false, desired: true, ordering: .relaxed).original == false)
             }
 
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 var usedConnectionIDs = Set<Int>()
                 for _ in 0..<config.maximumConnectionHardLimit {
                     await factory.nextConnectAttempt { connectionID in
@@ -187,14 +187,13 @@ import Testing
                     }
                 }
 
-
                 #expect(factory.pendingConnectionAttemptsCount == 0)
             }
 
             let (stream, continuation) = AsyncStream.makeStream(of: Void.self)
 
             for _ in 0..<iterations {
-                taskGroup.addTask_ {
+                taskGroup.addChildTask {
                     do {
                         let connectionLease = try await pool.leaseConnection()
                         connectionLease.release()
@@ -365,14 +364,15 @@ import Testing
             let failingKeepAliveDidRun = ManagedAtomic(false)
             // the following keep alive should not cause a crash
             _ = try? await keepAlive.nextKeepAlive { keepAliveConnection in
-                defer { 
-                    #expect(failingKeepAliveDidRun
-                        .compareExchange(expected: false, desired: true, ordering: .relaxed).original == false)
+                defer {
+                    #expect(
+                        failingKeepAliveDidRun
+                            .compareExchange(expected: false, desired: true, ordering: .relaxed).original == false)
                 }
                 #expect(keepAliveConnection === connectionLease.connection)
                 keepAliveConnection.close()
-                throw CancellationError() // any error 
-            } // will fail and it's expected
+                throw CancellationError()  // any error
+            }  // will fail and it's expected
             #expect(failingKeepAliveDidRun.load(ordering: .relaxed) == true)
 
             taskGroup.cancelAll()
@@ -1204,7 +1204,7 @@ import Testing
 
             // lease is successful because we are back in running state
             _ = try await pool.leaseConnection()
-            
+
             // shutdown
             pool.triggerForceShutdown()
 
@@ -1233,7 +1233,7 @@ import Testing
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 await pool.run()
             }
 
@@ -1298,7 +1298,7 @@ import Testing
         }
 
         await withTaskGroup(of: Void.self) { taskGroup in
-            taskGroup.addTask_ {
+            taskGroup.addChildTask {
                 await pool.run()
             }
 

@@ -1,6 +1,7 @@
 import NIOCore
-import class Foundation.JSONEncoder
+
 import class Foundation.JSONDecoder
+import class Foundation.JSONEncoder
 
 /// A type that can encode itself to a Postgres wire binary representation.
 /// Dynamic types are types that don't have a well-known Postgres type OID at compile time.
@@ -219,12 +220,12 @@ extension Optional: PostgresDecodable where Wrapped: PostgresDecodable, Wrapped.
     }
 
     @inlinable
-    public static func _decodeRaw<JSONDecoder : PostgresJSONDecoder>(
+    public static func _decodeRaw<JSONDecoder: PostgresJSONDecoder>(
         from buffer: inout ByteBuffer?,
         type: PostgresDataType,
         format: PostgresFormat,
         context: PostgresDecodingContext<JSONDecoder>
-    ) throws -> Optional<Wrapped> {
+    ) throws -> Wrapped? {
         switch buffer {
         case .some(var buffer):
             return try Wrapped(from: &buffer, type: type, format: format, context: context)

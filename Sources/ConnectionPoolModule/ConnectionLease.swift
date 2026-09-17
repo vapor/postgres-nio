@@ -2,7 +2,7 @@ public struct ConnectionLease<Connection: PooledConnection>: Sendable {
     public var connection: Connection
 
     @usableFromInline
-    let _release: @Sendable (Connection) -> ()
+    let _release: @Sendable (Connection) -> Void
 
     @inlinable
     public init(connection: Connection, release: @escaping @Sendable (Connection) -> Void) {

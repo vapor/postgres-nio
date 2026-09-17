@@ -1,32 +1,33 @@
-import Logging
-@testable import PostgresNIO
 import Atomics
-import XCTest
+import Logging
 import NIOCore
 import NIOPosix
-import NIOTestUtils
 import NIOSSL
+import NIOTestUtils
+import XCTest
+
+@testable import PostgresNIO
 
 final class PostgresNIOTests: XCTestCase {
-    
+
     private var group: (any EventLoopGroup)!
     private var eventLoop: any EventLoop { self.group.next() }
-    
+
     override class func setUp() {
         XCTAssertTrue(isLoggingConfigured)
     }
-    
+
     override func setUpWithError() throws {
         try super.setUpWithError()
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
-    
+
     override func tearDownWithError() throws {
         try self.group?.syncShutdownGracefully()
         self.group = nil
         try super.tearDownWithError()
     }
-    
+
     // MARK: Tests
 
     func testConnectAndClose() {
@@ -34,13 +35,13 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         XCTAssertNoThrow(try conn?.close().wait())
     }
-    
+
     func testConnectUDSAndClose() throws {
         try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
         let conn = try PostgresConnection.testUDS(on: eventLoop).wait()
         try conn.close().wait()
     }
-    
+
     func testConnectEstablishedChannelAndClose() throws {
         let channel = try ClientBootstrap(group: self.group).connect(to: PostgresConnection.address()).wait()
         let conn = try PostgresConnection.testChannel(channel, on: self.eventLoop).wait()
@@ -50,7 +51,7 @@ final class PostgresNIOTests: XCTestCase {
     func testSimpleQueryVersion() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
         XCTAssertEqual(rows?.count, 1)
@@ -61,7 +62,7 @@ final class PostgresNIOTests: XCTestCase {
         try XCTSkipUnless(env("POSTGRES_SOCKET") != nil)
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.testUDS(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try conn?.simpleQuery("SELECT version()").wait())
         XCTAssertEqual(rows?.count, 1)
@@ -81,7 +82,7 @@ final class PostgresNIOTests: XCTestCase {
     func testQueryVersion() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("SELECT version()", .init()).wait())
         XCTAssertEqual(rows?.count, 1)
@@ -91,7 +92,7 @@ final class PostgresNIOTests: XCTestCase {
     func testQuerySelectParameter() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("SELECT $1::TEXT as foo", ["hello"]).wait())
         XCTAssertEqual(rows?.count, 1)
@@ -101,9 +102,9 @@ final class PostgresNIOTests: XCTestCase {
     func testSQLError() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        XCTAssertThrowsError(_ = try conn?.simpleQuery("SELECT &").wait()) { error in
+        XCTAssertThrowsError(try conn?.simpleQuery("SELECT &").wait()) { error in
             XCTAssertEqual((error as? PostgresError)?.code, .syntaxError)
         }
     }
@@ -111,7 +112,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationsEmptyPayload() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         let receivedNotifications = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
@@ -129,7 +130,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationsNonEmptyPayload() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let receivedNotifications = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
             receivedNotifications.wrappingIncrement(ordering: .relaxed)
@@ -146,7 +147,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationsRemoveHandlerWithinHandler() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let receivedNotifications = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
             receivedNotifications.wrappingIncrement(ordering: .relaxed)
@@ -162,7 +163,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationsRemoveHandlerOutsideHandler() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let receivedNotifications = ManagedAtomic<Int>(0)
         let context = conn?.addListener(channel: "example") { context, notification in
             receivedNotifications.wrappingIncrement(ordering: .relaxed)
@@ -180,7 +181,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationsMultipleRegisteredHandlers() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let receivedNotifications1 = ManagedAtomic<Int>(0)
         conn?.addListener(channel: "example") { context, notification in
             receivedNotifications1.wrappingIncrement(ordering: .relaxed)
@@ -199,16 +200,18 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationsMultipleRegisteredHandlersRemoval() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let receivedNotifications1 = ManagedAtomic<Int>(0)
-        XCTAssertNotNil(conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications1.wrappingIncrement(ordering: .relaxed)
-            context.stop()
-        })
+        XCTAssertNotNil(
+            conn?.addListener(channel: "example") { context, notification in
+                receivedNotifications1.wrappingIncrement(ordering: .relaxed)
+                context.stop()
+            })
         let receivedNotifications2 = ManagedAtomic<Int>(0)
-        XCTAssertNotNil(conn?.addListener(channel: "example") { context, notification in
-            receivedNotifications2.wrappingIncrement(ordering: .relaxed)
-        })
+        XCTAssertNotNil(
+            conn?.addListener(channel: "example") { context, notification in
+                receivedNotifications2.wrappingIncrement(ordering: .relaxed)
+            })
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY example").wait())
@@ -220,10 +223,11 @@ final class PostgresNIOTests: XCTestCase {
     func testNotificationHandlerFiltersOnChannel() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        XCTAssertNotNil(conn?.addListener(channel: "desired") { context, notification in
-            XCTFail("Received notification on channel that handler was not registered for")
-        })
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        XCTAssertNotNil(
+            conn?.addListener(channel: "desired") { context, notification in
+                XCTFail("Received notification on channel that handler was not registered for")
+            })
         XCTAssertNoThrow(_ = try conn?.simpleQuery("LISTEN undesired").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("NOTIFY undesired").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SELECT 1").wait())
@@ -232,7 +236,7 @@ final class PostgresNIOTests: XCTestCase {
     func testSelectTypes() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var results: [PostgresRow]?
         XCTAssertNoThrow(results = try conn?.simpleQuery("SELECT * FROM pg_type").wait())
         XCTAssert((results?.count ?? 0) > 350, "Results count not large enough")
@@ -241,7 +245,7 @@ final class PostgresNIOTests: XCTestCase {
     func testSelectType() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var results: [PostgresRow]?
         XCTAssertNoThrow(results = try conn?.simpleQuery("SELECT * FROM pg_type WHERE typname = 'float8'").wait())
         // [
@@ -287,31 +291,23 @@ final class PostgresNIOTests: XCTestCase {
     func testIntegers() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        struct Integers: Decodable {
-            let smallint: Int16
-            let smallint_min: Int16
-            let smallint_max: Int16
-            let int: Int32
-            let int_min: Int32
-            let int_max: Int32
-            let bigint: Int64
-            let bigint_min: Int64
-            let bigint_max: Int64
-        }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var results: PostgresQueryResult?
-        XCTAssertNoThrow(results = try conn?.query("""
-        SELECT
-            1::SMALLINT                   as smallint,
-            -32767::SMALLINT              as smallint_min,
-            32767::SMALLINT               as smallint_max,
-            1::INT                        as int,
-            -2147483647::INT              as int_min,
-            2147483647::INT               as int_max,
-            1::BIGINT                     as bigint,
-            -9223372036854775807::BIGINT  as bigint_min,
-            9223372036854775807::BIGINT   as bigint_max
-        """).wait())
+        XCTAssertNoThrow(
+            results = try conn?.query(
+                """
+                SELECT
+                    1::SMALLINT                   as smallint,
+                    -32767::SMALLINT              as smallint_min,
+                    32767::SMALLINT               as smallint_max,
+                    1::INT                        as int,
+                    -2147483647::INT              as int_min,
+                    2147483647::INT               as int_max,
+                    1::BIGINT                     as bigint,
+                    -9223372036854775807::BIGINT  as bigint_min,
+                    9223372036854775807::BIGINT   as bigint_max
+                """
+            ).wait())
         XCTAssertEqual(results?.count, 1)
 
         let row = results?.first?.makeRandomAccess()
@@ -329,24 +325,20 @@ final class PostgresNIOTests: XCTestCase {
     func testPi() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
-        struct Pi: Decodable {
-            let text: String
-            let numeric_string: String
-            let numeric_decimal: Decimal
-            let double: Double
-            let float: Float
-        }
         var results: PostgresQueryResult?
-        XCTAssertNoThrow(results = try conn?.query("""
-        SELECT
-            pi()::TEXT     as text,
-            pi()::NUMERIC  as numeric_string,
-            pi()::NUMERIC  as numeric_decimal,
-            pi()::FLOAT8   as double,
-            pi()::FLOAT4   as float
-        """).wait())
+        XCTAssertNoThrow(
+            results = try conn?.query(
+                """
+                SELECT
+                    pi()::TEXT     as text,
+                    pi()::NUMERIC  as numeric_string,
+                    pi()::NUMERIC  as numeric_decimal,
+                    pi()::FLOAT8   as double,
+                    pi()::FLOAT4   as float
+                """
+            ).wait())
         XCTAssertEqual(results?.count, 1)
         let row = results?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "text"].string?.hasPrefix("3.14159265"), true)
@@ -360,17 +352,20 @@ final class PostgresNIOTests: XCTestCase {
     func testUUID() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         struct Model: Decodable {
             let id: UUID
             let string: String
         }
         var results: PostgresQueryResult?
-        XCTAssertNoThrow(results = try conn?.query("""
-        SELECT
-            '123e4567-e89b-12d3-a456-426655440000'::UUID as id,
-            '123e4567-e89b-12d3-a456-426655440000'::UUID as string
-        """).wait())
+        XCTAssertNoThrow(
+            results = try conn?.query(
+                """
+                SELECT
+                    '123e4567-e89b-12d3-a456-426655440000'::UUID as id,
+                    '123e4567-e89b-12d3-a456-426655440000'::UUID as string
+                """
+            ).wait())
         XCTAssertEqual(results?.count, 1)
         let row = results?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "id"].uuid, UUID(uuidString: "123E4567-E89B-12D3-A456-426655440000"))
@@ -385,23 +380,27 @@ final class PostgresNIOTests: XCTestCase {
         struct Model: Decodable {
             let range: Range<Int32>
         }
-        let results1: PostgresQueryResult = try await conn.query("""
-        SELECT
-            '[\(Int32.min), \(Int32.max))'::int4range AS range
-        """).get()
+        let results1: PostgresQueryResult = try await conn.query(
+            """
+            SELECT
+                '[\(Int32.min), \(Int32.max))'::int4range AS range
+            """
+        ).get()
         XCTAssertEqual(results1.count, 1)
         var row = results1.first?.makeRandomAccess()
         let expectedRange: Range<Int32> = Int32.min..<Int32.max
         let decodedRange = try row?.decode(column: "range", as: Range<Int32>.self, context: .default)
         XCTAssertEqual(decodedRange, expectedRange)
 
-        let results2 = try await conn.query("""
-        SELECT
-            ARRAY[
-                '[0, 1)'::int4range,
-                '[10, 11)'::int4range
-            ] AS ranges
-        """).get()
+        let results2 = try await conn.query(
+            """
+            SELECT
+                ARRAY[
+                    '[0, 1)'::int4range,
+                    '[10, 11)'::int4range
+                ] AS ranges
+            """
+        ).get()
         XCTAssertEqual(results2.count, 1)
         row = results2.first?.makeRandomAccess()
         let decodedRangeArray = try row?.decode(column: "ranges", as: [Range<Int32>].self, context: .default)
@@ -419,10 +418,12 @@ final class PostgresNIOTests: XCTestCase {
             let range: Range<Int32>
         }
         let randomValue = Int32.random(in: Int32.min...Int32.max)
-        let results: PostgresQueryResult = try await conn.query("""
-        SELECT
-            '[\(randomValue),\(randomValue))'::int4range AS range
-        """).get()
+        let results: PostgresQueryResult = try await conn.query(
+            """
+            SELECT
+                '[\(randomValue),\(randomValue))'::int4range AS range
+            """
+        ).get()
         XCTAssertEqual(results.count, 1)
         let row = results.first?.makeRandomAccess()
         let expectedRange: Range<Int32> = Int32.valueForEmptyRange..<Int32.valueForEmptyRange
@@ -442,23 +443,27 @@ final class PostgresNIOTests: XCTestCase {
         struct Model: Decodable {
             let range: Range<Int64>
         }
-        let results1: PostgresQueryResult = try await conn.query("""
-        SELECT
-            '[\(Int64.min), \(Int64.max))'::int8range AS range
-        """).get()
+        let results1: PostgresQueryResult = try await conn.query(
+            """
+            SELECT
+                '[\(Int64.min), \(Int64.max))'::int8range AS range
+            """
+        ).get()
         XCTAssertEqual(results1.count, 1)
         var row = results1.first?.makeRandomAccess()
         let expectedRange: Range<Int64> = Int64.min..<Int64.max
         let decodedRange = try row?.decode(column: "range", as: Range<Int64>.self, context: .default)
         XCTAssertEqual(decodedRange, expectedRange)
 
-        let results2: PostgresQueryResult = try await conn.query("""
-        SELECT
-            ARRAY[
-                '[0, 1)'::int8range,
-                '[10, 11)'::int8range
-            ] AS ranges
-        """).get()
+        let results2: PostgresQueryResult = try await conn.query(
+            """
+            SELECT
+                ARRAY[
+                    '[0, 1)'::int8range,
+                    '[10, 11)'::int8range
+                ] AS ranges
+            """
+        ).get()
         XCTAssertEqual(results2.count, 1)
         row = results2.first?.makeRandomAccess()
         let decodedRangeArray = try row?.decode(column: "ranges", as: [Range<Int64>].self, context: .default)
@@ -476,10 +481,12 @@ final class PostgresNIOTests: XCTestCase {
             let range: Range<Int64>
         }
         let randomValue = Int64.random(in: Int64.min...Int64.max)
-        let results: PostgresQueryResult = try await conn.query("""
-        SELECT
-            '[\(randomValue),\(randomValue))'::int8range AS range
-        """).get()
+        let results: PostgresQueryResult = try await conn.query(
+            """
+            SELECT
+                '[\(randomValue),\(randomValue))'::int8range AS range
+            """
+        ).get()
         XCTAssertEqual(results.count, 1)
         let row = results.first?.makeRandomAccess()
         let expectedRange: Range<Int64> = Int64.valueForEmptyRange..<Int64.valueForEmptyRange
@@ -494,19 +501,22 @@ final class PostgresNIOTests: XCTestCase {
     func testDates() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         struct Dates: Decodable {
             var date: Date
             var timestamp: Date
             var timestamptz: Date
         }
         var results: PostgresQueryResult?
-        XCTAssertNoThrow(results = try conn?.query("""
-        SELECT
-            '2016-01-18 01:02:03 +0042'::DATE         as date,
-            '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
-            '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
-        """).wait())
+        XCTAssertNoThrow(
+            results = try conn?.query(
+                """
+                SELECT
+                    '2016-01-18 01:02:03 +0042'::DATE         as date,
+                    '2016-01-18 01:02:03 +0042'::TIMESTAMP    as timestamp,
+                    '2016-01-18 01:02:03 +0042'::TIMESTAMPTZ  as timestamptz
+                """
+            ).wait())
         XCTAssertEqual(results?.count, 1)
         let row = results?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "date"].date?.description, "2016-01-18 00:00:00 +0000")
@@ -518,7 +528,7 @@ final class PostgresNIOTests: XCTestCase {
     func testBindInteger() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         XCTAssertNoThrow(_ = try conn?.simpleQuery("drop table if exists person;").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("create table person(id serial primary key, first_name text, last_name text);").wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("drop table person;").wait()) }
@@ -530,7 +540,7 @@ final class PostgresNIOTests: XCTestCase {
     func testAverageLengthNumeric() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var results: PostgresQueryResult?
         XCTAssertNoThrow(results = try conn?.query("select avg(length('foo')) as average_length").wait())
         let row = results?.first?.makeRandomAccess()
@@ -540,24 +550,27 @@ final class PostgresNIOTests: XCTestCase {
     func testNumericParsing() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '1234.5678'::numeric as a,
-            '-123.456'::numeric as b,
-            '123456.789123'::numeric as c,
-            '3.14159265358979'::numeric as d,
-            '10000'::numeric as e,
-            '0.00001'::numeric as f,
-            '100000000'::numeric as g,
-            '0.000000001'::numeric as h,
-            '100000000000'::numeric as i,
-            '0.000000000001'::numeric as j,
-            '123000000000'::numeric as k,
-            '0.000000000123'::numeric as l,
-            '0.5'::numeric as m
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '1234.5678'::numeric as a,
+                    '-123.456'::numeric as b,
+                    '123456.789123'::numeric as c,
+                    '3.14159265358979'::numeric as d,
+                    '10000'::numeric as e,
+                    '0.00001'::numeric as f,
+                    '100000000'::numeric as g,
+                    '0.000000001'::numeric as h,
+                    '100000000000'::numeric as i,
+                    '0.000000000001'::numeric as j,
+                    '123000000000'::numeric as k,
+                    '0.000000000123'::numeric as l,
+                    '0.5'::numeric as m
+                """
+            ).wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "a"].string, "1234.5678")
@@ -577,13 +590,16 @@ final class PostgresNIOTests: XCTestCase {
         // this seemingly duped test is useful for debugging numeric parsing
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let numeric = "790226039477542363.6032384900176272473"
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '\(numeric)'::numeric as n
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '\(numeric)'::numeric as n
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "n"].string, numeric)
     }
@@ -594,7 +610,7 @@ final class PostgresNIOTests: XCTestCase {
 
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         for _ in 0..<1_000_000 {
             let integer = UInt.random(in: UInt.min..<UInt.max)
@@ -602,10 +618,13 @@ final class PostgresNIOTests: XCTestCase {
             let number = "\(integer).\(fraction)"
                 .trimmingCharacters(in: CharacterSet(["0"]))
             var rows: PostgresQueryResult?
-            XCTAssertNoThrow(rows = try conn?.query("""
-            select
-                '\(number)'::numeric as n
-            """).wait())
+            XCTAssertNoThrow(
+                rows = try conn?.query(
+                    """
+                    select
+                        '\(number)'::numeric as n
+                    """
+                ).wait())
             let row = rows?.first?.makeRandomAccess()
             XCTAssertEqual(row?[data: "n"].string, number)
         }
@@ -614,7 +633,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNumericSerialization() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let a = PostgresNumeric(string: "123456.789123")!
         let b = PostgresNumeric(string: "-123456.789123")!
         let c = PostgresNumeric(string: "3.14159265358979")!
@@ -627,32 +646,36 @@ final class PostgresNIOTests: XCTestCase {
         let j = PostgresNumeric(string: "80216390553684000000.0")!
         let k = PostgresNumeric(string: "802163905536840000.000080216390553684")!
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::numeric as a,
-            $2::numeric as b,
-            $3::numeric as c,
-            $4::numeric as d,
-            $5::numeric as e,
-            $6::numeric as f,
-            $7::numeric as g,
-            $8::numeric as h,
-            $9::numeric as i,
-            $10::numeric as j,
-            $11::numeric as k
-        """, [
-            .init(numeric: a),
-            .init(numeric: b),
-            .init(numeric: c),
-            .init(numeric: d),
-            .init(numeric: e),
-            .init(numeric: f),
-            .init(numeric: g),
-            .init(numeric: h),
-            .init(numeric: i),
-            .init(numeric: j),
-            .init(numeric: k)
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::numeric as a,
+                    $2::numeric as b,
+                    $3::numeric as c,
+                    $4::numeric as d,
+                    $5::numeric as e,
+                    $6::numeric as f,
+                    $7::numeric as g,
+                    $8::numeric as h,
+                    $9::numeric as i,
+                    $10::numeric as j,
+                    $11::numeric as k
+                """,
+                [
+                    .init(numeric: a),
+                    .init(numeric: b),
+                    .init(numeric: c),
+                    .init(numeric: d),
+                    .init(numeric: e),
+                    .init(numeric: f),
+                    .init(numeric: g),
+                    .init(numeric: h),
+                    .init(numeric: i),
+                    .init(numeric: j),
+                    .init(numeric: k),
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "a"].decimal, Decimal(string: "123456.789123")!)
         XCTAssertEqual(row?[data: "b"].decimal, Decimal(string: "-123456.789123")!)
@@ -666,28 +689,34 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "j"].decimal, Decimal(string: "80216390553684000000.0")!)
         XCTAssertEqual(row?[data: "k"].decimal, Decimal(string: "802163905536840000.000080216390553684")!)
     }
-    
+
     func testDecimalStringSerialization() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
         XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table1\"").wait())
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
-        CREATE TABLE table1 (
-            "balance" text NOT NULL
-        );
-        """).wait())
+        XCTAssertNoThrow(
+            _ = try conn?.simpleQuery(
+                """
+                CREATE TABLE table1 (
+                    "balance" text NOT NULL
+                );
+                """
+            ).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table1\"").wait()) }
-        
+
         XCTAssertNoThrow(_ = try conn?.query("INSERT INTO table1 VALUES ($1)", [.init(decimal: Decimal(string: "123456.789123")!)]).wait())
-        
+
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        SELECT
-            "balance"
-        FROM table1
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                SELECT
+                    "balance"
+                FROM table1
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "balance"].decimal, Decimal(string: "123456.789123")!)
     }
@@ -695,16 +724,19 @@ final class PostgresNIOTests: XCTestCase {
     func testMoney() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '0'::money as a,
-            '0.05'::money as b,
-            '0.23'::money as c,
-            '3.14'::money as d,
-            '12345678.90'::money as e
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '0'::money as a,
+                    '0.05'::money as b,
+                    '0.23'::money as c,
+                    '3.14'::money as d,
+                    '12345678.90'::money as e
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "a"].string, "0.00")
         XCTAssertEqual(row?[data: "b"].string, "0.05")
@@ -717,12 +749,15 @@ final class PostgresNIOTests: XCTestCase {
     func testIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '{1,2,3}'::int[] as array
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '{1,2,3}'::int[] as array
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [1, 2, 3])
     }
@@ -731,12 +766,15 @@ final class PostgresNIOTests: XCTestCase {
     func testEmptyIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '{}'::int[] as array
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '{}'::int[] as array
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
@@ -745,12 +783,15 @@ final class PostgresNIOTests: XCTestCase {
     func testOptionalIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '{1, 2, NULL, 4}'::int8[] as array
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '{1, 2, NULL, 4}'::int8[] as array
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int?.self), [1, 2, nil, 4])
     }
@@ -759,12 +800,15 @@ final class PostgresNIOTests: XCTestCase {
     func testNullIntegerArrayParse() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            null::int[] as array
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    null::int[] as array
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), nil)
     }
@@ -773,14 +817,18 @@ final class PostgresNIOTests: XCTestCase {
     func testIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::int8[] as array
-        """, [
-            PostgresData(array: [1, 2, 3])
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::int8[] as array
+                """,
+                [
+                    PostgresData(array: [1, 2, 3])
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [1, 2, 3])
     }
@@ -789,14 +837,18 @@ final class PostgresNIOTests: XCTestCase {
     func testEmptyIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::int8[] as array
-        """, [
-            PostgresData(array: [] as [Int])
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::int8[] as array
+                """,
+                [
+                    PostgresData(array: [] as [Int])
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int.self), [])
     }
@@ -805,34 +857,42 @@ final class PostgresNIOTests: XCTestCase {
     func testOptionalIntegerArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::int8[] as array
-        """, [
-            PostgresData(array: [1, nil, 3] as [Int64?])
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::int8[] as array
+                """,
+                [
+                    PostgresData(array: [1, nil, 3] as [Int64?])
+                ]
+            ).wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Int64?.self), [1, nil, 3])
     }
-    
+
     @available(*, deprecated, message: "Testing deprecated functionality")
     func testDateArraySerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        let date1 = Date(timeIntervalSince1970: 1704088800),
-            date2 = Date(timeIntervalSince1970: 1706767200),
-            date3 = Date(timeIntervalSince1970: 1709272800)
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        let date1 = Date(timeIntervalSince1970: 1_704_088_800)
+        let date2 = Date(timeIntervalSince1970: 1_706_767_200)
+        let date3 = Date(timeIntervalSince1970: 1_709_272_800)
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::timestamptz[] as array
-        """, [
-            PostgresData(array: [date1, date2, date3])
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::timestamptz[] as array
+                """,
+                [
+                    PostgresData(array: [date1, date2, date3])
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "array"].array(of: Date.self), [date1, date2, date3])
     }
@@ -842,16 +902,19 @@ final class PostgresNIOTests: XCTestCase {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
         defer { XCTAssertNoThrow(try conn?.close().wait()) }
-        let date1 = Date(timeIntervalSince1970: 1704088800),//8766
-            date2 = Date(timeIntervalSince1970: 1706767200),//8797
-            date3 = Date(timeIntervalSince1970: 1709272800) //8826
-        var data = PostgresData(array: [date1, date2, date3].map { Int32(($0.timeIntervalSince1970 - 946_684_800) / 86_400).postgresData }, elementType: .date)
-        data.type = .dateArray // N.B.: `.date` format is an Int32 count of days since psqlStartDate
+        let date1 = Date(timeIntervalSince1970: 1_704_088_800)
+        let date2 = Date(timeIntervalSince1970: 1_706_767_200)
+        let date3 = Date(timeIntervalSince1970: 1_709_272_800)  //8826
+        var data = PostgresData(
+            array: [date1, date2, date3].map { Int32(($0.timeIntervalSince1970 - 946_684_800) / 86_400).postgresData }, elementType: .date)
+        data.type = .dateArray  // N.B.: `.date` format is an Int32 count of days since psqlStartDate
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("select $1::date[] as array", [data]).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(
-            row?[data: "array"].array(of: Date.self)?.map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) },
+            row?[data: "array"].array(of: Date.self)?.map {
+                Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero))
+            },
             [date1, date2, date3].map { Int32((($0.timeIntervalSince1970 - 946_684_800) / 86_400).rounded(.toNearestOrAwayFromZero)) }
         )
     }
@@ -860,34 +923,39 @@ final class PostgresNIOTests: XCTestCase {
     func testEmptyStringFromNonNullColumn() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+
         XCTAssertNoThrow(_ = try conn?.simpleQuery(#"DROP TABLE IF EXISTS "non_null_empty_strings""#).wait())
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
-        CREATE TABLE non_null_empty_strings (
-            "id" SERIAL,
-            "nonNullString" text NOT NULL,
-            PRIMARY KEY ("id")
-        );
-        """).wait())
+        XCTAssertNoThrow(
+            _ = try conn?.simpleQuery(
+                """
+                CREATE TABLE non_null_empty_strings (
+                    "id" SERIAL,
+                    "nonNullString" text NOT NULL,
+                    PRIMARY KEY ("id")
+                );
+                """
+            ).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery(#"DROP TABLE "non_null_empty_strings""#).wait()) }
-        
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
-        INSERT INTO non_null_empty_strings ("nonNullString") VALUES ('')
-        """).wait())
-        
+
+        XCTAssertNoThrow(
+            _ = try conn?.simpleQuery(
+                """
+                INSERT INTO non_null_empty_strings ("nonNullString") VALUES ('')
+                """
+            ).wait())
+
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try conn?.simpleQuery(#"SELECT * FROM "non_null_empty_strings""#).wait())
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first?.makeRandomAccess()
-        XCTAssertEqual(row?[data: "nonNullString"].string, "") // <--- this fails
+        XCTAssertEqual(row?[data: "nonNullString"].string, "")  // <--- this fails
     }
-
 
     func testBoolSerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         do {
             var rows: PostgresQueryResult?
             XCTAssertNoThrow(rows = try conn?.query("select $1::bool as bool", [true]).wait())
@@ -917,11 +985,15 @@ final class PostgresNIOTests: XCTestCase {
     func testBytesSerialize() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("select $1::bytea as bytes", [
-            PostgresData(bytes: [1, 2, 3])
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                "select $1::bytea as bytes",
+                [
+                    PostgresData(bytes: [1, 2, 3])
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "bytes"].bytes, [1, 2, 3])
     }
@@ -966,7 +1038,7 @@ final class PostgresNIOTests: XCTestCase {
         do {
             var rows: PostgresQueryResult?
             XCTAssertNoThrow(rows = try conn?.query("select '{\"hello\": \"world\"}'::jsonb as data").wait())
-            
+
             var resultString: String?
             XCTAssertNoThrow(resultString = try rows?.first?.decode(String.self, context: .default))
 
@@ -1103,10 +1175,12 @@ final class PostgresNIOTests: XCTestCase {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.testUnauthenticated(on: eventLoop).wait())
         let authFuture = conn?.authenticate(username: "invalid", database: "invalid", password: "bad")
-        XCTAssertThrowsError(_ = try authFuture?.wait()) { error in
-            XCTAssert((error as? PostgresError)?.code == .invalidPassword || (error as? PostgresError)?.code == .invalidAuthorizationSpecification)
+        XCTAssertThrowsError(try authFuture?.wait()) { error in
+            XCTAssert(
+                (error as? PostgresError)?.code == .invalidPassword || (error as? PostgresError)?.code == .invalidAuthorizationSpecification
+            )
         }
-        
+
         // in this case the connection will be closed by the remote
         XCTAssertNoThrow(try conn?.closeFuture.wait())
     }
@@ -1114,52 +1188,61 @@ final class PostgresNIOTests: XCTestCase {
     func testColumnsInJoin() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         let dateInTable1 = Date(timeIntervalSince1970: 1234)
         let dateInTable2 = Date(timeIntervalSince1970: 5678)
         XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table1\"").wait())
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
-        CREATE TABLE table1 (
-            "id" int8 NOT NULL,
-            "table2_id" int8,
-            "intValue" int8,
-            "stringValue" text,
-            "dateValue" timestamptz,
-            PRIMARY KEY ("id")
-        );
-        """).wait())
+        XCTAssertNoThrow(
+            _ = try conn?.simpleQuery(
+                """
+                CREATE TABLE table1 (
+                    "id" int8 NOT NULL,
+                    "table2_id" int8,
+                    "intValue" int8,
+                    "stringValue" text,
+                    "dateValue" timestamptz,
+                    PRIMARY KEY ("id")
+                );
+                """
+            ).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table1\"").wait()) }
 
         XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table2\"").wait())
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
-        CREATE TABLE table2 (
-            "id" int8 NOT NULL,
-            "intValue" int8,
-            "stringValue" text,
-            "dateValue" timestamptz,
-            PRIMARY KEY ("id")
-        );
-        """).wait())
+        XCTAssertNoThrow(
+            _ = try conn?.simpleQuery(
+                """
+                CREATE TABLE table2 (
+                    "id" int8 NOT NULL,
+                    "intValue" int8,
+                    "stringValue" text,
+                    "dateValue" timestamptz,
+                    PRIMARY KEY ("id")
+                );
+                """
+            ).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table2\"").wait()) }
 
         XCTAssertNoThrow(_ = try conn?.simpleQuery("INSERT INTO table1 VALUES (12, 34, 56, 'stringInTable1', to_timestamp(1234))").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("INSERT INTO table2 VALUES (34, 78, 'stringInTable2', to_timestamp(5678))").wait())
 
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        SELECT
-            "table1"."id" as "t1_id",
-            "table1"."intValue" as "t1_intValue",
-            "table1"."dateValue" as "t1_dateValue",
-            "table1"."stringValue" as "t1_stringValue",
-            "table2"."id" as "t2_id",
-            "table2"."intValue" as "t2_intValue",
-            "table2"."dateValue" as "t2_dateValue",
-            "table2"."stringValue" as "t2_stringValue",
-            *
-        FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                SELECT
+                    "table1"."id" as "t1_id",
+                    "table1"."intValue" as "t1_intValue",
+                    "table1"."dateValue" as "t1_dateValue",
+                    "table1"."stringValue" as "t1_stringValue",
+                    "table2"."id" as "t2_id",
+                    "table2"."intValue" as "t2_intValue",
+                    "table2"."dateValue" as "t2_dateValue",
+                    "table2"."stringValue" as "t2_stringValue",
+                    *
+                FROM table1 INNER JOIN table2 ON table1.table2_id = table2.id
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "t1_id"].int, 12)
         XCTAssertEqual(row?[data: "table2_id"].int, 34)
@@ -1175,31 +1258,35 @@ final class PostgresNIOTests: XCTestCase {
     @available(*, deprecated, message: "Testing deprecated functionality")
     func testStringArrays() {
         let query = """
-        SELECT
-            $1::uuid as "id",
-            $2::bigint as "revision",
-            $3::timestamp as "updated_at",
-            $4::timestamp as "created_at",
-            $5::text as "name",
-            $6::text[] as "countries",
-            $7::text[] as "languages",
-            $8::text[] as "currencies"
-        """
+            SELECT
+                $1::uuid as "id",
+                $2::bigint as "revision",
+                $3::timestamp as "updated_at",
+                $4::timestamp as "created_at",
+                $5::text as "name",
+                $6::text[] as "countries",
+                $7::text[] as "languages",
+                $8::text[] as "currencies"
+            """
 
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query(query, [
-            PostgresData(uuid: UUID(uuidString: "D2710E16-EB07-4FD6-A87E-B1BE41C9BD3D")!),
-            PostgresData(int: Int(0)),
-            PostgresData(date: Date(timeIntervalSince1970: 0)),
-            PostgresData(date: Date(timeIntervalSince1970: 0)),
-            PostgresData(string: "Foo"),
-            PostgresData(array: ["US"]),
-            PostgresData(array: ["en"]),
-            PostgresData(array: ["USD", "DKK"]),
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                query,
+                [
+                    PostgresData(uuid: UUID(uuidString: "D2710E16-EB07-4FD6-A87E-B1BE41C9BD3D")!),
+                    PostgresData(int: Int(0)),
+                    PostgresData(date: Date(timeIntervalSince1970: 0)),
+                    PostgresData(date: Date(timeIntervalSince1970: 0)),
+                    PostgresData(string: "Foo"),
+                    PostgresData(array: ["US"]),
+                    PostgresData(array: ["en"]),
+                    PostgresData(array: ["USD", "DKK"]),
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "countries"].array(of: String.self), ["US"])
         XCTAssertEqual(row?[data: "languages"].array(of: String.self), ["en"])
@@ -1208,16 +1295,16 @@ final class PostgresNIOTests: XCTestCase {
 
     func testBindDate() {
         // https://github.com/vapor/postgres-nio/issues/53
-        let date =  Date(timeIntervalSince1970: 1571425782)
+        let date = Date(timeIntervalSince1970: 1_571_425_782)
         let query = """
-        SELECT $1::json as "date"
-        """
+            SELECT $1::json as "date"
+            """
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
-        XCTAssertThrowsError(_ = try conn?.query(query, [.init(date: date)]).wait()) { error in
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
+        XCTAssertThrowsError(try conn?.query(query, [.init(date: date)]).wait()) { error in
             guard let postgresError = try? XCTUnwrap(error as? PostgresError) else { return }
-            guard case let .server(serverError) = postgresError else {
+            guard case .server(let serverError) = postgresError else {
                 XCTFail("Expected a .serverError but got \(postgresError)")
                 return
             }
@@ -1229,11 +1316,11 @@ final class PostgresNIOTests: XCTestCase {
     func testBindCharString() {
         // https://github.com/vapor/postgres-nio/issues/53
         let query = """
-        SELECT $1::char as "char"
-        """
+            SELECT $1::char as "char"
+            """
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query(query, [.init(string: "f")]).wait())
         let row = rows?.first?.makeRandomAccess()
@@ -1243,11 +1330,11 @@ final class PostgresNIOTests: XCTestCase {
     func testBindCharUInt8() {
         // https://github.com/vapor/postgres-nio/issues/53
         let query = """
-        SELECT $1::char as "char"
-        """
+            SELECT $1::char as "char"
+            """
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query(query, [.init(uint8: 42)]).wait())
         let row = rows?.first?.makeRandomAccess()
@@ -1258,15 +1345,19 @@ final class PostgresNIOTests: XCTestCase {
     func testDoubleArraySerialization() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let doubles: [Double] = [3.14, 42]
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::double precision[] as doubles
-        """, [
-            .init(array: doubles)
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::double precision[] as doubles
+                """,
+                [
+                    .init(array: doubles)
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "doubles"].array(of: Double.self), doubles)
     }
@@ -1275,14 +1366,18 @@ final class PostgresNIOTests: XCTestCase {
     func testUInt8Serialization() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            $1::"char" as int
-        """, [
-            .init(uint8: 5)
-        ]).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    $1::"char" as int
+                """,
+                [
+                    .init(uint8: 5)
+                ]
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "int"].uint8, 5)
     }
@@ -1290,7 +1385,7 @@ final class PostgresNIOTests: XCTestCase {
     func testPreparedQuery() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var prepared: PreparedQuery?
         XCTAssertNoThrow(prepared = try conn?.prepare(query: "SELECT 1 as one;").wait())
         var rows: [PostgresRow]?
@@ -1299,19 +1394,23 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(rows?.count, 1)
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "one"].int, 1)
-     }
+    }
 
     func testPrepareQueryClosure() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var queries: [[PostgresRow]]?
-        XCTAssertNoThrow(queries = try conn?.prepare(query: "SELECT $1::text as foo;", handler: { [eventLoop] query in
-            let a = query.execute(["a"])
-            let b = query.execute(["b"])
-            let c = query.execute(["c"])
-            return EventLoopFuture.whenAllSucceed([a, b, c], on: eventLoop)
-        }).wait())
+        XCTAssertNoThrow(
+            queries = try conn?.prepare(
+                query: "SELECT $1::text as foo;",
+                handler: { [eventLoop] query in
+                    let a = query.execute(["a"])
+                    let b = query.execute(["b"])
+                    let c = query.execute(["c"])
+                    return EventLoopFuture.whenAllSucceed([a, b, c], on: eventLoop)
+                }
+            ).wait())
         XCTAssertEqual(queries?.count, 3)
         var resultIterator = queries?.makeIterator()
         XCTAssertEqual(try resultIterator?.next()?.first?.decode(String.self, context: .default), "a")
@@ -1323,33 +1422,38 @@ final class PostgresNIOTests: XCTestCase {
     func testPreparedQueryNoResults() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS \"table_no_results\"").wait())
-        XCTAssertNoThrow(_ = try conn?.simpleQuery("""
-        CREATE TABLE table_no_results (
-            "id" int8 NOT NULL,
-            "stringValue" text,
-            PRIMARY KEY ("id")
-        );
-        """).wait())
+        XCTAssertNoThrow(
+            _ = try conn?.simpleQuery(
+                """
+                CREATE TABLE table_no_results (
+                    "id" int8 NOT NULL,
+                    "stringValue" text,
+                    PRIMARY KEY ("id")
+                );
+                """
+            ).wait())
         defer { XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE \"table_no_results\"").wait()) }
 
         XCTAssertNoThrow(_ = try conn?.prepare(query: "DELETE FROM \"table_no_results\" WHERE id = $1").wait())
     }
 
-
     // https://github.com/vapor/postgres-nio/issues/71
     func testChar1Serialization() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            '5'::char(1) as one,
-            '5'::char(2) as two
-        """).wait())
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    '5'::char(1) as one,
+                    '5'::char(2) as two
+                """
+            ).wait())
 
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "one"].uint8, 53)
@@ -1363,7 +1467,7 @@ final class PostgresNIOTests: XCTestCase {
     func testUserDefinedType() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         XCTAssertNoThrow(_ = try conn?.query("DROP TYPE IF EXISTS foo").wait())
         XCTAssertNoThrow(_ = try conn?.query("CREATE TYPE foo AS ENUM ('bar', 'qux')").wait())
@@ -1380,7 +1484,7 @@ final class PostgresNIOTests: XCTestCase {
     func testNullBind() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var res: PostgresQueryResult?
         XCTAssertNoThrow(res = try conn?.query("SELECT $1::text as foo", [String?.none.postgresData!]).wait())
@@ -1391,15 +1495,19 @@ final class PostgresNIOTests: XCTestCase {
     func testUpdateMetadata() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         XCTAssertNoThrow(_ = try conn?.simpleQuery("DROP TABLE IF EXISTS test_table").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("CREATE TABLE test_table(pk int PRIMARY KEY)").wait())
         XCTAssertNoThrow(_ = try conn?.simpleQuery("INSERT INTO test_table VALUES(1)").wait())
-        XCTAssertNoThrow(try conn?.query("DELETE FROM test_table", onMetadata: { metadata in
-            XCTAssertEqual(metadata.command, "DELETE")
-            XCTAssertEqual(metadata.oid, nil)
-            XCTAssertEqual(metadata.rows, 1)
-        }, onRow: { _ in }).wait())
+        XCTAssertNoThrow(
+            try conn?.query(
+                "DELETE FROM test_table",
+                onMetadata: { metadata in
+                    XCTAssertEqual(metadata.command, "DELETE")
+                    XCTAssertEqual(metadata.oid, nil)
+                    XCTAssertEqual(metadata.rows, 1)
+                }, onRow: { _ in }
+            ).wait())
         var rows: PostgresQueryResult?
         XCTAssertNoThrow(rows = try conn?.query("DELETE FROM test_table").wait())
         XCTAssertEqual(rows?.metadata.command, "DELETE")
@@ -1410,7 +1518,7 @@ final class PostgresNIOTests: XCTestCase {
     func testTooManyBinds() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         let binds = [PostgresData].init(repeating: .null, count: Int(UInt16.max) + 1)
         XCTAssertThrowsError(try conn?.query("SELECT version()", binds).wait()) { error in
             guard case .tooManyParameters = (error as? PSQLError)?.code.base else {
@@ -1422,7 +1530,7 @@ final class PostgresNIOTests: XCTestCase {
     func testRemoteClose() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        XCTAssertNoThrow( try conn?.channel.close().wait() )
+        XCTAssertNoThrow(try conn?.channel.close().wait())
     }
 
     // https://github.com/vapor/postgres-nio/issues/113
@@ -1430,7 +1538,7 @@ final class PostgresNIOTests: XCTestCase {
     func testVaryingCharArray() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         var res: PostgresQueryResult?
         XCTAssertNoThrow(res = try conn?.query(#"SELECT '{"foo", "bar", "baz"}'::VARCHAR[] as foo"#).wait())
@@ -1442,7 +1550,7 @@ final class PostgresNIOTests: XCTestCase {
     func testSetTimeZone() {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
 
         XCTAssertNoThrow(_ = try conn?.simpleQuery("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait())
         XCTAssertNoThrow(_ = try conn?.query("SET TIME ZONE INTERVAL '+5:45' HOUR TO MINUTE").wait())
@@ -1451,21 +1559,24 @@ final class PostgresNIOTests: XCTestCase {
     func testIntegerConversions() throws {
         var conn: PostgresConnection?
         XCTAssertNoThrow(conn = try PostgresConnection.test(on: eventLoop).wait())
-        defer { XCTAssertNoThrow( try conn?.close().wait() ) }
+        defer { XCTAssertNoThrow(try conn?.close().wait()) }
         var rows: PostgresQueryResult?
-        XCTAssertNoThrow(rows = try conn?.query("""
-        select
-            'a'::char as test8,
+        XCTAssertNoThrow(
+            rows = try conn?.query(
+                """
+                select
+                    'a'::char as test8,
 
-            '-32768'::smallint as min16,
-            '32767'::smallint as max16,
+                    '-32768'::smallint as min16,
+                    '32767'::smallint as max16,
 
-            '-2147483648'::integer as min32,
-            '2147483647'::integer as max32,
+                    '-2147483648'::integer as min32,
+                    '2147483647'::integer as max32,
 
-            '-9223372036854775808'::bigint as min64,
-            '9223372036854775807'::bigint as max64
-        """).wait())
+                    '-9223372036854775808'::bigint as min64,
+                    '9223372036854775807'::bigint as max64
+                """
+            ).wait())
         let row = rows?.first?.makeRandomAccess()
         XCTAssertEqual(row?[data: "test8"].uint8, 97)
         XCTAssertEqual(row?[data: "test8"].int16, 97)
@@ -1478,7 +1589,7 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "max16"].int16, .max)
         XCTAssertEqual(row?[data: "min16"].int32, -32768)
         XCTAssertEqual(row?[data: "max16"].int32, 32767)
-        XCTAssertEqual(row?[data: "min16"].int64,  -32768)
+        XCTAssertEqual(row?[data: "min16"].int64, -32768)
         XCTAssertEqual(row?[data: "max16"].int64, 32767)
 
         XCTAssertEqual(row?[data: "min32"].uint8, nil)
@@ -1487,8 +1598,8 @@ final class PostgresNIOTests: XCTestCase {
         XCTAssertEqual(row?[data: "max32"].int16, nil)
         XCTAssertEqual(row?[data: "min32"].int32, .min)
         XCTAssertEqual(row?[data: "max32"].int32, .max)
-        XCTAssertEqual(row?[data: "min32"].int64, -2147483648)
-        XCTAssertEqual(row?[data: "max32"].int64, 2147483647)
+        XCTAssertEqual(row?[data: "min32"].int64, -2_147_483_648)
+        XCTAssertEqual(row?[data: "max32"].int64, 2_147_483_647)
 
         XCTAssertEqual(row?[data: "min64"].uint8, nil)
         XCTAssertEqual(row?[data: "max64"].uint8, nil)

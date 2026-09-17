@@ -1,6 +1,7 @@
 import NIOCore
 import NIOEmbedded
 import Testing
+
 @testable import PostgresNIO
 
 @Suite struct ListenStateMachineTests {
@@ -39,15 +40,16 @@ import Testing
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: eventLoop,
-            logger: .psqlNoOpLogger,
+            logger: .psqlNoOp,
             configureSSLCallback: nil
         )
         // Only add the backend message encoder for inbound so we can write
         // PostgresBackendMessage values directly.
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-            handler,
-        ], loop: eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+                handler,
+            ], loop: eventLoop)
 
         // --- Get the connection to readyForQuery ---
         let connectPromise: EventLoopPromise<Void>? = nil
@@ -58,7 +60,7 @@ import Testing
         try embedded.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
         // Drain any outbound bytes (startup message, etc.)
-        while let _ = try embedded.readOutbound(as: ByteBuffer.self) {}
+        while (try embedded.readOutbound(as: ByteBuffer.self)) != nil {}
 
         // --- 1. Start listening: write a startListening task ---
         let listenChannel = "test_channel"
@@ -75,13 +77,15 @@ import Testing
         try embedded.writeOutbound(HandlerTask.startListening(listener))
 
         // Drain the LISTEN query bytes from the outbound buffer.
-        while let _ = try embedded.readOutbound(as: ByteBuffer.self) {}
+        while (try embedded.readOutbound(as: ByteBuffer.self)) != nil {}
 
         // --- 2. Backend fails the LISTEN query ---
         // Use a SQLSTATE that does not close the connection.
-        try embedded.writeInbound(PostgresBackendMessage.error(.init(fields: [
-            .sqlState: "42501",  // insufficient_privilege
-        ])))
+        try embedded.writeInbound(
+            PostgresBackendMessage.error(
+                .init(fields: [
+                    .sqlState: "42501"  // insufficient_privilege
+                ])))
         try embedded.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
 
         // The listener has been failed at this point. The listen channel state

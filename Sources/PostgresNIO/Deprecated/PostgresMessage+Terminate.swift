@@ -7,6 +7,6 @@ extension PostgresMessage {
             .terminate
         }
 
-        public func serialize(into buffer: inout ByteBuffer) { }
+        public func serialize(into buffer: inout ByteBuffer) {}
     }
 }

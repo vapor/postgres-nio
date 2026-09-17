@@ -1,6 +1,6 @@
-import _ConnectionPoolModule
 import DequeModule
 import NIOConcurrencyHelpers
+import _ConnectionPoolModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable where Clock.Duration == Duration {
@@ -37,7 +37,10 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
 
     public func makeConnection(
         id: Int,
-        for pool: ConnectionPool<MockConnection, Int, ConnectionIDGenerator, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>, NoOpConnectionPoolMetrics<Int>, Clock>
+        for pool: ConnectionPool<
+            MockConnection, Int, ConnectionIDGenerator, some ConnectionRequestProtocol, Int, MockPingPongBehavior<MockConnection>,
+            NoOpConnectionPoolMetrics<Int>, Clock
+        >
     ) async throws -> ConnectionAndMetadata<MockConnection> {
         if let autoMaxStreams = self.autoMaxStreams {
             let connection = MockConnection(id: id)
@@ -49,8 +52,10 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
         }
 
         // we currently don't support cancellation when creating a connection
-        let result = try await withCheckedThrowingContinuation { (checkedContinuation: CheckedContinuation<(MockConnection, UInt16), any Error>) in
-            let waiter = self.stateBox.withLockedValue { state -> (CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>)? in
+        let result = try await withCheckedThrowingContinuation {
+            (checkedContinuation: CheckedContinuation<(MockConnection, UInt16), any Error>) in
+            let waiter = self.stateBox.withLockedValue {
+                state -> (CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>)? in
                 if let waiter = state.waiter.popFirst() {
                     return waiter
                 } else {
@@ -69,8 +74,10 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
 
     @discardableResult
     public func nextConnectAttempt(_ closure: (ConnectionID) async throws -> UInt16) async rethrows -> Connection {
-        let (connectionID, continuation) = await withCheckedContinuation { (continuation: CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>) in
-            let attempt = self.stateBox.withLockedValue { state -> (ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>)? in
+        let (connectionID, continuation) = await withCheckedContinuation {
+            (continuation: CheckedContinuation<(ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>), Never>) in
+            let attempt = self.stateBox.withLockedValue {
+                state -> (ConnectionID, CheckedContinuation<(MockConnection, UInt16), any Error>)? in
                 if let attempt = state.attempts.popFirst() {
                     return attempt
                 } else {
@@ -95,7 +102,7 @@ public final class MockConnectionFactory<Clock: _Concurrency.Clock>: Sendable wh
             }
 
             self.stateBox.withLockedValue { state in
-                _ = state.runningConnections[connectionID] = connection
+                state.runningConnections[connectionID] = connection
             }
 
             continuation.resume(returning: (connection, streamCount))

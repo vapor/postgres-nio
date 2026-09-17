@@ -1,7 +1,7 @@
-import _ConnectionPoolModule
 import Atomics
 import DequeModule
 import NIOConcurrencyHelpers
+import _ConnectionPoolModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class MockClock: Clock {
@@ -34,7 +34,7 @@ public final class MockClock: Clock {
     private struct State: Sendable {
         var now: Instant
 
-        var sleepersHeap: Array<Sleeper>
+        var sleepersHeap: [Sleeper]
 
         var waiters: Deque<Waiter>
         var nextDeadlines: Deque<Instant>
@@ -173,4 +173,3 @@ public final class MockClock: Clock {
         }
     }
 }
-

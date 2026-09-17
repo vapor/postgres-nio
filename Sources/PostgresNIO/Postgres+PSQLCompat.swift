@@ -12,7 +12,7 @@ extension PSQLError {
 
             var fields = [PostgresMessage.Error.Field: String]()
             fields.reserveCapacity(serverInfo.underlying.fields.count)
-            serverInfo.underlying.fields.forEach { (key, value) in
+            for (key, value) in serverInfo.underlying.fields {
                 fields[PostgresMessage.Error.Field(rawValue: key.rawValue)!] = value
             }
             return PostgresError.server(PostgresMessage.Error(fields: fields))
@@ -38,7 +38,7 @@ extension PSQLError {
         case .tooManyParameters, .invalidCommandTag, .notEnoughColumns:
             return self
         case .clientClosedConnection,
-             .serverClosedConnection:
+            .serverClosedConnection:
             return PostgresError.connectionClosed
         case .connectionError:
             return self.underlying ?? self

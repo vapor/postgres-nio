@@ -50,7 +50,7 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Optional<Value>) throws {
+        public mutating func appendInterpolation<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Value?) throws {
             switch value {
             case .none:
                 self.binds.appendNull()
@@ -68,7 +68,7 @@ extension PostgresQuery {
         }
 
         @inlinable
-        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Optional<Value>) {
+        public mutating func appendInterpolation<Value: PostgresDynamicTypeEncodable>(_ value: Value?) {
             switch value {
             case .none:
                 self.binds.appendNull()
@@ -173,11 +173,11 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
-    public mutating func append<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Optional<Value>) throws {
+    public mutating func append<Value: PostgresThrowingDynamicTypeEncodable>(_ value: Value?) throws {
         switch value {
         case .none:
             self.appendNull()
-        case let .some(value):
+        case .some(let value):
             try self.append(value)
         }
     }
@@ -193,13 +193,13 @@ public struct PostgresBindings: Sendable, Hashable {
 
     @inlinable
     public mutating func append<Value: PostgresThrowingDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
-        _ value: Optional<Value>,
+        _ value: Value?,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
         switch value {
         case .none:
             self.appendNull()
-        case let .some(value):
+        case .some(let value):
             try self.append(value, context: context)
         }
     }
@@ -210,11 +210,11 @@ public struct PostgresBindings: Sendable, Hashable {
     }
 
     @inlinable
-    public mutating func append<Value: PostgresDynamicTypeEncodable>(_ value: Optional<Value>) {
+    public mutating func append<Value: PostgresDynamicTypeEncodable>(_ value: Value?) {
         switch value {
         case .none:
             self.appendNull()
-        case let .some(value):
+        case .some(let value):
             self.append(value)
         }
     }
@@ -230,13 +230,13 @@ public struct PostgresBindings: Sendable, Hashable {
 
     @inlinable
     public mutating func append<Value: PostgresDynamicTypeEncodable, JSONEncoder: PostgresJSONEncoder>(
-        _ value: Optional<Value>,
+        _ value: Value?,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
         switch value {
         case .none:
             self.appendNull()
-        case let .some(value):
+        case .some(let value):
             self.append(value, context: context)
         }
     }
@@ -290,11 +290,13 @@ extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertibl
         """
     }
 
-    private static func makeDebugDescription(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String {
+    private static func makeDebugDescription(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String
+    {
         "(\(Self.makeBindingPrintable(protected: protected, type: type, format: format, buffer: buffer)); \(type); format: \(format))"
     }
 
-    private static func makeBindingPrintable(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String {
+    private static func makeBindingPrintable(protected: Bool, type: PostgresDataType, format: PostgresFormat, buffer: ByteBuffer?) -> String
+    {
         if protected {
             return "****"
         }
@@ -315,7 +317,7 @@ extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertibl
 
             case (.varchar, _), (.bpchar, _), (.text, _), (.name, _):
                 let value = try String.init(from: &buffer, type: type, format: format, context: .default)
-                return String(reflecting: value) // adds quotes
+                return String(reflecting: value)  // adds quotes
 
             default:
                 return "\(buffer.readableBytes) bytes"
@@ -328,19 +330,19 @@ extension PostgresBindings: CustomStringConvertible, CustomDebugStringConvertibl
 
 /// A small helper to inspect encoded bindings
 private struct BindingsReader: Sequence {
-    typealias Element = Optional<ByteBuffer>
+    typealias Element = ByteBuffer?
 
     var buffer: ByteBuffer
 
     struct Iterator: IteratorProtocol {
-        typealias Element = Optional<ByteBuffer>
+        typealias Element = ByteBuffer?
         private var buffer: ByteBuffer
 
         init(buffer: ByteBuffer) {
             self.buffer = buffer
         }
 
-        mutating func next() -> Optional<Optional<ByteBuffer>> {
+        mutating func next() -> ByteBuffer?? {
             guard let length = self.buffer.readInteger(as: Int32.self) else {
                 return .none
             }

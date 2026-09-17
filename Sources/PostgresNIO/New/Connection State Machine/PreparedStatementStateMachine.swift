@@ -8,7 +8,7 @@ struct PreparedStatementStateMachine {
     }
 
     var preparedStatements: [String: State] = [:]
-    
+
     enum LookupAction {
         case prepareStatement
         case waitForAlreadyInFlightPreparation
@@ -74,7 +74,7 @@ struct PreparedStatementStateMachine {
         var statements: [PreparedStatementContext]
         var error: PSQLError
     }
-    
+
     mutating func errorHappened(name: String, error: PSQLError) -> ErrorHappenedAction {
         guard let state = self.preparedStatements[name] else {
             fatalError("Unknown prepared statement \(name)")

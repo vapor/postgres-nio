@@ -1,5 +1,5 @@
-import PostgresNIO
 import Foundation
+import PostgresNIO
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 enum DynamicDatabaseExplorer {
@@ -7,7 +7,8 @@ enum DynamicDatabaseExplorer {
         try await withMockDatabase { client in
             // snippet.explore
             // 1. Discover all user tables via the Postgres metadata tables
-            let tables = try await client.query("""
+            let tables = try await client.query(
+                """
                 SELECT table_name
                 FROM information_schema.tables
                 WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
@@ -75,7 +76,8 @@ func withMockDatabase(closure: (PostgresClient) async throws -> Void) async thro
         taskGroup.addTask { await client.run() }
 
         // Create some tables with different schemas to explore, and populate them with some mock data
-        try await client.query("""
+        try await client.query(
+            """
             CREATE TABLE IF NOT EXISTS "users" (
                 id SERIAL PRIMARY KEY,
                 email TEXT,
@@ -83,7 +85,8 @@ func withMockDatabase(closure: (PostgresClient) async throws -> Void) async thro
             );
             """
         )
-        try await client.query("""
+        try await client.query(
+            """
             INSERT INTO "users" (email, created_at) VALUES
                 ('alice@example.com', NOW()),
                 ('bob@example.com', NOW()),
@@ -91,7 +94,8 @@ func withMockDatabase(closure: (PostgresClient) async throws -> Void) async thro
             """
         )
 
-        try await client.query("""
+        try await client.query(
+            """
             CREATE TABLE IF NOT EXISTS "orders" (
                 id SERIAL PRIMARY KEY,
                 user_id INT,
@@ -101,14 +105,16 @@ func withMockDatabase(closure: (PostgresClient) async throws -> Void) async thro
             );
             """
         )
-        try await client.query("""
+        try await client.query(
+            """
             INSERT INTO "orders" (user_id, product_name, quantity, price) VALUES
                 (1, 'MacGuffin', 3, 19.99),
                 (2, 'Gadget', 1, 99.95)
             """
         )
 
-        try await client.query("""
+        try await client.query(
+            """
             CREATE TABLE IF NOT EXISTS "files" (
                 id SERIAL PRIMARY KEY,
                 filename TEXT,
@@ -116,7 +122,8 @@ func withMockDatabase(closure: (PostgresClient) async throws -> Void) async thro
             );
             """
         )
-        try await client.query("""
+        try await client.query(
+            """
             INSERT INTO "files" (filename, data) VALUES
                 ('report.pdf', decode('255044462d312e350a25d0d4c5d80a34', 'hex')),
                 ('photo.jpg', decode('ffd8ffe000104a46494600010101006000600000', 'hex'));

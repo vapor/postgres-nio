@@ -6,19 +6,19 @@ extension PostgresData {
     public init(uint8 value: UInt8) {
         self.init(type: .char, value: .init(integer: value))
     }
-    
+
     public init(int16 value: Int16) {
         self.init(type: .int2, value: .init(integer: value))
     }
-    
+
     public init(int32 value: Int32) {
         self.init(type: .int4, value: .init(integer: value))
     }
-    
+
     public init(int64 value: Int64) {
         self.init(type: .int8, value: .init(integer: value))
     }
-    
+
     public var int: Int? {
         guard var value = self.value else {
             return nil
@@ -78,7 +78,7 @@ extension PostgresData {
             return UInt8(string)
         }
     }
-    
+
     public var int16: Int16? {
         guard var value = self.value else {
             return nil
@@ -106,7 +106,7 @@ extension PostgresData {
             return Int16(string)
         }
     }
-    
+
     public var int32: Int32? {
         guard var value = self.value else {
             return nil
@@ -139,7 +139,7 @@ extension PostgresData {
             return Int32(string)
         }
     }
-    
+
     public var int64: Int64? {
         guard var value = self.value else {
             return nil
@@ -164,7 +164,7 @@ extension PostgresData {
                     .flatMap(Int64.init)
             case .oid:
                 assert(value.readableBytes == 4)
-                assert(Int.bitWidth == 64) // or else overflow is possible
+                assert(Int.bitWidth == 64)  // or else overflow is possible
                 return value.readInteger(as: UInt32.self)
                     .flatMap(Int64.init)
             case .int8:

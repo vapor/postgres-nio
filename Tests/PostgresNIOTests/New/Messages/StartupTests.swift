@@ -1,5 +1,6 @@
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct StartupTests {
@@ -47,13 +48,13 @@ import NIOCore
     @Test func testStartupMessageWithAdditionalOptions() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         var byteBuffer = ByteBuffer()
-        
+
         let user = "test"
         let database = "abc123"
-        
+
         encoder.startup(user: user, database: database, options: [("some", "options")])
         byteBuffer = encoder.flushBuffer()
-        
+
         let byteBufferLength = Int32(byteBuffer.readableBytes)
         #expect(byteBufferLength == byteBuffer.readInteger())
         #expect(PostgresFrontendMessage.Startup.versionThree == byteBuffer.readInteger())

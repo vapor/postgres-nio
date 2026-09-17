@@ -602,7 +602,7 @@ public struct PostgresDecodingError: Error, Equatable {
         public static let missingData = Self.init(.missingData)
         public static let typeMismatch = Self.init(.typeMismatch)
         public static let failure = Self.init(.failure)
-        
+
         public var description: String {
             switch self.base {
             case .missingData:
@@ -659,7 +659,7 @@ public struct PostgresDecodingError: Error, Equatable {
         self.line = line
     }
 
-    public static func ==(lhs: PostgresDecodingError, rhs: PostgresDecodingError) -> Bool {
+    public static func == (lhs: PostgresDecodingError, rhs: PostgresDecodingError) -> Bool {
         return lhs.code == rhs.code
             && lhs.columnName == rhs.columnName
             && lhs.columnIndex == rhs.columnIndex
@@ -686,7 +686,7 @@ extension PostgresDecodingError: CustomStringConvertible {
 extension PostgresDecodingError: CustomDebugStringConvertible {
     public var debugDescription: String {
         var result = #"PostgresDecodingError(code: \#(self.code)"#
-        
+
         result.append(#", columnName: \#(String(reflecting: self.columnName))"#)
         result.append(#", columnIndex: \#(self.columnIndex)"#)
         result.append(#", targetType: \#(String(reflecting: self.targetType))"#)
@@ -702,4 +702,3 @@ extension PostgresDecodingError: CustomDebugStringConvertible {
         return result
     }
 }
-

@@ -1,6 +1,6 @@
+import Benchmark
 import _ConnectionPoolModule
 import _ConnectionPoolTestUtils
-import Benchmark
 
 let benchmarks: @Sendable () -> Void = {
     Benchmark("Lease/Release 1k requests: 50 parallel", configuration: .init(scalingFactor: .kilo)) { benchmark in

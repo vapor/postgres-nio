@@ -1,6 +1,6 @@
+import Logging
 import NIOCore
 import NIOPosix
-import Logging
 
 extension Logger {
     static var psqlTest: Logger {
@@ -10,7 +10,7 @@ extension Logger {
     }
 }
 
-func withSilentServer<Success: ~Copyable>(_ body: (_ port: Int) async throws -> Success) async throws -> Success{
+func withSilentServer<Success: ~Copyable>(_ body: (_ port: Int) async throws -> Success) async throws -> Success {
     let server = try await ServerBootstrap(group: NIOSingletons.posixEventLoopGroup)
         .bind(to: .init(ipAddress: "127.0.0.1", port: 0)).get()
     let result: Result<Success, any Error>

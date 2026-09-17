@@ -77,7 +77,7 @@ extension PostgresData {
             return nil
         }
         // b
-        guard let _ = value.readInteger(as: UInt32.self) else {
+        guard value.readInteger(as: UInt32.self) != nil else {
             return nil
         }
         guard let type = value.readInteger(as: PostgresDataType.self) else {
@@ -97,9 +97,7 @@ extension PostgresData {
         assert(dimensions == 1, "Multi-dimensional arrays not yet supported")
 
         var array: [PostgresData] = []
-        while
-            let itemLength = value.readInteger(as: Int32.self)
-        {
+        while let itemLength = value.readInteger(as: Int32.self) {
             let itemValue = itemLength == -1 ? nil : value.readSlice(length: numericCast(itemLength))
             let data = PostgresData(
                 type: type,

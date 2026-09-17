@@ -49,7 +49,7 @@ public protocol PostgresPreparedStatement: Sendable {
     /// Make the bindings to provide concrete values to use when executing the prepared SQL statement.
     /// The order must match ``PostgresPreparedStatement/bindingDataTypes-4b6tx``.
     func makeBindings() throws -> PostgresBindings
-    
+
     /// Decode a row returned by the database into an instance of `Row`
     func decodeRow(_ row: PostgresRow) throws -> Row
 }

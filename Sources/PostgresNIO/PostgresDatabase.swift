@@ -1,5 +1,5 @@
-import NIOCore
 import Logging
+import NIOCore
 
 @preconcurrency
 public protocol PostgresDatabase: Sendable {
@@ -28,11 +28,11 @@ extension _PostgresDatabaseCustomLogger: PostgresDatabase {
     var eventLoop: any EventLoop {
         self.database.eventLoop
     }
-    
+
     func send(_ request: any PostgresRequest, logger: Logger) -> EventLoopFuture<Void> {
         self.database.send(request, logger: logger)
     }
-    
+
     func withConnection<T>(_ closure: @escaping (PostgresConnection) -> EventLoopFuture<T>) -> EventLoopFuture<T> {
         self.database.withConnection(closure)
     }

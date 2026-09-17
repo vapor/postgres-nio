@@ -1,5 +1,6 @@
-import NIOCore
 import NIOConcurrencyHelpers
+import NIOCore
+
 import struct Foundation.UUID
 
 extension PostgresDatabase {
@@ -16,26 +17,22 @@ extension PostgresDatabase {
     }
 
     @preconcurrency
-    public func prepare(query: String, handler: @Sendable @escaping (PreparedQuery) -> EventLoopFuture<[[PostgresRow]]>) -> EventLoopFuture<[[PostgresRow]]> {
+    public func prepare(query: String, handler: @Sendable @escaping (PreparedQuery) -> EventLoopFuture<[[PostgresRow]]>) -> EventLoopFuture<
+        [[PostgresRow]]
+    > {
         prepare(query: query)
-        .flatMap { preparedQuery in
-            handler(preparedQuery)
-            .flatMap { results in
-                preparedQuery.deallocate().map { results }
+            .flatMap { preparedQuery in
+                handler(preparedQuery)
+                    .flatMap { results in
+                        preparedQuery.deallocate().map { results }
+                    }
             }
-        }
     }
 }
-
 
 public struct PreparedQuery: Sendable {
     let underlying: PSQLPreparedStatement
     let database: any PostgresDatabase
-
-    init(underlying: PSQLPreparedStatement, database: any PostgresDatabase) {
-        self.underlying = underlying
-        self.database = database
-    }
 
     public func execute(_ binds: [PostgresData] = []) -> EventLoopFuture<[PostgresRow]> {
         let rowsBoxed = NIOLockedValueBox([PostgresRow]())
@@ -47,7 +44,7 @@ public struct PreparedQuery: Sendable {
     }
 
     @preconcurrency
-    public func execute(_ binds: [PostgresData] = [], _ onRow: @Sendable @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    public func execute(_ binds: [PostgresData] = [], _ onRow: @Sendable @escaping (PostgresRow) throws -> Void) -> EventLoopFuture<Void> {
         let command = PostgresCommands.executePreparedStatement(query: self, binds: binds, onRow: onRow)
         return self.database.send(command, logger: self.database.logger)
     }

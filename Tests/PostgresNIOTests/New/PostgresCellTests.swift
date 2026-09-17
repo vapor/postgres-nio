@@ -1,6 +1,7 @@
-@testable import PostgresNIO
-import Testing
 import NIOCore
+import Testing
+
+@testable import PostgresNIO
 
 @Suite struct PostgresCellTests {
     @Test func testDecodingANonOptionalString() {

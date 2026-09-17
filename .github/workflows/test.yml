@@ -169,6 +169,20 @@ jobs:
           path: .api-breakage
           key: api-breakage-${{ github.sha }}
 
+  lint:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    container: swift:noble
+    timeout-minutes: 5
+    steps:
+      - name: Configure git
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+      - name: Check out code
+        uses: actions/checkout@v7
+      - name: Lint
+        run: swift format lint --recursive .
+  
   musl:
     permissions:
       contents: read
