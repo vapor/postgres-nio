@@ -6,7 +6,7 @@ extension PostgresMessage {
     public struct BackendKeyData {
         /// The process ID of this backend.
         public var processID: Int32
-        
+
         /// The secret key of this backend.
         public var secretKey: Int32
     }

@@ -1,8 +1,9 @@
-import XCTest
 import NIOCore
-import NIOTLS
-import NIOSSL
 import NIOEmbedded
+import NIOSSL
+import NIOTLS
+import XCTest
+
 @testable import PostgresNIO
 
 class PostgresChannelHandlerTests: XCTestCase {
@@ -15,20 +16,21 @@ class PostgresChannelHandlerTests: XCTestCase {
     }
 
     // MARK: Startup
-    
+
     func testHandlerAddedWithoutSSL() {
         let config = self.testConnectionConfiguration()
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger,
+            logger: .psqlNoOp,
             configureSSLCallback: nil
         )
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-            handler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+                handler,
+            ], loop: self.eventLoop)
         defer {
             XCTAssertNoThrow({ try embedded.finish() })
         }
@@ -39,7 +41,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         guard case .startup(let startup) = maybeMessage else {
             return XCTFail("Unexpected message")
         }
-        
+
         XCTAssertEqual(startup.parameters.user, config.username)
         XCTAssertEqual(startup.parameters.database, config.database)
         XCTAssert(startup.parameters.options.isEmpty)
@@ -48,7 +50,7 @@ class PostgresChannelHandlerTests: XCTestCase {
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 5678))))
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.readyForQuery(.idle)))
     }
-    
+
     func testEstablishSSLCallbackIsCalledIfSSLIsSupported() {
         var config = self.testConnectionConfiguration()
         XCTAssertNoThrow(config.tls = .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
@@ -56,34 +58,35 @@ class PostgresChannelHandlerTests: XCTestCase {
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger
+            logger: .psqlNoOp
         ) { channel, _ in
             addSSLCallbackIsHit = true
         }
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-            handler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+                handler,
+            ], loop: self.eventLoop)
 
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
         XCTAssertEqual(.sslRequest, try embedded.readOutbound(as: PostgresFrontendMessage.self))
 
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.sslSupported))
-        
+
         // a NIOSSLHandler has been added, after it SSL had been negotiated
         XCTAssertTrue(addSSLCallbackIsHit)
-        
+
         // signal that the ssl connection has been established
         embedded.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: ""))
-        
+
         // startup message should be issued
         var maybeStartupMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self))
         guard case .startup(let startupMessage) = maybeStartupMessage else {
             return XCTFail("Unexpected message")
         }
-        
+
         XCTAssertEqual(startupMessage.parameters.user, config.username)
         XCTAssertEqual(startupMessage.parameters.database, config.database)
         XCTAssertEqual(startupMessage.parameters.replication, .false)
@@ -96,16 +99,17 @@ class PostgresChannelHandlerTests: XCTestCase {
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger
+            logger: .psqlNoOp
         ) { channel, _ in
             addSSLCallbackIsHit = true
         }
         let eventHandler = TestEventHandler()
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            handler,
-            eventHandler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                handler,
+                eventHandler,
+            ], loop: self.eventLoop)
 
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
         XCTAssertEqual(.sslRequest, try embedded.readOutbound(as: PostgresFrontendMessage.self))
@@ -126,39 +130,40 @@ class PostgresChannelHandlerTests: XCTestCase {
 
     func testSSLUnsupportedClosesConnection() throws {
         let config = self.testConnectionConfiguration(tls: .require(try NIOSSLContext(configuration: .makeClientConfiguration())))
-        
+
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger
+            logger: .psqlNoOp
         ) { channel, _ in
             XCTFail("This callback should never be exectuded")
             throw PSQLError.sslUnsupported
         }
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-            handler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+                handler,
+            ], loop: self.eventLoop)
         let eventHandler = TestEventHandler()
         try embedded.pipeline.syncOperations.addHandler(eventHandler, position: .last)
-        
+
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
         XCTAssertTrue(embedded.isActive)
-        
+
         // read the ssl request message
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .sslRequest)
         try embedded.writeInbound(PostgresBackendMessage.sslUnsupported)
-        
+
         // the event handler should have seen an error
         XCTAssertEqual(eventHandler.errors.count, 1)
-        
+
         // the connections should be closed
         XCTAssertFalse(embedded.isActive)
     }
-    
+
     // MARK: Run Actions
-    
+
     func testRunAuthenticateMD5Password() {
         let config = self.testConnectionConfiguration()
         let authContext = AuthContext(
@@ -169,26 +174,30 @@ class PostgresChannelHandlerTests: XCTestCase {
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger,
+            logger: .psqlNoOp,
             configureSSLCallback: nil
         )
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            handler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                handler,
+            ], loop: self.eventLoop)
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
 
-        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
+        XCTAssertEqual(
+            try embedded.readOutbound(as: PostgresFrontendMessage.self),
+            .startup(.versionThree(parameters: authContext.toStartupParameters())))
         let salt: UInt32 = 0x00_01_02_03
 
         let encoder = PSQLBackendMessageEncoder()
         var byteBuffer = ByteBuffer()
         encoder.encode(data: .authentication(.md5(salt: salt)), out: &byteBuffer)
         XCTAssertNoThrow(try embedded.writeInbound(byteBuffer))
-        
-        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a")))
+
+        XCTAssertEqual(
+            try embedded.readOutbound(as: PostgresFrontendMessage.self), .password(.init(value: "md522d085ed8dc3377968dc1c1a40519a2a")))
     }
-    
+
     func testRunAuthenticateCleartext() {
         let password = "postgres"
         let config = self.testConnectionConfiguration(password: password)
@@ -200,17 +209,20 @@ class PostgresChannelHandlerTests: XCTestCase {
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger,
+            logger: .psqlNoOp,
             configureSSLCallback: nil
         )
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
-            handler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                ReverseMessageToByteHandler(PSQLBackendMessageEncoder()),
+                handler,
+            ], loop: self.eventLoop)
 
         XCTAssertNoThrow(try embedded.connect(to: .init(ipAddress: "1.2.3.4", port: 5678)).wait())
-        XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .startup(.versionThree(parameters: authContext.toStartupParameters())))
+        XCTAssertEqual(
+            try embedded.readOutbound(as: PostgresFrontendMessage.self),
+            .startup(.versionThree(parameters: authContext.toStartupParameters())))
 
         XCTAssertNoThrow(try embedded.writeInbound(PostgresBackendMessage.authentication(.plaintext)))
         XCTAssertEqual(try embedded.readOutbound(as: PostgresFrontendMessage.self), .password(.init(value: password)))
@@ -221,13 +233,14 @@ class PostgresChannelHandlerTests: XCTestCase {
         let handler = PostgresChannelHandler(
             configuration: config,
             eventLoop: self.eventLoop,
-            logger: .psqlNoOpLogger,
+            logger: .psqlNoOp,
             configureSSLCallback: nil
         )
-        let embedded = EmbeddedChannel(handlers: [
-            ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
-            handler
-        ], loop: self.eventLoop)
+        let embedded = EmbeddedChannel(
+            handlers: [
+                ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()),
+                handler,
+            ], loop: self.eventLoop)
 
         var maybeMessage: PostgresFrontendMessage?
         XCTAssertNoThrow(embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil))
@@ -259,7 +272,7 @@ class PostgresChannelHandlerTests: XCTestCase {
     }
 
     // MARK: Helpers
-    
+
     func testConnectionConfiguration(
         host: String = "127.0.0.1",
         port: Int = 5432,
@@ -287,17 +300,17 @@ class PostgresChannelHandlerTests: XCTestCase {
 
 class TestEventHandler: ChannelInboundHandler {
     typealias InboundIn = Never
-    
+
     var errors = [PSQLError]()
     var events = [PSQLEvent]()
-    
+
     func errorCaught(context: ChannelHandlerContext, error: any Error) {
         guard let psqlError = error as? PSQLError else {
             return XCTFail("Unexpected error type received: \(error)")
         }
         self.errors.append(psqlError)
     }
-    
+
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         guard let psqlEvent = event as? PSQLEvent else {
             return XCTFail("Unexpected event type received: \(event)")

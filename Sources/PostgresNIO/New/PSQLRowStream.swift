@@ -1,5 +1,5 @@
-import NIOCore
 import Logging
+import NIOCore
 
 struct QueryResult {
     enum Value: Equatable {
@@ -37,10 +37,10 @@ final class PSQLRowStream: Sendable {
 
     private enum DownstreamState {
         case waitingForConsumer(BufferState)
-        case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, any PSQLRowsDataSource)
+        case iteratingRows(onRow: (PostgresRow) throws -> Void, EventLoopPromise<Void>, any PSQLRowsDataSource)
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, any PSQLRowsDataSource)
         case consumed(Result<StatementSummary, any Error>)
-        case asyncSequence(AsyncSequenceSource, any PSQLRowsDataSource, onFinish: @Sendable () -> ())
+        case asyncSequence(AsyncSequenceSource, any PSQLRowsDataSource, onFinish: @Sendable () -> Void)
     }
 
     internal let rowDescription: [RowDescription.Column]
@@ -72,7 +72,7 @@ final class PSQLRowStream: Sendable {
 
         var lookup = [String: Int]()
         lookup.reserveCapacity(rowDescription.count)
-        rowDescription.enumerated().forEach { (index, column) in
+        for (index, column) in rowDescription.enumerated() {
             lookup[column.name] = index
         }
         self.lookupTable = lookup
@@ -95,7 +95,7 @@ final class PSQLRowStream: Sendable {
         case fail(any Error)
     }
 
-    func asyncSequence(onFinish: @escaping @Sendable () -> () = {}) -> PostgresRowSequence {
+    func asyncSequence(onFinish: @escaping @Sendable () -> Void = {}) -> PostgresRowSequence {
         let producer = NIOThrowingAsyncSequenceProducer.makeSequence(
             elementType: DataRow.self,
             failureType: (any Error).self,
@@ -190,7 +190,7 @@ final class PSQLRowStream: Sendable {
 
     private enum CancelAction {
         case none
-        case cancelDataSource(any PSQLRowsDataSource, onFinish: @Sendable () -> ())
+        case cancelDataSource(any PSQLRowsDataSource, onFinish: @Sendable () -> Void)
     }
 
     private func cancel0() {
@@ -273,7 +273,7 @@ final class PSQLRowStream: Sendable {
 
     // MARK: Consume on EventLoop
 
-    func onRow(_ onRow: @Sendable @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    func onRow(_ onRow: @Sendable @escaping (PostgresRow) throws -> Void) -> EventLoopFuture<Void> {
         if self.eventLoop.inEventLoop {
             return self.onRow0(onRow)
         } else {
@@ -291,7 +291,7 @@ final class PSQLRowStream: Sendable {
         case failPromise(any Error)
     }
 
-    private func onRow0(_ onRow: @escaping (PostgresRow) throws -> ()) -> EventLoopFuture<Void> {
+    private func onRow0(_ onRow: @escaping (PostgresRow) throws -> Void) -> EventLoopFuture<Void> {
         let promise = self.eventLoop.makePromise(of: Void.self)
 
         let action = self.downstreamStateBox.withValue { state -> OnRowAction in
@@ -337,16 +337,18 @@ final class PSQLRowStream: Sendable {
     }
 
     internal func noticeReceived(_ notice: PostgresBackendMessage.NoticeResponse) {
-        self.logger.debug("Notice Received", metadata: [
-            .notice: "\(notice)"
-        ])
+        self.logger.debug(
+            "Notice Received",
+            metadata: [
+                .notice: "\(notice)"
+            ])
     }
 
     private enum ReceiveRowsAction {
         /// The rows have been buffered. Nothing to do.
         case none
         /// Forward the new rows to `onRow`. More rows may follow.
-        case forwardRows((PostgresRow) throws -> (), any PSQLRowsDataSource)
+        case forwardRows((PostgresRow) throws -> Void, any PSQLRowsDataSource)
         /// The rows have been buffered for a `.all()` consumer. Ask the data source for more.
         case requestMore(any PSQLRowsDataSource)
         /// Yield the new rows into the source and request more, if the source asks for more.
@@ -355,9 +357,11 @@ final class PSQLRowStream: Sendable {
 
     internal func receive(_ newRows: [DataRow]) {
         precondition(!newRows.isEmpty, "Expected to get rows!")
-        self.logger.trace("Row stream received rows", metadata: [
-            "row_count": "\(newRows.count)"
-        ])
+        self.logger.trace(
+            "Row stream received rows",
+            metadata: [
+                "row_count": "\(newRows.count)"
+            ])
 
         let action = self.downstreamStateBox.withValue { state -> ReceiveRowsAction in
             switch state {
@@ -416,7 +420,7 @@ final class PSQLRowStream: Sendable {
         case none
         case succeedVoidPromise(EventLoopPromise<Void>)
         case succeedRowsPromise(EventLoopPromise<[PostgresRow]>, [PostgresRow])
-        case finishAsyncSequence(AsyncSequenceSource, onFinish: @Sendable () -> ())
+        case finishAsyncSequence(AsyncSequenceSource, onFinish: @Sendable () -> Void)
     }
 
     private func receiveEnd(_ commandTag: String) {
@@ -463,7 +467,7 @@ final class PSQLRowStream: Sendable {
         case none
         case failVoidPromise(EventLoopPromise<Void>)
         case failRowsPromise(EventLoopPromise<[PostgresRow]>)
-        case failAsyncSequence(AsyncSequenceSource, onFinish: @Sendable () -> ())
+        case failAsyncSequence(AsyncSequenceSource, onFinish: @Sendable () -> Void)
     }
 
     private func receiveError(_ error: any Error) {
@@ -529,7 +533,7 @@ final class PSQLRowStream: Sendable {
         }
     }
 
-    private func forward(_ newRows: some Sequence<DataRow>, to onRow: (PostgresRow) throws -> ()) throws {
+    private func forward(_ newRows: some Sequence<DataRow>, to onRow: (PostgresRow) throws -> Void) throws {
         for data in newRows {
             try onRow(PostgresRow(data: data, lookupTable: self.lookupTable, columns: self.rowDescription))
         }
@@ -537,7 +541,7 @@ final class PSQLRowStream: Sendable {
 
     private func forward(
         _ newRows: some Sequence<DataRow>,
-        to onRow: (PostgresRow) throws -> (),
+        to onRow: (PostgresRow) throws -> Void,
         requestingMoreFrom dataSource: any PSQLRowsDataSource
     ) {
         self.eventLoop.preconditionInEventLoop()

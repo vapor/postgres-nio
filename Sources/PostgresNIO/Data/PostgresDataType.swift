@@ -592,7 +592,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         default: return nil
         }
     }
-    
+
     /// Returns the array type for this type if one is known.
     ///
     /// This list was manually generated.
@@ -778,7 +778,7 @@ public struct PostgresDataType: RawRepresentable, Sendable, Hashable, CustomStri
         default: return nil
         }
     }
-    
+
     // See `CustomStringConvertible.description`.
     public var description: String {
         return self.knownSQLName ?? "UNKNOWN \(self.rawValue)"

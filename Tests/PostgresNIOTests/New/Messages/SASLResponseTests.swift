@@ -1,5 +1,6 @@
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct SASLResponseTests {
@@ -11,14 +12,14 @@ import NIOCore
         var byteBuffer = encoder.flushBuffer()
 
         let length: Int = 1 + 4 + (data.count)
-        
+
         #expect(byteBuffer.readableBytes == length)
         #expect(byteBuffer.readInteger(as: UInt8.self) == PostgresFrontendMessage.ID.saslResponse.rawValue)
         #expect(byteBuffer.readInteger(as: Int32.self) == Int32(length - 1))
         #expect(byteBuffer.readBytes(length: data.count) == data)
         #expect(byteBuffer.readableBytes == 0)
     }
-    
+
     @Test func testEncodeWithoutData() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         let data: [UInt8] = []
@@ -26,7 +27,7 @@ import NIOCore
         var byteBuffer = encoder.flushBuffer()
 
         let length: Int = 1 + 4
-        
+
         #expect(byteBuffer.readableBytes == length)
         #expect(byteBuffer.readInteger(as: UInt8.self) == PostgresFrontendMessage.ID.saslResponse.rawValue)
         #expect(byteBuffer.readInteger(as: Int32.self) == Int32(length - 1))

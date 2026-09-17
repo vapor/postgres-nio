@@ -6,7 +6,7 @@ extension PostgresData {
         buffer.writeString(string)
         self.init(type: .text, formatCode: .binary, value: buffer)
     }
-    
+
     public var string: String? {
         guard var value = self.value else {
             return nil
@@ -65,12 +65,12 @@ extension PostgresData {
             return string
         }
     }
-    
+
     public var character: Character? {
         guard var value = self.value else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .binary:
             switch self.type {
@@ -99,7 +99,7 @@ extension String: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return .text
     }
-    
+
     public var postgresData: PostgresData? {
         return .init(string: self)
     }

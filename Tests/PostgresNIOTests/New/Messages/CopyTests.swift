@@ -1,6 +1,7 @@
-import Testing
 import NIOCore
 import NIOTestUtils
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct CopyTests {
@@ -8,7 +9,7 @@ import NIOTestUtils
         let expected: [PostgresBackendMessage] = [
             .copyInResponse(.init(format: .textual, columnFormats: [.textual, .textual])),
             .copyInResponse(.init(format: .binary, columnFormats: [.binary, .binary])),
-            .copyInResponse(.init(format: .binary, columnFormats: [.textual, .binary]))
+            .copyInResponse(.init(format: .binary, columnFormats: [.textual, .binary])),
         ]
 
         var buffer = ByteBuffer()
@@ -18,7 +19,7 @@ import NIOTestUtils
                 Issue.record("Expected only to get copyInResponse here!")
                 return
             }
-            buffer.writeBackendMessage(id: .copyInResponse ) { buffer in
+            buffer.writeBackendMessage(id: .copyInResponse) { buffer in
                 buffer.writeInteger(Int8(message.format.rawValue))
                 buffer.writeInteger(Int16(message.columnFormats.count))
                 for columnFormat in message.columnFormats {
@@ -34,8 +35,8 @@ import NIOTestUtils
 
     @Test func testDecodeFailureBecauseOfEmptyMessage() {
         var buffer = ByteBuffer()
-        buffer.writeBackendMessage(id: .copyInResponse) { _ in}
-        
+        buffer.writeBackendMessage(id: .copyInResponse) { _ in }
+
         #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
@@ -43,7 +44,6 @@ import NIOTestUtils
             )
         }
     }
-
 
     @Test func testDecodeFailureBecauseOfInvalidFormat() {
         var buffer = ByteBuffer()
@@ -79,7 +79,7 @@ import NIOTestUtils
             buffer.writeInteger(Int8(0))
             buffer.writeInteger(Int16(20))  // 20 columns promised, none given
         }
-        
+
         #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],
@@ -95,7 +95,7 @@ import NIOTestUtils
             buffer.writeInteger(Int16(1))
             buffer.writeInteger(Int8(20))  // Only 0 and 1 are valid formats
         }
-        
+
         #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: [(buffer, [])],

@@ -13,13 +13,13 @@ extension PostgresMessage {
             }
             return .init(parameter: parameter, value: value)
         }
-        
+
         /// The name of the run-time parameter being reported.
         public var parameter: String
-        
+
         /// The current value of the parameter.
         public var value: String
-        
+
         /// See `CustomStringConvertible`.
         public var description: String {
             return "\(parameter): \(value)"

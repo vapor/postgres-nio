@@ -1,5 +1,7 @@
-import class Foundation.JSONEncoder
 import NIOCore
+
+import class Foundation.JSONEncoder
+
 @testable import PostgresNIO
 
 // fully-qualifying all types in the extension has the same effect as adding a `@retroactive` before the protocol
@@ -30,17 +32,28 @@ extension PostgresNIO.ConnectionStateMachine.ConnectionAction: Swift.Equatable {
             return true
         case (.succeedQuery(let lhsPromise, let lhsResult), .succeedQuery(let rhsPromise, let rhsResult)):
             return lhsPromise.futureResult === rhsPromise.futureResult && lhsResult.value == rhsResult.value
-        case (.failQuery(let lhsPromise, let lhsError, let lhsCleanupContext), .failQuery(let rhsPromise, let rhsError, let rhsCleanupContext)):
+        case (
+            .failQuery(let lhsPromise, let lhsError, let lhsCleanupContext), .failQuery(let rhsPromise, let rhsError, let rhsCleanupContext)
+        ):
             return lhsPromise.futureResult === rhsPromise.futureResult && lhsError == rhsError && lhsCleanupContext == rhsCleanupContext
         case (.forwardRows(let lhsRows), .forwardRows(let rhsRows)):
             return lhsRows == rhsRows
         case (.forwardStreamComplete(let lhsBuffer, let lhsCommandTag), .forwardStreamComplete(let rhsBuffer, let rhsCommandTag)):
             return lhsBuffer == rhsBuffer && lhsCommandTag == rhsCommandTag
-        case (.forwardStreamError(let lhsError, let lhsRead, let lhsCleanupContext), .forwardStreamError(let rhsError , let rhsRead, let rhsCleanupContext)):
+        case (
+            .forwardStreamError(let lhsError, let lhsRead, let lhsCleanupContext),
+            .forwardStreamError(let rhsError, let rhsRead, let rhsCleanupContext)
+        ):
             return lhsError == rhsError && lhsRead == rhsRead && lhsCleanupContext == rhsCleanupContext
-        case (.sendParseDescribeSync(let lhsName, let lhsQuery, let lhsDataTypes), .sendParseDescribeSync(let rhsName, let rhsQuery, let rhsDataTypes)):
+        case (
+            .sendParseDescribeSync(let lhsName, let lhsQuery, let lhsDataTypes),
+            .sendParseDescribeSync(let rhsName, let rhsQuery, let rhsDataTypes)
+        ):
             return lhsName == rhsName && lhsQuery == rhsQuery && lhsDataTypes == rhsDataTypes
-        case (.succeedPreparedStatementCreation(let lhsPromise, let lhsRowDescription), .succeedPreparedStatementCreation(let rhsPromise, let rhsRowDescription)):
+        case (
+            .succeedPreparedStatementCreation(let lhsPromise, let lhsRowDescription),
+            .succeedPreparedStatementCreation(let rhsPromise, let rhsRowDescription)
+        ):
             return lhsPromise.futureResult === rhsPromise.futureResult && lhsRowDescription == rhsRowDescription
         case (.fireChannelInactive, .fireChannelInactive):
             return true
@@ -56,15 +69,15 @@ extension PostgresNIO.ConnectionStateMachine.ConnectionAction.CleanUpContext: Sw
         guard lhs.closePromise?.futureResult === rhs.closePromise?.futureResult else {
             return false
         }
-        
+
         guard lhs.error == rhs.error else {
             return false
         }
-        
+
         guard lhs.tasks == rhs.tasks else {
             return false
         }
-        
+
         return true
     }
 }
@@ -112,7 +125,8 @@ extension ConnectionStateMachine {
         }
         let authenticationMessageReceivedAction = state.authenticationMessageReceived(.md5(salt: salt))
         guard authenticationMessageReceivedAction == .sendPasswordMessage(.md5(salt: salt), authContext) else {
-            throw UnexpectedAction(actual: authenticationMessageReceivedAction, expected: .sendPasswordMessage(.md5(salt: salt), authContext))
+            throw UnexpectedAction(
+                actual: authenticationMessageReceivedAction, expected: .sendPasswordMessage(.md5(salt: salt), authContext))
         }
         let authenticationCompleteAction = state.authenticationMessageReceived(.ok)
         guard authenticationCompleteAction == .wait else {
@@ -148,7 +162,7 @@ extension ConnectionStateMachine {
             "server_version": "13.1 (Debian 13.1-1.pgdg100+1)",
             "session_authorization": "postgres",
             "IntervalStyle": "postgres",
-            "standard_conforming_strings": "on"
+            "standard_conforming_strings": "on",
         ]
 
         for (name, value) in paramaters {
@@ -158,7 +172,7 @@ extension ConnectionStateMachine {
             }
         }
 
-        let parameterStatusReceivedAction = state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882037977))
+        let parameterStatusReceivedAction = state.backendKeyDataReceived(.init(processID: 2730, secretKey: 882_037_977))
         guard parameterStatusReceivedAction == .wait else {
             throw UnexpectedAction(actual: parameterStatusReceivedAction, expected: .wait)
         }

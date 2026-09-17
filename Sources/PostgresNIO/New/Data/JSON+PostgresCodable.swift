@@ -1,10 +1,11 @@
 import NIOCore
 import NIOFoundationCompat
-import class Foundation.JSONEncoder
+
 import class Foundation.JSONDecoder
+import class Foundation.JSONEncoder
 
 @usableFromInline
-let JSONBVersionByte: UInt8 = 0x01
+let jsonbVersionByte: UInt8 = 0x01
 
 extension PostgresEncodable where Self: Encodable {
     public static var psqlType: PostgresDataType {
@@ -20,7 +21,7 @@ extension PostgresEncodable where Self: Encodable {
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) throws {
-        byteBuffer.writeInteger(JSONBVersionByte)
+        byteBuffer.writeInteger(jsonbVersionByte)
         try context.jsonEncoder.encode(self, into: &byteBuffer)
     }
 }
@@ -34,7 +35,7 @@ extension PostgresDecodable where Self: Decodable {
     ) throws {
         switch (format, type) {
         case (.binary, .jsonb):
-            guard JSONBVersionByte == buffer.readInteger(as: UInt8.self) else {
+            guard jsonbVersionByte == buffer.readInteger(as: UInt8.self) else {
                 throw PostgresDecodingError.Code.failure
             }
             self = try context.jsonDecoder.decode(Self.self, from: buffer)

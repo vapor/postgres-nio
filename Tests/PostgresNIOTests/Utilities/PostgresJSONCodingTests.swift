@@ -1,8 +1,8 @@
 import Atomics
 import Foundation
 import NIOCore
-import Testing
 import PostgresNIO
+import Testing
 
 /// The tests must be serialized because the decoding test also uses the `_defaultJSONEncoder`,
 /// increasing the counter in the encoding test.
@@ -20,7 +20,7 @@ import PostgresNIO
         }
         final class CustomJSONEncoder: PostgresJSONEncoder {
             let counter = ManagedAtomic(0)
-            func encode<T>(_ value: T) throws -> Data where T : Encodable {
+            func encode<T>(_ value: T) throws -> Data where T: Encodable {
                 self.counter.wrappingIncrement(ordering: .relaxed)
                 return try JSONEncoder().encode(value)
             }
@@ -50,7 +50,7 @@ import PostgresNIO
         }
         final class CustomJSONDecoder: PostgresJSONDecoder {
             let counter = ManagedAtomic(0)
-            func decode<T>(_ type: T.Type, from data: Data) throws -> T where T : Decodable {
+            func decode<T>(_ type: T.Type, from data: Data) throws -> T where T: Decodable {
                 self.counter.wrappingIncrement(ordering: .relaxed)
                 return try JSONDecoder().decode(type, from: data)
             }

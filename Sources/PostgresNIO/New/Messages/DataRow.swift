@@ -14,11 +14,11 @@ struct DataRow: Sendable, PostgresBackendMessage.PayloadDecodable, Hashable {
     var columnCount: Int16
     @usableFromInline
     var bytes: ByteBuffer
-    
+
     static func decode(from buffer: inout ByteBuffer) throws -> Self {
         let columnCount = try buffer.throwingReadInteger(as: Int16.self)
         let firstColumnIndex = buffer.readerIndex
-        
+
         for _ in 0..<columnCount {
             let bufferLength = try buffer.throwingReadInteger(as: Int32.self)
             guard bufferLength >= 0 else {
@@ -28,7 +28,7 @@ struct DataRow: Sendable, PostgresBackendMessage.PayloadDecodable, Hashable {
 
             try buffer.throwingMoveReaderIndex(forwardBy: Int(bufferLength))
         }
-        
+
         buffer.moveReaderIndex(to: firstColumnIndex)
         let columnSlice = buffer.readSlice(length: buffer.readableBytes)!
         return DataRow(columnCount: columnCount, bytes: columnSlice)
@@ -51,7 +51,7 @@ extension DataRow: Collection {
         init(_ index: Int) {
             self.offset = index
         }
-        
+
         // Only needed implementation for comparable. The compiler synthesizes the rest from this.
         @inlinable
         static func < (lhs: Self, rhs: Self) -> Bool {

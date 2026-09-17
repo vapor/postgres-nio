@@ -126,7 +126,7 @@ final class ConnectionFactory: Sendable {
 
             case .produce:
                 // TBD: we might want to consider moving this off the concurrent executor
-                self.reportProduceSSLContextResult(Result(catching: {try NIOSSLContext(configuration: tlsConfiguration)}))
+                self.reportProduceSSLContextResult(Result(catching: { try NIOSSLContext(configuration: tlsConfiguration) }))
 
             case .succeed(let context):
                 continuation.resume(returning: context)

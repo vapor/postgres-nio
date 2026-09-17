@@ -1,7 +1,8 @@
-@testable import PostgresNIO
 import Foundation
-import Testing
 import NIOCore
+import Testing
+
+@testable import PostgresNIO
 
 @Suite struct PostgresRowTests {
     let rowDescription = [
@@ -22,7 +23,7 @@ import NIOCore
             dataTypeSize: 0,
             dataTypeModifier: 0,
             format: .binary
-        )
+        ),
     ]
 
     @Test func testSequence() {
@@ -36,7 +37,10 @@ import NIOCore
         var iterator = row.makeIterator()
 
         #expect(iterator.next() == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        #expect(iterator.next() == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(
+            iterator.next()
+                == PostgresCell(
+                    bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
         #expect(iterator.next() == nil)
     }
 
@@ -56,7 +60,10 @@ import NIOCore
         #expect(endIndex == row.endIndex)
 
         #expect(row[startIndex] == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        #expect(row[secondIndex] == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(
+            row[secondIndex]
+                == PostgresCell(
+                    bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
     }
 
     @Test func testRandomAccessRow() {
@@ -73,10 +80,16 @@ import NIOCore
         #expect(randomAccessRow.endIndex == 2)
 
         #expect(randomAccessRow[0] == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        #expect(randomAccessRow[1] == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(
+            randomAccessRow[1]
+                == PostgresCell(
+                    bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
 
         #expect(randomAccessRow["id"] == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        #expect(randomAccessRow["name"] == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(
+            randomAccessRow["name"]
+                == PostgresCell(
+                    bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
     }
 
     @Test func testDecoding() throws {
@@ -128,7 +141,7 @@ import NIOCore
         let error = #expect(throws: PSQLError.self) {
             try row.decode(String.self)
         }
-        
+
         #expect(error?.code == .notEnoughColumns)
         #expect(error?.expectedColumns == 1)
         #expect(error?.returnedColumns == 0)
@@ -156,7 +169,7 @@ import NIOCore
         let error = #expect(throws: PSQLError.self) {
             try row.decode((String, String).self)
         }
-        
+
         #expect(error?.code == .notEnoughColumns)
         #expect(error?.expectedColumns == 2)
         #expect(error?.returnedColumns == 1)

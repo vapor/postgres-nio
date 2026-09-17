@@ -69,7 +69,6 @@ extension PostgresCell {
         }
     }
 
-
     /// Decode the cell into a Swift type that conforms to ``PostgresDecodable``.
     ///
     /// - Parameters:

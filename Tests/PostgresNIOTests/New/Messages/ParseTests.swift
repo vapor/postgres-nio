@@ -1,5 +1,6 @@
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct ParseTests {
@@ -14,14 +15,14 @@ import NIOCore
             parameters: parameters
         )
         var byteBuffer = encoder.flushBuffer()
-        
+
         let length: Int = 1 + 4 + (preparedStatementName.count + 1) + (query.count + 1) + 2 + parameters.count * 4
 
         //   1 id
         // + 4 length
         // + 4 preparedStatement (3 + 1 null terminator)
         // + 1 query ()
-        
+
         #expect(byteBuffer.readableBytes == length)
         #expect(byteBuffer.readInteger(as: UInt8.self) == PostgresFrontendMessage.ID.parse.rawValue)
         #expect(byteBuffer.readInteger(as: Int32.self) == Int32(length - 1))

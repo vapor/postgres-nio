@@ -1,5 +1,6 @@
-@testable import _ConnectionPoolModule
 import Testing
+
+@testable import _ConnectionPoolModule
 
 @Suite struct TinyFastSequenceTests {
     @Test func testCountIsEmptyAndIterator() {

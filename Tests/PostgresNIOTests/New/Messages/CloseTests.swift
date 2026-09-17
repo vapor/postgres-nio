@@ -1,5 +1,6 @@
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct CloseTests {
@@ -15,7 +16,7 @@ import NIOCore
         #expect("Hello" == byteBuffer.readNullTerminatedString())
         #expect(byteBuffer.readableBytes == 0)
     }
-    
+
     @Test func testEncodeCloseUnnamedStatement() {
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.closePreparedStatement("")

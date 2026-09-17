@@ -4,12 +4,12 @@ struct PostgresFrontendMessageEncoder {
 
     /// The SSL request code. The value is chosen to contain 1234 in the most significant 16 bits,
     /// and 5679 in the least significant 16 bits.
-    static let sslRequestCode: Int32 = 80877103
+    static let sslRequestCode: Int32 = 80_877_103
 
     /// The cancel request code. The value is chosen to contain 1234 in the most significant 16 bits,
     /// and 5678 in the least significant 16 bits. (To avoid confusion, this code must not be the same
     /// as any protocol version number.)
-    static let cancelRequestCode: Int32 = 80877102
+    static let cancelRequestCode: Int32 = 80_877_102
 
     static let startupVersionThree: Int32 = 0x00_03_00_00
 
@@ -17,10 +17,10 @@ struct PostgresFrontendMessageEncoder {
         case flushed
         case writable
     }
-    
+
     private var buffer: ByteBuffer
     private var state: State = .writable
-    
+
     init(buffer: ByteBuffer) {
         self.buffer = buffer
     }
@@ -61,8 +61,8 @@ struct PostgresFrontendMessageEncoder {
             buffer.writeInteger(UInt16(bind.count))
 
             // The parameter format codes. Each must presently be zero (text) or one (binary).
-            bind.metadata.forEach {
-                buffer.writeInteger($0.format.rawValue)
+            for metadata in bind.metadata {
+                buffer.writeInteger(metadata.format.rawValue)
             }
 
             buffer.writeInteger(UInt16(bind.count))
@@ -117,11 +117,13 @@ struct PostgresFrontendMessageEncoder {
         self.buffer.writeInteger(maxNumberOfRows)
     }
 
-    mutating func parse<Parameters: Collection>(preparedStatementName: String, query: String, parameters: Parameters) where Parameters.Element == PostgresDataType {
+    mutating func parse<Parameters: Collection>(preparedStatementName: String, query: String, parameters: Parameters)
+    where Parameters.Element == PostgresDataType {
         self.clearIfNeeded()
         self.buffer.psqlWriteMultipleIntegers(
             id: .parse,
-            length: UInt32(preparedStatementName.utf8.count + 1 + query.utf8.count + 1 + 2 + MemoryLayout<PostgresDataType>.size * parameters.count)
+            length: UInt32(
+                preparedStatementName.utf8.count + 1 + query.utf8.count + 1 + 2 + MemoryLayout<PostgresDataType>.size * parameters.count)
         )
         self.buffer.writeNullTerminatedString(preparedStatementName)
         self.buffer.writeNullTerminatedString(query)
@@ -168,7 +170,7 @@ struct PostgresFrontendMessageEncoder {
     }
 
     /// Adds the `CopyData` message ID and `dataLength` to the message buffer but not the actual data.
-    /// 
+    ///
     /// The caller of this function is expected to write the encoder's message buffer to the backend after calling this
     /// function, followed by sending the actual data to the backend.
     mutating func copyDataHeader(dataLength: UInt32) {
@@ -217,18 +219,18 @@ struct PostgresFrontendMessageEncoder {
 }
 
 private enum FrontendMessageID: UInt8, Hashable, Sendable {
-    case bind = 66 // B
-    case close = 67 // C
-    case copyData = 100 // d
-    case copyDone = 99 // c
-    case copyFail = 102 // f
-    case describe = 68 // D
-    case execute = 69 // E
-    case flush = 72 // H
-    case parse = 80 // P
-    case password = 112 // p - also both sasl values
-    case sync = 83 // S
-    case terminate = 88 // X
+    case bind = 66  // B
+    case close = 67  // C
+    case copyData = 100  // d
+    case copyDone = 99  // c
+    case copyFail = 102  // f
+    case describe = 68  // D
+    case execute = 69  // E
+    case flush = 72  // H
+    case parse = 80  // P
+    case password = 112  // p - also both sasl values
+    case sync = 83  // S
+    case terminate = 88  // X
 }
 
 extension ByteBuffer {
@@ -240,7 +242,7 @@ extension ByteBuffer {
         self.writeMultipleIntegers(id.rawValue, 4 + length, t1)
     }
 
-    mutating fileprivate func psqlLengthPrefixed(id: FrontendMessageID, _ encode: (inout ByteBuffer) -> ()) {
+    mutating fileprivate func psqlLengthPrefixed(id: FrontendMessageID, _ encode: (inout ByteBuffer) -> Void) {
         let lengthIndex = self.writerIndex + 1
         self.psqlWriteMultipleIntegers(id: id, length: 0)
         encode(&self)
@@ -248,9 +250,9 @@ extension ByteBuffer {
         self.setInteger(length, at: lengthIndex)
     }
 
-    mutating fileprivate func psqlLengthPrefixed(_ encode: (inout ByteBuffer) -> ()) {
+    mutating fileprivate func psqlLengthPrefixed(_ encode: (inout ByteBuffer) -> Void) {
         let lengthIndex = self.writerIndex
-        self.writeInteger(UInt32(0)) // placeholder
+        self.writeInteger(UInt32(0))  // placeholder
         encode(&self)
         let length = UInt32(self.writerIndex - lengthIndex)
         self.setInteger(length, at: lengthIndex)

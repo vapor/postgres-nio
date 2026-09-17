@@ -1,7 +1,8 @@
-@testable import PostgresNIO
-import Testing
-import NIOCore
 import Foundation
+import NIOCore
+import Testing
+
+@testable import PostgresNIO
 
 @Suite struct PostgresQueryTests {
     @Test func stringInterpolationWithOptional() {
@@ -37,8 +38,8 @@ import Foundation
         let dynamicString = DynamicString(value: "Hello world", psqlType: type, psqlFormat: format)
 
         let query: PostgresQuery = """
-        INSERT INTO foo (dynamicType) SET (\(dynamicString));
-        """
+            INSERT INTO foo (dynamicType) SET (\(dynamicString));
+            """
 
         #expect(query.sql == "INSERT INTO foo (dynamicType) SET ($1);")
 
@@ -61,10 +62,10 @@ import Foundation
         jsonEncoder.keyEncodingStrategy = .convertToSnakeCase
 
         var query: PostgresQuery?
-        #expect(throws: Never.self) { 
+        #expect(throws: Never.self) {
             query = try """
-                INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
-                """
+            INSERT INTO test (foo) SET (\(Foo(helloWorld: "bar"), context: .init(jsonEncoder: jsonEncoder)));
+            """
         }
 
         #expect(query?.sql == "INSERT INTO test (foo) SET ($1);")

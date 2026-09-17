@@ -1,6 +1,6 @@
-import NIOCore
 import Logging
 import NIOConcurrencyHelpers
+import NIOCore
 
 extension PostgresDatabase {
     public func query(
@@ -9,11 +9,14 @@ extension PostgresDatabase {
     ) -> EventLoopFuture<PostgresQueryResult> {
         let box = NIOLockedValueBox((metadata: PostgresQueryMetadata?.none, rows: [PostgresRow]()))
 
-        return self.query(string, binds, onMetadata: { metadata in
-            box.withLockedValue {
-                $0.metadata = metadata
+        return self.query(
+            string, binds,
+            onMetadata: { metadata in
+                box.withLockedValue {
+                    $0.metadata = metadata
+                }
             }
-        }) { row in
+        ) { row in
             box.withLockedValue {
                 $0.rows.append(row)
             }
@@ -28,14 +31,16 @@ extension PostgresDatabase {
     public func query(
         _ string: String,
         _ binds: [PostgresData] = [],
-        onMetadata: @Sendable @escaping (PostgresQueryMetadata) -> () = { _ in },
-        onRow: @Sendable @escaping (PostgresRow) throws -> ()
+        onMetadata: @Sendable @escaping (PostgresQueryMetadata) -> Void = { _ in },
+        onRow: @Sendable @escaping (PostgresRow) throws -> Void
     ) -> EventLoopFuture<Void> {
         var bindings = PostgresBindings(capacity: binds.count)
-        binds.forEach { bindings.append($0) }
+        for bind in binds {
+            bindings.append(bind)
+        }
         let query = PostgresQuery(unsafeSQL: string, binds: bindings)
         let request = PostgresCommands.query(query, onMetadata: onMetadata, onRow: onRow)
-        
+
         return self.send(request, logger: logger)
     }
 }

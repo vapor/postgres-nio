@@ -1,5 +1,5 @@
-import _ConnectionPoolModule
 import Testing
+import _ConnectionPoolModule
 
 @Suite struct ConnectionIDGeneratorTests {
 

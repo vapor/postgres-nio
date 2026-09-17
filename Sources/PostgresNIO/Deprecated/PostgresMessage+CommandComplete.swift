@@ -11,7 +11,7 @@ extension PostgresMessage {
             }
             return .init(tag: string)
         }
-        
+
         /// The command tag. This is usually a single word that identifies which SQL command was completed.
         public var tag: String
     }

@@ -1,6 +1,7 @@
-import XCTest
-@testable import PostgresNIO
 import NIOCore
+import XCTest
+
+@testable import PostgresNIO
 
 final class PostgresCodableTests: XCTestCase {
 
@@ -26,7 +27,7 @@ final class PostgresCodableTests: XCTestCase {
                     dataTypeSize: 0,
                     dataTypeModifier: 0,
                     format: .binary
-                )
+                ),
             ]
         )
 

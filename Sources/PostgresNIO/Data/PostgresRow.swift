@@ -1,4 +1,5 @@
 import NIOCore
+
 import class Foundation.JSONDecoder
 
 /// `PostgresRow` represents a single table row that is received from the server for a query or a prepared statement.
@@ -23,7 +24,7 @@ public struct PostgresRow: Sendable {
 }
 
 extension PostgresRow: Equatable {
-    public static func ==(lhs: Self, rhs: Self) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         // we don't need to compare the lookup table here, as the looup table is only derived
         // from the column description.
         lhs.data == rhs.data && lhs.columns == rhs.columns
@@ -289,11 +290,14 @@ extension PostgresRow {
         return PostgresMessage.DataRow(columns: columns)
     }
 
-    @available(*, deprecated, message: """
-        This call is O(n) where n is the number of cells in the row. For random access to cells
-        in a row create a PostgresRandomAccessRow from the row first and use its subscript
-        methods. (see `makeRandomAccess()`)
-        """)
+    @available(
+        *, deprecated,
+        message: """
+            This call is O(n) where n is the number of cells in the row. For random access to cells
+            in a row create a PostgresRandomAccessRow from the row first and use its subscript
+            methods. (see `makeRandomAccess()`)
+            """
+    )
     public func column(_ column: String) -> PostgresData? {
         guard let index = self.lookupTable[column] else {
             return nil

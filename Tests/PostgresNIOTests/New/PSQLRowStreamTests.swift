@@ -1,11 +1,11 @@
 import Atomics
-import NIOCore
 import Logging
-import XCTest
-@testable import PostgresNIO
 import NIOCore
 import NIOEmbedded
 import NIOPosix
+import XCTest
+
+@testable import PostgresNIO
 
 final class PSQLRowStreamTests: XCTestCase {
     let logger = Logger(label: "PSQLRowStreamTests")
@@ -17,23 +17,23 @@ final class PSQLRowStreamTests: XCTestCase {
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        
+
         XCTAssertEqual(try stream.all().wait(), [])
         XCTAssertEqual(stream.commandTag, "INSERT 0 1")
     }
-    
+
     func testFailedStream() {
         let stream = PSQLRowStream(
             source: .noRows(.failure(PSQLError.serverClosedConnection(underlying: nil))),
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        
+
         XCTAssertThrowsError(try stream.all().wait()) {
             XCTAssertEqual($0 as? PSQLError, .serverClosedConnection(underlying: nil))
         }
     }
-    
+
     func testGetArrayAfterStreamHasFinished() {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -46,19 +46,19 @@ final class PSQLRowStreamTests: XCTestCase {
         )
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
-        
+
         stream.receive([
             [ByteBuffer(string: "0")],
-            [ByteBuffer(string: "1")]
+            [ByteBuffer(string: "1")],
         ])
-        
+
         XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
         stream.receive(completion: .success("SELECT 2"))
-        
+
         // attach consumer
         let future = stream.all()
-        XCTAssertEqual(dataSource.hitDemand, 0) // TODO: Is this right?
-        
+        XCTAssertEqual(dataSource.hitDemand, 0)  // TODO: Is this right?
+
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try future.wait())
         XCTAssertEqual(rows?.count, 2)
@@ -76,37 +76,37 @@ final class PSQLRowStreamTests: XCTestCase {
         )
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
-        
+
         stream.receive([
             [ByteBuffer(string: "0")],
-            [ByteBuffer(string: "1")]
+            [ByteBuffer(string: "1")],
         ])
-        
+
         XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
-        
+
         // attach consumer
         let future = stream.all()
         XCTAssertEqual(dataSource.hitDemand, 1)
-        
+
         stream.receive([
             [ByteBuffer(string: "2")],
-            [ByteBuffer(string: "3")]
+            [ByteBuffer(string: "3")],
         ])
         XCTAssertEqual(dataSource.hitDemand, 2)
-        
+
         stream.receive([
             [ByteBuffer(string: "4")],
-            [ByteBuffer(string: "5")]
+            [ByteBuffer(string: "5")],
         ])
         XCTAssertEqual(dataSource.hitDemand, 3)
-        
+
         stream.receive(completion: .success("SELECT 2"))
-        
+
         var rows: [PostgresRow]?
         XCTAssertNoThrow(rows = try future.wait())
         XCTAssertEqual(rows?.count, 6)
     }
-    
+
     func testOnRowAfterStreamHasFinished() {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -119,16 +119,16 @@ final class PSQLRowStreamTests: XCTestCase {
         )
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
-        
+
         stream.receive([
             [ByteBuffer(string: "0")],
-            [ByteBuffer(string: "1")]
+            [ByteBuffer(string: "1")],
         ])
-        
+
         stream.receive(completion: .success("SELECT 2"))
-        
+
         XCTAssertEqual(dataSource.hitDemand, 0)
-        
+
         // attach consumer
         let counter = ManagedAtomic(0)
         let future = stream.onRow { row in
@@ -137,7 +137,7 @@ final class PSQLRowStreamTests: XCTestCase {
         }
         XCTAssertEqual(counter.load(ordering: .relaxed), 2)
         XCTAssertEqual(dataSource.hitDemand, 0)
-        
+
         XCTAssertNoThrow(try future.wait())
         XCTAssertEqual(stream.commandTag, "SELECT 2")
     }
@@ -154,18 +154,18 @@ final class PSQLRowStreamTests: XCTestCase {
         )
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
-        
+
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")],
             [ByteBuffer(string: "2")],
             [ByteBuffer(string: "3")],
         ])
-        
+
         stream.receive(completion: .success("SELECT 2"))
-        
+
         XCTAssertEqual(dataSource.hitDemand, 0)
-        
+
         // attach consumer
         let counter = ManagedAtomic(0)
         let future = stream.onRow { row in
@@ -175,9 +175,9 @@ final class PSQLRowStreamTests: XCTestCase {
                 throw OnRowError(row: expected)
             }
         }
-        XCTAssertEqual(counter.load(ordering: .relaxed), 2) // one more than where we excited, because we already incremented
+        XCTAssertEqual(counter.load(ordering: .relaxed), 2)  // one more than where we excited, because we already incremented
         XCTAssertEqual(dataSource.hitDemand, 0)
-        
+
         XCTAssertThrowsError(try future.wait()) {
             XCTAssertEqual($0 as? OnRowError, OnRowError(row: 1))
         }
@@ -195,14 +195,14 @@ final class PSQLRowStreamTests: XCTestCase {
         )
         XCTAssertEqual(dataSource.hitDemand, 0)
         XCTAssertEqual(dataSource.hitCancel, 0)
-        
+
         stream.receive([
             [ByteBuffer(string: "0")],
-            [ByteBuffer(string: "1")]
+            [ByteBuffer(string: "1")],
         ])
-        
+
         XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
-        
+
         // attach consumer
         let counter = ManagedAtomic(0)
         let future = stream.onRow { row in
@@ -211,23 +211,23 @@ final class PSQLRowStreamTests: XCTestCase {
         }
         XCTAssertEqual(counter.load(ordering: .relaxed), 2)
         XCTAssertEqual(dataSource.hitDemand, 1)
-        
+
         stream.receive([
             [ByteBuffer(string: "2")],
-            [ByteBuffer(string: "3")]
+            [ByteBuffer(string: "3")],
         ])
         XCTAssertEqual(counter.load(ordering: .relaxed), 4)
         XCTAssertEqual(dataSource.hitDemand, 2)
-        
+
         stream.receive([
             [ByteBuffer(string: "4")],
-            [ByteBuffer(string: "5")]
+            [ByteBuffer(string: "5")],
         ])
         XCTAssertEqual(counter.load(ordering: .relaxed), 6)
         XCTAssertEqual(dataSource.hitDemand, 3)
-        
+
         stream.receive(completion: .success("SELECT 6"))
-        
+
         XCTAssertNoThrow(try future.wait())
         XCTAssertEqual(stream.commandTag, "SELECT 6")
     }
@@ -285,7 +285,7 @@ final class PSQLRowStreamTests: XCTestCase {
 
         stream.receive([
             [ByteBuffer(string: "0")],
-            [ByteBuffer(string: "1")]
+            [ByteBuffer(string: "1")],
         ])
         XCTAssertEqual(counter.load(ordering: .relaxed), 2)
         XCTAssertEqual(dataSource.hitDemand, 2)
@@ -293,7 +293,7 @@ final class PSQLRowStreamTests: XCTestCase {
 
         stream.receive([
             [ByteBuffer(string: "2")],
-            [ByteBuffer(string: "3")]
+            [ByteBuffer(string: "3")],
         ])
         XCTAssertEqual(counter.load(ordering: .relaxed), 3, "Expected the stream to stop forwarding rows after the throw")
         XCTAssertEqual(dataSource.hitDemand, 2, "Expected no further demand after the throw")
@@ -464,16 +464,16 @@ private struct OnRowError: Error, Equatable {
 }
 
 class CountingDataSource: PSQLRowsDataSource {
-    
+
     var hitDemand: Int = 0
     var hitCancel: Int = 0
-    
+
     init() {}
-    
+
     func cancel(for stream: PSQLRowStream) {
         self.hitCancel += 1
     }
-    
+
     func request(for stream: PSQLRowStream) {
         self.hitDemand += 1
     }

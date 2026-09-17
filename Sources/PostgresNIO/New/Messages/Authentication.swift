@@ -1,7 +1,7 @@
 import NIOCore
 
 extension PostgresBackendMessage {
-    
+
     enum Authentication: PayloadDecodable, Hashable {
         case ok
         case kerberosV5
@@ -14,10 +14,10 @@ extension PostgresBackendMessage {
         case sasl(names: [String])
         case saslContinue(data: ByteBuffer)
         case saslFinal(data: ByteBuffer)
-        
+
         static func decode(from buffer: inout ByteBuffer) throws -> Self {
             let authID = try buffer.throwingReadInteger(as: Int32.self)
-            
+
             switch authID {
             case 0:
                 return .ok
@@ -45,7 +45,7 @@ extension PostgresBackendMessage {
                 while buffer.readerIndex < endIndex, let next = buffer.readNullTerminatedString() {
                     names.append(next)
                 }
-                
+
                 return .sasl(names: names)
             case 11:
                 let data = buffer.readSlice(length: buffer.readableBytes)!
@@ -57,7 +57,7 @@ extension PostgresBackendMessage {
                 throw PSQLPartialDecodingError.unexpectedValue(value: authID)
             }
         }
-        
+
     }
 }
 
@@ -68,7 +68,7 @@ extension PostgresBackendMessage.Authentication: CustomDebugStringConvertible {
             return ".ok"
         case .kerberosV5:
             return ".kerberosV5"
-        case .md5(salt: let salt):
+        case .md5(let salt):
             return ".md5(salt: \(String(reflecting: salt)))"
         case .plaintext:
             return ".plaintext"
@@ -78,13 +78,13 @@ extension PostgresBackendMessage.Authentication: CustomDebugStringConvertible {
             return ".gss"
         case .sspi:
             return ".sspi"
-        case .gssContinue(data: let data):
+        case .gssContinue(let data):
             return ".gssContinue(data: \(String(reflecting: data)))"
-        case .sasl(names: let names):
+        case .sasl(let names):
             return ".sasl(names: \(String(reflecting: names)))"
-        case .saslContinue(data: let data):
+        case .saslContinue(let data):
             return ".saslContinue(salt: \(String(reflecting: data)))"
-        case .saslFinal(data: let data):
+        case .saslFinal(let data):
             return ".saslFinal(salt: \(String(reflecting: data)))"
         }
     }

@@ -1,5 +1,5 @@
-import PostgresNIO
 import Foundation
+import PostgresNIO
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 enum Birthday {
@@ -20,11 +20,12 @@ enum Birthday {
         // 3. Run the client
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
-                await client.run() // !important
+                await client.run()  // !important
             }
 
             // 4. Create a friends table to store data into
-            try await client.query("""
+            try await client.query(
+                """
                 CREATE TABLE IF NOT EXISTS "friends" (
                     id SERIAL PRIMARY KEY,
                     given_name TEXT,
@@ -48,7 +49,8 @@ enum Birthday {
             let friend = Friend(firstName: "Hans", lastName: "Müller", birthday: johnsBirthday)
 
             // 7. Store friend into the database
-            try await client.query("""
+            try await client.query(
+                """
                 INSERT INTO "friends" (given_name, last_name, birthday)
                     VALUES
                         (\(friend.firstName), \(friend.lastName), \(friend.birthday));
@@ -56,7 +58,8 @@ enum Birthday {
             )
 
             // 8. Query database for the friend we just inserted
-            let rows = try await client.query("""
+            let rows = try await client.query(
+                """
                 SELECT id, given_name, last_name, birthday FROM "friends" WHERE given_name = \(friend.firstName)
                 """
             )
@@ -71,4 +74,3 @@ enum Birthday {
         }
     }
 }
-

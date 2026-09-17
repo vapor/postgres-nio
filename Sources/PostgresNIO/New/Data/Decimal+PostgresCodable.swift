@@ -1,4 +1,5 @@
 import NIOCore
+
 import struct Foundation.Decimal
 
 extension Decimal: PostgresEncodable {

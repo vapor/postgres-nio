@@ -1,4 +1,3 @@
-
 public struct ConnectionPoolError: Error, Hashable {
     @usableFromInline
     enum Base: Error, Hashable, Sendable {

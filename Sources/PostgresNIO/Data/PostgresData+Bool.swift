@@ -6,7 +6,7 @@ extension PostgresData {
         buffer.writeInteger(bool ? 1 : 0, as: UInt8.self)
         self.init(type: .bool, formatCode: .binary, value: buffer)
     }
-    
+
     public var bool: Bool? {
         guard var value = self.value else {
             return nil
@@ -17,7 +17,7 @@ extension PostgresData {
         guard let byte = value.readInteger(as: UInt8.self) else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .text:
             switch byte {
@@ -52,11 +52,11 @@ extension Bool: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return .bool
     }
-    
+
     public var postgresData: PostgresData? {
         return .init(bool: self)
     }
-    
+
     public init?(postgresData: PostgresData) {
         guard let bool = postgresData.bool else {
             return nil

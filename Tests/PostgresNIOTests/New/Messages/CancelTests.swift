@@ -1,5 +1,6 @@
-import Testing
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct CancelTests {
@@ -9,10 +10,10 @@ import NIOCore
         var encoder = PostgresFrontendMessageEncoder(buffer: .init())
         encoder.cancel(processID: processID, secretKey: secretKey)
         var byteBuffer = encoder.flushBuffer()
-        
+
         #expect(byteBuffer.readableBytes == 16)
-        #expect(16 == byteBuffer.readInteger(as: Int32.self)) // payload length
-        #expect(80877102 == byteBuffer.readInteger(as: Int32.self)) // cancel request code
+        #expect(16 == byteBuffer.readInteger(as: Int32.self))  // payload length
+        #expect(80_877_102 == byteBuffer.readInteger(as: Int32.self))  // cancel request code
         #expect(processID == byteBuffer.readInteger(as: Int32.self))
         #expect(secretKey == byteBuffer.readInteger(as: Int32.self))
         #expect(byteBuffer.readableBytes == 0)

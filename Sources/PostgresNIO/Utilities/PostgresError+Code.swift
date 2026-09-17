@@ -2,7 +2,7 @@ extension PostgresError {
     public struct Code: Sendable, ExpressibleByStringLiteral, Equatable {
         // Class 00 — Successful Completion
         public static let successfulCompletion: Code = "00000"
-        
+
         // Class 01 — Warning
         public static let warning: Code = "01000"
         public static let dynamicResultSetsReturned: Code = "0100C"
@@ -12,14 +12,14 @@ extension PostgresError {
         public static let privilegeNotRevoked: Code = "01006"
         public static let stringDataRightTruncation: Code = "01004"
         public static let deprecatedFeature: Code = "01P01"
-        
+
         // Class 02 — No Data (this is also a warning class per the SQL standard)
         public static let noData: Code = "02000"
         public static let noAdditionalDynamicResultSetsReturned: Code = "02001"
-        
+
         // Class 03 — SQL Statement Not Yet Complete
         public static let sqlStatementNotYetComplete: Code = "03000"
-        
+
         // Class 08 — Connection Exception
         public static let connectionException: Code = "08000"
         public static let connectionDoesNotExist: Code = "08003"
@@ -28,37 +28,37 @@ extension PostgresError {
         public static let sqlserverRejectedEstablishmentOfSqlconnection: Code = "08004"
         public static let transactionResolutionUnknown: Code = "08007"
         public static let protocolViolation: Code = "08P01"
-        
+
         // Class 09 — Triggered Action Exception
         public static let triggeredActionException: Code = "09000"
-        
+
         // Class 0A — Feature Not Supported
         public static let featureNotSupported: Code = "0A000"
-        
+
         // Class 0B — Invalid Transaction Initiation
         public static let invalidTransactionInitiation: Code = "0B000"
-        
+
         // Class 0F — Locator Exception
         public static let locatorException: Code = "0F000"
         public static let invalidLocatorSpecification: Code = "0F001"
-        
+
         // Class 0L — Invalid Grantor
         public static let invalidGrantor: Code = "0L000"
         public static let invalidGrantOperation: Code = "0LP01"
-        
+
         // Class 0P — Invalid Role Specification
         public static let invalidRoleSpecification: Code = "0P000"
-        
+
         // Class 0Z — Diagnostics Exception
         public static let diagnosticsException: Code = "0Z000"
         public static let stackedDiagnosticsAccessedWithoutActiveHandler: Code = "0Z002"
-        
+
         // Class 20 — Case Not Found
         public static let caseNotFound: Code = "20000"
-        
+
         // Class 21 — Cardinality Violation
         public static let cardinalityViolation: Code = "21000"
-        
+
         // Class 22 — Data Exception
         public static let dataException: Code = "22000"
         public static let arraySubscriptError: Code = "2202E"
@@ -109,7 +109,7 @@ extension PostgresError {
         public static let invalidXmlContent: Code = "2200N"
         public static let invalidXmlComment: Code = "2200S"
         public static let invalidXmlProcessingInstruction: Code = "2200T"
-        
+
         // Class 23 — Integrity Constraint Violation
         public static let integrityConstraintViolation: Code = "23000"
         public static let restrictViolation: Code = "23001"
@@ -118,10 +118,10 @@ extension PostgresError {
         public static let uniqueViolation: Code = "23505"
         public static let checkViolation: Code = "23514"
         public static let exclusionViolation: Code = "23P01"
-        
+
         // Class 24 — Invalid Cursor State
         public static let invalidCursorState: Code = "24000"
-        
+
         // Class 25 — Invalid Transaction State
         public static let invalidTransactionState: Code = "25000"
         public static let activeSqlTransaction: Code = "25001"
@@ -135,41 +135,41 @@ extension PostgresError {
         public static let noActiveSqlTransaction: Code = "25P01"
         public static let inFailedSqlTransaction: Code = "25P02"
         public static let idleInTransactionSessionTimeout: Code = "25P03"
-        
+
         // Class 26 — Invalid SQL Statement Name
         public static let invalidSqlStatementName: Code = "26000"
-        
+
         // Class 27 — Triggered Data Change Violation
         public static let triggeredDataChangeViolation: Code = "27000"
-        
+
         // Class 28 — Invalid Authorization Specification
         public static let invalidAuthorizationSpecification: Code = "28000"
         public static let invalidPassword: Code = "28P01"
-        
+
         // Class 2B — Dependent Privilege Descriptors Still Exist
         public static let dependentPrivilegeDescriptorsStillExist: Code = "2B000"
         public static let dependentObjectsStillExist: Code = "2BP01"
-        
+
         // Class 2D — Invalid Transaction Termination
         public static let invalidTransactionTermination: Code = "2D000"
-        
+
         // Class 2F — SQL Routine Exception
         public static let sqlRoutineException: Code = "2F000"
         public static let functionExecutedNoReturnStatement: Code = "2F005"
         public static let modifyingSqlDataNotPermitted: Code = "2F002"
         public static let prohibitedSqlStatementAttempted: Code = "2F003"
         public static let readingSqlDataNotPermitted: Code = "2F004"
-        
+
         // Class 34 — Invalid Cursor Name
         public static let invalidCursorName: Code = "34000"
-        
+
         // Class 38 — External Routine Exception
         public static let externalRoutineException: Code = "38000"
         public static let containingSqlNotPermitted: Code = "38001"
         public static let modifyingSqlDataNotPermittedExternal: Code = "38002"
         public static let prohibitedSqlStatementAttemptedExternal: Code = "38003"
         public static let readingSqlDataNotPermittedExternal: Code = "38004"
-        
+
         // Class 39 — External Routine Invocation Exception
         public static let externalRoutineInvocationException: Code = "39000"
         public static let invalidSqlstateReturned: Code = "39001"
@@ -177,24 +177,24 @@ extension PostgresError {
         public static let triggerProtocolViolated: Code = "39P01"
         public static let srfProtocolViolated: Code = "39P02"
         public static let eventTriggerProtocolViolated: Code = "39P03"
-        
+
         // Class 3B — Savepoint Exception
         public static let savepointException: Code = "3B000"
         public static let invalidSavepointSpecification: Code = "3B001"
-        
+
         // Class 3D — Invalid Catalog Name
         public static let invalidCatalogName: Code = "3D000"
-        
+
         // Class 3F — Invalid Schema Name
         public static let invalidSchemaName: Code = "3F000"
-        
+
         // Class 40 — Transaction Rollback
         public static let transactionRollback: Code = "40000"
         public static let transactionIntegrityConstraintViolation: Code = "40002"
         public static let serializationFailure: Code = "40001"
         public static let statementCompletionUnknown: Code = "40003"
         public static let deadlockDetected: Code = "40P01"
-        
+
         // Class 42 — Syntax Error or Access Rule Violation
         public static let syntaxErrorOrAccessRuleViolation: Code = "42000"
         public static let syntaxError: Code = "42601"
@@ -239,29 +239,29 @@ extension PostgresError {
         public static let invalidSchemaDefinition: Code = "42P15"
         public static let invalidTableDefinition: Code = "42P16"
         public static let invalidObjectDefinition: Code = "42P17"
-        
+
         // Class 44 — WITH CHECK OPTION Violation
         public static let withCheckOptionViolation: Code = "44000"
-        
+
         // Class 53 — Insufficient Resources
         public static let insufficientResources: Code = "53000"
         public static let diskFull: Code = "53100"
         public static let outOfMemory: Code = "53200"
         public static let tooManyConnections: Code = "53300"
         public static let configurationLimitExceeded: Code = "53400"
-        
+
         // Class 54 — Program Limit Exceeded
         public static let programLimitExceeded: Code = "54000"
         public static let statementTooComplex: Code = "54001"
         public static let tooManyColumns: Code = "54011"
         public static let tooManyArguments: Code = "54023"
-        
+
         // Class 55 — Object Not In Prerequisite State
         public static let objectNotInPrerequisiteState: Code = "55000"
         public static let objectInUse: Code = "55006"
         public static let cantChangeRuntimeParam: Code = "55P02"
         public static let lockNotAvailable: Code = "55P03"
-        
+
         // Class 57 — Operator Intervention
         public static let operatorIntervention: Code = "57000"
         public static let queryCanceled: Code = "57014"
@@ -269,20 +269,20 @@ extension PostgresError {
         public static let crashShutdown: Code = "57P02"
         public static let cannotConnectNow: Code = "57P03"
         public static let databaseDropped: Code = "57P04"
-        
+
         // Class 58 — System Error (errors external to PostgreSQL itself)
         public static let systemError: Code = "58000"
         public static let ioError: Code = "58030"
         public static let undefinedFile: Code = "58P01"
         public static let duplicateFile: Code = "58P02"
-        
+
         // Class 72 — Snapshot Failure
         public static let snapshotTooOld: Code = "72000"
-        
+
         // Class F0 — Configuration File Error
         public static let configFileError: Code = "F0000"
         public static let lockFileExists: Code = "F0001"
-        
+
         // Class HV — Foreign Data Wrapper Error (SQL/MED)
         public static let fdwError: Code = "HV000"
         public static let fdwColumnNameNotFound: Code = "HV005"
@@ -311,21 +311,21 @@ extension PostgresError {
         public static let fdwUnableToCreateExecution: Code = "HV00L"
         public static let fdwUnableToCreateReply: Code = "HV00M"
         public static let fdwUnableToEstablishConnection: Code = "HV00N"
-        
+
         // Class P0 — PL/pgSQL Error
         public static let plpgsqlError: Code = "P0000"
         public static let raiseException: Code = "P0001"
         public static let noDataFound: Code = "P0002"
         public static let tooManyRows: Code = "P0003"
         public static let assertFailure: Code = "P0004"
-        
+
         // Class XX — Internal Error
         public static let internalError: Code = "XX000"
         public static let dataCorrupted: Code = "XX001"
         public static let indexCorrupted: Code = "XX002"
-        
+
         public let raw: String
-        
+
         public init(stringLiteral value: String) {
             self.raw = value
         }
@@ -334,7 +334,7 @@ extension PostgresError {
             self.raw = raw
         }
     }
-    
+
     public var code: Code {
         switch self {
         case .protocol: return .internalError

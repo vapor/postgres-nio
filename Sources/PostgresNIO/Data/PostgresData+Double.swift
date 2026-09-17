@@ -6,12 +6,12 @@ extension PostgresData {
         buffer.psqlWriteDouble(double)
         self.init(type: .float8, formatCode: .binary, value: buffer)
     }
-    
+
     public var double: Double? {
         guard var value = self.value else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .binary:
             switch self.type {

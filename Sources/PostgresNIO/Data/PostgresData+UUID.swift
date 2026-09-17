@@ -7,12 +7,12 @@ extension PostgresData {
         buffer.writeUUIDBytes(uuid)
         self.init(type: .uuid, formatCode: .binary, value: buffer)
     }
-    
+
     public var uuid: UUID? {
         guard var value = self.value else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .binary:
             switch self.type {
@@ -34,7 +34,7 @@ extension UUID: PostgresDataConvertible {
     public static var postgresDataType: PostgresDataType {
         return .uuid
     }
-    
+
     public init?(postgresData: PostgresData) {
         guard let uuid = postgresData.uuid else {
             return nil

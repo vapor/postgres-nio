@@ -1,6 +1,7 @@
-import struct Foundation.Data
 import NIOCore
 import NIOFoundationCompat
+
+import struct Foundation.Data
 
 extension PostgresEncodable where Self: Sequence, Self.Element == UInt8 {
     public static var psqlType: PostgresDataType {
@@ -26,7 +27,7 @@ extension ByteBuffer: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
         .bytea
     }
-    
+
     public static var psqlFormat: PostgresFormat {
         .binary
     }
@@ -36,7 +37,7 @@ extension ByteBuffer: PostgresNonThrowingEncodable {
         into byteBuffer: inout ByteBuffer,
         context: PostgresEncodingContext<JSONEncoder>
     ) {
-        var copyOfSelf = self // dirty hack
+        var copyOfSelf = self  // dirty hack
         byteBuffer.writeBuffer(&copyOfSelf)
     }
 }

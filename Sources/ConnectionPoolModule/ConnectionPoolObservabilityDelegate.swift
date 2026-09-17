@@ -1,4 +1,3 @@
-
 public protocol ConnectionPoolObservabilityDelegate: Sendable {
     associatedtype ConnectionID: Hashable & Sendable
 
@@ -18,7 +17,7 @@ public protocol ConnectionPoolObservabilityDelegate: Sendable {
 
     /// The utilization of the connection changed; a stream may have been used, returned, or the
     /// maximum number of concurrent streams available on the connection changed.
-    func connectionUtilizationChanged(id:ConnectionID, streamsUsed: UInt16, streamCapacity: UInt16)
+    func connectionUtilizationChanged(id: ConnectionID, streamsUsed: UInt16, streamCapacity: UInt16)
 
     func keepAliveTriggered(id: ConnectionID)
 

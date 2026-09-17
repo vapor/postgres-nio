@@ -1,4 +1,3 @@
-
 extension PostgresRow {
     // --- snip TODO: Remove once bug is fixed, that disallows tuples of one
     @inlinable
@@ -73,8 +72,8 @@ extension PostgresRow {
         var cellIterator = self.data.makeIterator()
         var columnIterator = self.columns.makeIterator()
 
-        return (
-            repeat try Self.decodeNextColumn(
+        return
+            (repeat try Self.decodeNextColumn(
                 (each Column).self,
                 cellIterator: &cellIterator,
                 columnIterator: &columnIterator,
@@ -82,8 +81,7 @@ extension PostgresRow {
                 context: context,
                 file: file,
                 line: line
-            )
-        )
+            ))
     }
 
     @inlinable

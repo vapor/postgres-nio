@@ -1,4 +1,5 @@
 import Atomics
+
 @testable import _ConnectionPoolModule
 
 /// This is a `Future` type that shall make writing tests a bit simpler. I'm well aware, that this is a pattern

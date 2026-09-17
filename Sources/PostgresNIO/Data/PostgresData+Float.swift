@@ -2,12 +2,12 @@ extension PostgresData {
     public init(float: Float) {
         self.init(double: Double(float))
     }
-    
+
     public var float: Float? {
         guard var value = self.value else {
             return nil
         }
-        
+
         switch self.formatCode {
         case .binary:
             switch self.type {

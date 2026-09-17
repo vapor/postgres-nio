@@ -1,6 +1,6 @@
-import _ConnectionPoolModule
 import DequeModule
 import NIOConcurrencyHelpers
+import _ConnectionPoolModule
 
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 public final class MockPingPongBehavior<Connection: PooledConnection>: ConnectionKeepAliveBehavior {
@@ -22,8 +22,9 @@ public final class MockPingPongBehavior<Connection: PooledConnection>: Connectio
         precondition(self.keepAliveFrequency != nil)
 
         // we currently don't support cancellation when creating a connection
-        let success = try await withCheckedThrowingContinuation { (checkedContinuation: CheckedContinuation<Bool, any Error>) -> () in
-            let waiter = self.stateBox.withLockedValue { state -> (CheckedContinuation<(Connection, CheckedContinuation<Bool, any Error>), Never>)? in
+        let success = try await withCheckedThrowingContinuation { (checkedContinuation: CheckedContinuation<Bool, any Error>) -> Void in
+            let waiter = self.stateBox.withLockedValue {
+                state -> (CheckedContinuation<(Connection, CheckedContinuation<Bool, any Error>), Never>)? in
                 if let waiter = state.waiter.popFirst() {
                     return waiter
                 } else {
@@ -42,7 +43,8 @@ public final class MockPingPongBehavior<Connection: PooledConnection>: Connectio
 
     @discardableResult
     public func nextKeepAlive(_ closure: (Connection) async throws -> Bool) async rethrows -> Connection {
-        let (connection, continuation) = await withCheckedContinuation { (continuation: CheckedContinuation<(Connection, CheckedContinuation<Bool, any Error>), Never>) in
+        let (connection, continuation) = await withCheckedContinuation {
+            (continuation: CheckedContinuation<(Connection, CheckedContinuation<Bool, any Error>), Never>) in
             let run = self.stateBox.withLockedValue { state -> (Connection, CheckedContinuation<Bool, any Error>)? in
                 if let run = state.runs.popFirst() {
                     return run

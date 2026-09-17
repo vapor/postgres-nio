@@ -1,6 +1,7 @@
-import Testing
 import NIOCore
 import NIOTestUtils
+import Testing
+
 @testable import PostgresNIO
 
 @Suite struct BackendKeyDataTests {
@@ -9,11 +10,11 @@ import NIOTestUtils
             buffer.writeInteger(Int32(1234))
             buffer.writeInteger(Int32(4567))
         }
-        
+
         let expectedInOuts = [
-            (buffer, [PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567))]),
+            (buffer, [PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567))])
         ]
-        
+
         #expect(throws: Never.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: expectedInOuts,
@@ -21,18 +22,18 @@ import NIOTestUtils
             )
         }
     }
-    
+
     @Test func testDecodeInvalidLength() {
         var buffer = ByteBuffer()
         buffer.psqlWriteBackendMessageID(.backendKeyData)
         buffer.writeInteger(Int32(11))
         buffer.writeInteger(Int32(1234))
         buffer.writeInteger(Int32(4567))
-        
+
         let expected = [
-            (buffer, [PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567))]),
+            (buffer, [PostgresBackendMessage.backendKeyData(.init(processID: 1234, secretKey: 4567))])
         ]
-        
+
         #expect(throws: PostgresMessageDecodingError.self) {
             try ByteToMessageDecoderVerifier.verifyDecoder(
                 inputOutputPairs: expected,

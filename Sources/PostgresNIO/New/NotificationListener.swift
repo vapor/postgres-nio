@@ -86,7 +86,7 @@ final class NotificationListener: @unchecked Sendable {
             fatalError("Invalid state: \(self.state)")
 
         case .closure:
-            break // ignore
+            break  // ignore
         }
     }
 
@@ -126,7 +126,7 @@ final class NotificationListener: @unchecked Sendable {
             postgresListenContext.cancel()
 
         case .done:
-            break // ignore
+            break  // ignore
         }
     }
 
@@ -147,7 +147,7 @@ final class NotificationListener: @unchecked Sendable {
             postgresListenContext.cancel()
 
         case .done:
-            break // ignore
+            break  // ignore
         }
     }
 }

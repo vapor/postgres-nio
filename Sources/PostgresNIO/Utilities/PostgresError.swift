@@ -4,12 +4,12 @@ public enum PostgresError: Error, LocalizedError, CustomStringConvertible {
     case `protocol`(String)
     case server(PostgresMessage.Error)
     case connectionClosed
-    
+
     /// See `LocalizedError`.
     public var errorDescription: String? {
         return self.description
     }
-    
+
     /// See `CustomStringConvertible`.
     public var description: String {
         let description: String

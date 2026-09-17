@@ -1,12 +1,13 @@
 import Logging
-import XCTest
-import Testing
-import PostgresNIO
-#if canImport(Network)
-import NIOTransportServices
-#endif
-import NIOPosix
 import NIOCore
+import NIOPosix
+import PostgresNIO
+import Testing
+import XCTest
+
+#if canImport(Network)
+    import NIOTransportServices
+#endif
 
 final class AsyncPostgresConnectionTests: XCTestCase {
     func test1kRoundTrips() async throws {
@@ -107,7 +108,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 
             for try await element in rows.decode(String.self) {
                 XCTAssertEqual(element, applicationName)
-                
+
                 counter += 1
             }
 
@@ -121,9 +122,9 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         let eventLoop = eventLoopGroup.next()
 
         let start = 1
-        let end = 10000000
+        let end = 10_000_000
 
-        try await withTestConnection(on: eventLoop) { connection -> () in
+        try await withTestConnection(on: eventLoop) { connection -> Void in
             try await connection.query("SET statement_timeout=1000;", logger: .psqlTest)
 
             let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
@@ -159,7 +160,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         let start = 1
         let end = 10000
 
-        try await withTestConnection(on: eventLoop) { connection -> () in
+        try await withTestConnection(on: eventLoop) { connection -> Void in
             for _ in 0..<1000 {
                 do {
                     try await connection.query("SELECT generte_series(\(start), \(end));", logger: .psqlTest)
@@ -217,10 +218,10 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 
             let createQuery = PostgresQuery(
                 unsafeSQL: """
-                CREATE TABLE table1 (
-                \((0..<columnsCount).map({ #""int\#($0)" int NOT NULL"# }).joined(separator: ", "))
-                );
-                """
+                    CREATE TABLE table1 (
+                    \((0..<columnsCount).map({ #""int\#($0)" int NOT NULL"# }).joined(separator: ", "))
+                    );
+                    """
             )
             try await connection.query(createQuery, logger: .psqlTest)
 
@@ -259,9 +260,9 @@ final class AsyncPostgresConnectionTests: XCTestCase {
     func testListenAndNotify() async throws {
         let channelNames = [
             "foo",
-            "default"
+            "default",
         ]
-        
+
         let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
         defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
         let eventLoop = eventLoopGroup.next()
@@ -388,9 +389,9 @@ final class AsyncPostgresConnectionTests: XCTestCase {
     func testListenOnChannelWithClosure() async throws {
         let channelNames = [
             "foo",
-            "default"
+            "default",
         ]
-        
+
         let eventLoopGroup = MultiThreadedEventLoopGroup.singleton
         let eventLoop = eventLoopGroup.next()
 
@@ -441,26 +442,26 @@ final class AsyncPostgresConnectionTests: XCTestCase {
     }
 
     #if canImport(Network)
-    func testSelect10kRowsNetworkFramework() async throws {
-        let eventLoopGroup = NIOTSEventLoopGroup()
-        defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
-        let eventLoop = eventLoopGroup.next()
+        func testSelect10kRowsNetworkFramework() async throws {
+            let eventLoopGroup = NIOTSEventLoopGroup()
+            defer { XCTAssertNoThrow(try eventLoopGroup.syncShutdownGracefully()) }
+            let eventLoop = eventLoopGroup.next()
 
-        let start = 1
-        let end = 10000
+            let start = 1
+            let end = 10000
 
-        try await withTestConnection(on: eventLoop) { connection in
-            let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
-            var counter = 1
-            for try await row in rows {
-                let element = try row.decode(Int.self, context: .default)
-                XCTAssertEqual(element, counter)
-                counter += 1
+            try await withTestConnection(on: eventLoop) { connection in
+                let rows = try await connection.query("SELECT generate_series(\(start), \(end));", logger: .psqlTest)
+                var counter = 1
+                for try await row in rows {
+                    let element = try row.decode(Int.self, context: .default)
+                    XCTAssertEqual(element, counter)
+                    counter += 1
+                }
+
+                XCTAssertEqual(counter, end + 1)
             }
-
-            XCTAssertEqual(counter, end + 1)
         }
-    }
     #endif
 
     func testCancelTaskThatIsVeryLongRunningWhichAlsoFailsWhileInStreamingMode() async throws {
@@ -471,8 +472,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         // we cancel the query after 400ms.
         // the server times out the query after 1sec.
 
-        try await withTestConnection(on: eventLoop) { connection -> () in
-            try await connection.query("SET statement_timeout=1000;", logger: .psqlTest) // 1000 milliseconds
+        try await withTestConnection(on: eventLoop) { connection -> Void in
+            try await connection.query("SET statement_timeout=1000;", logger: .psqlTest)  // 1000 milliseconds
 
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
@@ -498,7 +499,7 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                     XCTAssertFalse(connection.isClosed, "Connection should survive!")
                 }
 
-                let delay: UInt64 = 400_000_000 // 400 milliseconds
+                let delay: UInt64 = 400_000_000  // 400 milliseconds
                 try await Task.sleep(nanoseconds: delay)
 
                 group.cancelAll()
@@ -596,7 +597,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 
         do {
             try await withTestConnection(on: eventLoop) { connection in
-                try await connection.query("""
+                try await connection.query(
+                    """
                     CREATE TABLE IF NOT EXISTS "\(unescaped: Self.preparedStatementTestTable)" (
                         id SERIAL PRIMARY KEY,
                         uuid UUID NOT NULL
@@ -614,13 +616,16 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 let rows = try await connection.execute(SelectPreparedStatement(id: 3), logger: .psqlTest)
                 var counter = 0
                 for try await (id, uuid) in rows {
-                    Logger.psqlTest.info("Received row", metadata: [
-                        "id": "\(id)", "uuid": "\(uuid)"
-                    ])
+                    Logger.psqlTest.info(
+                        "Received row",
+                        metadata: [
+                            "id": "\(id)", "uuid": "\(uuid)",
+                        ])
                     counter += 1
                 }
 
-                try await connection.query("""
+                try await connection.query(
+                    """
                     DROP TABLE "\(unescaped: Self.preparedStatementTestTable)";
                     """,
                     logger: .psqlTest
@@ -659,7 +664,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
         struct SelectPreparedStatement: PostgresPreparedStatement {
             static let name = "SELECT-AsyncTestPreparedStatementWithOptionalTestTable"
 
-            static let sql = #"SELECT id, uuid FROM "\#(AsyncPostgresConnectionTests.preparedStatementWithOptionalTestTable)" WHERE id <= $1;"#
+            static let sql =
+                #"SELECT id, uuid FROM "\#(AsyncPostgresConnectionTests.preparedStatementWithOptionalTestTable)" WHERE id <= $1;"#
             typealias Row = (Int, UUID?)
 
             var id: Int
@@ -677,7 +683,8 @@ final class AsyncPostgresConnectionTests: XCTestCase {
 
         do {
             try await withTestConnection(on: eventLoop) { connection in
-                try await connection.query("""
+                try await connection.query(
+                    """
                     CREATE TABLE IF NOT EXISTS "\(unescaped: Self.preparedStatementWithOptionalTestTable)" (
                         id SERIAL PRIMARY KEY,
                         uuid UUID
@@ -695,13 +702,16 @@ final class AsyncPostgresConnectionTests: XCTestCase {
                 let rows = try await connection.execute(SelectPreparedStatement(id: 3), logger: .psqlTest)
                 var counter = 0
                 for try await (id, uuid) in rows {
-                    Logger.psqlTest.info("Received row", metadata: [
-                        "id": "\(id)", "uuid": "\(String(describing: uuid))"
-                    ])
+                    Logger.psqlTest.info(
+                        "Received row",
+                        metadata: [
+                            "id": "\(id)", "uuid": "\(String(describing: uuid))",
+                        ])
                     counter += 1
                 }
 
-                try await connection.query("""
+                try await connection.query(
+                    """
                     DROP TABLE "\(unescaped: Self.preparedStatementWithOptionalTestTable)";
                     """,
                     logger: .psqlTest
@@ -721,7 +731,7 @@ extension XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line,
         _ closure: (PostgresConnection) async throws -> Result
-    ) async throws -> Result  {
+    ) async throws -> Result {
         let connection = try await PostgresConnection.test(on: eventLoop, options: options).get()
 
         do {

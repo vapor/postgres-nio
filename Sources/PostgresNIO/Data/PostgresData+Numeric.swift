@@ -1,4 +1,5 @@
 import NIOCore
+
 import struct Foundation.Decimal
 
 public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvertible, ExpressibleByStringLiteral {
@@ -25,22 +26,22 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             values.append(value)
         }
         return """
-        ndigits: \(self.ndigits)
-        weight: \(self.weight)
-        sign: \(self.sign)
-        dscale: \(self.dscale)
-        value: \(values)
-        """
+            ndigits: \(self.ndigits)
+            weight: \(self.weight)
+            sign: \(self.sign)
+            dscale: \(self.dscale)
+            value: \(values)
+            """
     }
 
     public var double: Double? {
         return Double(self.string)
     }
-    
+
     public init(decimal: Decimal) {
         self.init(decimalString: decimal.description)
     }
-    
+
     public init?(string: String) {
         // validate string contents are decimal
         guard Double(string) != nil else {
@@ -48,7 +49,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         }
         self.init(decimalString: string)
     }
-    
+
     public init(stringLiteral value: String) {
         self.init(decimalString: value)
     }
@@ -68,7 +69,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         default:
             fatalError("Unexpected decimal string: \(decimalString)")
         }
-        
+
         // check if negative
         let isNegative: Bool
         if integer.hasPrefix("-") {
@@ -77,14 +78,14 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         } else {
             isNegative = false
         }
-        
+
         // buffer will store 1+ Int16 values representing
         // 4 digit chunks of the number
         var buffer = ByteBufferAllocator().buffer(capacity: 0)
-        
+
         // weight always has 1 added to it, so start at -1
         var weight = -1
-        
+
         // iterate over each chunk in the integer part of the numeric
         // we use reverse chunked since the first chunk should be the
         // shortest if the integer length is not evenly divisible by 4
@@ -93,10 +94,10 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
             // convert the 4 digits to an Int16
             buffer.writeInteger(Int16(chunk)!, endianness: .big)
         }
-        
+
         // dscale will measure how many sig digits are in the fraction
         var dscale = 0
-        
+
         if let fractional = fractional {
             // iterate over each chunk in the fractional part of the numeric
             // we use normal chunking size the end chunk should be the shortest
@@ -117,7 +118,7 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
         self.dscale = numericCast(dscale)
         self.value = buffer
     }
-    
+
     public var decimal: Decimal {
         // force cast should always succeed since we know
         // string returns a valid decimal
@@ -150,7 +151,8 @@ public struct PostgresNumeric: CustomStringConvertible, CustomDebugStringConvert
                     integer += String(repeating: "0", count: 4 - char.description.count) + char.description
                 }
             } else {
-                fractional += String(repeating: "0", count: 4 - char.description.count)
+                fractional +=
+                    String(repeating: "0", count: 4 - char.description.count)
                     + char.description
             }
         }
@@ -236,7 +238,7 @@ extension PostgresData {
         buffer.writeBuffer(&value)
         self.init(type: .numeric, value: buffer)
     }
-    
+
     public var numeric: PostgresNumeric? {
         /// create mutable value since we will be using `.extract` which advances the buffer's view
         guard var value = self.value else {
@@ -252,10 +254,10 @@ extension PostgresData {
     }
 }
 
-private extension Collection {
+extension Collection {
     // splits the collection into chunks of the supplied size
     // if the collection is not evenly divisible, the last chunk will be smaller
-    func chunked(by maxSize: Int) -> [SubSequence] {
+    fileprivate func chunked(by maxSize: Int) -> [SubSequence] {
         return stride(from: 0, to: self.count, by: maxSize).map { current in
             let chunkStartIndex = self.index(self.startIndex, offsetBy: current)
             let chunkEndOffset = Swift.min(
@@ -266,10 +268,10 @@ private extension Collection {
             return self[chunkStartIndex..<chunkEndIndex]
         }
     }
-    
+
     // splits the collection into chunks of the supplied size
     // if the collection is not evenly divisible, the first chunk will be smaller
-    func reverseChunked(by maxSize: Int) -> [SubSequence] {
+    fileprivate func reverseChunked(by maxSize: Int) -> [SubSequence] {
         var chunkStartIndex = self.startIndex
         return stride(from: 0, to: self.count, by: maxSize).reversed().map { current in
             let distance = self.count - current
@@ -279,4 +281,3 @@ private extension Collection {
         }
     }
 }
-

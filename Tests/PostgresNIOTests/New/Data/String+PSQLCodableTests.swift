@@ -1,5 +1,6 @@
-import XCTest
 import NIOCore
+import XCTest
+
 @testable import PostgresNIO
 
 class String_PSQLCodableTests: XCTestCase {
@@ -20,7 +21,7 @@ class String_PSQLCodableTests: XCTestCase {
         buffer.writeString(expected)
 
         let dataTypes: [PostgresDataType] = [
-            .text, .varchar, .name, .bpchar
+            .text, .varchar, .name, .bpchar,
         ]
 
         for dataType in dataTypes {

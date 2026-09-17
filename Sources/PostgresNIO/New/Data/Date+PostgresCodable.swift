@@ -1,4 +1,5 @@
 import NIOCore
+
 import struct Foundation.Date
 
 extension Date: PostgresNonThrowingEncodable {
@@ -22,12 +23,12 @@ extension Date: PostgresNonThrowingEncodable {
     /// timestamp representation.
     ///
     /// This clamps to `MIN_TIMESTAMP` - 1 for underflow and to `END_TIMESTAMP` for overflow,
-    /// allowing Postgres to reject the value. We cannot reject it ourselves because 
+    /// allowing Postgres to reject the value. We cannot reject it ourselves because
     /// of the `PostgresNonThrowingEncodable` conformance.
     @usableFromInline
     var _psqlMicroseconds: Int64 {
         let microseconds = self.timeIntervalSince(Self._psqlDateStart) * Double(Self._microsecondsPerSecond)
-        guard 
+        guard
             let exact = Int64(exactly: microseconds.rounded(.towardZero)),
             exact >= Self._minTimestamp, exact < Self._endTimestamp
         else {

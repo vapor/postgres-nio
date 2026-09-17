@@ -11,8 +11,8 @@ extension PostgresMessage {
         /// Close Target. Determines if the Close command should close a prepared statement
         /// or portal.
         public enum Target: Int8 {
-            case preparedStatement = 0x53 // 'S' - prepared statement
-            case portal = 0x50 // 'P' - portal
+            case preparedStatement = 0x53  // 'S' - prepared statement
+            case portal = 0x50  // 'P' - portal
         }
 
         /// Determines if the `name` identifes a portal or a prepared statement
@@ -22,12 +22,11 @@ extension PostgresMessage {
         /// (an empty string selects the unnamed prepared statement or portal).
         public var name: String
 
-
         /// See `CustomStringConvertible`.
         public var description: String {
             switch target {
-                case .preparedStatement: return "Statement(\(name))"
-                case .portal: return "Portal(\(name))"
+            case .preparedStatement: return "Statement(\(name))"
+            case .portal: return "Portal(\(name))"
             }
         }
 

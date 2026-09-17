@@ -5,12 +5,12 @@ import NIOCore
 ///
 /// This should be used as a SubStateMachine in QuerySubStateMachines.
 struct RowStreamStateMachine {
-    
+
     enum Action {
         case read
         case wait
     }
-    
+
     private enum State {
         /// The state machine expects further writes to `channelRead`. The writes are appended to the buffer.
         case waitingForRows([DataRow])
@@ -42,7 +42,7 @@ struct RowStreamStateMachine {
             self.state = .modifying
             buffer.append(newRow)
             self.state = .waitingForRows(buffer)
-            
+
         // For all the following cases, please note:
         // Normally these code paths should never be hit. However there is one way to trigger
         // this:
@@ -54,12 +54,12 @@ struct RowStreamStateMachine {
             self.state = .modifying
             buffer.append(newRow)
             self.state = .waitingForRead(buffer)
-            
+
         case .waitingForDemand(var buffer):
             self.state = .modifying
             buffer.append(newRow)
             self.state = .waitingForDemand(buffer)
-            
+
         case .waitingForReadOrDemand(var buffer):
             self.state = .modifying
             buffer.append(newRow)
@@ -89,9 +89,11 @@ struct RowStreamStateMachine {
             }
 
         case .waitingForRead,
-             .waitingForDemand,
-             .waitingForReadOrDemand:
-            preconditionFailure("How can we receive a body part, after a channelReadComplete, but no read has been forwarded yet. Invalid state: \(self.state)")
+            .waitingForDemand,
+            .waitingForReadOrDemand:
+            preconditionFailure(
+                "How can we receive a body part, after a channelReadComplete, but no read has been forwarded yet. Invalid state: \(self.state)"
+            )
 
         case .failed:
             // Once the row stream state machine is marked as failed, no further events must be
@@ -169,9 +171,9 @@ struct RowStreamStateMachine {
             return buffer
 
         case .waitingForReadOrDemand(let buffer),
-             .waitingForRead(let buffer),
-             .waitingForDemand(let buffer):
-            
+            .waitingForRead(let buffer),
+            .waitingForDemand(let buffer):
+
             // Normally this code path should never be hit. However there is one way to trigger
             // this:
             //
@@ -193,8 +195,8 @@ struct RowStreamStateMachine {
     mutating func fail() -> Action {
         switch self.state {
         case .waitingForRows,
-             .waitingForReadOrDemand,
-             .waitingForRead:
+            .waitingForReadOrDemand,
+            .waitingForRead:
             self.state = .failed
             return .wait
 

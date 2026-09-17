@@ -1,7 +1,7 @@
 import NIOCore
 
-internal extension ByteBuffer {
-    
+extension ByteBuffer {
+
     @usableFromInline
     mutating func psqlReadFloat() -> Float? {
         return self.readInteger(as: UInt32.self).map { Float(bitPattern: $0) }

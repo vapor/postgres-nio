@@ -1,6 +1,7 @@
-@testable import _ConnectionPoolModule
-import _ConnectionPoolTestUtils
 import Testing
+import _ConnectionPoolTestUtils
+
+@testable import _ConnectionPoolModule
 
 @Suite struct PoolStateMachine_ConnectionGroupTests {
     var idGenerator = ConnectionIDGenerator()
@@ -94,17 +95,20 @@ import Testing
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
 
         let parkTimers = connections.parkConnection(at: index, hasBecomeIdle: true)
-        #expect(parkTimers == [
-            .init(timerID: 0, connectionID: newConnection.id, usecase: .keepAlive),
-            .init(timerID: 1, connectionID: newConnection.id, usecase: .idleTimeout),
-        ])
+        #expect(
+            parkTimers == [
+                .init(timerID: 0, connectionID: newConnection.id, usecase: .keepAlive),
+                .init(timerID: 1, connectionID: newConnection.id, usecase: .idleTimeout),
+            ])
 
         guard let keepAliveAction = connections.keepAliveIfIdle(newConnection.id) else {
             Issue.record("Expected to get a connection for ping pong")
             return
         }
         #expect(newConnection === keepAliveAction.connection)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 1 - keepAliveStreams, leasedStreams: keepAliveStreams))
+        #expect(
+            connections.stats
+                == .init(idle: 1, runningKeepAlive: 1, availableStreams: 1 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         guard case .available(_, let pingPongContext) = connections.keepAliveSucceeded(newConnection.id) else {
             Issue.record("Expected to get an AvailableContext")
@@ -199,13 +203,16 @@ import Testing
         #expect(connections.soonAvailableConnections == 2)
 
         let newThirdConnection = MockConnection(id: thirdRequest.connectionID)
-        let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(newThirdConnection, maxStreams: 1)
+        let (thirdConnectionIndex, establishedThirdConnectionContext) = connections.newConnectionEstablished(
+            newThirdConnection, maxStreams: 1)
         #expect(establishedThirdConnectionContext.info == .idle(availableStreams: 1, newIdle: true))
         #expect(establishedThirdConnectionContext.use == .demand)
         #expect(connections.stats == .init(connecting: 1, idle: 2, availableStreams: 2))
         #expect(connections.soonAvailableConnections == 1)
-        let thirdConnKeepTimer = TestPoolStateMachine.ConnectionTimer(timerID: 0, connectionID: thirdRequest.connectionID, usecase: .keepAlive)
-        let thirdConnIdleTimer = TestPoolStateMachine.ConnectionTimer(timerID: 1, connectionID: thirdRequest.connectionID, usecase: .idleTimeout)
+        let thirdConnKeepTimer = TestPoolStateMachine.ConnectionTimer(
+            timerID: 0, connectionID: thirdRequest.connectionID, usecase: .keepAlive)
+        let thirdConnIdleTimer = TestPoolStateMachine.ConnectionTimer(
+            timerID: 1, connectionID: thirdRequest.connectionID, usecase: .idleTimeout)
         let thirdConnIdleTimerCancellationToken = MockTimerCancellationToken(thirdConnIdleTimer)
         #expect(connections.parkConnection(at: thirdConnectionIndex, hasBecomeIdle: true) == [thirdConnKeepTimer, thirdConnIdleTimer])
 
@@ -220,7 +227,9 @@ import Testing
 
         // connection three should be moved to connection one and for this reason become permanent
 
-        #expect(connections.backoffDone(firstRequest.connectionID, retry: false) == .cancelTimers([backoffTimerCancellationToken, thirdConnIdleTimerCancellationToken]))
+        #expect(
+            connections.backoffDone(firstRequest.connectionID, retry: false)
+                == .cancelTimers([backoffTimerCancellationToken, thirdConnIdleTimerCancellationToken]))
         #expect(connections.stats == .init(idle: 2, availableStreams: 2))
 
         #expect(connections.closeConnectionIfIdle(newThirdConnection.id) == nil)
@@ -300,8 +309,11 @@ import Testing
         #expect(timers == [keepAliveTimer])
         #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
-        #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 1 - keepAliveStreams, leasedStreams: keepAliveStreams))
+        #expect(
+            keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
+        #expect(
+            connections.stats
+                == .init(idle: 1, runningKeepAlive: 1, availableStreams: 1 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         guard case .available(_, let afterPingIdleContext) = connections.keepAliveSucceeded(newConnection.id) else {
             Issue.record("Expected to receive an AvailableContext")
@@ -337,7 +349,8 @@ import Testing
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         let keepAliveAction = connections.keepAliveIfIdle(newConnection.id)
-        #expect(keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
+        #expect(
+            keepAliveAction == .init(connection: newConnection, keepAliveTimerCancellationContinuation: keepAliveTimerCancellationToken))
         #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 0, leasedStreams: 1))
 
         _ = connections.closeConnectionIfIdle(newConnection.id)
@@ -533,7 +546,11 @@ import Testing
             return
         }
         #expect(keepAliveAction.connection === connection)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: keepAliveReducesAvailableStreams ? 0 : 1, leasedStreams: keepAliveReducesAvailableStreams ? 1 : 0))
+        #expect(
+            connections.stats
+                == .init(
+                    idle: 1, runningKeepAlive: 1, availableStreams: keepAliveReducesAvailableStreams ? 0 : 1,
+                    leasedStreams: keepAliveReducesAvailableStreams ? 1 : 0))
 
         // Now mark for close while keep alive is running
         // Since keepAlive is running on idle, closeIfIdle triggers immediately
@@ -582,7 +599,9 @@ import Testing
             return
         }
         #expect(keepAliveAction.connection === connection)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 100 - keepAliveStreams, leasedStreams: keepAliveStreams))
+        #expect(
+            connections.stats
+                == .init(idle: 1, runningKeepAlive: 1, availableStreams: 100 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         // Lease a stream while keepAlive is running
         guard case .leasedConnection(let leaseResult) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
@@ -590,7 +609,9 @@ import Testing
             return
         }
         #expect(leaseResult.connection === connection)
-        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 99 - keepAliveStreams, leasedStreams: 1 + keepAliveStreams))
+        #expect(
+            connections.stats
+                == .init(leased: 1, runningKeepAlive: 1, availableStreams: 99 - keepAliveStreams, leasedStreams: 1 + keepAliveStreams))
 
         // Mark for close — runningKeepAlive should be decremented at mark time
         guard case .none = connections.connectionWillClose(connection.id) else {
@@ -638,11 +659,15 @@ import Testing
         let keepAliveTimerCancellationToken = MockTimerCancellationToken(keepAliveTimer)
         #expect(connections.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveTimerCancellationToken) == nil)
         _ = connections.keepAliveIfIdle(connection.id)
-        #expect(connections.stats == .init(idle: 1, runningKeepAlive: 1, availableStreams: 100 - keepAliveStreams, leasedStreams: keepAliveStreams))
+        #expect(
+            connections.stats
+                == .init(idle: 1, runningKeepAlive: 1, availableStreams: 100 - keepAliveStreams, leasedStreams: keepAliveStreams))
 
         // Lease while keepAlive is running
         _ = connections.leaseConnectionOrSoonAvailableConnectionCount()
-        #expect(connections.stats == .init(leased: 1, runningKeepAlive: 1, availableStreams: 99 - keepAliveStreams, leasedStreams: 1 + keepAliveStreams))
+        #expect(
+            connections.stats
+                == .init(leased: 1, runningKeepAlive: 1, availableStreams: 99 - keepAliveStreams, leasedStreams: 1 + keepAliveStreams))
 
         // Mark for close — runningKeepAlive decremented here
         guard case .none = connections.connectionWillClose(connection.id) else {

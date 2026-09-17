@@ -1,8 +1,8 @@
+import Logging
 import NIOCore
 import NIOTLS
-import Logging
 
-enum PSQLOutgoingEvent {    
+enum PSQLOutgoingEvent {
     /// the event we send down the channel to inform the ``PostgresChannelHandler`` to authenticate
     ///
     /// This shall be removed with the next breaking change and always supplied with `PSQLConnection.Configuration`.
@@ -12,18 +12,17 @@ enum PSQLOutgoingEvent {
 }
 
 enum PSQLEvent {
-    
+
     /// the event that is used to inform upstream handlers that ``PostgresChannelHandler`` has established a connection
     case readyForStartup
-    
+
     /// the event that is used to inform upstream handlers that ``PostgresChannelHandler`` is currently idle
     case readyForQuery
 }
 
-
 final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
     typealias InboundIn = Never
-    
+
     let logger: Logger
     var readyForStartupFuture: EventLoopFuture<Void>! {
         self.readyForStartupPromise!.futureResult
@@ -31,7 +30,6 @@ final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
     var authenticateFuture: EventLoopFuture<Void>! {
         self.authenticatePromise!.futureResult
     }
-    
 
     private enum State {
         case initialized
@@ -40,15 +38,15 @@ final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
         case authenticated
         case closed
     }
-    
+
     private var readyForStartupPromise: EventLoopPromise<Void>!
     private var authenticatePromise: EventLoopPromise<Void>!
     private var state: State = .initialized
-    
+
     init(logger: Logger) {
         self.logger = logger
     }
-    
+
     func userInboundEventTriggered(context: ChannelHandlerContext, event: Any) {
         switch event {
         case PSQLEvent.readyForStartup:
@@ -73,7 +71,7 @@ final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
             context.fireUserInboundEventTriggered(event)
         }
     }
-    
+
     func handlerAdded(context: ChannelHandlerContext) {
         self.readyForStartupPromise = context.eventLoop.makePromise(of: Void.self)
         self.authenticatePromise = context.eventLoop.makePromise(of: Void.self)
@@ -82,14 +80,14 @@ final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
             self.state = .connected
         }
     }
-    
+
     func channelActive(context: ChannelHandlerContext) {
         if case .initialized = self.state {
             self.state = .connected
         }
         context.fireChannelActive()
     }
-    
+
     func channelInactive(context: ChannelHandlerContext) {
         switch self.state {
         case .initialized:
@@ -123,13 +121,13 @@ final class PSQLEventsHandler: ChannelInboundHandler, RemovableChannelHandler {
         case .authenticated, .closed:
             break
         }
-        
+
         context.fireErrorCaught(error)
     }
-    
+
     func handlerRemoved(context: ChannelHandlerContext) {
         struct HandlerRemovedConnectionError: Error {}
-        
+
         if case .initialized = self.state {
             self.readyForStartupPromise.fail(HandlerRemovedConnectionError())
             self.authenticatePromise.fail(HandlerRemovedConnectionError())

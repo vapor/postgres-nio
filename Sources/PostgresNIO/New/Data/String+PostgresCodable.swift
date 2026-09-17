@@ -1,4 +1,5 @@
 import NIOCore
+
 import struct Foundation.UUID
 
 extension String: PostgresNonThrowingEncodable {
@@ -36,9 +37,9 @@ extension String: PostgresDecodable {
             }
             self = buffer.readString(length: buffer.readableBytes)!
         case (_, .varchar),
-             (_, .bpchar),
-             (_, .text),
-             (_, .name):
+            (_, .bpchar),
+            (_, .text),
+            (_, .name):
             // we can force unwrap here, since this method only fails if there are not enough
             // bytes available.
             self = buffer.readString(length: buffer.readableBytes)!

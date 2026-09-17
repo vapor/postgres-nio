@@ -1,5 +1,5 @@
-import NIOCore
 import NIOConcurrencyHelpers
+import NIOCore
 
 /// An async sequence of ``PostgresRow``s.
 ///
@@ -38,35 +38,29 @@ extension PostgresRowSequence {
         let lookupTable: [String: Int]
         let columns: [RowDescription.Column]
 
-        init(backing: BackingSequence.AsyncIterator, lookupTable: [String: Int], columns: [RowDescription.Column]) {
-            self.backing = backing
-            self.lookupTable = lookupTable
-            self.columns = columns
-        }
-
         #if compiler(>=6.2)
-        @concurrent
-        public mutating func next() async throws -> Element? {
-            if let dataRow = try await self.backing.next() {
-                return PostgresRow(
-                    data: dataRow,
-                    lookupTable: self.lookupTable,
-                    columns: self.columns
-                )
+            @concurrent
+            public mutating func next() async throws -> Element? {
+                if let dataRow = try await self.backing.next() {
+                    return PostgresRow(
+                        data: dataRow,
+                        lookupTable: self.lookupTable,
+                        columns: self.columns
+                    )
+                }
+                return nil
             }
-            return nil
-        }
         #else
-        public mutating func next() async throws -> Element? {
-            if let dataRow = try await self.backing.next() {
-                return PostgresRow(
-                    data: dataRow,
-                    lookupTable: self.lookupTable,
-                    columns: self.columns
-                )
+            public mutating func next() async throws -> Element? {
+                if let dataRow = try await self.backing.next() {
+                    return PostgresRow(
+                        data: dataRow,
+                        lookupTable: self.lookupTable,
+                        columns: self.columns
+                    )
+                }
+                return nil
             }
-            return nil
-        }
         #endif
 
         @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
@@ -134,7 +128,7 @@ struct AdaptiveRowBuffer: NIOAsyncSequenceProducerBackPressureStrategy {
         }
         self.canShrink = true
 
-        return false // bufferDepth < self.target
+        return false  // bufferDepth < self.target
     }
 
     mutating func didConsume(bufferDepth: Int) -> Bool {

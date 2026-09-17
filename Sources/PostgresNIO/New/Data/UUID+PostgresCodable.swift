@@ -1,8 +1,8 @@
 import NIOCore
 import NIOFoundationCompat
+
 import struct Foundation.UUID
 import typealias Foundation.uuid_t
-import NIOFoundationCompat
 
 extension UUID: PostgresNonThrowingEncodable {
     public static var psqlType: PostgresDataType {
@@ -37,10 +37,10 @@ extension UUID: PostgresDecodable {
             }
             self = uuid
         case (.binary, .varchar),
-             (.binary, .text),
-             (.text, .uuid),
-             (.text, .text),
-             (.text, .varchar):
+            (.binary, .text),
+            (.text, .uuid),
+            (.text, .text),
+            (.text, .varchar):
             guard buffer.readableBytes == 36 else {
                 throw PostgresDecodingError.Code.failure
             }
