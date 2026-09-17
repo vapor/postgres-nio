@@ -8,7 +8,7 @@ let package = Package(
         .macOS("14")
     ],
     dependencies: [
-        .package(path: "../"),
+        .package(name: "postgres-nio", path: "../"),
         .package(url: "https://github.com/ordo-one/package-benchmark.git", from: "1.29.0"),
     ],
     targets: [
