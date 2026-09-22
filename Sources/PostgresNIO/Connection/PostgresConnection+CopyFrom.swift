@@ -98,8 +98,6 @@ public struct PostgresCopyFromWriter: Sendable {
     }
 }
 
-// PostgresBinaryCopyFromWriter relies on non-Escapable types, which were only introduced in Swift 6.2
-#if compiler(>=6.2)
 /// Handle to send binary data for a `COPY ... FROM STDIN` query to the backend.
 ///
 /// It takes care of serializing ``PostgresEncodable`` column types into the binary format that Postgres expects.
@@ -222,7 +220,6 @@ public struct PostgresBinaryCopyFromWriter: ~Copyable {
         buffer.clear()
     }
 }
-#endif
 
 /// Specifies the format in which data is transferred to the backend in a COPY operation.
 ///
@@ -302,7 +299,6 @@ private func buildCopyFromQuery(
 }
 
 extension PostgresConnection {
-    #if compiler(>=6.2)
     /// Copy data into a table using a `COPY <table name> FROM STDIN` query, transferring data in a binary format.
     ///
     /// - Parameters:
@@ -348,7 +344,6 @@ extension PostgresConnection {
             try await binaryWriter.flush()
         }
     }
-    #endif
 
     /// Copy data into a table using a `COPY <table name> FROM STDIN` query.
     ///
