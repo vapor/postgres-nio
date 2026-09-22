@@ -767,7 +767,8 @@ extension PostgresConnection {
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result. Must consume the sequence to its end.
     /// - Returns: The result of the `body` closure and the query metadata.
-    public func queryWithMetadata<Result>(
+    @_disfavoredOverload
+    public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger,
         file: String = #fileID,

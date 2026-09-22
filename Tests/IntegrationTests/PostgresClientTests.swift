@@ -530,7 +530,7 @@ extension PostgresClientTests {
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func queryWithMetadataReturnsSelectRowCount() async throws {
         try await self.withClient { client, logger in
-            let (sum, metadata) = try await client.queryWithMetadata("SELECT generate_series(1, 100)", logger: logger) { rows in
+            let (sum, metadata) = try await client.query("SELECT generate_series(1, 100)", logger: logger) { rows in
                 var sum = 0
                 for try await (value) in rows.decode(Int.self) {
                     sum += value
@@ -559,7 +559,7 @@ extension PostgresClientTests {
                 logger: logger
             )
 
-            let (_, insert) = try await client.queryWithMetadata(
+            let (_, insert) = try await client.query(
                 #"INSERT INTO "\#(unescaped: tableName)" (value) SELECT generate_series(1, 25);"#,
                 logger: logger
             ) { rows in
@@ -569,7 +569,7 @@ extension PostgresClientTests {
             #expect(insert.oid == 0)
             #expect(insert.rows == 25)
 
-            let (doubled, update) = try await client.queryWithMetadata(
+            let (doubled, update) = try await client.query(
                 #"UPDATE "\#(unescaped: tableName)" SET value = value * 2 WHERE value > 20 RETURNING value;"#,
                 logger: logger
             ) { rows in
@@ -583,7 +583,7 @@ extension PostgresClientTests {
             #expect(update.command == "UPDATE")
             #expect(update.rows == 5)
 
-            let (_, delete) = try await client.queryWithMetadata(
+            let (_, delete) = try await client.query(
                 #"DELETE FROM "\#(unescaped: tableName)";"#,
                 logger: logger
             ) { rows in
@@ -600,7 +600,7 @@ extension PostgresClientTests {
     @Test func queryWithMetadataReleasesLeaseAfterBodyReturns() async throws {
         try await self.withClient(maximumConnections: 1) { client, logger in
             for i in 1...10 {
-                let (count, metadata) = try await client.queryWithMetadata("SELECT generate_series(1, \(i))", logger: logger) { rows in
+                let (count, metadata) = try await client.query("SELECT generate_series(1, \(i))", logger: logger) { rows in
                     var count = 0
                     for try await _ in rows { count += 1 }
                     return count
@@ -622,14 +622,14 @@ extension PostgresClientTests {
 
         try await self.withClient(maximumConnections: 1) { client, logger in
             await #expect(throws: MyError.self) {
-                try await client.queryWithMetadata("SELECT generate_series(1, 1000000)", logger: logger) { rows in
+                try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { rows in
                     for try await _ in rows {
                         throw MyError()
                     }
                 }
             }
 
-            let (_, metadata) = try await client.queryWithMetadata("SELECT 3", logger: logger) { rows in
+            let (_, metadata) = try await client.query("SELECT 3", logger: logger) { rows in
                 for try await _ in rows {}
             }
             #expect(metadata.rows == 1)

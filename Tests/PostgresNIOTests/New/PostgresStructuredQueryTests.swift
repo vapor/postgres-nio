@@ -263,7 +263,7 @@ import Logging
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 taskGroup.addTask {
-                    let (names, metadata) = try await connection.queryWithMetadata("SELECT name FROM users", logger: .psqlTest) { rows in
+                    let (names, metadata) = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
                         var names = [String]()
                         for try await row in rows {
                             names.append(try row.decode(String.self, context: .default))
@@ -289,7 +289,7 @@ import Logging
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 taskGroup.addTask {
-                    let (_, metadata) = try await connection.queryWithMetadata("INSERT INTO users (name) VALUES ('dave')", logger: .psqlTest) { rows in
+                    let (_, metadata) = try await connection.query("INSERT INTO users (name) VALUES ('dave')", logger: .psqlTest) { rows in
                         for try await _ in rows {}
                     }
                     #expect(metadata.command == "INSERT")
@@ -315,13 +315,13 @@ import Logging
                 taskGroup.addTask {
                     defer { scopeExited.signal() }
                     do {
-                        _ = try await connection.queryWithMetadata("SELECT name FROM users", logger: .psqlTest) { rows -> String? in
+                        _ = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows -> String? in
                             for try await row in rows {
                                 return try row.decode(String.self, context: .default)
                             }
                             return nil
                         }
-                        Issue.record("Expected queryWithMetadata to throw")
+                        Issue.record("Expected query to throw")
                     } catch let error as PSQLError {
                         #expect(error.code == .rowSequenceNotFullyConsumed)
                         #expect(error.query == "SELECT name FROM users")
@@ -333,7 +333,7 @@ import Logging
                 try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
                 try await channel.writeInbound(PostgresBackendMessage.dataRow(["alice"]))
                 // Only complete the query once the body has returned, so the stream is guaranteed to still be
-                // streaming when `queryWithMetadata` asks for the command tag.
+                // streaming when `query` asks for the command tag.
                 await scopeExited.wait()
                 try await channel.sendUnpreparedQueryEnd(dataRows: [["bob"], ["carol"]], commandTag: "SELECT 3")
 
@@ -349,7 +349,7 @@ import Logging
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
-                        _ = try await connection.queryWithMetadata("SELECT name FROM users", logger: .psqlTest) { rows in
+                        _ = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
                             var seen = [String]()
                             do {
                                 for try await row in rows {
@@ -358,11 +358,11 @@ import Logging
                                 Issue.record("Expected iteration to throw")
                             } catch {
                                 // Swallow the error: the stream is now `.consumed(.failure)` and the body
-                                // returns normally, so `queryWithMetadata` has no command tag to work with.
+                                // returns normally, so `query` has no command tag to work with.
                             }
                             return seen
                         }
-                        Issue.record("Expected queryWithMetadata to throw")
+                        Issue.record("Expected query to throw")
                     } catch let error as PSQLError {
                         #expect(error.code == .server)
                         #expect(error.serverInfo?[.sqlState] == "57014")

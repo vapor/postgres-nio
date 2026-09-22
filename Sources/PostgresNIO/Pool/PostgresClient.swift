@@ -455,7 +455,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
     /// - Returns: The result of the `body` closure and the query metadata.
-    public func queryWithMetadata<Result>(
+    @_disfavoredOverload
+    public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
         file: String = #fileID,
@@ -467,7 +468,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         defer { lease.release() }
 
-        return try await lease.connection.queryWithMetadata(query, logger: logger, file: file, line: line, body)
+        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary.
