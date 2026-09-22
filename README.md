@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/github/actions/workflow/status/vapor/postgres-nio/test.yml?event=push&style=plastic&logo=github&label=tests&logoColor=%23ccc" alt="Continuous Integration">
 </a>
 <a href="https://swift.org">
-    <img src="https://design.vapor.codes/images/swift60up.svg" alt="Swift 6.0+">
+    <img src="https://design.vapor.codes/images/swift62up.svg" alt="Swift 6.2+">
 </a>
 <a href="https://www.swift.org/sswg/incubation-process.html">
     <img src="https://design.vapor.codes/images/sswg-graduated.svg" alt="SSWG Incubation Level: Graduated">
@@ -163,7 +163,7 @@ Please see [SECURITY.md] for details on the security process.
 [Team Chat]: https://discord.gg/vapor
 [MIT License]: LICENSE
 [Continuous Integration]: https://github.com/vapor/postgres-nio/actions
-[Swift 6.0]: https://swift.org
+[Swift 6.2]: https://swift.org
 [Security.md]: https://github.com/vapor/.github/blob/main/SECURITY.md
 
 [`PostgresConnection`]: https://api.vapor.codes/postgresnio/postgresconnection
