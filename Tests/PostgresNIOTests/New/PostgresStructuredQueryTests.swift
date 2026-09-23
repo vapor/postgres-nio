@@ -315,7 +315,7 @@ import Logging
                 taskGroup.addTask {
                     defer { scopeExited.signal() }
                     do {
-                        _ = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows -> String? in
+                        (_, _) = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows -> String? in
                             for try await row in rows {
                                 return try row.decode(String.self, context: .default)
                             }
@@ -349,7 +349,7 @@ import Logging
             try await withThrowingTaskGroup(of: Void.self) { taskGroup in
                 taskGroup.addTask {
                     do {
-                        _ = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
+                        (_, _) = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
                             var seen = [String]()
                             do {
                                 for try await row in rows {
