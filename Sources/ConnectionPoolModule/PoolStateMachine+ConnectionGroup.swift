@@ -587,6 +587,12 @@ extension PoolStateMachine {
             case .idle:
                 self.stats.idle -= 1
                 self.stats.closing += 1
+                // The stream used by the running keep-alive was counted in
+                // `leasedStreams` by `keepAliveIfIdle`. It must be returned here: the
+                // connection moves to `.closing`, where nobody subtracts it anymore
+                // (`closed()` from `.closing` reports usedStreams = 0), so it would
+                // stay counted forever and eventually overflow `leasedStreams`.
+                self.stats.leasedStreams -= closeAction.usedStreams
             case .leased:
                 self.stats.leased -= 1
                 self.stats.leasedStreams -= closeAction.usedStreams
@@ -654,6 +660,12 @@ extension PoolStateMachine {
 
             self.stats.runningKeepAlive -= closeAction.runningKeepAlive ? 1 : 0
             self.stats.availableStreams -= closeAction.maxStreams - closeAction.usedStreams
+            // The stream used by a running keep-alive must be returned here: the
+            // connection moves to `.closing`, where `keepAliveSucceeded`/`keepAliveFailed`
+            // are no-ops. The LEASED streams instead stay counted on purpose: they are
+            // subtracted when the outstanding lease is released.
+            let keepAliveStream: UInt16 = (closeAction.runningKeepAlive && self.keepAliveReducesAvailableStreams) ? 1 : 0
+            self.stats.leasedStreams -= keepAliveStream
 
             switch closeAction.previousConnectionState {
             case .idle:
