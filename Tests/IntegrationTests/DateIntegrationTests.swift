@@ -22,7 +22,7 @@ struct DateIntegrationTests {
     func outOfRangeDatesAreRejectedByTheServer(secondsSincePSQLDateStart: Double) async throws {
         let date = Date(timeInterval: secondsSincePSQLDateStart, since: Date(timeIntervalSince1970: 946_684_800))
 
-        try await withTestConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
+        try await withConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
             do {
                 let rows = try await connection.query("SELECT \(date)::timestamptz", logger: .psqlTest)
                 for try await row in rows {
