@@ -1,11 +1,10 @@
-import Atomics
 import Foundation
 import Logging
-import NIOConcurrencyHelpers
 import NIOCore
 import NIOPosix
 import NIOSSL
 import NIOTestUtils
+import Synchronization
 import Testing
 @testable import PostgresNIO
 
@@ -97,62 +96,66 @@ struct PostgresNIOTests {
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationsEmptyPayload() async throws {
         try await withConnection { conn in
-            let received = NIOLockedValueBox<[(channel: String, payload: String)]>([])
+            let received = Mutex<[(channel: String, payload: String)]>([])
             conn.addListener(channel: "example") { context, notification in
-                received.withLockedValue { $0.append((notification.channel, notification.payload)) }
+                received.withLock { $0.append((notification.channel, notification.payload)) }
             }
             _ = try await conn.simpleQuery("LISTEN example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
             _ = try await conn.simpleQuery("SELECT 1").get()
 
-            let notifications = received.withLockedValue { $0 }
+            let notifications = received.withLock { $0 }
             #expect(notifications.count == 1)
             #expect(notifications.first?.channel == "example")
             #expect(notifications.first?.payload == "")
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationsNonEmptyPayload() async throws {
         try await withConnection { conn in
-            let received = NIOLockedValueBox<[(channel: String, payload: String)]>([])
+            let received = Mutex<[(channel: String, payload: String)]>([])
             conn.addListener(channel: "example") { context, notification in
-                received.withLockedValue { $0.append((notification.channel, notification.payload)) }
+                received.withLock { $0.append((notification.channel, notification.payload)) }
             }
             _ = try await conn.simpleQuery("LISTEN example").get()
             _ = try await conn.simpleQuery("NOTIFY example, 'Notification payload example'").get()
             // Notifications are asynchronous, so we should run at least one more query to make sure we'll have received the notification response by then
             _ = try await conn.simpleQuery("SELECT 1").get()
 
-            let notifications = received.withLockedValue { $0 }
+            let notifications = received.withLock { $0 }
             #expect(notifications.count == 1)
             #expect(notifications.first?.channel == "example")
             #expect(notifications.first?.payload == "Notification payload example")
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationsRemoveHandlerWithinHandler() async throws {
         try await withConnection { conn in
-            let receivedNotifications = ManagedAtomic<Int>(0)
+            let receivedNotifications = Mutex(0)
             conn.addListener(channel: "example") { context, notification in
-                receivedNotifications.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications.withLock { $0 += 1 }
                 context.stop()
             }
             _ = try await conn.simpleQuery("LISTEN example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             _ = try await conn.simpleQuery("SELECT 1").get()
-            #expect(receivedNotifications.load(ordering: .relaxed) == 1)
+            #expect(receivedNotifications.withLock { $0 } == 1)
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationsRemoveHandlerOutsideHandler() async throws {
         try await withConnection { conn in
-            let receivedNotifications = ManagedAtomic<Int>(0)
+            let receivedNotifications = Mutex(0)
             let context = conn.addListener(channel: "example") { context, notification in
-                receivedNotifications.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications.withLock { $0 += 1 }
             }
             _ = try await conn.simpleQuery("LISTEN example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
@@ -160,58 +163,61 @@ struct PostgresNIOTests {
             context.stop()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             _ = try await conn.simpleQuery("SELECT 1").get()
-            #expect(receivedNotifications.load(ordering: .relaxed) == 1)
+            #expect(receivedNotifications.withLock { $0 } == 1)
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationsMultipleRegisteredHandlers() async throws {
         try await withConnection { conn in
-            let receivedNotifications1 = ManagedAtomic<Int>(0)
+            let receivedNotifications1 = Mutex(0)
             conn.addListener(channel: "example") { context, notification in
-                receivedNotifications1.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications1.withLock { $0 += 1 }
             }
-            let receivedNotifications2 = ManagedAtomic<Int>(0)
+            let receivedNotifications2 = Mutex(0)
             conn.addListener(channel: "example") { context, notification in
-                receivedNotifications2.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications2.withLock { $0 += 1 }
             }
             _ = try await conn.simpleQuery("LISTEN example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             _ = try await conn.simpleQuery("SELECT 1").get()
-            #expect(receivedNotifications1.load(ordering: .relaxed) == 1)
-            #expect(receivedNotifications2.load(ordering: .relaxed) == 1)
+            #expect(receivedNotifications1.withLock { $0 } == 1)
+            #expect(receivedNotifications2.withLock { $0 } == 1)
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationsMultipleRegisteredHandlersRemoval() async throws {
         try await withConnection { conn in
-            let receivedNotifications1 = ManagedAtomic<Int>(0)
+            let receivedNotifications1 = Mutex(0)
             conn.addListener(channel: "example") { context, notification in
-                receivedNotifications1.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications1.withLock { $0 += 1 }
                 context.stop()
             }
-            let receivedNotifications2 = ManagedAtomic<Int>(0)
+            let receivedNotifications2 = Mutex(0)
             conn.addListener(channel: "example") { context, notification in
-                receivedNotifications2.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications2.withLock { $0 += 1 }
             }
             _ = try await conn.simpleQuery("LISTEN example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             _ = try await conn.simpleQuery("NOTIFY example").get()
             _ = try await conn.simpleQuery("SELECT 1").get()
-            #expect(receivedNotifications1.load(ordering: .relaxed) == 1)
-            #expect(receivedNotifications2.load(ordering: .relaxed) == 2)
+            #expect(receivedNotifications1.withLock { $0 } == 1)
+            #expect(receivedNotifications2.withLock { $0 } == 2)
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func notificationHandlerFiltersOnChannel() async throws {
         try await withConnection { conn in
-            let receivedNotifications = ManagedAtomic<Int>(0)
+            let receivedNotifications = Mutex(0)
             conn.addListener(channel: "desired") { context, notification in
-                receivedNotifications.wrappingIncrement(ordering: .relaxed)
+                receivedNotifications.withLock { $0 += 1 }
             }
             _ = try await conn.simpleQuery("LISTEN undesired").get()
             _ = try await conn.simpleQuery("NOTIFY undesired").get()
             _ = try await conn.simpleQuery("SELECT 1").get()
-            #expect(receivedNotifications.load(ordering: .relaxed) == 0, "Received notification on channel that handler was not registered for")
+            #expect(receivedNotifications.withLock { $0 } == 0, "Received notification on channel that handler was not registered for")
         }
     }
 
@@ -1226,17 +1232,18 @@ struct PostgresNIOTests {
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func updateMetadata() async throws {
         try await withConnection { conn in
             _ = try await conn.simpleQuery("DROP TABLE IF EXISTS test_table").get()
             _ = try await conn.simpleQuery("CREATE TABLE test_table(pk int PRIMARY KEY)").get()
             _ = try await conn.simpleQuery("INSERT INTO test_table VALUES(1)").get()
 
-            let receivedMetadata = NIOLockedValueBox<PostgresQueryMetadata?>(nil)
+            let receivedMetadata = Mutex<PostgresQueryMetadata?>(nil)
             _ = try await conn.query("DELETE FROM test_table", onMetadata: { metadata in
-                receivedMetadata.withLockedValue { $0 = metadata }
+                receivedMetadata.withLock { $0 = metadata }
             }, onRow: { _ in }).get()
-            let metadata = try #require(receivedMetadata.withLockedValue { $0 })
+            let metadata = try #require(receivedMetadata.withLock { $0 })
             #expect(metadata.command == "DELETE")
             #expect(metadata.oid == nil)
             #expect(metadata.rows == 1)
