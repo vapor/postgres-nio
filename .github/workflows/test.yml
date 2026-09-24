@@ -16,9 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         swift-image:
-          - swift:6.1-jammy
           - swift:6.2-noble
           - swift:6.3-noble
+          - swift:6.4-noble
           - swiftlang/swift:nightly-main-noble
     container: ${{ matrix.swift-image }}
     runs-on: ubuntu-latest
@@ -31,7 +31,7 @@ jobs:
         run: |
           swift test --filter '^(PostgresNIOTests|ConnectionPoolModuleTests)' --sanitize=thread --enable-code-coverage
       - name: Submit code coverage
-        uses: vapor/swift-codecov-action@855faf6b50974544c7ab3da724f49e602e43edc6 # v0.3.6
+        uses: vapor/swift-codecov-action@c93caea6600dbe3af0266a8ef6ee195c00181f04 # v0.3.7
         with:
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -53,7 +53,7 @@ jobs:
           - postgres-image: postgres:14
             postgres-auth: trust
     container:
-      image: swift:6.3-noble
+      image: swift:6.4-noble
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-latest
     env: &psql_shared_env
@@ -106,12 +106,12 @@ jobs:
           # Only test one auth method on macOS, Linux tests will cover the others
           - scram-sha-256
         macos-version:
-          - macos-15
           - macos-26
+          - xcode-27
         include:
-          - macos-version: macos-15
-            xcode-version: latest-stable
           - macos-version: macos-26
+            xcode-version: 26.6
+          - macos-version: xcode-27
             xcode-version: latest-stable
     runs-on: ${{ matrix.macos-version }}
     env:
@@ -138,7 +138,7 @@ jobs:
       - name: Run all tests
         run: swift test --enable-code-coverage
       - name: Submit code coverage
-        uses: vapor/swift-codecov-action@855faf6b50974544c7ab3da724f49e602e43edc6 # v0.3.6
+        uses: vapor/swift-codecov-action@c93caea6600dbe3af0266a8ef6ee195c00181f04 # v0.3.7
         with:
           codecov_token: ${{ secrets.CODECOV_TOKEN }}
           
@@ -181,8 +181,13 @@ jobs:
       - name: Install linux dependencies
         run: apt-get update && apt-get install -y curl jq
       - name: Install SDK
+        shell: bash
         run: |
-          tag="swift-$(swiftc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)-RELEASE"
+          version_num="$(swiftc --version | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+          if [[ -z "${version_num/???/}" ]]; then
+            version_num="${version_num}.0"
+          fi
+          tag="swift-${version_num}-RELEASE"
           sdk_info="$(curl -s https://www.swift.org/api/v1/install/releases.json | jq -r --arg tag "$tag" '.[] | select(.tag == $tag).platforms[] | select(.platform == "static-sdk") | [.version, .checksum] | @tsv')"
           version="$(echo "$sdk_info" | cut -f1)"
           checksum="$(echo "$sdk_info" | cut -f2)"

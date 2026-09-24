@@ -347,33 +347,31 @@ struct IntegrationTests {
         }
     }
 
-    #if compiler(>=6.2)  // copyFromBinary is only available in Swift 6.2+
-        @Test func copyFromBinary() async throws {
-            try await withConnection { connection in
-                try await self.createCopyTable(on: connection)
+    @Test func copyFromBinary() async throws {
+        try await withConnection { connection in
+            try await self.createCopyTable(on: connection)
 
-                try await connection.copyFromBinary(
-                    table: "copy_table", columns: ["id", "name"], logger: .psqlTest
-                ) { writer in
-                    let records: [(id: Int, name: String)] = [
-                        (1, "Alice"),
-                        (42, "Bob"),
-                    ]
-                    for record in records {
-                        try await writer.writeRow { columnWriter in
-                            try columnWriter.writeColumn(Int32(record.id))
-                            try columnWriter.writeColumn(record.name)
-                        }
+            try await connection.copyFromBinary(
+                table: "copy_table", columns: ["id", "name"], logger: .psqlTest
+            ) { writer in
+                let records: [(id: Int, name: String)] = [
+                    (1, "Alice"),
+                    (42, "Bob"),
+                ]
+                for record in records {
+                    try await writer.writeRow { columnWriter in
+                        try columnWriter.writeColumn(Int32(record.id))
+                        try columnWriter.writeColumn(record.name)
                     }
                 }
-                let rows = try await connection.query("SELECT id, name FROM copy_table", logger: .psqlTest)
-                    .collect().map { try $0.decode((Int, String).self) }
-                try #require(rows.count == 2)
-                #expect(rows[0].0 == 1)
-                #expect(rows[0].1 == "Alice")
-                #expect(rows[1].0 == 42)
-                #expect(rows[1].1 == "Bob")
             }
+            let rows = try await connection.query("SELECT id, name FROM copy_table", logger: .psqlTest)
+                .collect().map { try $0.decode((Int, String).self) }
+            try #require(rows.count == 2)
+            #expect(rows[0].0 == 1)
+            #expect(rows[0].1 == "Alice")
+            #expect(rows[1].0 == 42)
+            #expect(rows[1].1 == "Bob")
         }
-    #endif
+    }
 }
