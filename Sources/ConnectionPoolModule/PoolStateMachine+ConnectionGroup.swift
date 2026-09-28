@@ -209,7 +209,7 @@ extension PoolStateMachine {
             return (index, context)
         }
 
-        // After a new connection was established, schedule a timer to bind its absolute lifetime.
+        /// After a new connection was established, schedule a timer to bind its absolute lifetime.
         @inlinable
         mutating func scheduleLifetimeTimer(at index: Int) -> ConnectionTimer {
             self.connections[index].scheduleLifetimeTimer()

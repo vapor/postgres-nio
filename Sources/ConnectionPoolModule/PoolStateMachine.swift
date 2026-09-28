@@ -864,7 +864,7 @@ struct PoolStateMachine<
             let scheduledTimers: TinyFastSequence = lifetimeTimer.map { [$0] } ?? []
             let cancelledTimers = TinyFastSequence(leaseResult.timersToCancel)
             let connectionAction = self.createMultipleConnectionsAction(
-                connectionsRequired, cancelledTimers: .init(leaseResult.timersToCancel), scheduledTimers: scheduledTimers
+                connectionsRequired, cancelledTimers: cancelledTimers, scheduledTimers: scheduledTimers
             ) ?? (
                 scheduledTimers.isEmpty 
                 ? .cancelTimers(cancelledTimers) 

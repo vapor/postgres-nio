@@ -364,7 +364,7 @@ extension PoolStateMachine {
             // This gets called right after the connection was created, if the maxLifetime config flag is set.
             // Every case other than idle is wrong.
             switch self.state {
-            case .idle: 
+            case .idle:
                 precondition(self.lifetimeTimer == nil)
                 let timerState = self._nextTimer()
                 let timer = ConnectionTimer(timerID: timerState.timerID, connectionID: self.id, usecase: .maxLifetime)
@@ -572,8 +572,8 @@ extension PoolStateMachine {
                 let availableStreams = maxStreams - usedStreams - keepAlive.usedStreams
                 self.state = .draining(connection, usedStreams: usedStreams)
                 return .markedForClose(
-                    availableStreams: availableStreams, 
-                    keepAliveWasRunning: keepAlive.isRunning, 
+                    availableStreams: availableStreams,
+                    keepAliveWasRunning: keepAlive.isRunning,
                     lifetimeTimerCancellation: self._takeLifetimeTimerCancellation()
                 )
 
@@ -714,7 +714,7 @@ extension PoolStateMachine {
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .idle,
-                    cancelTimers: _timersToCancel(
+                    cancelTimers: self._timersToCancel(
                         keepAlive: keepAlive.cancelTimerIfScheduled(),
                         idle: idleTimerState?.cancellationContinuation
                     ),
@@ -759,7 +759,7 @@ extension PoolStateMachine {
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .idle,
-                    cancelTimers: _timersToCancel(
+                    cancelTimers: self._timersToCancel(
                         keepAlive: keepAlive.cancelTimerIfScheduled(),
                         idle: idleTimerState?.cancellationContinuation
                     ),
@@ -773,7 +773,7 @@ extension PoolStateMachine {
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .leased,
-                    cancelTimers: _timersToCancel(
+                    cancelTimers: self._timersToCancel(
                         keepAlive: keepAlive.cancelTimerIfScheduled()
                     ),
                     usedStreams: keepAlive.usedStreams + usedStreams,
@@ -852,7 +852,7 @@ extension PoolStateMachine {
                 self.state = .closed
                 return ClosedAction(
                     previousConnectionState: .idle,
-                    cancelTimers: _timersToCancel(
+                    cancelTimers: self._timersToCancel(
                         keepAlive: keepAlive.cancelTimerIfScheduled(),
                         idle: idleTimer?.cancellationContinuation
                     ),
@@ -865,7 +865,7 @@ extension PoolStateMachine {
                 self.state = .closed
                 return ClosedAction(
                     previousConnectionState: .leased,
-                    cancelTimers: _timersToCancel(),
+                    cancelTimers: self._timersToCancel(),
                     maxStreams: maxStreams,
                     usedStreams: usedStreams + keepAlive.usedStreams,
                     wasRunningKeepAlive: keepAlive.isRunning
@@ -875,7 +875,7 @@ extension PoolStateMachine {
                 self.state = .closed
                 return ClosedAction(
                     previousConnectionState: .leased,
-                    cancelTimers: _timersToCancel(),
+                    cancelTimers: self._timersToCancel(),
                     maxStreams: 0,
                     usedStreams: usedStreams,
                     wasRunningKeepAlive: false
@@ -885,7 +885,7 @@ extension PoolStateMachine {
                 self.state = .closed
                 return ClosedAction(
                     previousConnectionState: .closing,
-                    cancelTimers: _timersToCancel(),
+                    cancelTimers: self._timersToCancel(),
                     maxStreams: 0,
                     usedStreams: 0,
                     wasRunningKeepAlive: false
@@ -909,12 +909,10 @@ extension PoolStateMachine {
             keepAlive: TimerCancellationToken? = nil,
             idle: TimerCancellationToken? = nil
         ) -> TinyFastSequence<TimerCancellationToken> {
-            var cancelTimers: TinyFastSequence<TimerCancellationToken> = []
-            if let keepAlive = keepAlive { cancelTimers.append(keepAlive) }
-            if let idle = idle { cancelTimers.append(idle)}
-            defer { self.lifetimeTimer = nil }
-            if let lifetime = self.lifetimeTimer?.cancellationContinuation { cancelTimers.append(lifetime)}
-
+            var cancelTimers = TinyFastSequence(Max2Sequence(keepAlive, idle))
+            if let lifetime = self._takeLifetimeTimerCancellation() {
+                cancelTimers.append(lifetime)
+            }
             return cancelTimers
         }
 
