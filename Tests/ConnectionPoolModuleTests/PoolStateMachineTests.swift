@@ -1825,7 +1825,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let newRequests = (5..<8).map { TestPoolStateMachine.ConnectionRequest(connectionID: $0) }
         let connectionKeepAliveTimer = TestPoolStateMachine.Timer(.init(timerID: 1, connectionID: 0, usecase: .keepAlive), duration: .seconds(2))
         #expect(createdAction.request == .none)
-        #expect(createdAction.connection == .makeConnectionsCancelAndScheduleTimers(.init(newRequests), [], .init(connectionKeepAliveTimer)))
+        #expect(createdAction.connection == .makeConnectionsCancelAndScheduleTimers(.init(newRequests), [], .init(element: connectionKeepAliveTimer)))
 
         // make connection. Return 
         let connection2 = MockConnection(id: 5)
@@ -1833,7 +1833,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connectionKeepAliveTimer2 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 5, usecase: .keepAlive), duration: .seconds(2))
         #expect(createdAction2.request == .none)
         #expect(createdAction2.connection == .makeConnectionsCancelAndScheduleTimers(
-            .init(element: TestPoolStateMachine.ConnectionRequest(connectionID: 8)), [], .init(connectionKeepAliveTimer2))
+            .init(element: TestPoolStateMachine.ConnectionRequest(connectionID: 8)), [], .init(element: connectionKeepAliveTimer2))
         )
 
         #expect(stateMachine.connections.stats.active == 5)
@@ -1979,10 +1979,9 @@ typealias TestPoolStateMachine = PoolStateMachine<
             Issue.record()
             return
         }
-        let keepAliveTimer = try #require(timers2.first)
-        let idleTimeoutTimer = try #require(timers2.second)
-        #expect(keepAliveTimer.underlying.usecase == .keepAlive) 
-        #expect(idleTimeoutTimer.underlying.usecase == .idleTimeout)
+        #expect(timers2.count == 2)
+        let keepAliveTimer = try #require(timers2.first { $0.underlying.usecase == .keepAlive })
+        let idleTimeoutTimer = try #require(timers2.first { $0.underlying.usecase == .idleTimeout })
         // trigger keep alive
         let timerTriggered = stateMachine.timerTriggered(keepAliveTimer)
         guard case .runKeepAlive = timerTriggered.connection else {
@@ -2520,7 +2519,7 @@ typealias TestPoolStateMachine = PoolStateMachine<
             idleFired.connection == .makeConnectionsCancelAndScheduleTimers(
                 .init(),
                 .init(element: idleToken),
-                .init(newIdleTimer)
+                .init(element: newIdleTimer)
             )
         )
     }
@@ -2651,6 +2650,184 @@ typealias TestPoolStateMachine = PoolStateMachine<
         #expect(stateMachine.connections.stats.leasedStreams == 0)
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testNewConnectionSchedulesLifetimeTimer() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 4
+        configuration.maximumConnectionLifetime = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+        let connection = MockConnection(id: 0)
+
+        let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
+
+        #expect(created.connection == .scheduleTimers([timer]))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testReleasedConnectionDoesNotRescheduleLifetimeTimer() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 4
+        configuration.maximumConnectionLifetime = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+        let connection = MockConnection(id: 0)
+
+        let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        guard case .scheduleTimers(let timers) = created.connection else {
+            Issue.record("No timers scheduled")
+            return
+        }
+        #expect(timers.count == 1)
+        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
+        #expect(timers == [timer])
+
+        // schedule request to lease connection
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseRequest = stateMachine.leaseConnection(request)
+        #expect(leaseRequest.connection == .cancelTimers([]))
+        #expect(leaseRequest.request == .leaseConnection(.init(element: request), connection))
+
+        // release connection. must not contain .scheduleTimers
+        #expect(stateMachine.releaseConnection(connection, streams: 1) == .none())
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testNewConnectionLeasedImmediatelySchedulesLifetimeTimer() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 4
+        configuration.maximumConnectionLifetime = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+        let connection0 = MockConnection(id: 0)
+
+        let created0 = stateMachine.connectionEstablished(connection0, maxStreams: 1)
+        guard case .scheduleTimers(let timers) = created0.connection else {
+            Issue.record("No timers scheduled")
+            return
+        }
+        #expect(timers.count == 1)
+        let timer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
+        #expect(timers == [timer0])
+
+        // schedule request to lease connection
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        let leaseRequest1 = stateMachine.leaseConnection(request1)
+        #expect(leaseRequest1.connection == .cancelTimers([]))
+        #expect(leaseRequest1.request == .leaseConnection(.init(element: request1), connection0))
+
+        let request2 = MockRequest(connectionType: MockConnection.self)
+        let leaseRequest2 = stateMachine.leaseConnection(request2)
+        // request was queued
+        #expect(leaseRequest2.request == .none)
+        #expect(leaseRequest2.connection == .makeConnection(.init(connectionID: 1), []))
+
+        let connection1 = MockConnection(id: 1)
+        let connectionEstablished = stateMachine.connectionEstablished(connection1, maxStreams: 1)
+        let lifetimeTimer1 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .maxLifetime), duration: .seconds(10))
+        guard case let .makeConnectionsCancelAndScheduleTimers(_, canceledTimers, scheduledTimers) = connectionEstablished.connection else {
+            Issue.record()
+            return
+        }
+        #expect(canceledTimers == [])
+        #expect(scheduledTimers == [lifetimeTimer1])
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testLifetimeTimerClosesIdleConnection() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 4
+        configuration.maximumConnectionLifetime = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+        let connection = MockConnection(id: 0)
+
+        let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
+        let lifetimeToken = MockTimerCancellationToken(timer)
+
+        #expect(created.connection == .scheduleTimers([timer]))
+        #expect(stateMachine.timerScheduled(timer, cancelContinuation: lifetimeToken) == nil)
+
+        #expect(stateMachine.timerTriggered(timer).connection == .closeConnection(connection, [lifetimeToken]))
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testLifetimeTimerDrainsLeasedConnection() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 2
+        configuration.maximumConnectionHardLimit = 4
+        configuration.maximumConnectionLifetime = .seconds(10)
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        let requests = stateMachine.refillConnections()
+        #expect(requests.count == 1)
+        let connection = MockConnection(id: 0)
+
+        let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
+        let lifetimeToken = MockTimerCancellationToken(timer)
+
+        #expect(created.connection == .scheduleTimers([timer]))
+        #expect(stateMachine.timerScheduled(timer, cancelContinuation: lifetimeToken) == nil)
+
+        let request = MockRequest(connectionType: MockConnection.self)
+        let leaseRequest = stateMachine.leaseConnection(request)
+        #expect(leaseRequest.connection == .cancelTimers([]))
+        #expect(leaseRequest.request == .leaseConnection(.init(element: request), connection))
+
+        #expect(stateMachine.timerTriggered(timer).connection == .cancelTimers([lifetimeToken]))
+
+        #expect(stateMachine.releaseConnection(connection, streams: 1).connection == .closeConnection(connection, []))
+    }
 }
 
 struct SomeError: Error {}

@@ -209,6 +209,12 @@ extension PoolStateMachine {
             return (index, context)
         }
 
+        // After a new connection was established, schedule a timer to bind its absolute lifetime.
+        @inlinable
+        mutating func scheduleLifetimeTimer(at index: Int) -> ConnectionTimer {
+            self.connections[index].scheduleLifetimeTimer()
+        }
+
         @inlinable
         mutating func backoffNextConnectionAttempt(_ connectionID: Connection.ID) -> ConnectionTimer {
             guard let index = self.connections.firstIndex(where: { $0.id == connectionID }) else {
@@ -395,6 +401,7 @@ extension PoolStateMachine {
         @usableFromInline
         enum ConnectionWillCloseAction {
             case closeConnection(CloseAction)
+            case cancelTimer(TimerCancellationToken)
             case none
         }
 
@@ -434,7 +441,7 @@ extension PoolStateMachine {
                     timersToCancel: closeAction.cancelTimers
                 ))
 
-            case .markedForClose(let availableStreams, let keepAliveWasRunning):
+            case .markedForClose(let availableStreams, let keepAliveWasRunning, let lifetimeTimerCancellation):
                 self.stats.availableStreams -= availableStreams
                 if keepAliveWasRunning {
                     self.stats.leasedStreams -= self.keepAliveReducesAvailableStreams ? 1 : 0
@@ -457,6 +464,10 @@ extension PoolStateMachine {
                     {
                         self.connections.swapAt(index, overflowIndex)
                     }
+                }
+
+                if let lifetimeTimerCancellation {
+                    return .cancelTimer(lifetimeTimerCancellation)
                 }
 
                 return .none
@@ -611,10 +622,10 @@ extension PoolStateMachine {
             var connection: Connection
 
             @usableFromInline
-            var timersToCancel: Max2Sequence<TimerCancellationToken>
+            var timersToCancel: TinyFastSequence<TimerCancellationToken>
 
             @inlinable
-            init(connection: Connection, timersToCancel: Max2Sequence<TimerCancellationToken>) {
+            init(connection: Connection, timersToCancel: TinyFastSequence<TimerCancellationToken>) {
                 self.connection = connection
                 self.timersToCancel = timersToCancel
             }
@@ -642,7 +653,7 @@ extension PoolStateMachine {
         @usableFromInline
         enum CloseConnectionAction {
             case close(CloseAction)
-            case cancelTimers(Max2Sequence<TimerCancellationToken>)
+            case cancelTimers(TinyFastSequence<TimerCancellationToken>)
             case doNothing
         }
         /// Closes the connection at the given index.
@@ -788,7 +799,7 @@ extension PoolStateMachine {
             }
 
             let closedAction = self.connections[index].closed()
-            var timersToCancel = TinyFastSequence(closedAction.cancelTimers)
+            var timersToCancel = closedAction.cancelTimers
 
             if closedAction.wasRunningKeepAlive {
                 self.stats.runningKeepAlive -= 1
