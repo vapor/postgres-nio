@@ -8,7 +8,7 @@ import Testing
 struct PreparedQueryIntegrationTests {
     @Test(.bug("https://github.com/vapor/postgres-nio/issues/303"))
     func selectPlainPrepared() async throws {
-        try await withTestConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
+        try await withConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
             let prepared = try await connection.prepare(query: "SELECT 10, 20").get()
             let rows = try await prepared.execute().get()
 
@@ -22,7 +22,7 @@ struct PreparedQueryIntegrationTests {
 
     @Test(.bug("https://github.com/vapor/postgres-nio/issues/303"))
     func selectBoundPrepared() async throws {
-        try await withTestConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
+        try await withConnection(on: MultiThreadedEventLoopGroup.singleton.any()) { connection in
             let prepared = try await connection.prepare(query: "SELECT $1::int8, $2::int8").get()
             let rows = try await prepared.execute([PostgresData(int: 10), PostgresData(int: 20)]).get()
 
