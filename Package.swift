@@ -1,4 +1,4 @@
-// swift-tools-version:6.1
+// swift-tools-version:6.2
 import PackageDescription
 
 let swiftSettings: [SwiftSetting] = [
@@ -25,7 +25,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
         .package(url: "https://github.com/apple/swift-nio-transport-services.git", from: "1.19.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.25.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", "3.9.0" ..< "5.0.0"),
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.9.0" ..< "6.0.0"),
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
@@ -75,6 +75,7 @@ let package = Package(
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+                .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
             ],
             swiftSettings: swiftSettings
         ),
