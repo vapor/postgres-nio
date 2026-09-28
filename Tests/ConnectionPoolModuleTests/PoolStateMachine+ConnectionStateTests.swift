@@ -689,7 +689,8 @@ import Testing
         }
         #expect(lifetimeTimerCancellation == lifetimeToken)
 
-        #expect(state.closed().cancelTimers == [lifetimeToken])
+        // timer canceled in markForClose
+        #expect(state.closed().cancelTimers == [])
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
