@@ -135,6 +135,14 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
+            /// The maximum amount of time a connection is kept open, measured from when it was established.
+            /// `nil` means connections are never closed because of their age. Defaults to `nil`.
+            ///
+            /// Once a connection reaches its lifetime, it is closed immediately if it is idle. If it is currently
+            /// leased, it no longer accepts new leases and is closed once it has been released. In-flight queries
+            /// are never interrupted.
+            public var maximumConnectionLifetime: Duration? = nil
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -590,6 +598,7 @@ extension ConnectionPoolConfiguration {
         self.maximumConnectionSoftLimit = config.options.maximumConnections
         self.maximumConnectionHardLimit = config.options.maximumConnections
         self.idleTimeout = config.options.connectionIdleTimeout
+        self.maximumConnectionLifetime = config.options.maximumConnectionLifetime
     }
 }
 
