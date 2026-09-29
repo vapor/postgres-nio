@@ -116,4 +116,50 @@ import NIOCore
         let correctType = error.targetType == Int.self
         #expect(correctType)
     }
+
+    @Test func notEnoughColumnsSingleType() {
+        let rowDescription = [RowDescription.Column]()
+        let row = PostgresRow(
+            data: .makeTestDataRow(),
+            lookupTable: [:],
+            columns: rowDescription
+        )
+
+        let error = #expect(throws: PSQLError.self) {
+            try row.decode(String.self)
+        }
+        
+        #expect(error?.code == .notEnoughColumns)
+        #expect(error?.expectedColumns == 1)
+        #expect(error?.returnedColumns == 0)
+        #expect(error?.file == #fileID)
+    }
+
+    @Test func notEnoughColumnsTuple() {
+        let rowDescription = [
+            RowDescription.Column(
+                name: "name",
+                tableOID: 1,
+                columnAttributeNumber: 1,
+                dataType: .text,
+                dataTypeSize: 0,
+                dataTypeModifier: 0,
+                format: .binary
+            )
+        ]
+        let row = PostgresRow(
+            data: .makeTestDataRow(ByteBuffer(string: "Hello world!")),
+            lookupTable: ["name": 0],
+            columns: rowDescription
+        )
+
+        let error = #expect(throws: PSQLError.self) {
+            try row.decode((String, String).self)
+        }
+        
+        #expect(error?.code == .notEnoughColumns)
+        #expect(error?.expectedColumns == 2)
+        #expect(error?.returnedColumns == 1)
+        #expect(error?.file == #fileID)
+    }
 }

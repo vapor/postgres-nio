@@ -414,6 +414,63 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         }
     }
 
+    /// Run a query on the Postgres server the client is connected to.
+    /// 
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result.
+    /// - Returns: The result of the `body` closure.
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> Result {
+        let logger = logger ?? Self.loggingDisabled
+        let lease = try await self.leaseConnection()
+
+        defer { lease.release() }
+
+        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+    }
+
+    /// Run a query on the Postgres server the client is connected to.
+    /// 
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result.
+    /// - Returns: The result of the `body` closure and the query metadata.
+    @_disfavoredOverload
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
+        let logger = logger ?? Self.loggingDisabled
+        let lease = try await self.leaseConnection()
+
+        defer { lease.release() }
+
+        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+    }
+
     /// Execute a prepared statement, taking care of the preparation when necessary.
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
@@ -467,6 +524,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///
     /// Cancelling the task that executes the ``run()`` method is equivalent to closing the client. Once the task
     /// has been cancelled the client is not able to process any new queries or prepared statements.
+    /// 
+    /// Graceful shutdown is different to cancellation. If the client is gracefully shut down, work continues as
+    /// before until the request queue is drained and work is completed. New incoming requests will be rejected.
     ///
     /// @Snippet(path: "postgres-nio/Snippets/PostgresClient", slice: "run")
     ///
@@ -477,8 +537,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let atomicOp = self.runningAtomic.compareExchange(expected: false, desired: true, ordering: .relaxed)
         precondition(!atomicOp.original, "PostgresClient.run() should just be called once!")
 
-        await cancelWhenGracefulShutdown {
+        await withGracefulShutdownHandler {
             await self.pool.run()
+        } onGracefulShutdown: {
+            self.pool.triggerGracefulShutdown()
         }
     }
 

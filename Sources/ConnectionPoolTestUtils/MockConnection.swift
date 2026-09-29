@@ -19,6 +19,24 @@ public final class MockConnection: PooledConnection, Sendable {
         self.id = id
     }
 
+    public var isRunning: Bool {
+        self.lock.withLockedValue { state in
+            switch state {
+            case .running: return true
+            case .closing, .closed: return false
+            }
+        }
+    }
+
+    public var isClosing: Bool {
+        self.lock.withLockedValue { state in
+            switch state {
+            case .closing: return true
+            case .closed, .running: return false
+            }
+        }
+    }
+
     public var signalToClose: Void {
         get async throws {
             try await withCheckedThrowingContinuation { continuation in

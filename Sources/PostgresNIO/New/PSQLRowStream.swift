@@ -30,17 +30,29 @@ final class PSQLRowStream: Sendable {
     let logger: Logger
 
     private enum BufferState {
+        /// The query is still running and the result is being streamed as rows come in.
         case streaming(buffer: CircularBuffer<DataRow>, dataSource: any PSQLRowsDataSource)
+        /// The query finished succesfully and the result is in the buffer.
         case finished(buffer: CircularBuffer<DataRow>, summary: StatementSummary)
+        /// The query failed and consuming the row will yield the error.
         case failure(any Error)
     }
 
+    /// The state the consumer is in.
     private enum DownstreamState {
+        /// There is no consumer yet, we are waiting for one and we carry the state of the result buffer along.
         case waitingForConsumer(BufferState)
+        /// Currently streaming rows on the EventLoop from the data source and calling `onRow` on each.
         case iteratingRows(onRow: (PostgresRow) throws -> (), EventLoopPromise<Void>, any PSQLRowsDataSource)
+        /// Waiting to buffer all rows from the query.
         case waitingForAll([PostgresRow], EventLoopPromise<[PostgresRow]>, any PSQLRowsDataSource)
-        case consumed(Result<StatementSummary, any Error>)
+        /// An AsyncSequence is being used to consume the data, calling onFinish on end.
         case asyncSequence(AsyncSequenceSource, any PSQLRowsDataSource, onFinish: @Sendable () -> ())
+        /// The consumer is done consuming the result, either with a summary or with an error.
+        case consumed(Result<StatementSummary, any Error>)
+        /// The stream was invalidated from us, currently this only happens if the stream was used outside 
+        /// of the structured query API closure.
+        case invalidated(any Error)
     }
 
     internal let rowDescription: [RowDescription.Column]
@@ -106,7 +118,13 @@ final class PSQLRowStream: Sendable {
         let source = producer.source
 
         let action = self.downstreamStateBox.withValue { state -> AsyncSequenceAction in
-            guard case .waitingForConsumer(let bufferState) = state else {
+            let bufferState: BufferState
+            switch state {
+            case .waitingForConsumer(let bState): 
+                bufferState = bState
+            case .invalidated(let error):
+                return .fail(error)
+            case .asyncSequence, .consumed, .iteratingRows, .waitingForAll: 
                 preconditionFailure("Invalid state: \(state)")
             }
 
@@ -141,6 +159,79 @@ final class PSQLRowStream: Sendable {
         return PostgresRowSequence(producer.sequence, lookupTable: self.lookupTable, columns: self.rowDescription)
     }
 
+    /// Disallows further consumption of the stream by throwing an error on the next consumption attempt.
+    /// Currently this is only used to disallow consuming the stream used outside of the structured query API closure.
+    /// The buffer is drained before throwing, so if we have rows queued they will still be yielded before throwing the error.
+    func invalidate(error: any Error) {
+        if self.eventLoop.inEventLoop {
+            self.invalidate0(error: error)
+        } else {
+            self.eventLoop.execute {
+                self.invalidate0(error: error)
+            }
+        }
+    }
+
+    private enum InvalidateAction {
+        case none
+        case cancelDataSource(any PSQLRowsDataSource)
+        case cancelDataSourceFailingVoidPromise(any PSQLRowsDataSource, EventLoopPromise<Void>)
+        case cancelDataSourceFailingRowsPromise(any PSQLRowsDataSource, EventLoopPromise<[PostgresRow]>)
+        case cancelDataSourceAndFinishSequence(any PSQLRowsDataSource, AsyncSequenceSource, onFinish: @Sendable () -> ())
+    }
+
+    private func invalidate0(error: any Error) {
+        let action = self.downstreamStateBox.withValue { state -> InvalidateAction in
+            switch state {
+            case .waitingForConsumer(let bufferState):
+                state = .invalidated(error)
+
+                switch bufferState {
+                case .streaming(_, dataSource: let dataSource):
+                    return .cancelDataSource(dataSource)
+                case .failure, .finished: 
+                    return .none
+                }
+
+            case .iteratingRows(_, let promise, let dataSource):
+                state = .invalidated(error)
+                return .cancelDataSourceFailingVoidPromise(dataSource, promise)
+
+            case .waitingForAll(_, let promise, let dataSource):
+                state = .invalidated(error)
+                return .cancelDataSourceFailingRowsPromise(dataSource, promise)
+
+            case .asyncSequence(let asyncSequenceSource, let dataSource, let onFinish):
+                state = .invalidated(error)
+                return .cancelDataSourceAndFinishSequence(dataSource, asyncSequenceSource, onFinish: onFinish)
+
+            case .consumed, .invalidated:
+                return .none
+            }
+        }
+
+        switch action {
+        case .none: 
+            break
+
+        case .cancelDataSource(let dataSource):
+            dataSource.cancel(for: self)
+
+        case .cancelDataSourceFailingVoidPromise(let dataSource, let promise):
+            dataSource.cancel(for: self)
+            promise.fail(error)
+
+        case .cancelDataSourceFailingRowsPromise(let dataSource, let promise):
+            dataSource.cancel(for: self)
+            promise.fail(error)
+
+        case .cancelDataSourceAndFinishSequence(let dataSource, let sequenceSource, let onFinish):
+            dataSource.cancel(for: self)
+            sequenceSource.finish(error)
+            onFinish()
+        }
+    }
+
     func demand() {
         if self.eventLoop.inEventLoop {
             self.demand0()
@@ -162,7 +253,7 @@ final class PSQLRowStream: Sendable {
             case .waitingForConsumer, .iteratingRows, .waitingForAll:
                 preconditionFailure("Invalid state: \(state)")
 
-            case .consumed:
+            case .consumed, .invalidated:
                 return .none
 
             case .asyncSequence(_, let dataSource, _):
@@ -200,7 +291,7 @@ final class PSQLRowStream: Sendable {
                 state = .consumed(.failure(CancellationError()))
                 return .cancelDataSource(dataSource, onFinish: onFinish)
 
-            case .consumed:
+            case .consumed, .invalidated:
                 return .none
 
             case .waitingForConsumer, .iteratingRows, .waitingForAll:
@@ -240,7 +331,13 @@ final class PSQLRowStream: Sendable {
         let promise = self.eventLoop.makePromise(of: [PostgresRow].self)
 
         let action = self.downstreamStateBox.withValue { state -> AllAction in
-            guard case .waitingForConsumer(let bufferState) = state else {
+            let bufferState: BufferState
+            switch state {
+            case .waitingForConsumer(let bState): 
+                bufferState = bState
+            case .invalidated(let error):
+                return .failPromise(error)
+            case .asyncSequence, .consumed, .iteratingRows, .waitingForAll: 
                 preconditionFailure("Invalid state: \(state)")
             }
 
@@ -295,7 +392,13 @@ final class PSQLRowStream: Sendable {
         let promise = self.eventLoop.makePromise(of: Void.self)
 
         let action = self.downstreamStateBox.withValue { state -> OnRowAction in
-            guard case .waitingForConsumer(let bufferState) = state else {
+            let bufferState: BufferState
+            switch state {
+            case .waitingForConsumer(let bState): 
+                bufferState = bState
+            case .invalidated(let error):
+                return .failPromise(error)
+            case .asyncSequence, .consumed, .iteratingRows, .waitingForAll: 
                 preconditionFailure("Invalid state: \(state)")
             }
 
@@ -383,7 +486,7 @@ final class PSQLRowStream: Sendable {
             case .consumed(.success):
                 preconditionFailure("How can we receive further rows, if we are supposed to be done")
 
-            case .consumed(.failure):
+            case .consumed(.failure), .invalidated:
                 return .none
             }
         }
@@ -441,7 +544,7 @@ final class PSQLRowStream: Sendable {
                 state = .consumed(.success(.tag(commandTag)))
                 return .finishAsyncSequence(source, onFinish: onFinish)
 
-            case .consumed(.success(.tag)), .consumed(.failure):
+            case .consumed(.success(.tag)), .consumed(.failure), .invalidated:
                 return .none
             }
         }
@@ -488,7 +591,7 @@ final class PSQLRowStream: Sendable {
                 state = .consumed(.failure(error))
                 return .failAsyncSequence(source, onFinish: onFinish)
 
-            case .consumed(.success(.tag)), .consumed(.failure):
+            case .consumed(.success(.tag)), .consumed(.failure), .invalidated:
                 return .none
             }
         }
@@ -567,7 +670,7 @@ final class PSQLRowStream: Sendable {
             case .consumed:
                 return .none
 
-            case .waitingForConsumer, .waitingForAll, .asyncSequence:
+            case .waitingForConsumer, .waitingForAll, .asyncSequence, .invalidated:
                 preconditionFailure("Invalid state: \(state)")
             }
         }
@@ -588,7 +691,43 @@ final class PSQLRowStream: Sendable {
             }
             return consumed
         }
-        switch consumed {
+        return Self.commandTag(for: consumed)
+    }
+
+    /// The command tag of the finished query, or `nil` if the consumer has not run the stream to its end
+    /// (still streaming, never consumed, or invalidated). If the stream finished with an error, the returned
+    /// future fails with that error.
+    func consumedCommandTag() -> EventLoopFuture<String?> {
+        if self.eventLoop.inEventLoop {
+            return self.eventLoop.makeCompletedFuture(self.consumedCommandTag0())
+        } else {
+            return self.eventLoop.flatSubmit {
+                self.eventLoop.makeCompletedFuture(self.consumedCommandTag0())
+            }
+        }
+    }
+
+    private func consumedCommandTag0() -> Result<String?, any Error> {
+        self.downstreamStateBox.withValue { state in
+            switch state {
+            case .consumed(.success(let summary)):
+                return .success(Self.commandTag(for: summary))
+
+            case .consumed(.failure(is CancellationError)):
+                // The consumer dropped the iterator before the end, so there is no tag to report.
+                return .success(nil)
+
+            case .consumed(.failure(let error)):
+                return .failure(error)
+            
+            case .waitingForConsumer, .iteratingRows, .waitingForAll, .asyncSequence, .invalidated:
+                return .success(nil)
+            }
+        }
+    }
+
+    private static func commandTag(for summary: StatementSummary) -> String {
+        switch summary {
         case .tag(let tag):
             return tag
         case .emptyResponse:
