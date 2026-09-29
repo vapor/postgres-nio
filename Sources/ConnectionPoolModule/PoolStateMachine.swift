@@ -1,9 +1,20 @@
 #if canImport(Darwin)
 import Darwin
+#elseif os(Windows)
+import ucrt
 #elseif canImport(Glibc)
-import Glibc
+@preconcurrency import Glibc
 #elseif canImport(Musl)
-import Musl
+@preconcurrency import Musl
+#elseif canImport(Bionic)
+@preconcurrency import Bionic
+#elseif canImport(WASILibc)
+@preconcurrency import WASILibc
+#if canImport(wasi_pthread)
+import wasi_pthread
+#endif
+#else
+#error("The PoolStateMachine module was unable to identify your C library.")
 #endif
 
 @usableFromInline
