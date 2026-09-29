@@ -61,7 +61,7 @@ struct AsyncPostgresConnectionTests {
                 ,query
                 ,state
             FROM pg_stat_activity
-            WHERE state = 'active';
+            WHERE state = 'active' AND pid = pg_backend_pid();
             """
 
         try await withConnection { connection in
