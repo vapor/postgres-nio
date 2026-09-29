@@ -90,6 +90,7 @@ final class ConnectionFactory: Sendable {
         connectionConfig.options.tlsServerName = config.options.tlsServerName
         connectionConfig.options.requireBackendKeyData = config.options.requireBackendKeyData
         connectionConfig.options.additionalStartupParameters = config.options.additionalStartupParameters
+        connectionConfig.options.tracing = config.options.tracing
 
         return connectionConfig
     }
