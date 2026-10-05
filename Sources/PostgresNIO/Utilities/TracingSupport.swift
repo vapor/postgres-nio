@@ -1,18 +1,10 @@
 import NIOCore
 import Tracing
 
-/// Tracing configuration and the span attributes that are the same for every span a connection emits.
-///
-/// Created once per connection, after the channel has connected, so the peer address is known.
 struct TracingSupport: Sendable {
     let options: TracingConfiguration
-    /// The tracer spans are created with. A no-op tracer if tracing is disabled.
     let tracer: any Tracer
-    /// Attributes that only depend on the connection: `db.system.name`, `db.namespace`,
-    /// `server.address`, `server.port`, `network.peer.address` and `network.peer.port`.
     let baseAttributes: SpanAttributes
-    /// The `{target}` of the span naming fallback chain, when no collection name is available:
-    /// `db.namespace` if set, `server.address:server.port` otherwise.
     let target: String
 
     init(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?) {
