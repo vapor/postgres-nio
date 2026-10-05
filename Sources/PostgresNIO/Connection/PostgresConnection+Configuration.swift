@@ -90,6 +90,10 @@ extension PostgresConnection {
             /// startup message that the client sends to the server.
             public var additionalStartupParameters: [(String, String)]
 
+            /// The names of additional Postgres data types whose object identifiers (OIDs) shall be resolved while
+            /// the connection is established.
+            public var additionalDataTypeNames: [String]
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -98,6 +102,7 @@ extension PostgresConnection {
                 self.tlsServerName = nil
                 self.requireBackendKeyData = true
                 self.additionalStartupParameters = []
+                self.additionalDataTypeNames = []
             }
         }
         
