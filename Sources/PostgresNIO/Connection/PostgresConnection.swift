@@ -712,8 +712,7 @@ extension PostgresConnection {
     /// Run a query on the Postgres server the connection is connected to.
     /// 
     /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// consume the stream outside of the closure is a programmer error that triggers a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -731,11 +730,12 @@ extension PostgresConnection {
     ) async throws -> Result {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
+        let scope = PostgresRowSequence.Scope(file: file, line: line)
 
         do {
             let streamFuture = self.queryStream(query, logger: logger)
             (stream, sequence) = try await streamFuture.map { stream in
-                (stream, stream.asyncSequence())
+                (stream, stream.asyncSequence().scoped(to: scope))
             }.get()
         }  catch var error as PSQLError {
             error.file = file
@@ -744,7 +744,10 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
 
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+        defer {
+            scope.close()
+            stream.invalidate(error: PostgresRowSequence.Scope.ClosedError())
+        }
 
         return try await body(sequence)
     }
@@ -753,8 +756,7 @@ extension PostgresConnection {
     /// alongside the `body` closure's result.
     ///
     /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// consume the stream outside of the closure is a programmer error that triggers a precondition failure.
     ///
     /// The metadata is derived from the command tag the server sends after the last row, so `body` must
     /// iterate the sequence to its end. If it returns early the query is cancelled and the method throws
@@ -777,10 +779,11 @@ extension PostgresConnection {
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
+        let scope = PostgresRowSequence.Scope(file: file, line: line)
 
         do {
             (stream, sequence) = try await self.queryStream(query, logger: logger).map { stream in
-                (stream, stream.asyncSequence())
+                (stream, stream.asyncSequence().scoped(to: scope))
             }.get()
         }  catch var error as PSQLError {
             error.file = file
@@ -789,7 +792,10 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
 
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+        defer {
+            scope.close()
+            stream.invalidate(error: PostgresRowSequence.Scope.ClosedError())
+        }
 
         let result = try await body(sequence)
 
