@@ -1,5 +1,4 @@
-
-public protocol ConnectionPoolObservabilityDelegate: Sendable {
+public protocol ConnectionPoolObservabilityDelegate: ConnectionPoolStatisticsReporter, Sendable {
     associatedtype ConnectionID: Hashable & Sendable
 
     /// The connection with the given ID has started trying to establish a connection. The outcome
@@ -59,4 +58,6 @@ public struct NoOpConnectionPoolMetrics<ConnectionID: Hashable & Sendable>: Conn
     public func connectionClosed(id: ConnectionID, error: (any Error)?) {}
 
     public func requestQueueDepthChanged(_ newDepth: Int) {}
+
+    public func report(statistics: ConnectionPoolStatistics) {}
 }

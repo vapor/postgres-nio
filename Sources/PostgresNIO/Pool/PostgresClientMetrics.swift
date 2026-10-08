@@ -1,13 +1,56 @@
 import _ConnectionPoolModule
 import Logging
+import Metrics
+import NIOConcurrencyHelpers
 
 final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
     typealias ConnectionID = PostgresConnection.ID
 
-    let logger: Logger
+    private struct PoolInstruments {
+        let idleConnections: Gauge
+        let usedConnections: Gauge
+        let pendingRequests: Gauge
+        let maxConnections: Gauge
+        let maxIdleConnections: Gauge
+        let minIdleConnections: Gauge
 
-    init(logger: Logger) {
+        init(factory: any MetricsFactory, poolName: String) {
+            let pool = [("db.client.connection.pool.name", poolName)]
+            self.idleConnections = Gauge(label: "db.client.connection.count", dimensions: pool + [("db.client.connection.state", "idle")], factory: factory)
+            self.usedConnections = Gauge(label: "db.client.connection.count", dimensions: pool + [("db.client.connection.state", "used")], factory: factory)
+            self.pendingRequests = Gauge(label: "db.client.connection.pending_requests", dimensions: pool, factory: factory)
+            self.maxConnections = Gauge(label: "db.client.connection.max", dimensions: pool, factory: factory)
+            self.maxIdleConnections = Gauge(label: "db.client.connection.idle.max", dimensions: pool, factory: factory)
+            self.minIdleConnections = Gauge(label: "db.client.connection.idle.min", dimensions: pool, factory: factory)
+        }
+    }
+
+    let logger: Logger
+    private let poolInstruments: PoolInstruments?
+    private let lastStatisticsID = NIOLockedValueBox(0)
+
+    init(logger: Logger, metricsFactory: (any MetricsFactory)?) {
         self.logger = logger
+        self.poolInstruments = metricsFactory.map {
+            PoolInstruments(factory: $0, poolName: "postgresnio-connection-pool")
+        }
+    }
+
+    func report(statistics: ConnectionPoolStatistics) {
+        guard let instruments = self.poolInstruments else { return }
+
+        // Snapshots can arrive out of order
+        self.lastStatisticsID.withLockedValue { lastID in
+            guard statistics.id > lastID else { return }
+            lastID = statistics.id
+
+            instruments.idleConnections.record(statistics.idleConnectionCount)
+            instruments.usedConnections.record(statistics.usedConnectionCount)
+            instruments.pendingRequests.record(statistics.pendingRequests)
+            instruments.maxConnections.record(statistics.maxConnections)
+            instruments.maxIdleConnections.record(statistics.maxIdleConnections)
+            instruments.minIdleConnections.record(statistics.minIdleConnections)
+        }
     }
 
     func startedConnecting(id: ConnectionID) {

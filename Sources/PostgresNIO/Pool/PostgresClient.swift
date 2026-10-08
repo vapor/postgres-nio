@@ -4,6 +4,7 @@ import Atomics
 import Logging
 import ServiceLifecycle
 import _ConnectionPoolModule
+import Metrics
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
@@ -134,6 +135,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// for idle connections. `Nil` means that the client shall not run keep alive queries to the server. Defaults to a
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
+
+            /// Configures the metrics recorded for the client's connection pool and its connections.
+            /// See ``MetricsConfiguration``.
+            public var metrics: PostgresMetricsConfiguration = .init()
 
             /// Create an options structure with default values.
             ///
@@ -281,6 +286,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         eventLoopGroup: any EventLoopGroup = PostgresClient.defaultEventLoopGroup,
         backgroundLogger: Logger
     ) {
+        let metricsFactory = configuration.options.metrics.factory
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
         self.factory = factory
         self.backgroundLogger = backgroundLogger
@@ -290,7 +296,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<PostgresConnection>.self,
             keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-            observabilityDelegate: .init(logger: backgroundLogger),
+            observabilityDelegate: .init(logger: backgroundLogger, metricsFactory: metricsFactory),
             clock: ContinuousClock()
         ) { (connectionID, pool) in
             let connection = try await factory.makeConnection(connectionID, pool: pool)

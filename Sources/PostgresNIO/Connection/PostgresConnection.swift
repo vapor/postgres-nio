@@ -7,6 +7,7 @@ import NIOTransportServices
 #endif
 import NIOSSL
 import Logging
+import Metrics
 
 /// A Postgres connection. Use it to run queries against a Postgres server.
 ///
@@ -49,10 +50,14 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
 
-    init(channel: any Channel, connectionID: ID, logger: Logger) {
+    /// The factory used to record this connection's query metrics, or `nil` if metrics are disabled.
+    let metricsFactory: (any MetricsFactory)?
+
+    init(channel: any Channel, connectionID: ID, logger: Logger, metricsFactory: (any MetricsFactory)?) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
+        self.metricsFactory = metricsFactory
     }
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
@@ -233,7 +238,12 @@ public final class PostgresConnection: Sendable {
                     )
                 }
 
-                let connection = PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
+                let connection = PostgresConnection(
+                    channel: channel,
+                    connectionID: connectionID,
+                    logger: logger,
+                    metricsFactory: configuration.options.metrics.factory
+                )
                 return connection.start(configuration: configuration).map { _ in
                     timeoutTask.cancel()
                     return connection
