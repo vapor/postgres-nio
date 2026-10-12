@@ -1,4 +1,3 @@
-import Atomics
 import NIOCore
 import NIOConcurrencyHelpers
 
@@ -11,29 +10,23 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
     typealias BackingSequence = NIOThrowingAsyncSequenceProducer<DataRow, any Error, AdaptiveRowBuffer, PSQLRowStream>
 
     let backing: BackingSequence
+    let stream: PSQLRowStream
     let lookupTable: [String: Int]
     let _columns: [RowDescription.Column]
-    var scope: Scope?
 
-    init(_ backing: BackingSequence, lookupTable: [String: Int], columns: [RowDescription.Column]) {
+    init(_ backing: BackingSequence, stream: PSQLRowStream, lookupTable: [String: Int], columns: [RowDescription.Column]) {
         self.backing = backing
+        self.stream = stream
         self.lookupTable = lookupTable
         self._columns = columns
-        self.scope = nil
-    }
-
-    func scoped(to scope: Scope) -> PostgresRowSequence {
-        var sequence = self
-        sequence.scope = scope
-        return sequence
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(
             backing: self.backing.makeAsyncIterator(),
+            stream: self.stream,
             lookupTable: self.lookupTable,
-            columns: self._columns,
-            scope: self.scope
+            columns: self._columns
         )
     }
 }
@@ -44,24 +37,24 @@ extension PostgresRowSequence {
         public typealias Failure = any Error
 
         let backing: BackingSequence.AsyncIterator
+        let stream: PSQLRowStream
 
         let lookupTable: [String: Int]
         let columns: [RowDescription.Column]
-        let scope: Scope?
 
-        init(backing: BackingSequence.AsyncIterator, lookupTable: [String: Int], columns: [RowDescription.Column], scope: Scope?) {
+        init(backing: BackingSequence.AsyncIterator, stream: PSQLRowStream, lookupTable: [String: Int], columns: [RowDescription.Column]) {
             self.backing = backing
+            self.stream = stream
             self.lookupTable = lookupTable
             self.columns = columns
-            self.scope = scope
         }
 
         @concurrent
         public mutating func next() async throws -> Element? {
-            self.scope?.preconditionOpen()
+            self.stream.preconditionNotInvalidated()
             defer {
-                // re-check: the scope may have changed while we were suspended
-                self.scope?.preconditionOpen()
+                // re-check: the stream may have been invalidated while we were suspended
+                self.stream.preconditionNotInvalidated()
             }
             if let dataRow = try await self.backing.next() {
                 return PostgresRow(
@@ -80,10 +73,10 @@ extension PostgresRowSequence {
             struct UnsafeTransfer: @unchecked Sendable {
                 var backing: BackingSequence.AsyncIterator
             }
-            self.scope?.preconditionOpen()
+            self.stream.preconditionNotInvalidated()
             defer {
-                // re-check: the scope may have changed while we were suspended
-                self.scope?.preconditionOpen()
+                // re-check: the stream may have been invalidated while we were suspended
+                self.stream.preconditionNotInvalidated()
             }
             let unsafeTransfer = UnsafeTransfer(backing: self.backing)
             if let dataRow = try await unsafeTransfer.backing.next() {
@@ -95,33 +88,6 @@ extension PostgresRowSequence {
             }
             return nil
         }
-    }
-}
-
-extension PostgresRowSequence {
-    /// Tracks whether the `query` closure a ``PostgresRowSequence`` was passed to has returned.
-    /// Consuming the sequence after the scope is closed is a programmer error and triggers a precondition failure.
-    final class Scope: Sendable {
-        private let isClosed = ManagedAtomic(false)
-        let file: String
-        let line: Int
-
-        init(file: String, line: Int) {
-            self.file = file
-            self.line = line
-        }
-
-        func close() {
-            self.isClosed.store(true, ordering: .releasing)
-        }
-
-        func preconditionOpen() {
-            if self.isClosed.load(ordering: .acquiring) {
-                preconditionFailure("A PostgresRowSequence was consumed after the closure of the query started at \(self.file):\(self.line) returned. The sequence must not escape the closure it was passed to.")
-            }
-        }
-
-        struct ClosedError: Error {}
     }
 }
 

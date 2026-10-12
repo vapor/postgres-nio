@@ -730,12 +730,11 @@ extension PostgresConnection {
     ) async throws -> Result {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
-        let scope = PostgresRowSequence.Scope(file: file, line: line)
 
         do {
             let streamFuture = self.queryStream(query, logger: logger)
             (stream, sequence) = try await streamFuture.map { stream in
-                (stream, stream.asyncSequence().scoped(to: scope))
+                (stream, stream.asyncSequence())
             }.get()
         }  catch var error as PSQLError {
             error.file = file
@@ -744,10 +743,7 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
 
-        defer {
-            scope.close()
-            stream.invalidate(error: PostgresRowSequence.Scope.ClosedError())
-        }
+        defer { stream.invalidate(file: file, line: line) }
 
         return try await body(sequence)
     }
@@ -779,11 +775,10 @@ extension PostgresConnection {
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
-        let scope = PostgresRowSequence.Scope(file: file, line: line)
 
         do {
             (stream, sequence) = try await self.queryStream(query, logger: logger).map { stream in
-                (stream, stream.asyncSequence().scoped(to: scope))
+                (stream, stream.asyncSequence())
             }.get()
         }  catch var error as PSQLError {
             error.file = file
@@ -792,10 +787,7 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
 
-        defer {
-            scope.close()
-            stream.invalidate(error: PostgresRowSequence.Scope.ClosedError())
-        }
+        defer { stream.invalidate(file: file, line: line) }
 
         let result = try await body(sequence)
 
