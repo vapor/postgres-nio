@@ -10,11 +10,13 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
     typealias BackingSequence = NIOThrowingAsyncSequenceProducer<DataRow, any Error, AdaptiveRowBuffer, PSQLRowStream>
 
     let backing: BackingSequence
+    let stream: PSQLRowStream
     let lookupTable: [String: Int]
     let _columns: [RowDescription.Column]
 
-    init(_ backing: BackingSequence, lookupTable: [String: Int], columns: [RowDescription.Column]) {
+    init(_ backing: BackingSequence, stream: PSQLRowStream, lookupTable: [String: Int], columns: [RowDescription.Column]) {
         self.backing = backing
+        self.stream = stream
         self.lookupTable = lookupTable
         self._columns = columns
     }
@@ -22,6 +24,7 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(
             backing: self.backing.makeAsyncIterator(),
+            stream: self.stream,
             lookupTable: self.lookupTable,
             columns: self._columns
         )
@@ -34,18 +37,25 @@ extension PostgresRowSequence {
         public typealias Failure = any Error
 
         let backing: BackingSequence.AsyncIterator
+        let stream: PSQLRowStream
 
         let lookupTable: [String: Int]
         let columns: [RowDescription.Column]
 
-        init(backing: BackingSequence.AsyncIterator, lookupTable: [String: Int], columns: [RowDescription.Column]) {
+        init(backing: BackingSequence.AsyncIterator, stream: PSQLRowStream, lookupTable: [String: Int], columns: [RowDescription.Column]) {
             self.backing = backing
+            self.stream = stream
             self.lookupTable = lookupTable
             self.columns = columns
         }
 
         @concurrent
         public mutating func next() async throws -> Element? {
+            self.stream.preconditionNotInvalidated()
+            defer {
+                // re-check: the stream may have been invalidated while we were suspended
+                self.stream.preconditionNotInvalidated()
+            }
             if let dataRow = try await self.backing.next() {
                 return PostgresRow(
                     data: dataRow,
@@ -62,6 +72,11 @@ extension PostgresRowSequence {
             // does not supported the next(isolation:) call yet, we will hop here back and forth.
             struct UnsafeTransfer: @unchecked Sendable {
                 var backing: BackingSequence.AsyncIterator
+            }
+            self.stream.preconditionNotInvalidated()
+            defer {
+                // re-check: the stream may have been invalidated while we were suspended
+                self.stream.preconditionNotInvalidated()
             }
             let unsafeTransfer = UnsafeTransfer(backing: self.backing)
             if let dataRow = try await unsafeTransfer.backing.next() {
