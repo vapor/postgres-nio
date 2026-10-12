@@ -1,4 +1,3 @@
-import Foundation
 import NIOCore
 import NIOEmbedded
 import NIOConcurrencyHelpers
@@ -108,7 +107,6 @@ import Logging
         }
         let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
         #expect(stderr.contains(Self.usedOutsideScopeMessage))
-        #expect(!stderr.contains(Self.rowMarker))
     }
 
     @Test func sequenceEscapingTheScopeAfterPartialConsumptionCannotBeConsumedFurther() async throws {
@@ -145,7 +143,6 @@ import Logging
         }
         let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
         #expect(stderr.contains(Self.usedOutsideScopeMessage))
-        #expect(!stderr.contains(Self.rowMarker))
     }
 
     @Test func sequenceEscapingTheScopeDoesNotYieldAlreadyBufferedRows() async throws {
@@ -191,7 +188,6 @@ import Logging
         }
         let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
         #expect(stderr.contains(Self.usedOutsideScopeMessage))
-        #expect(!stderr.contains(Self.rowMarker))
     }
 
     @Test func sequenceConsumedConcurrentlyTrapsWhenScopeClosesWhileSuspended() async throws {
@@ -209,9 +205,9 @@ import Logging
                                     for try await row in rows {
                                         Self.reportRow(row)
                                     }
-                                    Self.report("\(Self.escapedOutcomeMarker)end")
+                                    Issue.record("Escaped consumer finished without trapping")
                                 } catch {
-                                    Self.report("\(Self.escapedOutcomeMarker)\(error)")
+                                    Issue.record("Escaped consumer received \(error) instead of trapping")
                                 }
                             }
                             await consumerStarted.wait()
@@ -223,7 +219,6 @@ import Logging
                         // Closing the scope fails the suspended `next()` with the internal invalidation error.
                         // It must trap instead of surfacing that error, otherwise the consumer finishes normally.
                         await consumer.value
-                        exit(EXIT_SUCCESS)
                     }
 
                     _ = try await channel.waitForUnpreparedRequest()
@@ -235,8 +230,6 @@ import Logging
         }
         let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
         #expect(stderr.contains(Self.usedOutsideScopeMessage))
-        #expect(!stderr.contains(Self.rowMarker))
-        #expect(!stderr.contains(Self.escapedOutcomeMarker))
     }
 
     @Test func bodyThrowsPropagatesErrorAndConnectionStaysUsable() async throws {
@@ -457,18 +450,11 @@ import Logging
         }
     }
 
-    private static let rowMarker = "escaped row: "
-    private static let escapedOutcomeMarker = "escaped outcome: "
     private static let usedOutsideScopeMessage = "A PostgresRowSequence was consumed after the closure"
 
-    /// Writes the row to stderr, which is unbuffered, so the parent of an exit test sees it even after a trap.
     private static func reportRow(_ row: PostgresRow) {
         let name = (try? row.decode(String.self, context: .default)) ?? "<undecodable>"
-        Self.report("\(Self.rowMarker)\(name)")
-    }
-
-    private static func report(_ line: String) {
-        FileHandle.standardError.write(Data("\(line)\n".utf8))
+        Issue.record("Escaped consumer received row \(name)")
     }
 
     private func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {

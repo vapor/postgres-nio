@@ -416,8 +416,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Run a query on the Postgres server the client is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure is a programmer error that triggers a precondition failure.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -443,8 +443,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Run a query on the Postgres server the client is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure is a programmer error that triggers a precondition failure.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run

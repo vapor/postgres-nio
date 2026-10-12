@@ -59,7 +59,6 @@ final class PSQLRowStream: Sendable {
     internal let rowDescription: [RowDescription.Column]
     private let lookupTable: [String: Int]
     private let downstreamStateBox: NIOLoopBoundBox<DownstreamState>
-
     private let invalidation = ManagedAtomicLazyReference<InvalidatedError>()
 
     init(

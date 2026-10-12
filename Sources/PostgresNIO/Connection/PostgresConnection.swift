@@ -711,8 +711,8 @@ extension PostgresConnection {
 extension PostgresConnection {
     /// Run a query on the Postgres server the connection is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure is a programmer error that triggers a precondition failure.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -751,8 +751,8 @@ extension PostgresConnection {
     /// Run a query on the Postgres server the connection is connected to and return the query's metadata
     /// alongside the `body` closure's result.
     ///
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure is a programmer error that triggers a precondition failure.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// The metadata is derived from the command tag the server sends after the last row, so `body` must
     /// iterate the sequence to its end. If it returns early the query is cancelled and the method throws
