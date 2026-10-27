@@ -6,13 +6,16 @@ import NIOConcurrencyHelpers
 final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
     typealias ConnectionID = PostgresConnection.ID
 
-    private struct PoolInstruments {
+    struct PoolInstruments {
         let idleConnections: Gauge
         let usedConnections: Gauge
         let pendingRequests: Gauge
         let maxConnections: Gauge
         let maxIdleConnections: Gauge
         let minIdleConnections: Gauge
+        let createTime: Timer
+        let waitTime: Timer
+        let useTime: Timer
 
         init(factory: any MetricsFactory, poolName: String) {
             let pool = [("db.client.connection.pool.name", poolName)]
@@ -22,11 +25,14 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
             self.maxConnections = Gauge(label: "db.client.connection.max", dimensions: pool, factory: factory)
             self.maxIdleConnections = Gauge(label: "db.client.connection.idle.max", dimensions: pool, factory: factory)
             self.minIdleConnections = Gauge(label: "db.client.connection.idle.min", dimensions: pool, factory: factory)
+            self.createTime = Timer(label: "db.client.connection.create_time", dimensions: pool, factory: factory)
+            self.waitTime = Timer(label: "db.client.connection.wait_time", dimensions: pool, factory: factory)
+            self.useTime = Timer(label: "db.client.connection.use_time", dimensions: pool, factory: factory)
         }
     }
 
     let logger: Logger
-    private let poolInstruments: PoolInstruments?
+    let poolInstruments: PoolInstruments?
     private let lastStatisticsID = NIOLockedValueBox(0)
 
     init(logger: Logger, metricsFactory: (any MetricsFactory)?) {

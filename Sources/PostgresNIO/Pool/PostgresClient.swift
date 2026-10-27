@@ -258,6 +258,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     let factory: ConnectionFactory
     let runningAtomic = ManagedAtomic(false)
     let backgroundLogger: Logger
+    let metrics: PostgresClientMetrics
 
     /// Creates a new ``PostgresClient``, that does not log any background information.
     ///
@@ -286,20 +287,22 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         eventLoopGroup: any EventLoopGroup = PostgresClient.defaultEventLoopGroup,
         backgroundLogger: Logger
     ) {
-        let metricsFactory = configuration.options.metrics.factory
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
+        let metrics = PostgresClientMetrics(logger: backgroundLogger, metricsFactory: configuration.options.metrics.factory)
         self.factory = factory
         self.backgroundLogger = backgroundLogger
+        self.metrics = metrics
 
         self.pool = ConnectionPool(
             configuration: .init(configuration),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<PostgresConnection>.self,
             keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-            observabilityDelegate: .init(logger: backgroundLogger, metricsFactory: metricsFactory),
+            observabilityDelegate: metrics,
             clock: ContinuousClock()
         ) { (connectionID, pool) in
             let connection = try await factory.makeConnection(connectionID, pool: pool)
+            metrics.poolInstruments?.createTime.record(duration: .now - ContinuousClock.now)
 
             return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
         }
@@ -556,7 +559,19 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         if !self.runningAtomic.load(ordering: .relaxed) {
             self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }
-        return try await self.pool.leaseConnection()
+        guard let instruments = self.metrics.poolInstruments else {
+            return try await self.pool.leaseConnection()
+        }
+
+        let start = ContinuousClock.now
+        let lease = try await self.pool.leaseConnection()
+        let leasedAt = ContinuousClock.now
+        instruments.waitTime.record(duration: leasedAt - start)
+
+        return ConnectionLease(connection: lease.connection) { _ in
+            instruments.useTime.record(duration: .now - leasedAt)
+            lease.release()
+        }
     }
 
     /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.
