@@ -1263,7 +1263,7 @@ extension AuthContext: Equatable {
             return false
         }
 
-        return lhs.additionalParameters.elementsEqual(rhs.additionalParameters) { lhs, rhs in
+        return zip(lhs.additionalParameters, rhs.additionalParameters).allSatisfy { lhs, rhs in
             lhs.0 == rhs.0 && lhs.1 == rhs.1
         }
     }
