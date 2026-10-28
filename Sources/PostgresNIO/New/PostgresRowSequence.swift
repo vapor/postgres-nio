@@ -10,13 +10,20 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
     typealias BackingSequence = NIOThrowingAsyncSequenceProducer<DataRow, any Error, AdaptiveRowBuffer, PSQLRowStream>
 
     let backing: BackingSequence
+    let stream: PSQLRowStream
     let lookupTable: [String: Int]
     let _columns: [RowDescription.Column]
 
-    init(_ backing: BackingSequence, lookupTable: [String: Int], columns: [RowDescription.Column]) {
+    init(_ backing: BackingSequence, stream: PSQLRowStream, lookupTable: [String: Int], columns: [RowDescription.Column]) {
         self.backing = backing
+        self.stream = stream
         self.lookupTable = lookupTable
         self._columns = columns
+    }
+
+    @usableFromInline
+    func invalidate(query: PostgresQuery, file: String, line: Int) {
+        self.stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line))
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
