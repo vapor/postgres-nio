@@ -52,10 +52,6 @@ extension PostgresRowSequence {
         @concurrent
         public mutating func next() async throws -> Element? {
             self.stream.preconditionNotInvalidated()
-            defer {
-                // re-check: the stream may have been invalidated while we were suspended
-                self.stream.preconditionNotInvalidated()
-            }
             if let dataRow = try await self.backing.next() {
                 return PostgresRow(
                     data: dataRow,
@@ -74,10 +70,6 @@ extension PostgresRowSequence {
                 var backing: BackingSequence.AsyncIterator
             }
             self.stream.preconditionNotInvalidated()
-            defer {
-                // re-check: the stream may have been invalidated while we were suspended
-                self.stream.preconditionNotInvalidated()
-            }
             let unsafeTransfer = UnsafeTransfer(backing: self.backing)
             if let dataRow = try await unsafeTransfer.backing.next() {
                 return PostgresRow(
