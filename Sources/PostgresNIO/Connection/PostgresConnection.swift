@@ -798,6 +798,99 @@ extension PostgresConnection {
             throw error // rethrow with more metadata
         }
     }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows.
+    /// - Returns: The result of the `body` closure.
+    @inlinable
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> Result where Row == Statement.Row {
+        let query = try PostgresQuery(unsafeSQL: Statement.sql, binds: preparedStatement.makeBindings())
+        let rows = try await startScopedExecute(Statement.self, query, logger: logger, file: file, line: line)
+        defer { rows.invalidate(file: file, line: line) }
+
+        return try await body(rows.map { try preparedStatement.decodeRow($0) })
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary, and return the
+    /// statement's metadata alongside the `body` closure's result.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// The metadata is derived from the command tag the server sends after the last row, so `body` must
+    /// iterate the sequence to its end. If it returns early the statement is cancelled and the method throws
+    /// `PSQLError.rowSequenceNotFullyConsumed`.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows. Must consume the sequence to its end.
+    /// - Returns: The result of the `body` closure and the statement metadata.
+    @inlinable
+    @_disfavoredOverload
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) where Row == Statement.Row {
+        let query = try PostgresQuery(unsafeSQL: Statement.sql, binds: preparedStatement.makeBindings())
+        let rows = try await startScopedExecute(Statement.self, query, logger: logger, file: file, line: line)
+        defer { rows.invalidate(file: file, line: line) }
+
+        let result = try await body(rows.map { try preparedStatement.decodeRow($0) })
+
+        let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
+
+        return (result, metadata)
+    }
+
+    @usableFromInline
+    func startScopedExecute<Statement: PostgresPreparedStatement>(
+        _ statement: Statement.Type,
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String,
+        line: Int
+    ) async throws -> PostgresRowSequence {
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let task = HandlerTask.executePreparedStatement(.init(
+            name: Statement.name,
+            sql: Statement.sql,
+            bindings: query.binds,
+            bindingDataTypes: Statement.bindingDataTypes,
+            logger: logger,
+            promise: promise
+        ))
+        self.channel.write(task, promise: nil)
+
+        do {
+            return try await promise.futureResult.map { $0.asyncSequence() }.get()
+        }  catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+    }
 }
 
 // MARK: EventLoopFuture interface
