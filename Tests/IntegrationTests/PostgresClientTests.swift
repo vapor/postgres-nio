@@ -331,6 +331,343 @@ struct PostgresClientTests {
 
 }
 
+// MARK: - Structured queries
+
+extension PostgresClientTests {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryReturnsBodyResult() async throws {
+        try await self.withClient { client, logger in
+            let sum = try await client.query("SELECT generate_series(1, 100)", logger: logger) { rows in
+                var sum = 0
+                for try await (value) in rows.decode(Int.self) {
+                    sum += value
+                }
+                return sum
+            }
+            #expect(sum == 5050)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryVoidBody() async throws {
+        try await self.withClient { client, logger in
+            try await client.query("SELECT 1", logger: logger) { rows in
+                var count = 0
+                for try await _ in rows { count += 1 }
+                #expect(count == 1)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryReleasesLeaseAfterBodyReturns() async throws {
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            for i in 0..<20 {
+                if i.isMultiple(of: 2) {
+                    let count = try await client.query("SELECT generate_series(1, 10)", logger: logger) { rows in
+                        var count = 0
+                        for try await _ in rows { count += 1 }
+                        return count
+                    }
+                    #expect(count == 10)
+                } else {
+                    try await client.query("SELECT generate_series(1, 10)", logger: logger) { _ in }
+                }
+            }
+
+            let rows = try await client.query("SELECT 1", logger: logger)
+            for try await (value) in rows.decode(Int.self) {
+                #expect(value == 1)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryReleasesLeaseWhenBodyStopsEarly() async throws {
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            let first = try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { rows -> Int? in
+                for try await (value) in rows.decode(Int.self) {
+                    return value
+                }
+                return nil
+            }
+            #expect(first == 1)
+
+            let second = try await client.query("SELECT 2", logger: logger) { rows -> Int? in
+                var last: Int?
+                for try await (value) in rows.decode(Int.self) { last = value }
+                return last
+            }
+            #expect(second == 2)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryReleasesLeaseWhenBodyThrows() async throws {
+        struct MyError: Error {}
+
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            do {
+                try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { rows in
+                    for try await _ in rows {
+                        throw MyError()
+                    }
+                }
+                Issue.record("Expected body error to propagate")
+            } catch is MyError {}
+
+            let value = try await client.query("SELECT 3", logger: logger) { rows -> Int? in
+                var last: Int?
+                for try await (value) in rows.decode(Int.self) { last = value }
+                return last
+            }
+            #expect(value == 3)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryEscapedSequenceIsInvalidated() async throws {
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            let escaped = try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { (rows: PostgresRowSequence) in
+                rows
+            }
+
+            var rowsSeen = 0
+            do {
+                for try await _ in escaped { rowsSeen += 1 }
+                Issue.record("Expected escaped sequence to throw")
+            } catch let error as PSQLError {
+                #expect(error.code == .rowSequenceUsedOutsideScope)
+            }
+            #expect(rowsSeen < 1_000_000, "Escaped sequence must not deliver the whole result")
+
+            try await client.query("SELECT 1", logger: logger) { rows in
+                for try await _ in rows {}
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryServerErrorIsThrownWithMetadata() async throws {
+        try await self.withClient { client, logger in
+            let query: PostgresQuery = "SELECT * FROM table_that_does_not_exist"
+            do {
+                _ = try await client.query(query, logger: logger) { (_: PostgresRowSequence) in
+                    Issue.record("Body must not run when the query fails upfront")
+                }
+                Issue.record("Expected query to throw")
+            } catch let error as PSQLError {
+                #expect(error.code == .server)
+                #expect(error.serverInfo?[.sqlState] == "42P01")
+                #expect(error.query == query)
+                #expect(error.file == #fileID)
+                #expect(error.line != nil)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryTooManyParameters() async throws {
+        try await self.withClient { client, logger in
+            var bindings = PostgresBindings()
+            for _ in 0...Int(UInt16.max) {
+                bindings.append(1)
+            }
+            let query = PostgresQuery(unsafeSQL: "SELECT 1", binds: bindings)
+
+            do {
+                _ = try await client.query(query, logger: logger) { (_: PostgresRowSequence) in
+                    Issue.record("Body must not run")
+                }
+                Issue.record("Expected query to throw")
+            } catch let error as PSQLError {
+                #expect(error.code == .tooManyParameters)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryConcurrentlyThroughPool() async throws {
+        try await self.withClient(maximumConnections: 8) { client, logger in
+            let iterations = 1000
+
+            try await withThrowingTaskGroup(of: Int.self) { taskGroup in
+                for i in 0..<iterations {
+                    taskGroup.addTask {
+                        try await client.query("SELECT \(i)", logger: logger) { rows in
+                            var last = -1
+                            for try await (value) in rows.decode(Int.self) { last = value }
+                            return last
+                        }
+                    }
+                }
+
+                var seen = Set<Int>()
+                for try await value in taskGroup {
+                    seen.insert(value)
+                }
+                #expect(seen.count == iterations)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredQueryOnConnectionInsideWithConnection() async throws {
+        try await self.withClient { client, logger in
+            let names = try await client.withConnection { connection in
+                try await connection.query("SELECT unnest(ARRAY['alice', 'bob', 'carol'])", logger: logger) { rows in
+                    var names = [String]()
+                    for try await (name) in rows.decode(String.self) {
+                        names.append(name)
+                    }
+                    return names
+                }
+            }
+            #expect(names == ["alice", "bob", "carol"])
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataReturnsSelectRowCount() async throws {
+        try await self.withClient { client, logger in
+            let (sum, metadata) = try await client.query("SELECT generate_series(1, 100)", logger: logger) { rows in
+                var sum = 0
+                for try await (value) in rows.decode(Int.self) {
+                    sum += value
+                }
+                return sum
+            }
+            #expect(sum == 5050)
+            #expect(metadata.command == "SELECT")
+            #expect(metadata.rows == 100)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataReportsAffectedRowsForWrites() async throws {
+        let tableName = "test_client_query_with_metadata"
+
+        try await self.withClient { client, logger in
+            try await client.query("DROP TABLE IF EXISTS \"\(unescaped: tableName)\";", logger: logger)
+            try await client.query(
+                """
+                CREATE TABLE "\(unescaped: tableName)" (
+                    id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+                    value INT NOT NULL
+                );
+                """,
+                logger: logger
+            )
+
+            let (_, insert) = try await client.query(
+                #"INSERT INTO "\#(unescaped: tableName)" (value) SELECT generate_series(1, 25);"#,
+                logger: logger
+            ) { rows in
+                for try await _ in rows {}
+            }
+            #expect(insert.command == "INSERT")
+            #expect(insert.oid == 0)
+            #expect(insert.rows == 25)
+
+            let (doubled, update) = try await client.query(
+                #"UPDATE "\#(unescaped: tableName)" SET value = value * 2 WHERE value > 20 RETURNING value;"#,
+                logger: logger
+            ) { rows in
+                var doubled = [Int]()
+                for try await (value) in rows.decode(Int.self) {
+                    doubled.append(value)
+                }
+                return doubled.sorted()
+            }
+            #expect(doubled == [42, 44, 46, 48, 50])
+            #expect(update.command == "UPDATE")
+            #expect(update.rows == 5)
+
+            let (_, delete) = try await client.query(
+                #"DELETE FROM "\#(unescaped: tableName)";"#,
+                logger: logger
+            ) { rows in
+                for try await _ in rows {}
+            }
+            #expect(delete.command == "DELETE")
+            #expect(delete.rows == 25)
+
+            try await client.query("DROP TABLE \"\(unescaped: tableName)\";", logger: logger)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataReleasesLeaseAfterBodyReturns() async throws {
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            for i in 1...10 {
+                let (count, metadata) = try await client.query("SELECT generate_series(1, \(i))", logger: logger) { rows in
+                    var count = 0
+                    for try await _ in rows { count += 1 }
+                    return count
+                }
+                #expect(count == i)
+                #expect(metadata.rows == i)
+            }
+
+            let rows = try await client.query("SELECT 1", logger: logger)
+            for try await (value) in rows.decode(Int.self) {
+                #expect(value == 1)
+            }
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func queryWithMetadataBodyThrowsReleasesLease() async throws {
+        struct MyError: Error {}
+
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            await #expect(throws: MyError.self) {
+                try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { rows in
+                    for try await _ in rows {
+                        throw MyError()
+                    }
+                }
+            }
+
+            let (_, metadata) = try await client.query("SELECT 3", logger: logger) { rows in
+                for try await _ in rows {}
+            }
+            #expect(metadata.rows == 1)
+        }
+    }
+
+    // MARK: Helpers
+
+    private func withClient(
+        maximumConnections: Int? = nil,
+        _ body: (PostgresClient, Logger) async throws -> ()
+    ) async throws {
+        var logger = Logger(label: "test")
+        logger.logLevel = .debug
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        if let maximumConnections {
+            clientConfig.options.maximumConnections = maximumConnections
+        }
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: .singletonMultiThreadedEventLoopGroup, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            do {
+                try await body(client, logger)
+            } catch {
+                taskGroup.cancelAll()
+                throw error
+            }
+
+            taskGroup.cancelAll()
+        }
+    }
+}
+
 @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
 extension PostgresClient.Configuration {
     static func makeTestConfiguration() -> PostgresClient.Configuration {

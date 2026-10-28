@@ -88,6 +88,13 @@ extension PostgresQuery {
             self.sql.append(contentsOf: "$\(self.binds.count)")
         }
 
+        public mutating func appendInterpolation(_ query: PostgresQuery) {
+            self.sql.append(contentsOf: PostgresQuery.renumberPlaceholders(in: query.sql, by: self.binds.count))
+            self.binds.metadata.append(contentsOf: query.binds.metadata)
+            var bytes = query.binds.bytes
+            self.binds.bytes.writeBuffer(&bytes)
+        }
+
         @inlinable
         public mutating func appendInterpolation(unescaped interpolated: String) {
             self.sql.append(contentsOf: interpolated)
