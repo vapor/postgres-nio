@@ -91,7 +91,8 @@ import Logging
                         scopeExited.signal()
 
                         for try await row in escaped {
-                            Self.reportRow(row)
+                            let name = (try? row.decode(String.self, context: .default)) ?? "<undecodable>"
+                            Issue.record("Escaped consumer received row \(name)")
                         }
                     }
 
@@ -106,7 +107,7 @@ import Logging
             }
         }
         let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
-        #expect(stderr.contains(Self.usedOutsideScopeMessage))
+        #expect(stderr.contains("A PostgresRowSequence was consumed after the closure"))
     }
 
     @Test func bodyThrowsPropagatesErrorAndConnectionStaysUsable() async throws {
@@ -325,13 +326,6 @@ import Logging
 
             try await taskGroup.waitForAll()
         }
-    }
-
-    private static let usedOutsideScopeMessage = "A PostgresRowSequence was consumed after the closure"
-
-    private static func reportRow(_ row: PostgresRow) {
-        let name = (try? row.decode(String.self, context: .default)) ?? "<undecodable>"
-        Issue.record("Escaped consumer received row \(name)")
     }
 
     private func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
