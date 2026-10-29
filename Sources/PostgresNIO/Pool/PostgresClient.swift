@@ -4,6 +4,7 @@ import Atomics
 import Logging
 import ServiceLifecycle
 import _ConnectionPoolModule
+import Metrics
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
@@ -135,6 +136,10 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
+            /// Configures the metrics recorded for the client's connection pool and its connections.
+            /// See ``PostgresMetricsConfiguration``.
+            public var metrics: PostgresMetricsConfiguration = .init()
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -253,6 +258,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     let factory: ConnectionFactory
     let runningAtomic = ManagedAtomic(false)
     let backgroundLogger: Logger
+    let metrics: PostgresClientMetrics
 
     /// Creates a new ``PostgresClient``, that does not log any background information.
     ///
@@ -282,18 +288,27 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         backgroundLogger: Logger
     ) {
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
+        let metrics = PostgresClientMetrics(
+            logger: backgroundLogger,
+            configuration: configuration.options.metrics,
+            minimumConnections: configuration.options.minimumConnections,
+            maximumConnections: configuration.options.maximumConnections
+        )
         self.factory = factory
         self.backgroundLogger = backgroundLogger
+        self.metrics = metrics
 
         self.pool = ConnectionPool(
             configuration: .init(configuration),
             idGenerator: ConnectionIDGenerator(),
             requestType: ConnectionRequest<PostgresConnection>.self,
             keepAliveBehavior: .init(configuration.options.keepAliveBehavior, logger: backgroundLogger),
-            observabilityDelegate: .init(logger: backgroundLogger),
+            observabilityDelegate: metrics,
             clock: ContinuousClock()
         ) { (connectionID, pool) in
+            let start = ContinuousClock.now
             let connection = try await factory.makeConnection(connectionID, pool: pool)
+            metrics.poolInstruments?.createTime.record(duration: .now - start)
 
             return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
         }
@@ -550,7 +565,19 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         if !self.runningAtomic.load(ordering: .relaxed) {
             self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }
-        return try await self.pool.leaseConnection()
+        guard let instruments = self.metrics.poolInstruments else {
+            return try await self.pool.leaseConnection()
+        }
+
+        let start = ContinuousClock.now
+        let lease = try await self.pool.leaseConnection()
+        let leasedAt = ContinuousClock.now
+        instruments.waitTime.record(duration: leasedAt - start)
+
+        return ConnectionLease(connection: lease.connection) { _ in
+            instruments.useTime.record(duration: .now - leasedAt)
+            lease.release()
+        }
     }
 
     /// Returns the default `EventLoopGroup` singleton, automatically selecting the best for the platform.

@@ -1,13 +1,66 @@
 import _ConnectionPoolModule
 import Logging
+import Metrics
+import NIOConcurrencyHelpers
 
 final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
     typealias ConnectionID = PostgresConnection.ID
 
-    let logger: Logger
+    struct PoolInstruments {
+        let idleConnections: Gauge
+        let usedConnections: Gauge
+        let pendingRequests: Gauge
+        let createTime: Timer
+        let waitTime: Timer
+        let useTime: Timer
 
-    init(logger: Logger) {
+        init(factory: any MetricsFactory, configuration: PostgresMetricsConfiguration, minimumConnections: Int, maximumConnections: Int) {
+            let labels = configuration.labels
+            let names = configuration.dimensions
+            let pool = [(names.connectionPoolNameKey, names.connectionPoolNameValue)]
+            
+            // The limits never change, so they are recorded once
+            Gauge(label: labels.connectionMax, dimensions: pool, factory: factory).record(maximumConnections)
+            Gauge(label: labels.connectionIdleMax, dimensions: pool, factory: factory).record(maximumConnections)
+            Gauge(label: labels.connectionIdleMin, dimensions: pool, factory: factory).record(minimumConnections)
+
+            self.idleConnections = Gauge(label: labels.connectionCount, dimensions: pool + [(names.connectionStateKey, "idle")], factory: factory)
+            self.usedConnections = Gauge(label: labels.connectionCount, dimensions: pool + [(names.connectionStateKey, "used")], factory: factory)
+            self.pendingRequests = Gauge(label: labels.pendingRequests, dimensions: pool, factory: factory)
+            self.createTime = Timer(label: labels.createTime, dimensions: pool, factory: factory)
+            self.waitTime = Timer(label: labels.waitTime, dimensions: pool, factory: factory)
+            self.useTime = Timer(label: labels.useTime, dimensions: pool, factory: factory)
+        }
+    }
+
+    let logger: Logger
+    let poolInstruments: PoolInstruments?
+    private let lastStatisticsID = NIOLockedValueBox(0)
+
+    init(logger: Logger, configuration: PostgresMetricsConfiguration, minimumConnections: Int, maximumConnections: Int) {
         self.logger = logger
+        self.poolInstruments = configuration.factory.map {
+            PoolInstruments(
+                factory: $0,
+                configuration: configuration,
+                minimumConnections: minimumConnections,
+                maximumConnections: maximumConnections
+            )
+        }
+    }
+
+    func report(statistics: ConnectionPoolStatistics) {
+        guard let instruments = self.poolInstruments else { return }
+
+        // Snapshots can arrive out of order
+        self.lastStatisticsID.withLockedValue { lastID in
+            guard statistics.id > lastID else { return }
+            lastID = statistics.id
+
+            instruments.idleConnections.record(statistics.idleConnectionCount)
+            instruments.usedConnections.record(statistics.usedConnectionCount)
+            instruments.pendingRequests.record(statistics.pendingRequests)
+        }
     }
 
     func startedConnecting(id: ConnectionID) {
