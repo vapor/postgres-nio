@@ -7,7 +7,6 @@ import NIOTransportServices
 #endif
 import NIOSSL
 import Logging
-import Metrics
 
 /// A Postgres connection. Use it to run queries against a Postgres server.
 ///
@@ -50,14 +49,13 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
 
-    /// The factory used to record this connection's query metrics, or `nil` if metrics are disabled.
-    let metricsFactory: (any MetricsFactory)?
+    let metrics: PostgresMetrics?
 
-    init(channel: any Channel, connectionID: ID, logger: Logger, metricsFactory: (any MetricsFactory)?) {
+    init(channel: any Channel, connectionID: ID, logger: Logger, metrics: PostgresMetrics?) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
-        self.metricsFactory = metricsFactory
+        self.metrics = metrics
     }
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
@@ -242,7 +240,7 @@ public final class PostgresConnection: Sendable {
                     channel: channel,
                     connectionID: connectionID,
                     logger: logger,
-                    metricsFactory: configuration.options.metrics.factory
+                    metrics: PostgresMetrics(configuration: configuration, remoteAddress: channel.remoteAddress)
                 )
                 return connection.start(configuration: configuration).map { _ in
                     timeoutTask.cancel()
@@ -742,6 +740,9 @@ extension PostgresConnection {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
 
+        let start = self.metrics?.startTiming()
+        var failure: (any Error)?
+
         do {
             let streamFuture = self.queryStream(query, logger: logger)
             (stream, sequence) = try await streamFuture.map { stream in
@@ -751,12 +752,24 @@ extension PostgresConnection {
             error.file = file
             error.line = line
             error.query = query
+            self.metrics?.record(start: start, error: error)
             throw error // rethrow with more metadata
+        } catch {
+            self.metrics?.record(start: start, error: error)
+            throw error
         }
 
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+        defer {
+            stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line))
+            self.metrics?.record(start: start, error: failure)
+        }
 
-        return try await body(sequence)
+        do {
+            return try await body(sequence)
+        } catch {
+            failure = error
+            throw error
+        }
     }
 
     /// Run a query on the Postgres server the connection is connected to and return the query's metadata
@@ -788,6 +801,9 @@ extension PostgresConnection {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
 
+        let start = self.metrics?.startTiming()
+        var failure: (any Error)?
+
         do {
             (stream, sequence) = try await self.queryStream(query, logger: logger).map { stream in
                 (stream, stream.asyncSequence())
@@ -796,12 +812,25 @@ extension PostgresConnection {
             error.file = file
             error.line = line
             error.query = query
+            self.metrics?.record(start: start, error: error)
             throw error // rethrow with more metadata
+        } catch {
+            self.metrics?.record(start: start, error: error)
+            throw error
         }
 
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+        defer {
+            stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line))
+            self.metrics?.record(start: start, error: failure)
+        }
 
-        let result = try await body(sequence)
+        let result: Result
+        do {
+            result = try await body(sequence)
+        } catch {
+            failure = error
+            throw error
+        }
 
         do {
             guard let consumedCommandTag = try await stream.consumedCommandTag().get() else {
@@ -815,6 +844,7 @@ extension PostgresConnection {
             error.file = file
             error.line = line
             error.query = query
+            failure = error
             throw error // rethrow with more metadata
         }
     }

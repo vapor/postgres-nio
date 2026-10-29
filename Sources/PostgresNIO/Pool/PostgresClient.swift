@@ -137,7 +137,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
             /// Configures the metrics recorded for the client's connection pool and its connections.
-            /// See ``MetricsConfiguration``.
+            /// See ``PostgresMetricsConfiguration``.
             public var metrics: PostgresMetricsConfiguration = .init()
 
             /// Create an options structure with default values.
@@ -288,7 +288,12 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         backgroundLogger: Logger
     ) {
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
-        let metrics = PostgresClientMetrics(logger: backgroundLogger, metricsFactory: configuration.options.metrics.factory)
+        let metrics = PostgresClientMetrics(
+            logger: backgroundLogger,
+            configuration: configuration.options.metrics,
+            minimumConnections: configuration.options.minimumConnections,
+            maximumConnections: configuration.options.maximumConnections
+        )
         self.factory = factory
         self.backgroundLogger = backgroundLogger
         self.metrics = metrics
@@ -301,8 +306,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             observabilityDelegate: metrics,
             clock: ContinuousClock()
         ) { (connectionID, pool) in
+            let start = ContinuousClock.now
             let connection = try await factory.makeConnection(connectionID, pool: pool)
-            metrics.poolInstruments?.createTime.record(duration: .now - ContinuousClock.now)
+            metrics.poolInstruments?.createTime.record(duration: .now - start)
 
             return ConnectionAndMetadata(connection: connection, maximalStreamsOnConnection: 1)
         }

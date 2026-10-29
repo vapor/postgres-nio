@@ -7,12 +7,6 @@ public struct ConnectionPoolStatistics: Sendable, Equatable {
     public let idleConnectionCount: Int
     /// Connections that have at least one leased stream.
     public let usedConnectionCount: Int
-    /// The maximum number of connections the pool may open.
-    public let maxConnections: Int
-    /// The number of connections the pool keeps open while idle.
-    public let maxIdleConnections: Int
-    /// The minimum number of connections the pool keeps open.
-    public let minIdleConnections: Int
     /// Requests waiting for a connection.
     public let pendingRequests: Int
 
@@ -21,17 +15,11 @@ public struct ConnectionPoolStatistics: Sendable, Equatable {
         id: Int,
         idleConnectionCount: Int,
         usedConnectionCount: Int,
-        maxConnections: Int,
-        maxIdleConnections: Int,
-        minIdleConnections: Int,
         pendingRequests: Int
     ) {
         self.id = id
         self.idleConnectionCount = idleConnectionCount
         self.usedConnectionCount = usedConnectionCount
-        self.maxConnections = maxConnections
-        self.maxIdleConnections = maxIdleConnections
-        self.minIdleConnections = minIdleConnections
         self.pendingRequests = pendingRequests
     }
 }

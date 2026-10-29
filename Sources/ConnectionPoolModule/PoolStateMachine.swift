@@ -285,9 +285,6 @@ struct PoolStateMachine<
             id: self.lastStatsID,
             idleConnectionCount: Int(self.connections.stats.idle),
             usedConnectionCount: Int(self.connections.stats.leased),
-            maxConnections: self.configuration.maximumConnectionHardLimit,
-            maxIdleConnections: self.configuration.maximumConnectionSoftLimit,
-            minIdleConnections: self.configuration.minimumConnectionCount,
             pendingRequests: self.requestQueue.count
         )
     }
@@ -313,11 +310,11 @@ struct PoolStateMachine<
             // to queue and do nothing otherwise fallthrough to the rest of the function
             if !self.requestQueue.isEmpty && self.cacheNoMoreConnectionsAllowed {
                 self.requestQueue.queue(request)
-                return .none()
+                return .init(request: .none, connection: .none, stats: self.makeStats())
             }
         case .connectionCreationFailing:
             self.requestQueue.queue(request)
-            return .none()
+            return .init(request: .none, connection: .none, stats: self.makeStats())
 
         case .circuitBreakOpen:
             return .init(

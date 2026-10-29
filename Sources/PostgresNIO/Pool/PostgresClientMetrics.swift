@@ -10,24 +10,26 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
         let idleConnections: Gauge
         let usedConnections: Gauge
         let pendingRequests: Gauge
-        let maxConnections: Gauge
-        let maxIdleConnections: Gauge
-        let minIdleConnections: Gauge
         let createTime: Timer
         let waitTime: Timer
         let useTime: Timer
 
-        init(factory: any MetricsFactory, poolName: String) {
-            let pool = [("db.client.connection.pool.name", poolName)]
-            self.idleConnections = Gauge(label: "db.client.connection.count", dimensions: pool + [("db.client.connection.state", "idle")], factory: factory)
-            self.usedConnections = Gauge(label: "db.client.connection.count", dimensions: pool + [("db.client.connection.state", "used")], factory: factory)
-            self.pendingRequests = Gauge(label: "db.client.connection.pending_requests", dimensions: pool, factory: factory)
-            self.maxConnections = Gauge(label: "db.client.connection.max", dimensions: pool, factory: factory)
-            self.maxIdleConnections = Gauge(label: "db.client.connection.idle.max", dimensions: pool, factory: factory)
-            self.minIdleConnections = Gauge(label: "db.client.connection.idle.min", dimensions: pool, factory: factory)
-            self.createTime = Timer(label: "db.client.connection.create_time", dimensions: pool, factory: factory)
-            self.waitTime = Timer(label: "db.client.connection.wait_time", dimensions: pool, factory: factory)
-            self.useTime = Timer(label: "db.client.connection.use_time", dimensions: pool, factory: factory)
+        init(factory: any MetricsFactory, configuration: PostgresMetricsConfiguration, minimumConnections: Int, maximumConnections: Int) {
+            let labels = configuration.labels
+            let names = configuration.dimensions
+            let pool = [(names.connectionPoolNameKey, names.connectionPoolNameValue)]
+            
+            // The limits never change, so they are recorded once
+            Gauge(label: labels.connectionMax, dimensions: pool, factory: factory).record(maximumConnections)
+            Gauge(label: labels.connectionIdleMax, dimensions: pool, factory: factory).record(maximumConnections)
+            Gauge(label: labels.connectionIdleMin, dimensions: pool, factory: factory).record(minimumConnections)
+
+            self.idleConnections = Gauge(label: labels.connectionCount, dimensions: pool + [(names.connectionStateKey, "idle")], factory: factory)
+            self.usedConnections = Gauge(label: labels.connectionCount, dimensions: pool + [(names.connectionStateKey, "used")], factory: factory)
+            self.pendingRequests = Gauge(label: labels.pendingRequests, dimensions: pool, factory: factory)
+            self.createTime = Timer(label: labels.createTime, dimensions: pool, factory: factory)
+            self.waitTime = Timer(label: labels.waitTime, dimensions: pool, factory: factory)
+            self.useTime = Timer(label: labels.useTime, dimensions: pool, factory: factory)
         }
     }
 
@@ -35,10 +37,15 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
     let poolInstruments: PoolInstruments?
     private let lastStatisticsID = NIOLockedValueBox(0)
 
-    init(logger: Logger, metricsFactory: (any MetricsFactory)?) {
+    init(logger: Logger, configuration: PostgresMetricsConfiguration, minimumConnections: Int, maximumConnections: Int) {
         self.logger = logger
-        self.poolInstruments = metricsFactory.map {
-            PoolInstruments(factory: $0, poolName: "postgresnio-connection-pool")
+        self.poolInstruments = configuration.factory.map {
+            PoolInstruments(
+                factory: $0,
+                configuration: configuration,
+                minimumConnections: minimumConnections,
+                maximumConnections: maximumConnections
+            )
         }
     }
 
@@ -53,9 +60,6 @@ final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
             instruments.idleConnections.record(statistics.idleConnectionCount)
             instruments.usedConnections.record(statistics.usedConnectionCount)
             instruments.pendingRequests.record(statistics.pendingRequests)
-            instruments.maxConnections.record(statistics.maxConnections)
-            instruments.maxIdleConnections.record(statistics.maxIdleConnections)
-            instruments.minIdleConnections.record(statistics.minIdleConnections)
         }
     }
 

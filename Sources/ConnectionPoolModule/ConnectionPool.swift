@@ -369,11 +369,6 @@ public final class ConnectionPool<
         }
     }
 
-    @inlinable
-    /* private */ func reportStats(_ stats: ConnectionPoolStatistics) {
-        self.observabilityDelegate.report(statistics: stats)
-    }
-
     // MARK: Run actions
 
     @inlinable
@@ -388,7 +383,7 @@ public final class ConnectionPool<
     /*private*/ func runStateMachineActions(_ actions: StateMachine.Action) {
         self.runConnectionAction(actions.connection)
         self.runRequestAction(actions.request)
-        if let stats = actions.stats { self.reportStats(stats) }
+        if let stats = actions.stats { self.observabilityDelegate.report(statistics: stats) }
     }
 
     @inlinable

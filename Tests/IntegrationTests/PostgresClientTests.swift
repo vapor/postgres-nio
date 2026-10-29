@@ -65,6 +65,7 @@ struct PostgresClientTests {
 
         let pool = [("db.client.connection.pool.name", "postgresnio-connection-pool")]
         #expect(try metrics.expectTimer("db.client.connection.create_time", pool).values.count == 1)
+        #expect(try metrics.expectTimer("db.client.connection.create_time", pool).values.first! > 0)
         #expect(try metrics.expectTimer("db.client.connection.wait_time", pool).values.count == 1)
         #expect(try metrics.expectTimer("db.client.connection.use_time", pool).values.count == 1)
     }

@@ -125,6 +125,102 @@ typealias TestPoolStateMachine = PoolStateMachine<
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testActionsReportStatistics() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 4
+        configuration.maximumConnectionHardLimit = 4
+        configuration.keepAliveDuration = nil
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        #expect(stateMachine.refillConnections().count == 1)
+        let connection1 = MockConnection(id: 0)
+        let established1 = stateMachine.connectionEstablished(connection1, maxStreams: 1).stats
+        #expect(established1?.idleConnectionCount == 1)
+        #expect(established1?.usedConnectionCount == 0)
+
+        let request1 = MockRequest(connectionType: MockConnection.self)
+        let leased1 = stateMachine.leaseConnection(request1).stats
+        #expect(leased1?.idleConnectionCount == 0)
+        #expect(leased1?.usedConnectionCount == 1)
+        #expect(leased1?.pendingRequests == 0)
+
+        // No idle connection left, so the request waits for a new one.
+        let request2 = MockRequest(connectionType: MockConnection.self)
+        let queued2 = stateMachine.leaseConnection(request2).stats
+        #expect(queued2?.usedConnectionCount == 1)
+        #expect(queued2?.pendingRequests == 1)
+
+        let connection2 = MockConnection(id: 1)
+        let leased2 = stateMachine.connectionEstablished(connection2, maxStreams: 1).stats
+        #expect(leased2?.usedConnectionCount == 2)
+        #expect(leased2?.pendingRequests == 0)
+
+        let released1 = stateMachine.releaseConnection(connection1, streams: 1).stats
+        #expect(released1?.idleConnectionCount == 1)
+        #expect(released1?.usedConnectionCount == 1)
+
+        let ids = [established1, leased1, queued2, leased2, released1].compactMap { $0?.id }
+        #expect(ids == ids.sorted() && Set(ids).count == ids.count)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testRequestsQueuedOnAFullPoolReportStatistics() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 1
+        configuration.maximumConnectionHardLimit = 1
+        configuration.keepAliveDuration = nil
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        #expect(stateMachine.refillConnections().count == 1)
+        _ = stateMachine.connectionEstablished(MockConnection(id: 0), maxStreams: 1)
+        _ = stateMachine.leaseConnection(MockRequest(connectionType: MockConnection.self))
+
+        // The pool is full: both requests wait, and the gauge has to show each of them.
+        #expect(stateMachine.leaseConnection(MockRequest(connectionType: MockConnection.self)).stats?.pendingRequests == 1)
+        #expect(stateMachine.leaseConnection(MockRequest(connectionType: MockConnection.self)).stats?.pendingRequests == 2)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testReleasingTheOnlyConnectionReportsStatistics() {
+        var configuration = PoolConfiguration()
+        configuration.minimumConnectionCount = 1
+        configuration.maximumConnectionSoftLimit = 4
+        configuration.maximumConnectionHardLimit = 4
+        configuration.keepAliveDuration = nil
+
+        var stateMachine = TestPoolStateMachine(
+            configuration: configuration,
+            generator: .init(),
+            timerCancellationTokenType: MockTimerCancellationToken.self,
+            clock: MockClock()
+        )
+
+        #expect(stateMachine.refillConnections().count == 1)
+        let connection = MockConnection(id: 0)
+        _ = stateMachine.connectionEstablished(connection, maxStreams: 1)
+        _ = stateMachine.leaseConnection(MockRequest(connectionType: MockConnection.self))
+
+        // Nothing else to do after this release, but the connection went from used to idle.
+        let released = stateMachine.releaseConnection(connection, streams: 1).stats
+        #expect(released?.idleConnectionCount == 1)
+        #expect(released?.usedConnectionCount == 0)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func testOnlyOverflowConnections() {
         var configuration = PoolConfiguration()
         configuration.minimumConnectionCount = 0
