@@ -127,7 +127,11 @@ public struct ConnectionPoolConfiguration: Sendable {
     /// Maximum number of in-progress new connection requests to run at any one time.
     public var maximumConcurrentConnectionRequests: Int
 
-    /// Maximum amount of time the connection can stay open.
+    /// Maximum amount of time the connection can stay open, measured from when it was
+    /// established. `nil` disables the limit.
+    ///
+    /// Each connection's lifetime is reduced by a random amount of up to 2.5%, 
+    /// so that connections opened together don't expire together.
     public var maximumConnectionLifetime: Duration?
 
     /// Creates a new connection pool configuration.

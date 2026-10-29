@@ -140,7 +140,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             ///
             /// Once a connection reaches its lifetime, it is closed immediately if it is idle. If it is currently
             /// leased, it no longer accepts new leases and is closed once it has been released. In-flight queries
-            /// are never interrupted.
+            /// are never interrupted. To avoid closing many connections at once, each connection's lifetime is
+            /// reduced by a random amount of up to 2.5%.
             public var maximumConnectionLifetime: Duration? = nil
 
             /// Create an options structure with default values.

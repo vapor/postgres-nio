@@ -966,7 +966,9 @@ struct PoolStateMachine<
             return Timer(connectionTimer, duration: self.configuration.idleTimeoutDuration)
 
         case .maxLifetime:
-            return Timer(connectionTimer, duration: self.configuration.maximumConnectionLifetime!)
+            let lifetime = self.configuration.maximumConnectionLifetime!
+            // spread out connections opened together, so they don't all expire at the same instant
+            return Timer(connectionTimer, duration: lifetime - lifetime * Double.random(in: 0..<0.025))
 
         }
     }

@@ -2670,9 +2670,14 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection = MockConnection(id: 0)
 
         let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
-        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
-
-        #expect(created.connection == .scheduleTimers([timer]))
+        guard case .scheduleTimers(let timers) = created.connection, let timer = timers.first else {
+            Issue.record("Expected the lifetime timer to be scheduled, got \(created.connection)")
+            return
+        }
+        #expect(timers.count == 1)
+        #expect(timer.underlying == .init(timerID: 0, connectionID: 0, usecase: .maxLifetime))
+        // the lifetime is reduced by a random jitter of up to 2.5%
+        #expect((.seconds(10) * 0.975 ... .seconds(10)).contains(timer.duration))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -2695,13 +2700,12 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection = MockConnection(id: 0)
 
         let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
-        guard case .scheduleTimers(let timers) = created.connection else {
+        guard case .scheduleTimers(let timers) = created.connection, let timer = timers.first else {
             Issue.record("No timers scheduled")
             return
         }
         #expect(timers.count == 1)
-        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
-        #expect(timers == [timer])
+        #expect(timer.underlying == .init(timerID: 0, connectionID: 0, usecase: .maxLifetime))
 
         // schedule request to lease connection
         let request = MockRequest(connectionType: MockConnection.self)
@@ -2733,13 +2737,12 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection0 = MockConnection(id: 0)
 
         let created0 = stateMachine.connectionEstablished(connection0, maxStreams: 1)
-        guard case .scheduleTimers(let timers) = created0.connection else {
+        guard case .scheduleTimers(let timers) = created0.connection, let timer0 = timers.first else {
             Issue.record("No timers scheduled")
             return
         }
         #expect(timers.count == 1)
-        let timer0 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
-        #expect(timers == [timer0])
+        #expect(timer0.underlying == .init(timerID: 0, connectionID: 0, usecase: .maxLifetime))
 
         // schedule request to lease connection
         let request1 = MockRequest(connectionType: MockConnection.self)
@@ -2755,13 +2758,14 @@ typealias TestPoolStateMachine = PoolStateMachine<
 
         let connection1 = MockConnection(id: 1)
         let connectionEstablished = stateMachine.connectionEstablished(connection1, maxStreams: 1)
-        let lifetimeTimer1 = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 1, usecase: .maxLifetime), duration: .seconds(10))
-        guard case let .makeConnectionsCancelAndScheduleTimers(_, canceledTimers, scheduledTimers) = connectionEstablished.connection else {
+        guard case let .makeConnectionsCancelAndScheduleTimers(_, canceledTimers, scheduledTimers) = connectionEstablished.connection,
+              let lifetimeTimer1 = scheduledTimers.first else {
             Issue.record()
             return
         }
         #expect(canceledTimers == [])
-        #expect(scheduledTimers == [lifetimeTimer1])
+        #expect(scheduledTimers.count == 1)
+        #expect(lifetimeTimer1.underlying == .init(timerID: 0, connectionID: 1, usecase: .maxLifetime))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -2784,10 +2788,14 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection = MockConnection(id: 0)
 
         let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
-        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
-        let lifetimeToken = MockTimerCancellationToken(timer)
+        guard case .scheduleTimers(let timers) = created.connection, let timer = timers.first else {
+            Issue.record("Expected the lifetime timer to be scheduled, got \(created.connection)")
+            return
+        }
+        #expect(timers.count == 1)
+        #expect(timer.underlying == .init(timerID: 0, connectionID: 0, usecase: .maxLifetime))
 
-        #expect(created.connection == .scheduleTimers([timer]))
+        let lifetimeToken = MockTimerCancellationToken(timer)
         #expect(stateMachine.timerScheduled(timer, cancelContinuation: lifetimeToken) == nil)
 
         #expect(stateMachine.timerTriggered(timer).connection == .closeConnection(connection, [lifetimeToken]))
@@ -2813,10 +2821,14 @@ typealias TestPoolStateMachine = PoolStateMachine<
         let connection = MockConnection(id: 0)
 
         let created = stateMachine.connectionEstablished(connection, maxStreams: 1)
-        let timer = TestPoolStateMachine.Timer(.init(timerID: 0, connectionID: 0, usecase: .maxLifetime), duration: .seconds(10))
-        let lifetimeToken = MockTimerCancellationToken(timer)
+        guard case .scheduleTimers(let timers) = created.connection, let timer = timers.first else {
+            Issue.record("Expected the lifetime timer to be scheduled, got \(created.connection)")
+            return
+        }
+        #expect(timers.count == 1)
+        #expect(timer.underlying == .init(timerID: 0, connectionID: 0, usecase: .maxLifetime))
 
-        #expect(created.connection == .scheduleTimers([timer]))
+        let lifetimeToken = MockTimerCancellationToken(timer)
         #expect(stateMachine.timerScheduled(timer, cancelContinuation: lifetimeToken) == nil)
 
         let request = MockRequest(connectionType: MockConnection.self)
