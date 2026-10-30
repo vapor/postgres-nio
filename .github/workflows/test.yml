@@ -18,10 +18,10 @@ jobs:
         swift-image:
           - swift:6.2-noble
           - swift:6.3-noble
-          - swift:6.4-noble
+          - swift:6.4-resolute
           - swiftlang/swift:nightly-main-noble
     container: ${{ matrix.swift-image }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Install curl for Codecov
         run: apt-get update -yq && apt-get install -y curl
@@ -53,9 +53,9 @@ jobs:
           - postgres-image: postgres:14
             postgres-auth: trust
     container:
-      image: swift:6.4-noble
+      image: swift:6.4-resolute
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env: &psql_shared_env
       # Unfortunately, fluent-postgres-driver details leak through here
       POSTGRES_DB: 'test_database'
@@ -145,8 +145,8 @@ jobs:
   api-breakage:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
-    container: swift:noble
+    runs-on: ubuntu-24.04
+    container: swift:resolute
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -172,8 +172,8 @@ jobs:
   musl:
     permissions:
       contents: read
-    runs-on: ubuntu-latest
-    container: swift:noble
+    runs-on: ubuntu-24.04
+    container: swift:resolute
     timeout-minutes: 30
     steps:
       - name: Check out code
