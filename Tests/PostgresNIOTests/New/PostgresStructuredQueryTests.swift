@@ -79,119 +79,35 @@ import Logging
     }
 
     @Test func sequenceEscapingTheScopeCannotBeConsumed() async throws {
-        try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
-                let scopeExited = Signal()
+        let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+            try await PostgresStructuredQueryTests().withAsyncTestingChannel { connection, channel in
+                try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                    let scopeExited = Signal()
 
-                taskGroup.addTask {
-                    let escaped = try await connection.query("SELECT name FROM users", logger: .psqlTest) { (rows: PostgresRowSequence) in
-                        rows
-                    }
-                    scopeExited.signal()
+                    taskGroup.addTask {
+                        let escaped = try await connection.query("SELECT name FROM users", logger: .psqlTest) { (rows: PostgresRowSequence) in
+                            rows
+                        }
+                        scopeExited.signal()
 
-                    var rowsSeen = 0
-                    await #expect(throws: PSQLError.rowSequenceUsedOutsideScope) {
-                        for try await _ in escaped { rowsSeen += 1 }
-                    }
-                    #expect(rowsSeen == 0)
-                }
-
-                _ = try await channel.waitForUnpreparedRequest()
-                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
-                // This waits for the scope signal, so after this we're out of scope and can return remaining rows.
-                await scopeExited.wait()
-                try await channel.sendUnpreparedQueryEnd(dataRows: [["alice"], ["bob"]], commandTag: "SELECT 2")
-
-                try await taskGroup.waitForAll()
-            }
-
-            try await self.runSimpleSelect(on: connection, channel: channel)
-        }
-    }
-
-    @Test func sequenceEscapingTheScopeAfterPartialConsumptionCannotBeConsumedFurther() async throws {
-        try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
-                let scopeExited = Signal()
-
-                taskGroup.addTask {
-                    let (first, escapedIterator) = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
-                        var iterator = rows.makeAsyncIterator()
-                        let first = try await iterator.next()
-                        return (try first?.decode(String.self, context: .default), iterator)
-                    }
-                    scopeExited.signal()
-                    #expect(first == "alice")
-
-                    var iterator = escapedIterator
-                    await #expect(throws: PSQLError.rowSequenceUsedOutsideScope) {
-                        _ = try await iterator.next()
-                    }
-                }
-
-                _ = try await channel.waitForUnpreparedRequest()
-                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
-                try await channel.writeInbound(PostgresBackendMessage.dataRow(["alice"]))
-                try await channel.testingEventLoop.executeInContext { channel.read() }
-                // This waits for the scope signal, so after this we're out of scope and can return remaining rows.
-                await scopeExited.wait()
-                try await channel.sendUnpreparedQueryEnd(dataRows: [["bob"], ["carol"]], commandTag: "SELECT 3")
-
-                try await taskGroup.waitForAll()
-            }
-
-            try await self.runSimpleSelect(on: connection, channel: channel)
-        }
-    }
-
-    @Test func sequenceEscapingTheScopeYieldsAlreadyBufferedRowsBeforeFailing() async throws {
-        try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
-                let scopeExited = Signal()
-
-                taskGroup.addTask {
-                    let (first, escapedIterator) = try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
-                        var iterator = rows.makeAsyncIterator()
-                        let first = try await iterator.next()
-                        return (try first?.decode(String.self, context: .default), iterator)
-                    }
-                    scopeExited.signal()
-                    #expect(first == "alice")
-
-                    // `NIOThrowingAsyncSequenceProducer.Source.finish(_:)` delivers already buffered elements
-                    // before surfacing the failure, so rows that arrived inside the scope are still yielded.
-                    var iterator = escapedIterator
-                    var remaining = [String]()
-                    await #expect(throws: PSQLError.rowSequenceUsedOutsideScope) {
-                        while let row = try await iterator.next() {
-                            remaining.append(try row.decode(String.self, context: .default))
+                        for try await row in escaped {
+                            let name = (try? row.decode(String.self, context: .default)) ?? "<undecodable>"
+                            Issue.record("Escaped consumer received row \(name)")
                         }
                     }
-                    #expect(remaining == ["bob", "carol"])
-                }
 
-                _ = try await channel.waitForUnpreparedRequest()
-                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
-                // Deliver all rows in one batch while the body is running, so `bob` and `carol` sit in the
-                // sequence's buffer when the scope exits.
-                try await channel.testingEventLoop.executeInContext {
-                    for name in ["alice", "bob", "carol"] {
-                        channel.pipeline.fireChannelRead(PostgresBackendMessage.dataRow([name]))
-                    }
-                    channel.pipeline.fireChannelReadComplete()
-                }
-                try await channel.testingEventLoop.executeInContext { channel.read() }
-                await scopeExited.wait()
-                try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 3"))
-                try await channel.testingEventLoop.executeInContext { channel.read() }
-                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
-                try await channel.testingEventLoop.executeInContext { channel.read() }
+                    _ = try await channel.waitForUnpreparedRequest()
+                    try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
+                    // This waits for the scope signal, so after this we're out of scope and can return remaining rows.
+                    await scopeExited.wait()
+                    try await channel.sendUnpreparedQueryEnd(dataRows: [["alice"], ["bob"]], commandTag: "SELECT 2")
 
-                try await taskGroup.waitForAll()
+                    try await taskGroup.waitForAll()
+                }
             }
-
-            try await self.runSimpleSelect(on: connection, channel: channel)
         }
+        let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
+        #expect(stderr.contains("A PostgresRowSequence was consumed after the closure"))
     }
 
     @Test func bodyThrowsPropagatesErrorAndConnectionStaysUsable() async throws {
