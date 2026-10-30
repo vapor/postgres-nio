@@ -49,6 +49,10 @@ extension PoolStateMachine {
             @usableFromInline var active: UInt16 {
                 self.idle + self.leased + self.connecting + self.backingOff
             }
+
+            @usableFromInline var total: UInt16 {
+                self.idle + self.leased + self.connecting + self.backingOff + self.closing
+            }
         }
 
         /// The minimum number of connections
@@ -935,6 +939,7 @@ extension PoolStateMachine {
                 }
 
             default:
+                self.removeO1(indexToDelete)
                 return nil
             }
         }

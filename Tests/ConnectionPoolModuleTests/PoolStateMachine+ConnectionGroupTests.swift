@@ -42,6 +42,7 @@ import Testing
 
         let requests3 = connections.refillConnections()
         #expect(requests3.isEmpty == true)
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -126,6 +127,7 @@ import Testing
         #expect(closeContext.connectionsStarting == 0)
         #expect(connections.isEmpty)
         #expect(connections.stats == .init())
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -160,6 +162,7 @@ import Testing
         #expect(backoffDoneAction == .createConnection(.init(connectionID: 0), backoffTimerCancellationToken))
 
         #expect(connections.stats == .init(connecting: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -224,6 +227,7 @@ import Testing
         #expect(connections.stats == .init(idle: 2, availableStreams: 2))
 
         #expect(connections.closeConnectionIfIdle(newThirdConnection.id) == nil)
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -264,6 +268,7 @@ import Testing
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
 
         #expect(connections.closeConnectionIfIdle(newFirstConnection.id) != nil)
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -310,6 +315,7 @@ import Testing
         #expect(afterPingIdleContext.info == .idle(availableStreams: 1, newIdle: false))
         #expect(afterPingIdleContext.use == .persisted)
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -346,6 +352,7 @@ import Testing
             return
         }
         #expect(connections.stats == .init(closing: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     // MARK: - connectionWillClose tests
@@ -377,6 +384,7 @@ import Testing
         }
         #expect(closeAction.connection === connection)
         #expect(connections.stats == .init(closing: 1, availableStreams: 0))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -412,6 +420,7 @@ import Testing
 
         // Connection should no longer be found by leaseConnection
         #expect(connections.leaseConnection() == nil)
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -448,6 +457,7 @@ import Testing
         }
         #expect(closeAction.connection === connection)
         #expect(connections.stats == .init(closing: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -500,6 +510,7 @@ import Testing
         }
         #expect(closeAction.connection === connection)
         #expect(connections.stats == .init(closing: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -544,6 +555,7 @@ import Testing
         #expect(closeAction.connection === connection)
         // idle -= 1, closing += 1, runningKeepAlive -= 1 (from closeAction)
         #expect(connections.stats == .init(closing: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -606,6 +618,7 @@ import Testing
         }
         #expect(closeAction.connection === connection)
         #expect(connections.stats == .init(closing: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -657,6 +670,7 @@ import Testing
             return
         }
         #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -739,6 +753,81 @@ import Testing
         #expect(idx == 0)
         #expect(ctx.use == .persisted)
         #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+        #expect(connections.connections.count == connections.stats.total)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testConnectionOverflowWillClose() {
+        // Setup: min=1, softLimit=1, hardLimit=2
+        // This gives us 1 persisted slot (index 0) and 1 overflow slot (index 1)
+        var connections = TestPoolStateMachine.ConnectionGroup(
+            generator: self.idGenerator,
+            minimumConcurrentConnections: 1,
+            maximumConcurrentConnectionSoftLimit: 1,
+            maximumConcurrentConnectionHardLimit: 3,
+            keepAlive: false,
+            keepAliveReducesAvailableStreams: false
+        )
+
+        // Create the persisted connection
+        let requests = connections.refillConnections()
+        #expect(requests.count == 1)
+        let persistedConn = MockConnection(id: requests[0].connectionID)
+        let (_, persistedCtx) = connections.newConnectionEstablished(persistedConn, maxStreams: 1)
+        #expect(persistedCtx.use == .persisted)
+        #expect(connections.stats == .init(idle: 1, availableStreams: 1))
+
+        // Lease the persisted connection
+        guard case .leasedConnection(let leaseResult1) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease persisted connection")
+            return
+        }
+        #expect(leaseResult1.use == .persisted)
+        #expect(connections.stats == .init(leased: 1, leasedStreams: 1))
+
+        // Create an overflow connection
+        guard let overflowRequest = connections.createNewOverflowConnectionIfPossible() else {
+            Issue.record("Expected to create overflow connection")
+            return
+        }
+        let overflowConn = MockConnection(id: overflowRequest.connectionID)
+        let (_, overflowCtx) = connections.newConnectionEstablished(overflowConn, maxStreams: 1)
+        #expect(overflowCtx.use == .overflow)
+        #expect(connections.stats == .init(idle: 1, leased: 1, availableStreams: 1, leasedStreams: 1))
+
+        // Create second overflow connection
+        guard let overflowRequest2 = connections.createNewOverflowConnectionIfPossible() else {
+            Issue.record("Expected to create overflow connection")
+            return
+        }
+        let overflowConn2 = MockConnection(id: overflowRequest2.connectionID)
+        let (_, overflowCtx2) = connections.newConnectionEstablished(overflowConn2, maxStreams: 1)
+        #expect(overflowCtx2.use == .overflow)
+        #expect(connections.stats == .init(idle: 2, leased: 1, availableStreams: 2, leasedStreams: 1))
+
+        // Lease the overflow connection
+        guard case .leasedConnection(let leaseResult2) = connections.leaseConnectionOrSoonAvailableConnectionCount() else {
+            Issue.record("Expected to lease overflow connection")
+            return
+        }
+        #expect(leaseResult2.use == .overflow)
+        #expect(connections.stats == .init(idle: 1, leased: 2, availableStreams: 1, leasedStreams: 2))
+
+        // Release the overflow connection
+        guard case .available(_, let ctx) = connections.releaseConnection(overflowConn.id, streams: 1) else {
+            Issue.record("Expected draining connection to close on release")
+            return
+        }
+        #expect(connections.stats == .init(idle: 2, leased: 1, availableStreams: 2, leasedStreams: 1))
+        #expect(ctx.use == .overflow)
+
+        _ = connections.closeConnectionIfIdle(overflowConn.id)
+        #expect(connections.stats == .init(idle: 1, leased: 1, closing: 1, availableStreams: 1, leasedStreams: 1))
+
+        let closedAction = connections.connectionClosed(overflowConn.id, shuttingDown: false)
+        #expect(closedAction.newConnectionRequest == nil)
+        #expect(connections.stats == .init(idle: 1, leased: 1, availableStreams: 1, leasedStreams: 1))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     // MARK: - connectionReceivedNewMaxStreamSetting tests
@@ -770,6 +859,7 @@ import Testing
         #expect(info?.oldMaxStreams == initial)
         #expect(info?.usedStreams == 0)
         #expect(connections.stats == .init(idle: 1, availableStreams: update))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -804,6 +894,7 @@ import Testing
         #expect(info?.oldMaxStreams == 4)
         // availableStreams should go to 0 (was 1, decrease by min(2, 1) = 1)
         #expect(connections.stats == .init(leased: 1, availableStreams: 0, leasedStreams: 3))
+        #expect(connections.connections.count == connections.stats.total)
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -849,5 +940,6 @@ import Testing
         let info = connections.connectionReceivedNewMaxStreamSetting(connection.id, newMaxStreamSetting: 8)
         #expect(info == nil)
         #expect(connections.stats == statsBeforeMaxStreamChange)
+        #expect(connections.connections.count == connections.stats.total)
     }
 }
