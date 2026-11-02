@@ -1,3 +1,5 @@
+/// Observes what happens inside a ``ConnectionPool``: connections being created, kept alive and closed, and,
+/// through ``ConnectionPoolStatisticsReporter/report(statistics:)``, snapshots of the pool's state.
 public protocol ConnectionPoolObservabilityDelegate: ConnectionPoolStatisticsReporter, Sendable {
     associatedtype ConnectionID: Hashable & Sendable
 
