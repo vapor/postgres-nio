@@ -267,7 +267,7 @@ struct ExtendedQueryStateMachine {
             return .wait
 
         case .prepareStatement(_, _, _, let eventLoopPromise):
-            return .succeedPreparedStatementCreation(eventLoopPromise, with: rowDescription)
+            return .succeedPreparedStatementCreation(eventLoopPromise, with: RowDescription(columns: columns))
         }
     }
     

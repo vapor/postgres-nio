@@ -49,6 +49,10 @@ extension PoolStateMachine {
             @usableFromInline var active: UInt16 {
                 self.idle + self.leased + self.connecting + self.backingOff
             }
+
+            @usableFromInline var total: UInt16 {
+                self.idle + self.leased + self.connecting + self.backingOff + self.closing
+            }
         }
 
         /// The minimum number of connections
@@ -827,29 +831,19 @@ extension PoolStateMachine {
 
         // MARK: Shutdown
 
-        mutating func triggerGracefulShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
+        @usableFromInline
+        mutating func closeConnections(onlyNonLeased: Bool, cleanup: inout ConnectionAction.Shutdown) {
             for index in self.connections.indices {
-                switch self.connections[index].state {
-                case .idle, .backingOff:
-                    switch closeConnection(at: index, deleteConnection: false) {
-                    case .close(let closeAction):
-                        cleanup.connections.append(closeAction.connection)
-                        cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
-                    case .cancelTimers(let timers):
-                        cleanup.timersToCancel.append(contentsOf: timers)
-                    case .doNothing:
+                if onlyNonLeased {
+                    switch self.connections[index].state {
+                    case .idle, .backingOff:
                         break
+                    case .leased, .draining, .closing, .closed, .starting:
+                        continue
                     }
-                default:
-                    break
                 }
-            }
-            self.connections = self.connections.filter { !$0.isClosed }
-        }
 
-        mutating func triggerForceShutdown(_ cleanup: inout ConnectionAction.Shutdown) {
-            for index in self.connections.indices {
-                switch closeConnection(at: index, deleteConnection: false) {
+                switch self.closeConnection(at: index, deleteConnection: false) {
                 case .close(let closeAction):
                     cleanup.connections.append(closeAction.connection)
                     cleanup.timersToCancel.append(contentsOf: closeAction.timersToCancel)
@@ -945,6 +939,7 @@ extension PoolStateMachine {
                 }
 
             default:
+                self.removeO1(indexToDelete)
                 return nil
             }
         }

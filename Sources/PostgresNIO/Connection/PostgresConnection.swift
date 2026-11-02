@@ -11,7 +11,7 @@ import Logging
 /// A Postgres connection. Use it to run queries against a Postgres server.
 ///
 /// Thread safety is achieved by dispatching all access to shared state onto the underlying EventLoop.
-public final class PostgresConnection: @unchecked Sendable {
+public final class PostgresConnection: Sendable {
     /// A Postgres connection ID.
     public typealias ID = Int
 
@@ -47,7 +47,7 @@ public final class PostgresConnection: @unchecked Sendable {
 
     public let id: ID
 
-    private var _logger: Logger
+    private let _logger: Logger
 
     init(channel: any Channel, connectionID: ID, logger: Logger) {
         self.channel = channel
@@ -58,11 +58,61 @@ public final class PostgresConnection: @unchecked Sendable {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
     }
 
+    /// Connect to the Postgres server described by `configuration` — negotiate
+    /// TLS (if configured), send the startup message, and authenticate — then
+    /// remove PostgresNIO's handlers, returning the authenticated channel for the
+    /// caller to drive with its own pipeline. Any TLS handler and the socket are
+    /// left in place; only PostgresNIO's own protocol handlers are removed. This
+    /// lets a caller reuse PostgresNIO's TCP/TLS/startup/authentication (including
+    /// SCRAM-SHA-256) and then speak a protocol PostgresNIO does not implement —
+    /// for example, streaming replication.
+    public static func establishAndAuthChannelWithoutPostgresHandler(
+        using configuration: Configuration,
+        on eventLoop: any EventLoop,
+        logger: Logger
+    ) -> EventLoopFuture<any Channel> {
+        let configuration = InternalConfiguration(configuration)
+        return eventLoop.flatSubmit {
+            Self.makeChannel(on: eventLoop, configuration: configuration).flatMap { channel in
+                Self.installHandlersAndStartup(
+                    on: channel,
+                    configuration: configuration,
+                    logger: logger
+                ).flatMap { () -> EventLoopFuture<any Channel> in
+                    do {
+                        let pipeline = channel.pipeline.syncOperations
+                        let channelHandler = try pipeline.context(handlerType: PostgresChannelHandler.self)
+                        let eventsHandler = try pipeline.context(handlerType: PSQLEventsHandler.self)
+                        return pipeline.removeHandler(context: channelHandler)
+                            .and(pipeline.removeHandler(context: eventsHandler))
+                            .map { _ in channel }
+                    } catch {
+                        return channel.eventLoop.makeFailedFuture(error)
+                    }
+                }
+            }
+        }
+    }
+
     func start(configuration: InternalConfiguration) -> EventLoopFuture<Void> {
+        Self.installHandlersAndStartup(on: self.channel, configuration: configuration, logger: self.logger)
+    }
+
+    /// Install PostgresNIO's channel handlers on `channel` (a TLS handler first,
+    /// if configured), send the startup message, and authenticate; the returned
+    /// future succeeds once the connection reaches `ReadyForQuery`.
+    ///
+    /// Must be called on `channel.eventLoop`. Shared bring-up for
+    /// ``start(configuration:)`` and ``establishAndAuthChannelWithoutPostgresHandler(using:on:logger:)``.
+    static func installHandlersAndStartup(
+        on channel: any Channel,
+        configuration: InternalConfiguration,
+        logger: Logger
+    ) -> EventLoopFuture<Void> {
         // 1. configure handlers
 
         let configureSSLCallback: ((any Channel, PostgresChannelHandler) throws -> ())?
-        
+
         switch configuration.tls.base {
         case .prefer(let context), .require(let context):
             configureSSLCallback = { channel, postgresChannelHandler in
@@ -90,10 +140,10 @@ public final class PostgresConnection: @unchecked Sendable {
         // 2. add handlers
 
         do {
-            try self.channel.pipeline.syncOperations.addHandler(eventHandler)
-            try self.channel.pipeline.syncOperations.addHandler(channelHandler, position: .before(eventHandler))
+            try channel.pipeline.syncOperations.addHandler(eventHandler)
+            try channel.pipeline.syncOperations.addHandler(channelHandler, position: .before(eventHandler))
         } catch {
-            return self.eventLoop.makeFailedFuture(error)
+            return channel.eventLoop.makeFailedFuture(error)
         }
 
         let startupFuture: EventLoopFuture<Void>
@@ -109,7 +159,7 @@ public final class PostgresConnection: @unchecked Sendable {
             // in case of an startup error, the connection must be closed and after that
             // the originating error should be surfaced
 
-            self.channel.closeFuture.flatMapThrowing { _ in
+            channel.closeFuture.flatMapThrowing { _ in
                 throw error
             }
         }
@@ -161,26 +211,7 @@ public final class PostgresConnection: @unchecked Sendable {
         // on and the EventLoop. In addition, it eliminates all potential races between the creating
         // thread and the EventLoop.
         let future = eventLoop.flatSubmit { () -> EventLoopFuture<PostgresConnection> in
-            let connectFuture: EventLoopFuture<any Channel>
-
-            switch configuration.connection {
-            case .resolved(let address):
-                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
-                connectFuture = bootstrap.connect(to: address)
-            case .unresolvedTCP(let host, let port):
-                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
-                connectFuture = bootstrap.connect(host: host, port: port)
-            case .unresolvedUDS(let path):
-                let bootstrap = self.makeBootstrap(on: eventLoop, configuration: configuration)
-                connectFuture = bootstrap.connect(unixDomainSocketPath: path)
-            case .bootstrapped(let channel):
-                guard channel.isActive else {
-                    return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
-                }
-                connectFuture = eventLoop.makeSucceededFuture(channel)
-            }
-
-            return connectFuture.flatMap { channel -> EventLoopFuture<PostgresConnection> in
+            return self.makeChannel(on: eventLoop, configuration: configuration).flatMap { channel -> EventLoopFuture<PostgresConnection> in
                 // 1. check if the connection request was cancelled in the mean time.
                 if let closeFuture = cancelHandler.channelConnected(channel) {
                     return closeFuture.flatMapThrowing { throw CancellationError() }
@@ -240,6 +271,25 @@ public final class PostgresConnection: @unchecked Sendable {
         }
 
         fatalError("No matching bootstrap found")
+    }
+
+    private static func makeChannel(
+        on eventLoop: any EventLoop,
+        configuration: InternalConfiguration
+    ) -> EventLoopFuture<any Channel> {
+        switch configuration.connection {
+        case .resolved(let address):
+            return self.makeBootstrap(on: eventLoop, configuration: configuration).connect(to: address)
+        case .unresolvedTCP(let host, let port):
+            return self.makeBootstrap(on: eventLoop, configuration: configuration).connect(host: host, port: port)
+        case .unresolvedUDS(let path):
+            return self.makeBootstrap(on: eventLoop, configuration: configuration).connect(unixDomainSocketPath: path)
+        case .bootstrapped(let channel):
+            guard channel.isActive else {
+                return eventLoop.makeFailedFuture(PSQLError.connectionError(underlying: ChannelError.alreadyClosed))
+            }
+            return eventLoop.makeSucceededFuture(channel)
+        }
     }
 
     // MARK: Query
@@ -654,6 +704,108 @@ extension PostgresConnection {
             }
 
             throw transactionError
+        }
+    }
+}
+
+extension PostgresConnection {
+    /// Run a query on the Postgres server the connection is connected to.
+    /// 
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result.
+    /// - Returns: The result of the `body` closure.
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> Result {
+        let stream: PSQLRowStream
+        let sequence: PostgresRowSequence
+
+        do {
+            let streamFuture = self.queryStream(query, logger: logger)
+            (stream, sequence) = try await streamFuture.map { stream in
+                (stream, stream.asyncSequence())
+            }.get()
+        }  catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+
+        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+
+        return try await body(sequence)
+    }
+
+    /// Run a query on the Postgres server the connection is connected to and return the query's metadata
+    /// alongside the `body` closure's result.
+    ///
+    /// The result of the query can only be consumed inside of the `body` closure and attempting to
+    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
+    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    ///
+    /// The metadata is derived from the command tag the server sends after the last row, so `body` must
+    /// iterate the sequence to its end. If it returns early the query is cancelled and the method throws
+    /// `PSQLError.rowSequenceNotFullyConsumed`.
+    ///
+    /// - Parameters:
+    ///   - query: The ``PostgresQuery`` to run
+    ///   - logger: The `Logger` to log into for the query
+    ///   - file: The file the query was started in. Used for better error reporting.
+    ///   - line: The line the query was started in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the query result. Must consume the sequence to its end.
+    /// - Returns: The result of the `body` closure and the query metadata.
+    @_disfavoredOverload
+    public func query<Result>(
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
+        let stream: PSQLRowStream
+        let sequence: PostgresRowSequence
+
+        do {
+            (stream, sequence) = try await self.queryStream(query, logger: logger).map { stream in
+                (stream, stream.asyncSequence())
+            }.get()
+        }  catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+
+        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
+
+        let result = try await body(sequence)
+
+        do {
+            guard let consumedCommandTag = try await stream.consumedCommandTag().get() else {
+                throw PSQLError.rowSequenceNotFullyConsumed
+            }
+            guard let metadata = PostgresQueryMetadata(string: consumedCommandTag) else {
+                throw PSQLError.invalidCommandTag(consumedCommandTag)
+            }
+            return (result, metadata)
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
         }
     }
 }

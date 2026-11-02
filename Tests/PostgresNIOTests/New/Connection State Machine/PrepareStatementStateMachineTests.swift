@@ -28,6 +28,39 @@ import NIOEmbedded
                        .succeedPreparedStatementCreation(promise, with: .init(columns: columns)))
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
+
+    @Test(.bug("https://github.com/vapor/postgres-nio/issues/303")) 
+    func testCreatePreparedStatementReturnsBinaryFormattedRowDescription() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let promise = EmbeddedEventLoop().makePromise(of: RowDescription?.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+
+        let name = "haha"
+        let query = #"SELECT id FROM users WHERE id = $1 "#
+        let prepareStatementContext = ExtendedQueryContext(
+            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
+        )
+
+        #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
+                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+
+        let textColumns: [RowDescription.Column] = [
+            .init(name: "id", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: -1, format: .text
+        )
+        ]
+        let binaryColumns = textColumns.map { column -> RowDescription.Column in
+            var column = column
+            column.format = .binary
+            return column
+        }
+
+        #expect(state.rowDescriptionReceived(.init(columns: textColumns)) ==
+                       .succeedPreparedStatementCreation(promise, with: .init(columns: binaryColumns)))
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
+    }
     
     @Test func testCreatePreparedStatementReturningNoData() throws {
         var state = try ConnectionStateMachine.makeReadyForQuery()

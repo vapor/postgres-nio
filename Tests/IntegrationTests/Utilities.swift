@@ -1,4 +1,5 @@
 import XCTest
+import Testing
 import PostgresNIO
 import NIOCore
 import Logging
@@ -40,6 +41,26 @@ extension PostgresConnection {
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
+
+    static func test(
+        on eventLoop: any EventLoop = MultiThreadedEventLoopGroup.singleton.any(),
+        options: Configuration.Options? = nil
+    ) async throws -> PostgresConnection {
+        let logger = Logger(label: "postgres.connection.test")
+        var config = PostgresConnection.Configuration(
+            host: env("POSTGRES_HOSTNAME") ?? "localhost",
+            port: env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database",
+            tls: .disable
+        )
+        if let options {
+            config.options = options
+        }
+        
+        return try await PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
     
     static func testUDS(on eventLoop: any EventLoop) -> EventLoopFuture<PostgresConnection> {
         let logger = Logger(label: "postgres.connection.test")
@@ -51,6 +72,18 @@ extension PostgresConnection {
         )
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
+
+    static func testUDS(on eventLoop: any EventLoop = MultiThreadedEventLoopGroup.singleton.any()) async throws -> PostgresConnection {
+        let logger = Logger(label: "postgres.connection.test")
+        let config = PostgresConnection.Configuration(
+            unixSocketPath: env("POSTGRES_SOCKET") ?? "/tmp/.s.PGSQL.\(env("POSTGRES_PORT").flatMap(Int.init(_:)) ?? 5432)",
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database"
+        )
+        
+        return try await PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
     
     static func testChannel(_ channel: any Channel, on eventLoop: any EventLoop) -> EventLoopFuture<PostgresConnection> {
@@ -64,6 +97,36 @@ extension PostgresConnection {
         
         return PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
     }
+
+    static func testChannel(_ channel: any Channel, on eventLoop: any EventLoop) async throws -> PostgresConnection {
+        let logger = Logger(label: "postgres.connection.test")
+        let config = PostgresConnection.Configuration(
+            establishedChannel: channel,
+            username: env("POSTGRES_USER") ?? "test_username",
+            password: env("POSTGRES_PASSWORD") ?? "test_password",
+            database: env("POSTGRES_DB") ?? "test_database"
+        )
+        
+        return try await PostgresConnection.connect(on: eventLoop, configuration: config, id: 0, logger: logger)
+    }
+}
+
+func withConnection<Result>(
+    on eventLoop: any EventLoop = MultiThreadedEventLoopGroup.singleton.any(),
+    options: PostgresConnection.Configuration.Options? = nil,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ body: (PostgresConnection) async throws -> Result
+) async throws -> Result {
+    let connection = try await PostgresConnection.test(on: eventLoop, options: options)
+    do {
+        let result = try await body(connection)
+        try await connection.close()
+        return result
+    } catch {
+        Issue.record(error, "Unexpected error: \(String(reflecting: error))", sourceLocation: sourceLocation)
+        try? await connection.close()
+        throw error
+    }
 }
 
 extension Logger {
@@ -76,17 +139,16 @@ func env(_ name: String) -> String? {
     getenv(name).flatMap { String(cString: $0) }
 }
 
+var shouldRunLongRunningTests: Bool {
+    // The env var must be set and have the value `"true"`, `"1"`, or `"yes"` (case-insensitive).
+    // For the sake of sheer annoying pedantry, values like `"2"` are treated as false.
+    guard let rawValue = env("POSTGRES_LONG_RUNNING_TESTS") else { return false }
+    if let boolValue = Bool(rawValue) { return boolValue }
+    if let intValue = Int(rawValue) { return intValue == 1 }
+    return rawValue.lowercased() == "yes"
+}
+
 extension XCTestCase {
-    
-    public static var shouldRunLongRunningTests: Bool {
-        // The env var must be set and have the value `"true"`, `"1"`, or `"yes"` (case-insensitive).
-        // For the sake of sheer annoying pedantry, values like `"2"` are treated as false.
-        guard let rawValue = env("POSTGRES_LONG_RUNNING_TESTS") else { return false }
-        if let boolValue = Bool(rawValue) { return boolValue }
-        if let intValue = Int(rawValue) { return intValue == 1 }
-        return rawValue.lowercased() == "yes"
-    }
-    
     public static var shouldRunPerformanceTests: Bool {
         // Same semantics as above. Any present non-truthy value will explicitly disable performance
         // tests even if they would've overwise run in the current configuration.

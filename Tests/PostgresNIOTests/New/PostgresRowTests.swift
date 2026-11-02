@@ -1,173 +1,142 @@
-import XCTest
 @testable import PostgresNIO
+import Foundation
+import Testing
 import NIOCore
 
-final class PostgresRowTests: XCTestCase {
+@Suite struct PostgresRowTests {
+    let rowDescription = [
+        RowDescription.Column(
+            name: "id",
+            tableOID: 1,
+            columnAttributeNumber: 1,
+            dataType: .uuid,
+            dataTypeSize: 0,
+            dataTypeModifier: 0,
+            format: .binary
+        ),
+        RowDescription.Column(
+            name: "name",
+            tableOID: 1,
+            columnAttributeNumber: 1,
+            dataType: .text,
+            dataTypeSize: 0,
+            dataTypeModifier: 0,
+            format: .binary
+        )
+    ]
 
-    func testSequence() {
-        let rowDescription = [
-            RowDescription.Column(
-                name: "id",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .uuid,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            ),
-            RowDescription.Column(
-                name: "name",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .text,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            )
-        ]
-
+    @Test func testSequence() {
         let row = PostgresRow(
             data: .makeTestDataRow(nil, ByteBuffer(string: "Hello world!")),
             lookupTable: ["id": 0, "name": 1],
-            columns: rowDescription
+            columns: self.rowDescription
         )
 
-        XCTAssertEqual(row.count, 2)
+        #expect(row.count == 2)
         var iterator = row.makeIterator()
 
-        XCTAssertEqual(iterator.next(), PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        XCTAssertEqual(iterator.next(), PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
-        XCTAssertNil(iterator.next())
+        #expect(iterator.next() == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
+        #expect(iterator.next() == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(iterator.next() == nil)
     }
 
-    func testCollection() {
-        let rowDescription = [
-            RowDescription.Column(
-                name: "id",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .uuid,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            ),
-            RowDescription.Column(
-                name: "name",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .text,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            )
-        ]
-
+    @Test func testCollection() {
         let row = PostgresRow(
             data: .makeTestDataRow(nil, ByteBuffer(string: "Hello world!")),
             lookupTable: ["id": 0, "name": 1],
-            columns: rowDescription
+            columns: self.rowDescription
         )
 
-        XCTAssertEqual(row.count, 2)
+        #expect(row.count == 2)
         let startIndex = row.startIndex
         let secondIndex = row.index(after: startIndex)
         let endIndex = row.index(after: secondIndex)
-        XCTAssertLessThan(startIndex, secondIndex)
-        XCTAssertLessThan(secondIndex, endIndex)
-        XCTAssertEqual(endIndex, row.endIndex)
+        #expect(startIndex < secondIndex)
+        #expect(secondIndex < endIndex)
+        #expect(endIndex == row.endIndex)
 
-        XCTAssertEqual(row[startIndex], PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        XCTAssertEqual(row[secondIndex], PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(row[startIndex] == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
+        #expect(row[secondIndex] == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
     }
 
-    func testRandomAccessRow() {
-        let rowDescription = [
-            RowDescription.Column(
-                name: "id",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .uuid,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            ),
-            RowDescription.Column(
-                name: "name",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .text,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            )
-        ]
-
+    @Test func testRandomAccessRow() {
         let row = PostgresRow(
             data: .makeTestDataRow(nil, ByteBuffer(string: "Hello world!")),
             lookupTable: ["id": 0, "name": 1],
-            columns: rowDescription
+            columns: self.rowDescription
         )
 
         let randomAccessRow = row.makeRandomAccess()
 
-        XCTAssertEqual(randomAccessRow.count, 2)
-        let startIndex = randomAccessRow.startIndex
-        let endIndex = randomAccessRow.endIndex
-        XCTAssertEqual(startIndex, 0)
-        XCTAssertEqual(endIndex, 2)
+        #expect(randomAccessRow.count == 2)
+        #expect(randomAccessRow.startIndex == 0)
+        #expect(randomAccessRow.endIndex == 2)
 
-        XCTAssertEqual(randomAccessRow[0], PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        XCTAssertEqual(randomAccessRow[1], PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(randomAccessRow[0] == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
+        #expect(randomAccessRow[1] == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
 
-        XCTAssertEqual(randomAccessRow["id"], PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
-        XCTAssertEqual(randomAccessRow["name"], PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
+        #expect(randomAccessRow["id"] == PostgresCell(bytes: nil, dataType: .uuid, format: .binary, columnName: "id", columnIndex: 0))
+        #expect(randomAccessRow["name"] == PostgresCell(bytes: ByteBuffer(string: "Hello world!"), dataType: .text, format: .binary, columnName: "name", columnIndex: 1))
     }
 
-    func testDecoding() {
-        let rowDescription = [
-            RowDescription.Column(
-                name: "id",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .uuid,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            ),
-            RowDescription.Column(
-                name: "name",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .text,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            )
-        ]
-
+    @Test func testDecoding() throws {
         let row = PostgresRow(
             data: .makeTestDataRow(nil, ByteBuffer(string: "Hello world!")),
             lookupTable: ["id": 0, "name": 1],
+            columns: self.rowDescription
+        )
+
+        let result = try row.decode((UUID?, String).self)
+        #expect(result.0 == .none)
+        #expect(result.1 == "Hello world!")
+    }
+
+    @Test func testDecodingTypeMismatch() throws {
+        let row = PostgresRow(
+            data: .makeTestDataRow(nil, ByteBuffer(integer: 123)),
+            lookupTable: ["id": 0, "name": 1],
+            columns: self.rowDescription
+        )
+
+        let error = #expect(throws: PostgresDecodingError.self) {
+            try row.decode((UUID?, Int).self)
+        }
+        guard let error else {
+            Issue.record("Expected error at this point")
+            return
+        }
+
+        #expect(error.columnName == "name")
+        #expect(error.columnIndex == 1)
+        #expect(error.line == #line - 10)
+        #expect(error.file == #fileID)
+        #expect(error.postgresData == ByteBuffer(integer: 123))
+        #expect(error.postgresFormat == .binary)
+        #expect(error.postgresType == .text)
+        let correctType = error.targetType == Int.self
+        #expect(correctType)
+    }
+
+    @Test func notEnoughColumnsSingleType() {
+        let rowDescription = [RowDescription.Column]()
+        let row = PostgresRow(
+            data: .makeTestDataRow(),
+            lookupTable: [:],
             columns: rowDescription
         )
 
-        var result: (UUID?, String)?
-        XCTAssertNoThrow(result = try row.decode((UUID?, String).self))
-        XCTAssertEqual(result?.0, .some(.none))
-        XCTAssertEqual(result?.1, "Hello world!")
+        let error = #expect(throws: PSQLError.self) {
+            try row.decode(String.self)
+        }
+        
+        #expect(error?.code == .notEnoughColumns)
+        #expect(error?.expectedColumns == 1)
+        #expect(error?.returnedColumns == 0)
+        #expect(error?.file == #fileID)
     }
 
-    func testDecodingTypeMismatch() {
+    @Test func notEnoughColumnsTuple() {
         let rowDescription = [
-            RowDescription.Column(
-                name: "id",
-                tableOID: 1,
-                columnAttributeNumber: 1,
-                dataType: .uuid,
-                dataTypeSize: 0,
-                dataTypeModifier: 0,
-                format: .binary
-            ),
             RowDescription.Column(
                 name: "name",
                 tableOID: 1,
@@ -178,24 +147,19 @@ final class PostgresRowTests: XCTestCase {
                 format: .binary
             )
         ]
-
         let row = PostgresRow(
-            data: .makeTestDataRow(nil, ByteBuffer(integer: 123)),
-            lookupTable: ["id": 0, "name": 1],
+            data: .makeTestDataRow(ByteBuffer(string: "Hello world!")),
+            lookupTable: ["name": 0],
             columns: rowDescription
         )
 
-        XCTAssertThrowsError(try row.decode((UUID?, Int).self)) { error in
-            guard let psqlError = error as? PostgresDecodingError else { return XCTFail("Unexpected error type") }
-
-            XCTAssertEqual(psqlError.columnName, "name")
-            XCTAssertEqual(psqlError.columnIndex, 1)
-            XCTAssertEqual(psqlError.line, #line - 5)
-            XCTAssertEqual(psqlError.file, #fileID)
-            XCTAssertEqual(psqlError.postgresData, ByteBuffer(integer: 123))
-            XCTAssertEqual(psqlError.postgresFormat, .binary)
-            XCTAssertEqual(psqlError.postgresType, .text)
-            XCTAssert(psqlError.targetType == Int.self)
+        let error = #expect(throws: PSQLError.self) {
+            try row.decode((String, String).self)
         }
+        
+        #expect(error?.code == .notEnoughColumns)
+        #expect(error?.expectedColumns == 2)
+        #expect(error?.returnedColumns == 1)
+        #expect(error?.file == #fileID)
     }
 }

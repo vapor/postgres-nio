@@ -1081,19 +1081,13 @@ extension ConnectionStateMachine {
              .uncleanShutdown,
              .unlistenFailed:
             return true
-        case .queryCancelled:
+        case .queryCancelled, .notEnoughColumns, .rowSequenceUsedOutsideScope, .rowSequenceNotFullyConsumed:
             return false
         case .server, .listenFailed:
-            guard let sqlState = error.serverInfo?[.sqlState] else {
+            guard error.serverInfo?[.sqlState] != nil else {
                 // any error message that doesn't have a sql state field, is unexpected by default.
                 return true
             }
-            
-            if sqlState.starts(with: "28") {
-                // these are authentication errors
-                return true
-            }
-            
             return false
         case .clientClosedConnection, .poolClosed:
             preconditionFailure("A pure client error was thrown directly in PostgresConnection, this shouldn't happen")
@@ -1269,7 +1263,7 @@ extension AuthContext: Equatable {
             return false
         }
 
-        return lhs.additionalParameters.elementsEqual(rhs.additionalParameters) { lhs, rhs in
+        return zip(lhs.additionalParameters, rhs.additionalParameters).allSatisfy { lhs, rhs in
             lhs.0 == rhs.0 && lhs.1 == rhs.1
         }
     }

@@ -1,89 +1,114 @@
-import XCTest
+import Foundation
 import NIOCore
+import Testing
+
 @testable import PostgresNIO
 
-class Date_PSQLCodableTests: XCTestCase {
+@Suite
+struct Date_PSQLCodableTests {
 
-    func testNowRoundTrip() {
+    @Test func nowRoundTrip() throws {
         let value = Date()
 
         var buffer = ByteBuffer()
         value.encode(into: &buffer, context: .default)
-        XCTAssertEqual(Date.psqlType, .timestamptz)
-        XCTAssertEqual(buffer.readableBytes, 8)
+        #expect(Date.psqlType == .timestamptz)
+        #expect(buffer.readableBytes == 8)
 
-        var result: Date?
-        XCTAssertNoThrow(result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default))
-        XCTAssertEqual(value.timeIntervalSince1970, result?.timeIntervalSince1970 ?? 0, accuracy: 0.001)
+        let result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default)
+        #expect(abs(value.timeIntervalSince1970 - result.timeIntervalSince1970) < 0.001)
     }
 
-    func testDecodeRandomDate() {
+    @Test func decodeRandomDate() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
         var result: Date?
-        XCTAssertNoThrow(result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default))
-        XCTAssertNotNil(result)
+        #expect(throws: Never.self) { 
+            result = try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default) 
+        }
+        #expect(result != nil)
     }
 
-    func testDecodeFailureInvalidLength() {
+    @Test func decodeFailureInvalidLength() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
         buffer.writeInteger(Int64.random(in: Int64.min...Int64.max))
 
-        XCTAssertThrowsError(try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) { 
+            try Date(from: &buffer, type: .timestamptz, format: .binary, context: .default) 
         }
     }
 
-    func testDecodeDate() {
+    @Test func decodeDate() {
         var firstDateBuffer = ByteBuffer()
         firstDateBuffer.writeInteger(Int32.min)
 
         var firstDate: Date?
-        XCTAssertNoThrow(firstDate = try Date(from: &firstDateBuffer, type: .date, format: .binary, context: .default))
-        XCTAssertNotNil(firstDate)
+        #expect(throws: Never.self) { 
+            firstDate = try Date(from: &firstDateBuffer, type: .date, format: .binary, context: .default) 
+        }
+        #expect(firstDate != nil)
 
         var lastDateBuffer = ByteBuffer()
         lastDateBuffer.writeInteger(Int32.max)
 
         var lastDate: Date?
-        XCTAssertNoThrow(lastDate = try Date(from: &lastDateBuffer, type: .date, format: .binary, context: .default))
-        XCTAssertNotNil(lastDate)
+        #expect(throws: Never.self) { 
+            lastDate = try Date(from: &lastDateBuffer, type: .date, format: .binary, context: .default) 
+        }
+        #expect(lastDate != nil)
     }
 
-    func testDecodeDateFromTimestamp() {
-        var firstDateBuffer = ByteBuffer()
-        firstDateBuffer.writeInteger(Int32.min)
-
-        var firstDate: Date?
-        XCTAssertNoThrow(firstDate = try Date(from: &firstDateBuffer, type: .date, format: .binary, context: .default))
-        XCTAssertNotNil(firstDate)
-
-        var lastDateBuffer = ByteBuffer()
-        lastDateBuffer.writeInteger(Int32.max)
-
-        var lastDate: Date?
-        XCTAssertNoThrow(lastDate = try Date(from: &lastDateBuffer, type: .date, format: .binary, context: .default))
-        XCTAssertNotNil(lastDate)
-    }
-
-    func testDecodeDateFailsWithTooMuchData() {
+    @Test func decodeDateFailsWithTooMuchData() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(0))
 
-        XCTAssertThrowsError(try Date(from: &buffer, type: .date, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try Date(from: &buffer, type: .date, format: .binary, context: .default)
         }
     }
 
-    func testDecodeDateFailsWithWrongDataType() {
+    @Test func decodeDateFailsWithWrongDataType() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(0))
 
-        XCTAssertThrowsError(try Date(from: &buffer, type: .int8, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .typeMismatch)
+        #expect(throws: PostgresDecodingError.Code.typeMismatch) {
+            try Date(from: &buffer, type: .int8, format: .binary, context: .default)
         }
     }
 
+    @Test(
+        .bug("https://github.com/vapor/postgres-nio/issues/632"),
+        arguments: [
+            (Double.greatestFiniteMagnitude, Date._endTimestamp),
+            (-.greatestFiniteMagnitude, Date._minTimestamp - 1),
+            (.infinity, Date._endTimestamp),
+            (-.infinity, Date._minTimestamp - 1),
+            (.nan, Date._endTimestamp),
+            (9_300_000_000_000, Date._endTimestamp),
+            (-9_300_000_000_000, Date._minTimestamp - 1)
+        ])
+    func encodeDatesOutsideOfInt64MicrosecondRange(secondsSincePSQLDateStart: Double, expected: Int64) {
+        let value = Date(timeInterval: secondsSincePSQLDateStart, since: Date(timeIntervalSince1970: 946_684_800))
+
+        var buffer = ByteBuffer()
+        value.encode(into: &buffer, context: .default)
+        #expect(buffer.readInteger(as: Int64.self) == expected)
+    }
+
+    @Test(.bug("https://github.com/vapor/postgres-nio/issues/632"))
+    func encodeDateLandingExactlyOnNegativeInfinity() {
+        let value = Date(
+            timeInterval: -9_223_372_036_854.775390625,
+            since: Date(timeIntervalSince1970: 946_684_800)
+        )
+        // Precondition for this test to be meaningful: the naive conversion does produce `Int64.min`.
+        let naive = value.timeIntervalSince(Date(timeIntervalSince1970: 946_684_800)) * 1_000_000
+        #expect(Int64(exactly: naive.rounded(.towardZero)) == Int64.min)
+
+        var buffer = ByteBuffer()
+        value.encode(into: &buffer, context: .default)
+        #expect(buffer.readInteger(as: Int64.self) == Date._minTimestamp - 1)
+    }
 }
