@@ -331,19 +331,16 @@ struct PostgresClientTests {
 
     /// The OID is only looked up when the type is first used, so a connection opened before the extension
     /// was created, like one running migrations, can still use it.
-    func testLTreeResolvesLazilyAfterExtensionIsInstalled() async throws {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeResolvesLazilyAfterExtensionIsInstalled() async throws {
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
         let logger = mlogger
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
-        self.addTeardownBlock {
-            try await eventLoopGroup.shutdownGracefully()
-        }
 
         var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
         // make sure every query runs on the same connection
         clientConfig.options.maximumConnections = 1
-        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -360,7 +357,7 @@ struct PostgresClientTests {
             for try await label in rows.decode(PostgresLTree.self) {
                 decoded.append(label)
             }
-            XCTAssertEqual(decoded, [value])
+            #expect(decoded == [value])
 
             taskGroup.cancelAll()
         }
@@ -368,7 +365,8 @@ struct PostgresClientTests {
 
     /// The OID lookup is still running when the statement gets queued, so the OID has to be resolved
     /// when `Parse` is sent.
-    func testLTreeResolvesLazilyForPreparedStatements() async throws {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeResolvesLazilyForPreparedStatements() async throws {
         struct SelectLTree: PostgresPreparedStatement {
             static let name = "SELECT-ltree-lazy-resolution"
             static let sql = "SELECT $1"
@@ -390,12 +388,8 @@ struct PostgresClientTests {
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
         let logger = mlogger
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
-        self.addTeardownBlock {
-            try await eventLoopGroup.shutdownGracefully()
-        }
 
-        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -410,24 +404,21 @@ struct PostgresClientTests {
             for try await label in try await client.execute(SelectLTree(label: value), logger: logger) {
                 decoded.append(label)
             }
-            XCTAssertEqual(decoded, [value])
+            #expect(decoded == [value])
 
             taskGroup.cancelAll()
         }
     }
 
-    func testLTreeBindRoundTrip() async throws {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeBindRoundTrip() async throws {
         let tableName = "test_client_ltree_bind"
 
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
         let logger = mlogger
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
-        self.addTeardownBlock {
-            try await eventLoopGroup.shutdownGracefully()
-        }
 
-        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -465,22 +456,19 @@ struct PostgresClientTests {
             for try await label in rows.decode(PostgresLTree.self) {
                 decoded.append(label)
             }
-            XCTAssertEqual(decoded, [inserted])
+            #expect(decoded == [inserted])
 
             taskGroup.cancelAll()
         }
     }
 
-    func testLTreeBindInTypeAmbiguousContext() async throws {
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeBindInTypeAmbiguousContext() async throws {
         var mlogger = Logger(label: "test")
         mlogger.logLevel = .debug
         let logger = mlogger
-        let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 8)
-        self.addTeardownBlock {
-            try await eventLoopGroup.shutdownGracefully()
-        }
 
-        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: eventLoopGroup, backgroundLogger: logger)
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {
@@ -497,7 +485,7 @@ struct PostgresClientTests {
             for try await label in rows.decode(PostgresLTree.self) {
                 decoded.append(label)
             }
-            XCTAssertEqual(decoded, [value])
+            #expect(decoded == [value])
 
             taskGroup.cancelAll()
         }
