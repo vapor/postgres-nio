@@ -3,6 +3,7 @@ import NIOEmbedded
 import NIOConcurrencyHelpers
 import Testing
 import Logging
+import MetricsTestKit
 @testable import PostgresNIO
 
 @Suite struct PostgresStructuredQueryTests {
@@ -32,6 +33,65 @@ import Logging
                 try await taskGroup.waitForAll()
             }
         }
+    }
+
+    @Test func successfulQueryRecordsDuration() async throws {
+        let metrics = TestMetrics()
+        try await self.withAsyncTestingChannel(metricsFactory: metrics) { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    try await connection.query("SELECT name FROM users", logger: .psqlTest) { rows in
+                        for try await _ in rows {}
+                    }
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.sendUnpreparedQueryStart(columns: [.textColumn(named: "name")])
+                try await channel.sendUnpreparedQueryEnd(dataRows: [["alice"], ["bob"], ["carol"]], commandTag: "SELECT 3")
+
+                try await taskGroup.waitForAll()
+            }
+        }
+
+        let timers = metrics.timers.filter { $0.label == "db.client.operation.duration" }
+        #expect(timers.count == 1)
+        #expect(timers.first?.values.count == 1)
+        #expect(timers.first?.dimensions.contains { $0.0 == "error.type" } == false)
+    }
+
+    @Test func queryRejectedByServerRecordsItsSQLState() async throws {
+        let metrics = TestMetrics()
+        try await self.withAsyncTestingChannel(metricsFactory: metrics) { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    await #expect(throws: PSQLError.self) {
+                        try await connection.query("SELECT * FROM missing", logger: .psqlTest) { rows in
+                            for try await _ in rows {}
+                        }
+                    }
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                    .message: "relation \"missing\" does not exist",
+                    .sqlState: "42P01",
+                ])))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                try await taskGroup.waitForAll()
+            }
+        }
+
+        let timers = metrics.timers.filter { $0.label == "db.client.operation.duration" }
+        let (failed, succeeded) = (
+            timers.filter { $0.dimensions.contains { $0.0 == "error.type" } },
+            timers.filter { !$0.dimensions.contains { $0.0 == "error.type" } }
+        )
+        #expect(failed.count == 1)
+        #expect(failed.first?.values.count == 1)
+        #expect(failed.first?.dimensions.contains { $0 == ("error.type", "42P01") } == true)
+        #expect(failed.first?.dimensions.contains { $0 == ("db.response.status_code", "42P01") } == true)
+        #expect(succeeded.allSatisfy { $0.values.isEmpty })
     }
 
     @Test func bodyReturnsVoid() async throws {
@@ -412,7 +472,10 @@ import Logging
         }
     }
 
-    private func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
+    private func withAsyncTestingChannel(
+        metricsFactory: TestMetrics? = nil,
+        _ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()
+    ) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
             try channel.pipeline.syncOperations.addHandlers(ReverseByteToMessageHandler(PSQLFrontendMessageDecoder()))
@@ -420,12 +483,15 @@ import Logging
         }
         try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
 
-        let configuration = PostgresConnection.Configuration(
+        var configuration = PostgresConnection.Configuration(
             establishedChannel: channel,
             username: "username",
             password: "postgres",
             database: "database"
         )
+        if let metricsFactory {
+            configuration.options.metrics = .init(factory: metricsFactory)
+        }
 
         let logger = self.logger
         async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: logger)

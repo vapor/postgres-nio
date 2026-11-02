@@ -90,6 +90,9 @@ extension PostgresConnection {
             /// startup message that the client sends to the server.
             public var additionalStartupParameters: [(String, String)]
 
+            /// Configures the metrics recorded for this connection. See ``PostgresMetricsConfiguration``.
+            public var metrics: PostgresMetricsConfiguration
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -98,6 +101,7 @@ extension PostgresConnection {
                 self.tlsServerName = nil
                 self.requireBackendKeyData = true
                 self.additionalStartupParameters = []
+                self.metrics = .init()
             }
         }
         
