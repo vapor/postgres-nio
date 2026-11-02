@@ -1,46 +1,33 @@
-/// A Swift representation for the Postgres `ltree` type, provided by the `ltree` extension.
+/// A Swift representation of the Postgres `ltree` type, which comes from the `ltree` extension.
 ///
-/// An `ltree` value is a sequence of zero or more labels separated by dots, for example
-/// `Top.Science.Astronomy`.
-///
-/// Enable the extension in your database before using the type:
+/// An `ltree` is a path of labels separated by dots, e.g. `Top.Science.Astronomy`.
+/// The extension needs to be enabled in the database before the type can be used:
 /// ```sql
 /// CREATE EXTENSION IF NOT EXISTS ltree;
 /// ```
 ///
-/// ## Wire format
+/// Since the type comes from an extension it doesn't have a fixed OID, so each connection looks it up
+/// the first time it's used. If the extension is dropped and created again, connections that already
+/// used the type keep the old OID and need to be reconnected.
 ///
-/// Because `ltree` is an extension type its Postgres OID is assigned when the extension is installed
-/// and is therefore not stable across databases. It is instead resolved per connection: add `"ltree"`
-/// to ``PostgresConnection/Configuration/Options/additionalDataTypeNames`` and the OID is looked up
-/// while the connection is being established. The dotted path is always written as text, never as binary.
-///
+/// To skip the lookup, bind the path as a `String` and cast it in SQL instead:
 /// ```swift
-/// config.options.additionalDataTypeNames = ["ltree"]
+/// try await client.query("SELECT \(path.description)::ltree")
 /// ```
 ///
-/// Without that option, or if the extension is not installed, values are bound with an unspecified
-/// parameter type (OID `0`) and Postgres has to infer the type from context. Binding an `ltree` where
-/// Postgres can't infer it (for example `SELECT $1` with no surrounding type information)
-/// will then fail.
+/// Values are always sent as text, and can be decoded from text or from binary, which Postgres supports
+/// for `ltree` since version 13.
 ///
-/// When decoding, both wire formats the server may send are supported:
-/// - `.text`: the raw dotted path.
-/// - `.binary`: a one-byte version prefix (currently `1`) followed by the path text. Binary
-///   send/receive for `ltree` was only added in PostgreSQL 13.
-///
-/// For more information on the type, see https://www.postgresql.org/docs/current/ltree.html.
+/// For more information see https://www.postgresql.org/docs/current/ltree.html.
 public struct PostgresLTree: Equatable, Hashable, Sendable {
-    /// The individual labels of the path, ordered from the root to the leaf.
+    /// The labels of the path, from the root to the leaf.
     ///
-    /// A label must not contain `.`: `["a.b"]` is sent as `a.b`, which Postgres stores as the two labels
-    /// `a` and `b`, and nothing reports it.
+    /// A label can't contain a `.`, otherwise Postgres will split it into multiple labels.
     public var labels: [String]
 
-    /// Create an `ltree` from its individual labels, in order from the root to the leaf.
+    /// Create an `ltree` from its labels, from the root to the leaf.
     ///
     /// - Parameter labels: The labels making up the path, e.g. `["Top", "Science", "Astronomy"]`.
-    ///   A label must not contain `.`, see ``labels``.
     public init(labels: [String]) {
         self.labels = labels
     }
@@ -56,12 +43,11 @@ extension PostgresLTree: ExpressibleByArrayLiteral {
 }
 
 extension PostgresLTree: CustomStringConvertible, LosslessStringConvertible {
-    /// Create an `ltree` by splitting a dotted path string into its labels.
-    /// 
-    /// Input that Postgres would reject (such as `a..b`) is parsed leniently
-    /// rather than failing. The server is the authority here.
+    /// Create an `ltree` by splitting a dotted path into its labels.
     ///
-    /// - Parameter description: A dotted path such as `Top.Science.Astronomy`.
+    /// Empty labels, like in `a..b`, are dropped. Other invalid labels are left for Postgres to reject.
+    ///
+    /// - Parameter description: A dotted path, e.g. `Top.Science.Astronomy`.
     public init(_ description: String) {
         self.labels = description.split(separator: ".").map(String.init)
     }

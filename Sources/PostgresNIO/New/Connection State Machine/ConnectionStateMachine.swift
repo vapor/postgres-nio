@@ -1079,10 +1079,7 @@ extension ConnectionStateMachine {
              .invalidCommandTag,
              .connectionError,
              .uncleanShutdown,
-             .unlistenFailed,
-             // A connection that cannot provide the data types the user declared as required is not
-             // fit for purpose, so tear it down rather than hand it back.
-             .unresolvedDataTypeNames:
+             .unlistenFailed:
             return true
         case .queryCancelled:
             return false

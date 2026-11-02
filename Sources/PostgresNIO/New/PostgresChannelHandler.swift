@@ -25,7 +25,8 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     private var listenState = ListenStateMachine()
     private var preparedStatementState = PreparedStatementStateMachine()
     private var resolvedDataTypes: [String: PostgresDataType] = [:]
-    private var unresolvableDataTypes: Set<String> = []
+    // names that were already looked up, found or not, so each one is only queried once
+    private var requestedDataTypes: Set<String> = []
 
     init(
         configuration: PostgresConnection.InternalConfiguration,
@@ -46,10 +47,6 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
     func handlerAdded(context: ChannelHandlerContext) {
         self.handlerContext = context
         self.encoder = PostgresFrontendMessageEncoder(buffer: context.channel.allocator.buffer(capacity: 256))
-
-        if !self.configuration.options.additionalDataTypeNames.isEmpty {
-            self.enqueueDataTypePopulation(for: self.configuration.options.additionalDataTypeNames, required: true, on: context)
-        }
 
         if context.channel.isActive {
             self.connected(context: context)
@@ -324,7 +321,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
         self.run(action, with: context)
     }
 
-    /// Enqueue a query resolving the OIDs of any bindings that name a type we haven't resolved yet.
+    /// Enqueue a query resolving the OIDs of any bindings that name a type we haven't looked up yet.
     private func enqueueDataTypeResolutionIfNeeded(for task: PSQLTask, context: ChannelHandlerContext) {
         let bindings: PostgresBindings? =
             switch task {
@@ -343,30 +340,17 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             }
 
         guard let bindings else { return }
+        guard bindings.metadata.contains(where: { $0.dataTypeName != nil }) else { return }
 
-        let hasMissing = bindings.metadata.contains { meta in
-            meta.dataTypeName.map { self.resolvedDataTypes[$0] == nil } ?? false
-        }
-        guard hasMissing else { return }
+        let missingDataTypes = Set(bindings.metadata.compactMap(\.dataTypeName)).subtracting(self.requestedDataTypes)
+        guard !missingDataTypes.isEmpty else { return }
 
-        let missingDataTypes = bindings.metadata.compactMap { meta in
-            meta.dataTypeName.flatMap { self.resolvedDataTypes[$0] == nil ? $0 : nil }
-        }
-
-        self.enqueueDataTypePopulation(for: missingDataTypes, required: false, on: context)
+        self.requestedDataTypes.formUnion(missingDataTypes)
+        self.enqueueDataTypePopulation(for: Array(missingDataTypes), on: context)
     }
 
     /// Enqueue a query resolving `dataTypeNames` to OIDs.
-    ///
-    /// - Parameter required: Whether failing to resolve a name should fail the connection. This is `true`
-    ///   for names the user listed in ``PostgresConnection/Configuration/Options/additionalDataTypeNames``
-    ///   — those are a declared requirement — and `false` for names discovered from a query's bindings,
-    ///   where an unresolvable name only means that particular type cannot be sent with a concrete OID.
-    private func enqueueDataTypePopulation(
-        for dataTypeNames: [String],
-        required: Bool,
-        on context: ChannelHandlerContext
-    ) {
+    private func enqueueDataTypePopulation(for dataTypeNames: [String], on context: ChannelHandlerContext) {
         let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
         let queryContext = ExtendedQueryContext(
             query: """
@@ -378,10 +362,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             promise: promise
         )
 
-        let loopBound = NIOLoopBound((self, context), eventLoop: self.eventLoop)
+        let loopBound = NIOLoopBound(self, eventLoop: self.eventLoop)
         promise.futureResult.flatMap { $0.all() }.whenComplete { result in
-            let (handler, context) = loopBound.value
-            handler.onMissingDataTypesPopulated(result, for: dataTypeNames, required: required, context: context)
+            loopBound.value.onMissingDataTypesPopulated(result, for: dataTypeNames)
         }
 
         self.run(self.state.enqueue(task: .extendedQuery(queryContext)), with: context)
@@ -389,9 +372,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
 
     private func onMissingDataTypesPopulated(
         _ result: Result<[PostgresRow], any Error>,
-        for dataTypeNames: [String],
-        required: Bool,
-        context: ChannelHandlerContext
+        for dataTypeNames: [String]
     ) {
         switch result {
         case .success(let rows):
@@ -405,28 +386,15 @@ final class PostgresChannelHandler: ChannelDuplexHandler {
             }
 
             let unresolved = dataTypeNames.filter { self.resolvedDataTypes[$0] == nil }
-            guard !unresolved.isEmpty else { return }
-
-            if required {
-                // The user declared these types as a requirement, and the server does not have them.
-                // Remember that, so any query binding one fails with an error naming the type instead of
-                // sending OID 0 and failing later inside a decoder.
-                //
-                // Deliberately *not* failing connection establishment: the pool would retry the failing
-                // connection for `circuitBreakerTripAfter` (60s by default) and then fail the caller with
-                // `ConnectionPoolError.connectionCreationCircuitBreakerTripped`, which does not carry this
-                // error. The user would wait a minute to be told nothing useful.
-                self.unresolvableDataTypes.formUnion(unresolved)
-                self.logger.error("Required additional data types do not exist", metadata: [
-                    .dataTypeNames: "\(unresolved)"
-                ])
-            } else {
+            if !unresolved.isEmpty {
                 self.logger.warning("Some additional data types could not be resolved", metadata: [
                     .dataTypeNames: "\(unresolved)"
                 ])
             }
 
         case .failure(let error):
+            // Unmark the names so the next query on this connection looks them up again
+            self.requestedDataTypes.subtract(dataTypeNames)
             if let error = error as? PSQLError,
                 [.clientClosedConnection, .serverClosedConnection, .connectionError, .uncleanShutdown].contains(error.code)
             {

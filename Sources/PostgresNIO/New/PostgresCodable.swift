@@ -22,10 +22,9 @@ public protocol PostgresThrowingDynamicTypeEncodable {
         context: PostgresEncodingContext<JSONEncoder>
     ) throws
 
-    /// The Postgres name for this type. This is used for types that don't have a static OID.
-    /// Setting this on a type, combined with adding it to ``PostgresConnection/Configuration/Options/additionalDataTypeNames``,
-    /// will allow usage of this type through its dynamically constructed OID, by querying the OID
-    /// at connection startup.
+    /// The Postgres name of this type. This is used for types that don't have a static OID, like types
+    /// coming from extensions. The OID is looked up by name the first time the type is used on a connection,
+    /// if the type can't be found ``psqlType`` is used instead.
     var psqlTypeName: String? { get }
 }
 

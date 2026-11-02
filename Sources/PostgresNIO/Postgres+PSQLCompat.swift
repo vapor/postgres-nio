@@ -35,7 +35,7 @@ extension PSQLError {
             return PostgresError.protocol("Received unencrypted data after SSL request")
         case .saslError:
             return self.underlying ?? self
-        case .tooManyParameters, .invalidCommandTag, .unresolvedDataTypeNames:
+        case .tooManyParameters, .invalidCommandTag:
             return self
         case .clientClosedConnection,
              .serverClosedConnection:

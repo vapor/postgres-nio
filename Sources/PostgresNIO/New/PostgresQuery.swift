@@ -124,11 +124,11 @@ public struct PostgresBindings: Sendable, Hashable {
         @usableFromInline
         var dataType: PostgresDataType
         @usableFromInline
-        var dataTypeName: String?
-        @usableFromInline
         var format: PostgresFormat
         @usableFromInline
         var protected: Bool
+        @usableFromInline
+        var dataTypeName: String?
 
         @inlinable
         init(dataType: PostgresDataType, format: PostgresFormat, protected: Bool, dataTypeName: String? = nil) {
