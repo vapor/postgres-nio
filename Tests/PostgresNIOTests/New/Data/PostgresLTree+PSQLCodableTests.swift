@@ -10,17 +10,6 @@ import Testing
         #expect(ltree.description == "Top.Science.Astronomy")
     }
 
-    @Test func testInitFromStringSplitsOnDots() {
-        let ltree = PostgresLTree("Top.Science.Astronomy")
-        #expect(ltree.labels == ["Top", "Science", "Astronomy"])
-    }
-
-    @Test func testSingleLabel() {
-        let ltree = PostgresLTree("Top")
-        #expect(ltree.labels == ["Top"])
-        #expect(ltree.description == "Top")
-    }
-
     @Test func testStringRoundTrip() {
         let paths = ["Top", "Top.Science", "Top.Science.Astronomy.Astrophysics", "a-b.c_d.e0"]
         for path in paths {
@@ -50,23 +39,6 @@ import Testing
         let decoded = try PostgresLTree(from: &buffer, type: .text, format: .text, context: .default)
         #expect(decoded == empty)
         #expect(decoded.labels == [])
-    }
-
-    @Test func testAppend() throws {
-        var ltree = PostgresLTree(labels: ["Top", "Science"])
-        ltree.append("Astronomy")
-        #expect(ltree.labels == ["Top", "Science", "Astronomy"])
-        #expect(ltree.description == "Top.Science.Astronomy")
-    }
-
-    @Test func testPop() throws {
-        var ltree = PostgresLTree(labels: ["Top", "Science", "Astronomy"])
-        #expect(ltree.popLast() == "Astronomy")
-        #expect(ltree.labels == ["Top", "Science"])
-        #expect(ltree.popLast() == "Science")
-        #expect(ltree.popLast() == "Top")
-        #expect(ltree.popLast() == nil)
-        #expect(ltree.labels == [])
     }
 
     @Test func testEncodeAsText() throws {

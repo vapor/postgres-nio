@@ -31,28 +31,18 @@
 ///
 /// For more information on the type, see https://www.postgresql.org/docs/current/ltree.html.
 public struct PostgresLTree: Equatable, Hashable, Sendable {
-    @usableFromInline var values: [String]
+    /// The individual labels of the path, ordered from the root to the leaf.
+    ///
+    /// A label must not contain `.`: `["a.b"]` is sent as `a.b`, which Postgres stores as the two labels
+    /// `a` and `b`, and nothing reports it.
+    public var labels: [String]
 
     /// Create an `ltree` from its individual labels, in order from the root to the leaf.
     ///
-    /// - Parameter values: The labels making up the path, e.g. `["Top", "Science", "Astronomy"]`.
+    /// - Parameter labels: The labels making up the path, e.g. `["Top", "Science", "Astronomy"]`.
+    ///   A label must not contain `.`, see ``labels``.
     public init(labels: [String]) {
-        self.values = labels
-    }
-
-    /// Append a label to the end (leaf) of the path.
-    public mutating func append(_ label: String) {
-        values.append(label)
-    }
-
-    /// Remove and return the last (leaf) label of the path, or `nil` if the path is empty.
-    public mutating func popLast() -> String? {
-        values.popLast()
-    }
-
-    /// The individual labels of the path, ordered from the root to the leaf.
-    public var labels: [String] {
-        self.values
+        self.labels = labels
     }
 }
 
@@ -61,7 +51,7 @@ extension PostgresLTree: ExpressibleByArrayLiteral {
     ///
     /// - Parameter arrayLiteral: The labels making up the path, e.g. `["Top", "Science", "Astronomy"]`.
     public init(arrayLiteral elements: String...) {
-        self.values = elements
+        self.labels = elements
     }
 }
 
@@ -73,12 +63,12 @@ extension PostgresLTree: CustomStringConvertible, LosslessStringConvertible {
     ///
     /// - Parameter description: A dotted path such as `Top.Science.Astronomy`.
     public init(_ description: String) {
-        self.values = description.split(separator: ".").map(String.init)
+        self.labels = description.split(separator: ".").map(String.init)
     }
 
     /// The path as a dotted string, e.g. `Top.Science.Astronomy`.
     public var description: String {
-        self.values.joined(separator: ".")
+        self.labels.joined(separator: ".")
     }
 }
 
@@ -121,7 +111,7 @@ extension PostgresLTree: PostgresDynamicTypeEncodable {
         context: PostgresEncodingContext<JSONEncoder>
     ) {
         // Write directly into the buffer avoiding extra allocations of `.joined`
-        for (index, label) in self.values.enumerated() {
+        for (index, label) in self.labels.enumerated() {
             if index != 0 {
                 byteBuffer.writeInteger(UInt8(ascii: "."))
             }
