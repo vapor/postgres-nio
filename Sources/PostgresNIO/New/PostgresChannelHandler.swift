@@ -353,10 +353,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
     /// Enqueue a query resolving `dataTypeNames` to OIDs.
     private func enqueueDataTypePopulation(for dataTypeNames: [String], on context: ChannelHandlerContext) {
         let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
+        // matching the bare name (the part after the last dot) first lets Postgres use pg_type's name index
         let queryContext = ExtendedQueryContext(
             query: """
                 SELECT requested, t.oid FROM unnest(\(dataTypeNames)) AS requested
-                    JOIN pg_type t ON requested IN (t.typname, t.typnamespace::regnamespace::text || '.' || t.typname)
+                    JOIN pg_type t ON t.typname = substring(requested from '[^.]*$')::name
+                        AND requested IN (t.typname, t.typnamespace::regnamespace::text || '.' || t.typname)
                     WHERE requested LIKE '%.%' OR pg_type_is_visible(t.oid)
                 """,
             logger: self.logger,

@@ -491,6 +491,55 @@ struct PostgresClientTests {
         }
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func qualifiedDataTypeNames() async throws {
+        struct Mood: PostgresDynamicTypeEncodable {
+            let psqlTypeName: String?
+            var psqlType: PostgresDataType { .null }
+            var psqlFormat: PostgresFormat { .text }
+
+            func encode<JSONEncoder: PostgresJSONEncoder>(
+                into byteBuffer: inout ByteBuffer,
+                context: PostgresEncodingContext<JSONEncoder>
+            ) {
+                byteBuffer.writeString("ok")
+            }
+        }
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // make sure every query runs on the same connection, so the `search_path` below applies
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP SCHEMA IF EXISTS type_lookup_a, type_lookup_b CASCADE;")
+            try await client.query("CREATE SCHEMA type_lookup_a;")
+            try await client.query("CREATE SCHEMA type_lookup_b;")
+            try await client.query("CREATE TYPE type_lookup_a.mood AS ENUM ('ok');")
+            try await client.query("CREATE TYPE type_lookup_b.mood AS ENUM ('ok');")
+            try await client.query("SET search_path = public, type_lookup_a;")
+
+            for (name, expected) in [("mood", "mood"), ("type_lookup_b.mood", "type_lookup_b.mood")] {
+                let rows = try await client.query("SELECT pg_typeof(\(Mood(psqlTypeName: name)))::text")
+                var types = [String]()
+                for try await type in rows.decode(String.self) {
+                    types.append(type)
+                }
+                #expect(types == [expected])
+            }
+
+            taskGroup.cancelAll()
+        }
+    }
+
 }
 
 // MARK: - Structured queries
