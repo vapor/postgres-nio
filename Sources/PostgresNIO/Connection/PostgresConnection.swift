@@ -722,6 +722,7 @@ extension PostgresConnection {
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
     /// - Returns: The result of the `body` closure.
+    @inlinable
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger,
@@ -729,24 +730,10 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> Result {
-        let stream: PSQLRowStream
-        let sequence: PostgresRowSequence
+        let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
+        defer { rows.invalidate(query: query, file: file, line: line) }
 
-        do {
-            let streamFuture = self.queryStream(query, logger: logger)
-            (stream, sequence) = try await streamFuture.map { stream in
-                (stream, stream.asyncSequence())
-            }.get()
-        }  catch var error as PSQLError {
-            error.file = file
-            error.line = line
-            error.query = query
-            throw error // rethrow with more metadata
-        }
-
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
-
-        return try await body(sequence)
+        return try await body(rows)
     }
 
     /// Run a query on the Postgres server the connection is connected to and return the query's metadata
@@ -768,6 +755,7 @@ extension PostgresConnection {
     ///   - body: The closure that's used to consume the query result. Must consume the sequence to its end.
     /// - Returns: The result of the `body` closure and the query metadata.
     @_disfavoredOverload
+    @inlinable
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger,
@@ -775,32 +763,36 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
-        let stream: PSQLRowStream
-        let sequence: PostgresRowSequence
+        let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
+        defer { rows.invalidate(query: query, file: file, line: line) }
 
+        let result = try await body(rows)
+        let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
+        return (result, metadata)
+    }
+
+    @usableFromInline
+    func startScopedQuery(_ query: PostgresQuery, logger: Logger, file: String, line: Int) async throws -> PostgresRowSequence {
         do {
-            (stream, sequence) = try await self.queryStream(query, logger: logger).map { stream in
-                (stream, stream.asyncSequence())
-            }.get()
-        }  catch var error as PSQLError {
+            return try await self.queryStream(query, logger: logger).map { $0.asyncSequence() }.get()
+        } catch var error as PSQLError {
             error.file = file
             error.line = line
             error.query = query
             throw error // rethrow with more metadata
         }
+    }
 
-        defer { stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line)) }
-
-        let result = try await body(sequence)
-
+    @usableFromInline
+    func consumedMetadata(of rows: PostgresRowSequence, query: PostgresQuery, file: String, line: Int) async throws -> PostgresQueryMetadata {
         do {
-            guard let consumedCommandTag = try await stream.consumedCommandTag().get() else {
+            guard let consumedCommandTag = try await rows.stream.consumedCommandTag().get() else {
                 throw PSQLError.rowSequenceNotFullyConsumed
             }
             guard let metadata = PostgresQueryMetadata(string: consumedCommandTag) else {
                 throw PSQLError.invalidCommandTag(consumedCommandTag)
             }
-            return (result, metadata)
+            return metadata
         } catch var error as PSQLError {
             error.file = file
             error.line = line
