@@ -21,6 +21,11 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
         self._columns = columns
     }
 
+    @usableFromInline
+    func invalidate(file: String, line: Int) {
+        self.stream.invalidate(file: file, line: line)
+    }
+
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(
             backing: self.backing.makeAsyncIterator(),
