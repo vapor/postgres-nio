@@ -184,4 +184,17 @@ import NIOSSL
         // make sure we don't crash
         queryPromise.fail(PSQLError.server(.init(fields: fields)))
     }
+
+    @Test func testAuthContextEqualityComparesAdditionalParameters() {
+        func makeAuthContext(_ additionalParameters: [(String, String)]) -> AuthContext {
+            AuthContext(username: "test", password: "abc123", database: "test", additionalParameters: additionalParameters)
+        }
+        let parameters = [("application_name", "test"), ("search_path", "public")]
+        let authContext = makeAuthContext(parameters)
+
+        #expect(authContext == makeAuthContext(parameters))
+        #expect(authContext != makeAuthContext([("application_name", "other"), ("search_path", "public")]))
+        #expect(authContext != makeAuthContext(parameters.reversed()))
+        #expect(authContext != makeAuthContext([("application_name", "test")]))
+    }
 }

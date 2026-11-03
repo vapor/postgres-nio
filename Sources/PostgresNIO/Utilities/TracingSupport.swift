@@ -1,8 +1,10 @@
 import NIOCore
 import Tracing
 
+@usableFromInline
 struct TracingSupport: Sendable {
     let options: TracingConfiguration
+    @usableFromInline
     let tracer: any Tracer
     let baseAttributes: SpanAttributes
     let target: String
@@ -78,6 +80,7 @@ struct TracingSupport: Sendable {
     /// 4. `{db.system.name}` (`postgresql`)
     ///
     /// The query text is never inspected, as mandated by the spec.
+    @usableFromInline
     func spanName(summary: String? = nil, operation: String? = nil, collection: String? = nil) -> String {
         if let summary {
             return summary
@@ -94,6 +97,7 @@ struct TracingSupport: Sendable {
     /// Unlike `Tracer.withSpan`, this does not record errors thrown by `operation` on the span: server
     /// errors carry fields such as `DETAIL` and `HINT` that may contain user data. The operation is
     /// expected to record a sanitized form via ``recordError(_:in:)`` before throwing.
+    @inlinable
     func withSpan<T>(
         _ operationName: String,
         at startedAt: DefaultTracerClock.Instant = DefaultTracerClock.now,
@@ -115,6 +119,7 @@ struct TracingSupport: Sendable {
     ///
     /// The error itself is deliberately not recorded on the span: server errors carry fields such as
     /// `DETAIL` and `HINT` that may contain user data.
+    @usableFromInline
     func recordError(_ error: any Error, in span: any Span) {
         let errorType: String
         switch error {
