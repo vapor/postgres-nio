@@ -22,13 +22,14 @@ public struct PostgresRowSequence: AsyncSequence, Sendable {
     }
 
     @usableFromInline
-    func invalidate(query: PostgresQuery, file: String, line: Int) {
-        self.stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line))
+    func invalidate(file: String, line: Int) {
+        self.stream.invalidate(file: file, line: line)
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(
             backing: self.backing.makeAsyncIterator(),
+            stream: self.stream,
             lookupTable: self.lookupTable,
             columns: self._columns
         )
@@ -41,18 +42,21 @@ extension PostgresRowSequence {
         public typealias Failure = any Error
 
         let backing: BackingSequence.AsyncIterator
+        let stream: PSQLRowStream
 
         let lookupTable: [String: Int]
         let columns: [RowDescription.Column]
 
-        init(backing: BackingSequence.AsyncIterator, lookupTable: [String: Int], columns: [RowDescription.Column]) {
+        init(backing: BackingSequence.AsyncIterator, stream: PSQLRowStream, lookupTable: [String: Int], columns: [RowDescription.Column]) {
             self.backing = backing
+            self.stream = stream
             self.lookupTable = lookupTable
             self.columns = columns
         }
 
         @concurrent
         public mutating func next() async throws -> Element? {
+            self.stream.preconditionNotInvalidated()
             if let dataRow = try await self.backing.next() {
                 return PostgresRow(
                     data: dataRow,
@@ -70,6 +74,7 @@ extension PostgresRowSequence {
             struct UnsafeTransfer: @unchecked Sendable {
                 var backing: BackingSequence.AsyncIterator
             }
+            self.stream.preconditionNotInvalidated()
             let unsafeTransfer = UnsafeTransfer(backing: self.backing)
             if let dataRow = try await unsafeTransfer.backing.next() {
                 return PostgresRow(
