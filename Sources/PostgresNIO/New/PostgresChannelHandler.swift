@@ -24,6 +24,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
 
     private var listenState = ListenStateMachine()
     private var preparedStatementState = PreparedStatementStateMachine()
+    // never refreshed, so a later `search_path` change doesn't affect these OIDs
     private var resolvedDataTypes: [String: PostgresDataType] = [:]
     // names that were already looked up, found or not, so each one is only queried once
     private var requestedDataTypes: Set<String> = []
@@ -354,9 +355,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
         let promise = context.eventLoop.makePromise(of: PSQLRowStream.self)
         let queryContext = ExtendedQueryContext(
             query: """
-                SELECT typname, oid FROM pg_type
-                    WHERE typname = ANY (\(dataTypeNames))
-                    AND pg_type_is_visible(oid);
+                SELECT requested, t.oid FROM unnest(\(dataTypeNames)) AS requested
+                    JOIN pg_type t ON requested IN (t.typname, t.typnamespace::regnamespace::text || '.' || t.typname)
+                    WHERE requested LIKE '%.%' OR pg_type_is_visible(t.oid)
                 """,
             logger: self.logger,
             promise: promise

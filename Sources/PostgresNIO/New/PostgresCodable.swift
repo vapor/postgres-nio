@@ -25,6 +25,11 @@ public protocol PostgresThrowingDynamicTypeEncodable {
     /// The Postgres name of this type. This is used for types that don't have a static OID, like types
     /// coming from extensions. The OID is looked up by name the first time the type is used on a connection,
     /// if the type can't be found ``psqlType`` is used instead.
+    /// 
+    /// The name must be unqualified and match `pg_type.typname` exactly, e.g. `"ltree"`, not `"ext.ltree"` or `"LTree"`.
+    ///
+    /// The OID is cached per connection, so changing the `search_path` afterwards doesn't update it. If the
+    /// name exists in more than one schema, the connection keeps using the type it found the first time.
     var psqlTypeName: String? { get }
 }
 
