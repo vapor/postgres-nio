@@ -690,42 +690,43 @@ extension PostgresConnection {
         let span = self.tracing?.startTransactionSpan()
         defer { span?.end() }
 
-        do {
-            try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+        // `withValue` doesn't return `sending` so the compiler marks this as an error, without `nonisolated(unsafe)`.
+        // We can drop `nonisolated(unsafe)` once `withValue` returns `sending`, but until then we're safe since 
+        // we don't keep `value` (the result from `process`) anywhere. We just have to be careful to continue doing so
+        nonisolated(unsafe) let value = try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+            do {
                 try await self.query("BEGIN;", logger: logger, summary: "BEGIN") { _ in }
+            } catch {
+                let transactionError = PostgresTransactionError(file: file, line: line, beginError: error)
+                self.tracing?.recordError(transactionError, in: span)
+                throw transactionError
             }
-        } catch {
-            let transactionError = PostgresTransactionError(file: file, line: line, beginError: error)
-            self.tracing?.recordError(transactionError, in: span)
-            throw transactionError
-        }
 
-        var closureHasFinished: Bool = false
-        do {
-            let value = try await process(self)
-            closureHasFinished = true
-            try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+            var closureHasFinished: Bool = false
+            do {
+                let value = try await process(self)
+                closureHasFinished = true
                 try await self.query("COMMIT;", logger: logger, summary: "COMMIT") { _ in }
-            }
-            return value
-        } catch {
-            var transactionError = PostgresTransactionError(file: file, line: line)
-            if !closureHasFinished {
-                transactionError.closureError = error
-                do {
-                    try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+                return value
+            } catch {
+                var transactionError = PostgresTransactionError(file: file, line: line)
+                if !closureHasFinished {
+                    transactionError.closureError = error
+                    do {
                         try await self.query("ROLLBACK;", logger: logger, summary: "ROLLBACK") { _ in }
+                    } catch {
+                        transactionError.rollbackError = error
                     }
-                } catch {
-                    transactionError.rollbackError = error
+                } else {
+                    transactionError.commitError = error
                 }
-            } else {
-                transactionError.commitError = error
-            }
 
-            self.tracing?.recordError(transactionError, in: span)
-            throw transactionError
+                self.tracing?.recordError(transactionError, in: span)
+                throw transactionError
+            }
         }
+
+        return value
     }
 }
 

@@ -79,6 +79,7 @@ let package = Package(
                 .product(name: "NIOTestUtils", package: "swift-nio"),
                 .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -99,8 +100,6 @@ let package = Package(
             dependencies: [
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
-                .product(name: "Tracing", package: "swift-distributed-tracing"),
-                .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings
         ),

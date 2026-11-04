@@ -467,7 +467,7 @@ private final class Signal: Sendable {
 }
 
 extension RowDescription.Column {
-    fileprivate static func textColumn(named name: String) -> RowDescription.Column {
+    static func textColumn(named name: String) -> RowDescription.Column {
         .init(
             name: name,
             tableOID: 0,
@@ -479,7 +479,7 @@ extension RowDescription.Column {
         )
     }
 
-    fileprivate static func int8Column(named name: String = "") -> RowDescription.Column {
+    static func int8Column(named name: String = "") -> RowDescription.Column {
         .init(
             name: name,
             tableOID: 0,
@@ -495,7 +495,7 @@ extension RowDescription.Column {
 extension NIOAsyncTestingChannel {
     /// Sends everything up to and including `BindComplete` for an unnamed query that returns rows,
     /// which is the point where the `PSQLRowStream` is handed to the caller and the body starts executing.
-    fileprivate func sendUnpreparedQueryStart(columns: [RowDescription.Column]) async throws {
+    func sendUnpreparedQueryStart(columns: [RowDescription.Column]) async throws {
         try await self.writeInbound(PostgresBackendMessage.parseComplete)
         try await self.testingEventLoop.executeInContext { self.read() }
         try await self.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
@@ -507,7 +507,7 @@ extension NIOAsyncTestingChannel {
     }
 
     /// Sends the given rows followed by `CommandComplete` and `ReadyForQuery`.
-    fileprivate func sendUnpreparedQueryEnd(dataRows: [DataRow], commandTag: String) async throws {
+    func sendUnpreparedQueryEnd(dataRows: [DataRow], commandTag: String) async throws {
         try await self.testingEventLoop.executeInContext {
             for dataRow in dataRows {
                 self.pipeline.fireChannelRead(PostgresBackendMessage.dataRow(dataRow))
