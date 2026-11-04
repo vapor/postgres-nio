@@ -16,6 +16,23 @@ import Testing
 
 @Suite(.serialized)
 struct AsyncPostgresConnectionTests {
+    @Test(.timeLimit(.minutes(1)))
+    func queryAfterClientCloseFailsWithoutHanging() async throws {
+        try await withConnection { connection in
+            try await connection.close()
+            let started = NIODeadline.now()
+            do {
+                _ = try await connection.query("SELECT 1", logger: .psqlTest)
+                Issue.record("Expected closed connection failure")
+            } catch let error as PSQLError {
+                #expect(error.code == .clientClosedConnection)
+            } catch {
+                Issue.record("Expected a PostgreSQL connection error")
+            }
+            #expect(NIODeadline.now() - started < .seconds(1))
+        }
+    }
+
     @Test func oneThousandRoundTrips() async throws {
         try await withConnection { connection in
             for _ in 0..<1_000 {

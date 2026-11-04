@@ -256,8 +256,12 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
 
         switch handlerTask {
         case .closeCommand(let command):
+            promise?.succeed(())
             psqlTask = .closeCommand(command)
         case .extendedQuery(let query):
+            // A write promise acknowledges acceptance of the task, not query
+            // completion (which has its own promise in the query context).
+            promise?.succeed(())
             psqlTask = .extendedQuery(query)
 
         case .startListening(let listener):
@@ -288,6 +292,7 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
                 return
             }
         case .executePreparedStatement(let preparedStatement):
+            promise?.succeed(())
             let action = self.preparedStatementState.lookup(
                 preparedStatement: preparedStatement
             )
