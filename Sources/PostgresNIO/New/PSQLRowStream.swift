@@ -156,7 +156,7 @@ final class PSQLRowStream: Sendable {
             source.finish(error)
         }
 
-        return PostgresRowSequence(producer.sequence, lookupTable: self.lookupTable, columns: self.rowDescription)
+        return PostgresRowSequence(producer.sequence, stream: self, lookupTable: self.lookupTable, columns: self.rowDescription)
     }
 
     /// Disallows further consumption of the stream by throwing an error on the next consumption attempt.
