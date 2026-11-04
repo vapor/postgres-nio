@@ -373,40 +373,49 @@ extension PostgresConnection {
     )  async throws {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
-        let writer: PostgresCopyFromWriter = try await withCheckedThrowingContinuation { continuation in
-            let context = ExtendedQueryContext(
-                copyFromQuery: buildCopyFromQuery(table: table, columns: columns, format: format),
-                triggerCopy: continuation,
-                logger: logger
-            )
-            self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
-        }
+        let query = buildCopyFromQuery(table: table, columns: columns, format: format)
+        let span = self.tracing?.startSpan(queryText: query.sql, operation: "COPY", collection: table)
+        defer { span?.end() }
 
         do {
-            try await writeData(writer)
-        } catch {
-            // We need to send a `CopyFail` to the backend to put it out of copy mode. This will most likely throw, most
-            // notably for the following two reasons. In both of them, it's better to ignore the error thrown by
-            // `writer.failed` and instead throw the error from `writeData`:
-            //  - We send `CopyFail` and the backend replies with an `ErrorResponse` that relays the `CopyFail` message.
-            //    This took the backend out of copy mode but it's more informative to the user to see the error they
-            //    threw instead of the one that got relayed back, so it's better to ignore the error here.
-            //  - The backend sent us an `ErrorResponse` during the copy, eg. because of an invalid format. This puts
-            //    the `ExtendedQueryStateMachine` in the error state. Trying to send a `CopyFail` will throw but trigger
-            //    a `Sync` that takes the backend out of copy mode. If `writeData` threw the error from from the
-            //    `PostgresCopyFromWriter.write` call, `writer.failed` will throw with the same error, so it doesn't
-            //    matter that we ignore the error here. If the user threw some other error, it's better to honor the
-            //    user's error.
-            try? await writer.failed(error: error)
+            let writer: PostgresCopyFromWriter = try await withCheckedThrowingContinuation { continuation in
+                let context = ExtendedQueryContext(
+                    copyFromQuery: query,
+                    triggerCopy: continuation,
+                    logger: logger
+                )
+                self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+            }
 
+            do {
+                try await writeData(writer)
+            } catch {
+                // We need to send a `CopyFail` to the backend to put it out of copy mode. This will most likely throw, most
+                // notably for the following two reasons. In both of them, it's better to ignore the error thrown by
+                // `writer.failed` and instead throw the error from `writeData`:
+                //  - We send `CopyFail` and the backend replies with an `ErrorResponse` that relays the `CopyFail` message.
+                //    This took the backend out of copy mode but it's more informative to the user to see the error they
+                //    threw instead of the one that got relayed back, so it's better to ignore the error here.
+                //  - The backend sent us an `ErrorResponse` during the copy, eg. because of an invalid format. This puts
+                //    the `ExtendedQueryStateMachine` in the error state. Trying to send a `CopyFail` will throw but trigger
+                //    a `Sync` that takes the backend out of copy mode. If `writeData` threw the error from from the
+                //    `PostgresCopyFromWriter.write` call, `writer.failed` will throw with the same error, so it doesn't
+                //    matter that we ignore the error here. If the user threw some other error, it's better to honor the
+                //    user's error.
+                try? await writer.failed(error: error)
+
+                throw error
+            }
+
+            // `writer.done` may fail, eg. because the backend sends an error response after receiving `CopyDone` or during
+            // the transfer of the last bit of data so that the user didn't call `PostgresCopyFromWriter.write` again, which
+            // would have checked the error state. In either of these cases, calling `writer.done` puts the backend out of
+            // copy mode, so we don't need to send another `CopyFail`. Thus, this must not be handled in the `do` block
+            // above.
+            try await writer.done()
+        } catch {
+            self.tracing?.recordError(error, in: span)
             throw error
         }
-
-        // `writer.done` may fail, eg. because the backend sends an error response after receiving `CopyDone` or during
-        // the transfer of the last bit of data so that the user didn't call `PostgresCopyFromWriter.write` again, which
-        // would have checked the error state. In either of these cases, calling `writer.done` puts the backend out of
-        // copy mode, so we don't need to send another `CopyFail`. Thus, this must not be handled in the `do` block
-        // above.
-        try await writer.done()
     }
 }

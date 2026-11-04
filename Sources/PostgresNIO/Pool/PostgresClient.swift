@@ -4,6 +4,7 @@ import Atomics
 import Logging
 import ServiceLifecycle
 import _ConnectionPoolModule
+import Tracing
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.
@@ -134,6 +135,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// for idle connections. `Nil` means that the client shall not run keep alive queries to the server. Defaults to a
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
+
+            /// Tracing configuration.
+            public var tracing: PostgresTracingConfiguration = PostgresTracingConfiguration()
 
             /// Create an options structure with default values.
             ///
@@ -423,6 +427,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
+    ///   - summary: A low-cardinality summary of the query (e.g. `SELECT users`), used as the span's name and
+    ///              recorded as `db.query.summary`. Must not contain values, such as an id.
     ///   - file: The file the query was started in. Used for better error reporting.
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
@@ -431,6 +437,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
+        summary: String? = nil,
         file: String = #fileID,
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
@@ -440,7 +447,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         defer { lease.release() }
 
-        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+        return try await lease.connection.query(query, logger: logger, summary: summary, file: file, line: line, body)
     }
 
     /// Run a query on the Postgres server the client is connected to.
@@ -452,6 +459,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
+    ///   - summary: A low-cardinality summary of the query (e.g. `SELECT users`), used as the span's name and
+    ///              recorded as `db.query.summary`. Must not contain values, such as an id.
     ///   - file: The file the query was started in. Used for better error reporting.
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
@@ -461,6 +470,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
+        summary: String? = nil,
         file: String = #fileID,
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
@@ -470,7 +480,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         defer { lease.release() }
 
-        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+        return try await lease.connection.query(query, logger: logger, summary: summary, file: file, line: line, body)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary.

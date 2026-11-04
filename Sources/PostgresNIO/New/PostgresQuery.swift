@@ -7,6 +7,10 @@ public struct PostgresQuery: Sendable, Hashable {
     /// The query binds.
     public var binds: PostgresBindings
 
+    /// Creates a query from a SQL string and its binds.
+    ///
+    /// - Warning: `sql` is recorded on spans as `db.query.text`, see ``PostgresTracingConfiguration/recordsQueryText``.
+    ///   Pass values as `binds` instead of interpolating them into `sql`, or they will end up in your traces.
     public init(unsafeSQL sql: String, binds: PostgresBindings = PostgresBindings()) {
         self.sql = sql
         self.binds = binds
@@ -95,6 +99,10 @@ extension PostgresQuery {
             self.binds.bytes.writeBuffer(&bytes)
         }
 
+        /// Appends `interpolated` to the SQL as is, without binding it.
+        ///
+        /// - Warning: The SQL is recorded on spans as `db.query.text`, see ``PostgresTracingConfiguration/recordsQueryText``.
+        ///   Do not use this for values, or they will end up in your traces.
         @inlinable
         public mutating func appendInterpolation(unescaped interpolated: String) {
             self.sql.append(contentsOf: interpolated)
