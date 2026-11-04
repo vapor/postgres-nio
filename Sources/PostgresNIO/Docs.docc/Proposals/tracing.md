@@ -49,7 +49,7 @@ The spec defines a fallback chain for the span name:
 	4. `server.address:server.port`
 4. `{db.system.name}` ( `postgresql`)
 
-The PSQL conventions say `db.operation.name` should only be recorded "if the operation is executed via a higher-level API that does not support multiple operation names", and that it "SHOULD NOT be extracted from `db.query.text`". We therefore never parse SQL to obtain it. What we can know without touching the query text is:
+The PSQL conventions say `db.operation.name` should only be recorded "if the operation is executed via a higher-level API that does not support multiple operation names", and that it "SHOULD NOT be extracted from `db.query.text`". We therefore never parse SQL to obtain it. What we can know without touching the query text is:
 - prepared statements: we can read it from the Swift type name (`PostgresPreparedStatement.name`);
 - `COPY`: the target table comes from the API, so `db.collection.name` is set and `db.operation.name` is `COPY`;
 - transactions: we write `BEGIN`, `COMMIT` and `ROLLBACK` ourselves, so naming them is not extraction. The scope span is named `TRANSACTION`.
@@ -71,7 +71,7 @@ The same parameter supplies `db.query.summary` to the metrics implementation, wh
 
 We only accept a SQLSTATE that is five uppercase letters or digits.
 
-We do not attach the error itself to the span, and we do not copy the server's error fields onto it. Postgres appends user data into the primary message, not only into `DETAIL` and `HINT`, and we want to avoid leaking user data in the traces. Postgres does not provide a deterministic list of attributes which contain user data, so we try to take the safe path. This also means we must not use `Tracer.withSpan`, which records the thrown error on the span automatically. See Design.
+We do not attach the error itself to the span, and we do not copy the server's error fields onto it. Postgres appends user data into the primary message, not only into `DETAIL` and `HINT`, and we want to avoid leaking user data in the traces. Postgres does not provide a deterministic list of attributes which contain user data, so we try to take the safe path. This also means we must not use `Tracer.withSpan`, which records the thrown error on the span automatically. See Design.
 
 ### Attributes
 
@@ -99,8 +99,8 @@ Notes:
   - Transaction scope: `db.system.name`, `db.namespace` and `server.*` only. No query-level attributes as those live on the child spans.
 
 Left out:
-  - We do not produce [`db.query.parameter.<key>`](https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-parameter). This attribute includes the bind parameters used in the query and therefore possibly sensitive data. While it can be useful for debugging, users should rely on other methods to check their input, as leaving it enabled in production by mistake could leak that data.
-  - We also do not produce `db.stored_procedure.name`. PostgresNIO has no stored procedure API, so the only way to learn the name would be to parse `db.query.text`, which the conventions forbid. The attribute is unreachable for us.
+  - We do not produce [`db.query.parameter.<key>`](https://opentelemetry.io/docs/specs/semconv/registry/attributes/db/#db-query-parameter). This attribute includes the bind parameters used in the query and therefore possibly sensitive data. While it can be useful for debugging, users should rely on other methods to check their input, as leaving it enabled in production by mistake could leak that data.
+  - We also do not produce `db.stored_procedure.name`. PostgresNIO has no stored procedure API, so the only way to learn the name would be to parse `db.query.text`, which the conventions forbid. The attribute is unreachable for us.
 
 #### `db.namespace`
 
@@ -125,7 +125,9 @@ init?(configuration: PostgresConnection.InternalConfiguration, remoteAddress: So
 ### Span lifetime
 
 The span is created with `startSpan` and ended in a `defer`. We do not use `Tracer.withSpan` since it records the thrown error on the span, which is exactly what the Error section forbids.
-The client captures the start instant before it leases a connection and passes it down, so that time spent waiting for a connection is inside the query span rather than invisible before it.
+The span starts once the connection is available, so time spent waiting for a pooled connection is not part of it. The `db.client.connection.wait_time` metric covers that wait.
+
+A query span lasts until `body` returns, but it is not the current `ServiceContext` while `body` runs. Spans the caller creates inside `body` are therefore siblings of the query span, not its children, as with valkey-swift. The transaction span instead is the current context for the whole `withTransaction` block, so `process` runs inside it and the queries and spans it creates are children of the transaction span.
 
 ### Returned rows
 
@@ -140,6 +142,7 @@ Tracing is configurable and enabled by default through a new `tracing` property 
 var configuration = PostgresClient.Configuration(...)
 configuration.options.tracing.tracer = myTracer
 configuration.options.tracing.recordsQueryText = false
+configuration.options.tracing.attributeNames.databaseSystemName = "db.system"
 ```
 
 ```swift
@@ -153,17 +156,38 @@ public struct PostgresTracingConfiguration: Sendable {
     /// Whether the number of rows received is recorded as `db.response.returned_rows`. Defaults to `false`.
     public var recordsReturnedRows: Bool = false
 
+    /// The attribute names used in spans. Defaults to the OpenTelemetry names.
+    public var attributeNames: AttributeNames = .init()
+
     public init(tracer: (any Tracer)? = InstrumentationSystem.tracer) {
-        self.tracer = tracer is NoOpTracer ? nil : tracer
+        self.tracer = tracer
+    }
+
+    public struct AttributeNames: Sendable {
+        public var databaseSystemName: String = "db.system.name"
+        public var databaseNamespace: String = "db.namespace"
+        public var databaseQueryText: String = "db.query.text"
+        public var databaseQuerySummary: String = "db.query.summary"
+        public var databaseOperationName: String = "db.operation.name"
+        public var databaseCollectionName: String = "db.collection.name"
+        public var databaseResponseStatusCode: String = "db.response.status_code"
+        public var databaseResponseReturnedRows: String = "db.response.returned_rows"
+        public var errorType: String = "error.type"
+        public var serverAddress: String = "server.address"
+        public var serverPort: String = "server.port"
+        public var networkPeerAddress: String = "network.peer.address"
+        public var networkPeerPort: String = "network.peer.port"
     }
 }
 ```
-The tracer is read once, when the configuration is created, so the instrumentation system must be bootstrapped first. A `NoOpTracer` is normalised to `nil` so we do nothing when nobody is collecting spans. Relying on the no-op tracer instead would still allocate a span per query.
+The tracer is read once, when the configuration is created, so the instrumentation system must be bootstrapped first. A `NoOpTracer` disables tracing just like `nil`. The connection checks for it when it is created and from then on does nothing, so no span is allocated per query when nobody is collecting spans.
+
+The attribute names default to the OpenTelemetry ones. They can be changed for a backend that expects an older version of the conventions, for example `db.system` instead of `db.system.name`. valkey-swift and async-http-client offer the same option.
 
 ## Alternatives considered
 
 ### Inferring the operation name from the query
-We could take the first keyword of the query text, match it against a known set such as `SELECT` and `UPDATE`, and use it as `db.operation.name`. This would give better span names for hand written queries with no summary. The PSQL conventions explicitly forbid deriving the attribute from `db.query.text`, and a parser that is wrong on a comment, a CTE or a leading whitespace variant produces a misleading low cardinality attribute, so we do not do this.
+We could take the first keyword of the query text, match it against a known set such as `SELECT` and `UPDATE`, and use it as `db.operation.name`. This would give better span names for hand written queries with no summary. The PSQL conventions explicitly forbid deriving the attribute from `db.query.text`, and a parser that is wrong on a comment, a CTE or a leading whitespace variant produces a misleading low cardinality attribute, so we do not do this.
 
 ### Not tracing
 
