@@ -12,11 +12,11 @@ import NIOEmbedded
         let name = "haha"
         let query = #"SELECT id FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
+            name: name, query: query, parameterTypes: .explicit([]), logger: .psqlTest, promise: promise
         )
 
         #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
-                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
+                       .sendParseDescribeSync(name: name, query: query, parameterTypes: .explicit([])))
         #expect(state.parseCompleteReceived() == .wait)
         #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
 
@@ -39,11 +39,11 @@ import NIOEmbedded
         let name = "haha"
         let query = #"SELECT id FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
+            name: name, query: query, parameterTypes: .explicit([]), logger: .psqlTest, promise: promise
         )
 
         #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
-                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
+                       .sendParseDescribeSync(name: name, query: query, parameterTypes: .explicit([])))
         #expect(state.parseCompleteReceived() == .wait)
         #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
 
@@ -71,11 +71,11 @@ import NIOEmbedded
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
+            name: name, query: query, parameterTypes: .explicit([]), logger: .psqlTest, promise: promise
         )
 
         #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
-                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
+                       .sendParseDescribeSync(name: name, query: query, parameterTypes: .explicit([])))
         #expect(state.parseCompleteReceived() == .wait)
         #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
 
@@ -93,11 +93,11 @@ import NIOEmbedded
         let name = "haha"
         let query = #"DELETE FROM users WHERE id = $1 "#
         let prepareStatementContext = ExtendedQueryContext(
-            name: name, query: query, bindingDataTypes: [], logger: .psqlTest, promise: promise
+            name: name, query: query, parameterTypes: .explicit([]), logger: .psqlTest, promise: promise
         )
 
         #expect(state.enqueue(task: .extendedQuery(prepareStatementContext)) ==
-                       .sendParseDescribeSync(name: name, query: query, bindingDataTypes: []))
+                       .sendParseDescribeSync(name: name, query: query, parameterTypes: .explicit([])))
         #expect(state.parseCompleteReceived() == .wait)
         #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
 

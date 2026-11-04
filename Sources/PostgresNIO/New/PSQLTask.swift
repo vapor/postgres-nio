@@ -43,7 +43,7 @@ final class ExtendedQueryContext: Sendable {
         /// on the `PostgresChannelHandler`.
         case copyFrom(PostgresQuery, triggerCopy: CheckedContinuation<PostgresCopyFromWriter, any Error>)
         case executeStatement(PSQLExecuteStatement, EventLoopPromise<PSQLRowStream>)
-        case prepareStatement(name: String, query: String, bindingDataTypes: [PostgresDataType], EventLoopPromise<RowDescription?>)
+        case prepareStatement(name: String, query: String, parameterTypes: PreparedStatementParameterTypes, EventLoopPromise<RowDescription?>)
     }
     
     let query: Query
@@ -76,14 +76,19 @@ final class ExtendedQueryContext: Sendable {
         self.logger = logger
     }
 
+    enum PreparedStatementParameterTypes: Sendable, Hashable {
+        case explicit([PostgresDataType])   // user declared Statement.bindingDataTypes
+        case derived(PostgresBindings)      // resolve from binds at send time
+    }
+
     init(
         name: String,
         query: String,
-        bindingDataTypes: [PostgresDataType],
+        parameterTypes: PreparedStatementParameterTypes,
         logger: Logger,
         promise: EventLoopPromise<RowDescription?>
     ) {
-        self.query = .prepareStatement(name: name, query: query, bindingDataTypes: bindingDataTypes, promise)
+        self.query = .prepareStatement(name: name, query: query, parameterTypes: parameterTypes, promise)
         self.logger = logger
     }
 }
@@ -107,11 +112,7 @@ final class PreparedStatementContext: Sendable {
         self.name = name
         self.sql = sql
         self.bindings = bindings
-        if bindingDataTypes.isEmpty {
-            self.bindingDataTypes = bindings.metadata.map(\.dataType)
-        } else {
-            self.bindingDataTypes = bindingDataTypes
-        }
+        self.bindingDataTypes = bindingDataTypes
         self.logger = logger
         self.promise = promise
     }
