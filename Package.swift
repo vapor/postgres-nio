@@ -30,8 +30,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
         .package(url: "https://github.com/apple/swift-distributed-tracing.git", from: "1.4.1"),
-        .package(url: "https://github.com/apple/swift-service-context.git", from: "1.3.0"),
-        .package(url: "https://github.com/swift-otel/swift-otel-semantic-conventions.git", from: "1.39.0", traits: ["Tracing", "Experimental"])
     ],
     targets: [
         .target(
@@ -52,7 +50,6 @@ let package = Package(
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
                 .product(name: "Tracing", package: "swift-distributed-tracing"),
-                .product(name: "OTelSemanticConventions", package: "swift-otel-semantic-conventions")
             ],
             swiftSettings: swiftSettings + [.enableExperimentalFeature("Lifetimes")]
         ),
@@ -81,6 +78,7 @@ let package = Package(
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
                 .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings
         ),
@@ -101,6 +99,8 @@ let package = Package(
             dependencies: [
                 .target(name: "PostgresNIO"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings
         ),

@@ -91,7 +91,7 @@ extension PostgresConnection {
             public var additionalStartupParameters: [(String, String)]
 
             /// Tracing configuration.
-            public var tracing: TracingConfiguration
+            public var tracing: PostgresTracingConfiguration
 
             /// Create an options structure with default values.
             ///
@@ -101,7 +101,7 @@ extension PostgresConnection {
                 self.tlsServerName = nil
                 self.requireBackendKeyData = true
                 self.additionalStartupParameters = []
-                self.tracing = .default
+                self.tracing = PostgresTracingConfiguration()
             }
         }
         

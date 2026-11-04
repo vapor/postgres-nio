@@ -8,7 +8,6 @@ import NIOTransportServices
 import NIOSSL
 import Logging
 import Tracing
-import OTelSemanticConventions
 
 /// A Postgres connection. Use it to run queries against a Postgres server.
 ///
@@ -51,9 +50,9 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
     @usableFromInline
-    let tracing: TracingSupport
+    let tracing: PostgresTracing?
 
-    init(channel: any Channel, connectionID: ID, logger: Logger, tracing: TracingSupport) {
+    init(channel: any Channel, connectionID: ID, logger: Logger, tracing: PostgresTracing?) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
@@ -242,7 +241,7 @@ public final class PostgresConnection: Sendable {
                     channel: channel,
                     connectionID: connectionID,
                     logger: logger,
-                    tracing: TracingSupport(configuration: configuration, remoteAddress: channel.remoteAddress)
+                    tracing: PostgresTracing(configuration: configuration, remoteAddress: channel.remoteAddress)
                 )
                 return connection.start(configuration: configuration).map { _ in
                     timeoutTask.cancel()
@@ -688,24 +687,35 @@ extension PostgresConnection {
         isolation: isolated (any Actor)? = #isolation,
         _ process: (PostgresConnection) async throws -> sending Result
     ) async throws -> sending Result {
+        let span = self.tracing?.startTransactionSpan()
+        defer { span?.end() }
+
         do {
-            try await self.query("BEGIN;", logger: logger)
+            try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+                try await self.query("BEGIN;", logger: logger, summary: "BEGIN") { _ in }
+            }
         } catch {
-            throw PostgresTransactionError(file: file, line: line, beginError: error)
+            let transactionError = PostgresTransactionError(file: file, line: line, beginError: error)
+            self.tracing?.recordError(transactionError, in: span)
+            throw transactionError
         }
 
         var closureHasFinished: Bool = false
         do {
             let value = try await process(self)
             closureHasFinished = true
-            try await self.query("COMMIT;", logger: logger)
+            try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+                try await self.query("COMMIT;", logger: logger, summary: "COMMIT") { _ in }
+            }
             return value
         } catch {
             var transactionError = PostgresTransactionError(file: file, line: line)
             if !closureHasFinished {
                 transactionError.closureError = error
                 do {
-                    try await self.query("ROLLBACK;", logger: logger)
+                    try await ServiceContext.$current.withValue(span?.context ?? ServiceContext.current) {
+                        try await self.query("ROLLBACK;", logger: logger, summary: "ROLLBACK") { _ in }
+                    }
                 } catch {
                     transactionError.rollbackError = error
                 }
@@ -713,6 +723,7 @@ extension PostgresConnection {
                 transactionError.commitError = error
             }
 
+            self.tracing?.recordError(transactionError, in: span)
             throw transactionError
         }
     }
@@ -725,13 +736,13 @@ extension PostgresConnection {
     /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
     /// Rows that were already buffered when body returned are still delivered before the error is thrown.
     ///
-    /// A span is created for the query, lasting until `body` returns. See ``TracingConfiguration``.
+    /// A span is created for the query, lasting until `body` returns. See ``PostgresTracingConfiguration``.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
     ///   - summary: A low-cardinality summary of the query (e.g. `SELECT users`), used as the span's name and
-    ///              recorded as `db.query.summary`. Must not be derived from the query text at runtime.
+    ///              recorded as `db.query.summary`. Must not contain values, such as an id.
     ///   - file: The file the query was started in. Used for better error reporting.
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
@@ -745,18 +756,19 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> Result {
-        try await self.tracing.withSpan(self.tracing.spanName(summary: summary)) { span in
-            let rows = try await self.startScopedQuery(query, logger: logger, summary: summary, span: span, file: file, line: line)
+        let span = self.tracing?.startSpan(queryText: query.sql, summary: summary)
+        defer { span?.end() }
+
+        do {
+            let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
             defer { rows.invalidate(query: query, file: file, line: line) }
 
-            do {
-                let result = try await body(rows)
-                self.recordReturnedRows(of: rows, in: span)
-                return result
-            } catch {
-                self.tracing.recordError(error, in: span)
-                throw error
-            }
+            let result = try await body(rows)
+            self.tracing?.recordReturnedRows(of: rows, in: span)
+            return result
+        } catch {
+            self.tracing?.recordError(error, in: span)
+            throw error
         }
     }
 
@@ -771,9 +783,13 @@ extension PostgresConnection {
     /// iterate the sequence to its end. If it returns early the query is cancelled and the method throws
     /// `PSQLError.rowSequenceNotFullyConsumed`.
     ///
+    /// A span is created for the query, lasting until the metadata is received. See ``PostgresTracingConfiguration``.
+    ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
+    ///   - summary: A low-cardinality summary of the query (e.g. `SELECT users`), used as the span's name and
+    ///              recorded as `db.query.summary`. Must not contain values, such as an id.
     ///   - file: The file the query was started in. Used for better error reporting.
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result. Must consume the sequence to its end.
@@ -788,49 +804,32 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
-        try await self.tracing.withSpan(self.tracing.spanName(summary: summary)) { span in
-            let rows = try await self.startScopedQuery(query, logger: logger, summary: summary, span: span, file: file, line: line)
+        let span = self.tracing?.startSpan(queryText: query.sql, summary: summary)
+        defer { span?.end() }
+
+        do {
+            let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
             defer { rows.invalidate(query: query, file: file, line: line) }
 
             let result = try await body(rows)
             let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
+            self.tracing?.recordReturnedRows(of: rows, in: span)
             return (result, metadata)
+        } catch {
+            self.tracing?.recordError(error, in: span)
+            throw error
         }
     }
 
     @usableFromInline
-    func startScopedQuery(
-        _ query: PostgresQuery,
-        logger: Logger,
-        summary: String?,
-        span: any Span,
-        file: String,
-        line: Int
-    ) async throws -> PostgresRowSequence {
-        span.attributes.merge(self.tracing.baseAttributes)
-        span.attributes.db.query.summary = summary
-        if self.tracing.options.recordsQueryText {
-            span.attributes.db.query.text = query.sql
-        }
-
+    func startScopedQuery(_ query: PostgresQuery, logger: Logger, file: String, line: Int) async throws -> PostgresRowSequence {
         do {
             return try await self.queryStream(query, logger: logger).map { $0.asyncSequence() }.get()
         } catch var error as PSQLError {
             error.file = file
             error.line = line
             error.query = query
-            self.tracing.recordError(error, in: span)
             throw error // rethrow with more metadata
-        } catch {
-            self.tracing.recordError(error, in: span)
-            throw error
-        }
-    }
-
-    @usableFromInline
-    func recordReturnedRows(of rows: PostgresRowSequence, in span: any Span) {
-        if self.tracing.options.recordsReturnedRows {
-            span.attributes.db.response.returnedRows = rows.stream.receivedRowCount.load(ordering: .relaxed)
         }
     }
 
