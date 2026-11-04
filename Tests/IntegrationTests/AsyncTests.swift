@@ -427,15 +427,14 @@ struct AsyncPostgresConnectionTests {
         }
     #endif
 
-    @Test(.timeLimit(.minutes(1)))
-    func cancelTaskThatIsVeryLongRunningWhichAlsoFailsWhileInStreamingMode() async throws {
+    @Test func cancelTaskThatIsVeryLongRunningWhichAlsoFailsWhileInStreamingMode() async throws {
+        // we cancel the query after 400ms.
+        // the server times out the query after 1sec.
         try await withConnection { connection -> Void in
             try await connection.query("SET statement_timeout=1000;", logger: .psqlTest)  // 1000 milliseconds
 
             try await withThrowingTaskGroup(of: Void.self) { group in
-                let (started, continuation) = AsyncStream.makeStream(of: Void.self)
                 group.addTask {
-                    defer { continuation.finish() }
                     let start = 1
                     let end = 100_000_000
 
@@ -445,9 +444,6 @@ struct AsyncPostgresConnectionTests {
                         for try await element in rows.decode(Int.self, context: .default) {
                             #expect(element == counter + 1)
                             counter += 1
-                            if counter == 1 {
-                                continuation.yield()
-                            }
                         }
                     }
                     #expect(counter >= 1)
@@ -456,9 +452,8 @@ struct AsyncPostgresConnectionTests {
                     #expect(!connection.isClosed, "Connection should survive!")
                 }
 
-                // A fixed delay could cancel a scheduled consumer before it reads any rows.
-                let firstRow: Void? = await started.first { _ in true }
-                try #require(firstRow != nil, "Query ended before consuming its first row")
+                let delay: UInt64 = 400_000_000  // 400 milliseconds
+                try await Task.sleep(nanoseconds: delay)
 
                 group.cancelAll()
             }

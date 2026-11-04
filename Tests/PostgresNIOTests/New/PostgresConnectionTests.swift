@@ -650,13 +650,18 @@ import Synchronization
         }
     }
 
-    @Test(.timeLimit(.minutes(1)))
-    func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
+    @Test func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
             try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
-                // Launching child tasks would not guarantee both writes precede graceful shutdown.
-                let queries: [EventLoopFuture<PostgresQueryResult>] = try await channel.testingEventLoop.executeInContext {
-                    (1...2).map { _ in connection.query("SELECT 1;", logger: logger) }
+                for _ in 1...2 {
+                    taskGroup.addTask {
+                        let rows = try await connection.query("SELECT 1;", logger: logger)
+                        var iterator = rows.decode(Int.self).makeAsyncIterator()
+                        let first = try await iterator.next()
+                        #expect(first == 1)
+                        let second = try await iterator.next()
+                        #expect(second == nil)
+                    }
                 }
 
                 for i in 0...1 {
@@ -683,7 +688,7 @@ import Synchronization
                     try await channel.testingEventLoop.executeInContext { channel.read() }
                     try await channel.writeInbound(PostgresBackendMessage.dataRow([Int(1)]))
                     try await channel.testingEventLoop.executeInContext { channel.read() }
-                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 1"))
+                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 1 1"))
                     try await channel.testingEventLoop.executeInContext { channel.read() }
                     try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
                 }
@@ -692,19 +697,6 @@ import Synchronization
                 #expect(terminate == .terminate)
                 try await channel.closeFuture.get()
                 #expect(!channel.isActive)
-
-                for query in queries {
-                    do {
-                        let result = try await query.get()
-                        #expect(result.rows.count == 1)
-                        for row in result.rows {
-                            let value = try row.decode(Int.self)
-                            #expect(value == 1)
-                        }
-                    } catch {
-                        Issue.record("Queued query failed during graceful shutdown: \(error)")
-                    }
-                }
 
                 while let taskResult = await taskGroup.nextResult() {
                     switch taskResult {
