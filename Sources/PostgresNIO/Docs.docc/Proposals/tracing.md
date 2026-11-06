@@ -47,7 +47,7 @@ The spec defines a fallback chain for the span name:
 	2. `db.stored_procedure.name`
 	3. `db.namespace`
 	4. `server.address:server.port`
-4. `{db.system.name}` ( `postgresql`)
+4. `{db.system.name}` (`postgresql` by default)
 
 The PSQL conventions say `db.operation.name` should only be recorded "if the operation is executed via a higher-level API that does not support multiple operation names", and that it "SHOULD NOT be extracted from `db.query.text`". We therefore never parse SQL to obtain it. What we can know without touching the query text is:
 - prepared statements: we can read it from the Swift type name (`PostgresPreparedStatement.name`);
@@ -79,7 +79,7 @@ The table below applies to query, prepared statement and `COPY` spans. `db.syste
 
 | Key                         | Requirement level                                                                                                | Type   | Description                                                                                         | Example                              |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `db.system.name`            | Required                                                                                                         | string | Constant.                                                                                           | `postgresql`                         |
+| `db.system.name`            | Required                                                                                                         | string | Configurable, defaults to `postgresql`.                                                             | `postgresql`                         |
 | `db.namespace`              | Conditionally required, if available without an additional network call                                          | string | The schema associated with the connection, qualified by the database name.                          | `mydatabase` |
 | `db.response.status_code`   | Conditionally required, if the response ended with a warning or an error                                         | string | [PostgreSQL error code](https://www.postgresql.org/docs/current/errcodes-appendix.html) (SQLSTATE). | `08P01`; `23505`                     |
 | `error.type`                | Conditionally required, if and only if the operation failed                                                      | string | Class of error. See Errors.                                                                         | `23505`; `cancelled`; `_OTHER`       |
@@ -116,11 +116,11 @@ This also means that using `PostgresQuery(unsafeSQL:)` might leak sensitive info
 
 Spans are emitted by the connection, not by the client. Queries can be run on a standalone `PostgresConnection`, and the connection is also where the peer address is known. `PostgresConnection` therefore will hold an optional `PostgresTracing`, built once during `connect` and reused for every span:
 ```swift
-let tracing: PostgresTracing?
+let tracing: PostgresTracing
 
-init?(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?)
+init(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?)
 ```
-`PostgresTracing` holds the tracer, the attributes that depend on the connection and the span name target. None of these need to be rebuilt per-query. Where possible, logic will be extracted from `PostgresMetrics` to compute values, such as `server.port`, and shared with `PostgresTracing`. Metrics turns the result into dimensions while tracing turns it into `SpanAttributes`.
+`PostgresTracing` holds the attributes that depend on the connection and the span name target. None of these need to be rebuilt per-query. Where possible, logic will be extracted from `PostgresMetrics` to compute values, such as `server.port`, and shared with `PostgresTracing`. Metrics turns the result into dimensions while tracing turns it into `SpanAttributes`.
 
 ### Span lifetime
 
@@ -140,49 +140,29 @@ The attribute is opt-in since it's still in development in the spec.
 Tracing is configurable and enabled by default through a new `tracing` property on the options of both `PostgresClient.Configuration` and `PostgresConnection.Configuration`:
 ```swift
 var configuration = PostgresClient.Configuration(...)
-configuration.options.tracing.tracer = myTracer
 configuration.options.tracing.recordsQueryText = false
-configuration.options.tracing.attributeNames.databaseSystemName = "db.system"
+configuration.options.tracing.databaseSystemName = "cockroachdb"
 ```
 
 ```swift
 public struct PostgresTracingConfiguration: Sendable {
-    /// The tracer to use, or `nil` to disable tracing.
-    public var tracer: (any Tracer)?
-
     /// Whether the query's SQL is recorded as `db.query.text`. Defaults to `true`.
     public var recordsQueryText: Bool = true
 
     /// Whether the number of rows received is recorded as `db.response.returned_rows`. Defaults to `false`.
     public var recordsReturnedRows: Bool = false
 
-    /// The attribute names used in spans. Defaults to the OpenTelemetry names.
-    public var attributeNames: AttributeNames = .init()
+    /// The value of `db.system.name`. Defaults to `postgresql`.
+    public var databaseSystemName: String = "postgresql"
 
-    public init(tracer: (any Tracer)? = InstrumentationSystem.tracer) {
-        self.tracer = tracer
-    }
-
-    public struct AttributeNames: Sendable {
-        public var databaseSystemName: String = "db.system.name"
-        public var databaseNamespace: String = "db.namespace"
-        public var databaseQueryText: String = "db.query.text"
-        public var databaseQuerySummary: String = "db.query.summary"
-        public var databaseOperationName: String = "db.operation.name"
-        public var databaseCollectionName: String = "db.collection.name"
-        public var databaseResponseStatusCode: String = "db.response.status_code"
-        public var databaseResponseReturnedRows: String = "db.response.returned_rows"
-        public var errorType: String = "error.type"
-        public var serverAddress: String = "server.address"
-        public var serverPort: String = "server.port"
-        public var networkPeerAddress: String = "network.peer.address"
-        public var networkPeerPort: String = "network.peer.port"
-    }
+    public init() {}
 }
 ```
-The tracer is read once, when the configuration is created, so the instrumentation system must be bootstrapped first. A `NoOpTracer` disables tracing just like `nil`. The connection checks for it when it is created and from then on does nothing, so no span is allocated per query when nobody is collecting spans.
+Every operation reads `InstrumentationSystem.tracer`, which returns the tracer bound with `withTracer(_:_:)` or else the bootstrapped one.
+The read happens per operation and not once per connection, so that a tracer set with `withTracer` is respected for each individual operation.
+A client therefore cannot have its own tracer, and there is no per-client switch to turn tracing off. An operation that should not be traced runs inside `withTracer(NoOpTracer())`. The operation checks for a `NoOpTracer` before starting a span, so no span is allocated when nobody is collecting spans.
 
-The attribute names default to the OpenTelemetry ones. They can be changed for a backend that expects an older version of the conventions, for example `db.system` instead of `db.system.name`. valkey-swift and async-http-client offer the same option.
+`db.system.name` defaults to `postgresql`. It can be changed for a different database that speaks the Postgres protocol, for example `cockroachdb`, which has its own value in the conventions. The attribute names themselves are not configurable.
 
 ## Alternatives considered
 
