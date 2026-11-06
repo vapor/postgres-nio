@@ -374,7 +374,7 @@ extension PostgresConnection {
         var logger = logger
         logger[postgresMetadataKey: .connectionID] = "\(self.id)"
         let query = buildCopyFromQuery(table: table, columns: columns, format: format)
-        let span = self.tracing?.startSpan(queryText: query.sql, operation: "COPY", collection: table)
+        let span = self.tracing.startSpan(queryText: query.sql, operation: "COPY", collection: table)
         defer { span?.end() }
 
         do {
@@ -414,7 +414,7 @@ extension PostgresConnection {
             // above.
             try await writer.done()
         } catch {
-            self.tracing?.recordError(error, in: span)
+            self.tracing.recordError(error, in: span)
             throw error
         }
     }

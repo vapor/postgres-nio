@@ -4,7 +4,6 @@ import Atomics
 import Logging
 import ServiceLifecycle
 import _ConnectionPoolModule
-import Tracing
 
 /// A Postgres client that is backed by an underlying connection pool. Use ``Configuration`` to change the client's
 /// behavior.

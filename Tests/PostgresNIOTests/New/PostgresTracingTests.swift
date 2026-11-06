@@ -180,8 +180,8 @@ import Tracing
         }
     }
 
-    @Test func attributeNamesAreConfigurable() async throws {
-        try await self.withTracedConnection(configure: { $0.attributeNames.databaseSystemName = "db.system" }) { connection, channel, tracer in
+    @Test func databaseSystemNameIsConfigurable() async throws {
+        try await self.withTracedConnection(configure: { $0.databaseSystemName = "cockroachdb" }) { connection, channel, tracer in
             async let query: Void = connection.query("DELETE FROM users", logger: .psqlTest) { rows in
                 for try await _ in rows {}
             }
@@ -189,18 +189,19 @@ import Tracing
             try await query
 
             try #require(tracer.finishedSpans.count == 1)
-            let attributes = tracer.finishedSpans[0].attributes
-            #expect(attributes.get("db.system") == .string("postgresql"))
-            #expect(attributes.get("db.system.name") == nil)
+            #expect(tracer.finishedSpans[0].attributes.get("db.system.name") == .string("cockroachdb"))
         }
     }
 
-    @Test func noOpTracerDisablesTracing() {
-        var configuration = PostgresConnection.Configuration(
-            host: "localhost", username: "test", password: nil, database: nil, tls: .disable
-        )
-        configuration.options.tracing.tracer = NoOpTracer()
-        #expect(PostgresTracing(configuration: .init(configuration), remoteAddress: nil) == nil)
+    @Test func noOpTracerInScopeDisablesTracing() async throws {
+        try await self.withTracedConnection { connection, channel, tracer in
+            try await withTracer(NoOpTracer()) {
+                async let query: Void = connection.query("DELETE FROM users", logger: .psqlTest, summary: "DELETE users") { _ in }
+                try await self.respond(to: channel, commandTag: "DELETE 0")
+                try await query
+            }
+            #expect(tracer.finishedSpans.isEmpty)
+        }
     }
 
     @Test(arguments: ["2350", "235050", "23a05", "2350!", ""])
@@ -254,7 +255,6 @@ import Tracing
         var configuration = PostgresConnection.Configuration(
             establishedChannel: channel, username: "username", password: "postgres", database: "database"
         )
-        configuration.options.tracing.tracer = tracer
         configure(&configuration.options.tracing)
 
         async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: .psqlTest)
@@ -265,7 +265,7 @@ import Tracing
         let connection = try await connectionPromise
 
         do {
-            try await body(connection, channel, tracer)
+            try await withTracer(tracer) { try await body(connection, channel, tracer) }
         } catch {
             try? await connection.close()
             throw error

@@ -3,38 +3,31 @@ import Tracing
 
 @usableFromInline
 struct PostgresTracing: Sendable {
-    private let tracer: any Tracer
     private let recordsQueryText: Bool
     private let recordsReturnedRows: Bool
-    private let names: PostgresTracingConfiguration.AttributeNames
     /// `db.system.name`, `db.namespace`, `server.address` and `server.port`, which the transaction span reports.
     private let scopeAttributes: SpanAttributes
     /// ``scopeAttributes`` plus `network.peer.address` and `network.peer.port`, which every other span reports.
     private let baseAttributes: SpanAttributes
     private let target: String
 
-    /// Creates the state a connection traces with, or `nil` when tracing is disabled.
-    init?(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?) {
+    init(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?) {
         let tracing = configuration.options.tracing
-        guard let tracer = tracing.tracer, !(tracer is NoOpTracer) else { return nil }
-        self.tracer = tracer
         self.recordsQueryText = tracing.recordsQueryText
         self.recordsReturnedRows = tracing.recordsReturnedRows
-        let names = tracing.attributeNames
-        self.names = names
 
         var attributes = SpanAttributes()
-        attributes[names.databaseSystemName] = "postgresql"
-        attributes[names.databaseNamespace] = configuration.database
+        attributes["db.system.name"] = tracing.databaseSystemName
+        attributes["db.namespace"] = configuration.database
 
         // `server.*` describes what the user asked to connect to, `network.peer.*` what we ended up
         // talking to
         var endpoint: String?
         func appendServer(address: String, port: Int?) {
-            attributes[names.serverAddress] = address
+            attributes["server.address"] = address
             // The conventions only ask for the port when it isn't the default one.
             if let port, port != 5432 {
-                attributes[names.serverPort] = port
+                attributes["server.port"] = port
             }
             endpoint = port.map { "\(address):\($0)" } ?? address
         }
@@ -55,11 +48,11 @@ struct PostgresTracing: Sendable {
         self.scopeAttributes = attributes
 
         if let remoteAddress, let address = remoteAddress.ipAddress ?? remoteAddress.pathname {
-            attributes[names.networkPeerAddress] = address
-            attributes[names.networkPeerPort] = remoteAddress.port
+            attributes["network.peer.address"] = address
+            attributes["network.peer.port"] = remoteAddress.port
         }
         self.baseAttributes = attributes
-        self.target = configuration.database ?? endpoint ?? "postgresql"
+        self.target = configuration.database ?? endpoint ?? tracing.databaseSystemName
     }
 
     /// Computes the span name following the OTel database span naming fallback chain:
@@ -68,7 +61,7 @@ struct PostgresTracing: Sendable {
     /// 2. `{db.operation.name} {target}`, if a low-cardinality operation name is known
     /// 3. `{target}`, being the first available of `db.collection.name`, `db.namespace`
     ///    or `server.address:server.port`
-    /// 4. `{db.system.name}` (`postgresql`)
+    /// 4. `{db.system.name}`
     ///
     /// The query text is never inspected, as mandated by the spec.
     private func spanName(summary: String?, operation: String?, collection: String?) -> String {
@@ -82,45 +75,50 @@ struct PostgresTracing: Sendable {
         return target
     }
 
+    private var activeTracer: (any Tracer)? {
+        let tracer = InstrumentationSystem.tracer
+        return tracer is NoOpTracer ? nil : tracer
+    }
+
     @usableFromInline
     func startSpan(
         queryText: String,
         summary: String? = nil,
         operation: String? = nil,
         collection: String? = nil
-    ) -> any Span {
-        let span = self.tracer.startSpan(
+    ) -> (any Span)? {
+        guard let tracer = self.activeTracer else { return nil }
+        let span = tracer.startSpan(
             self.spanName(summary: summary, operation: operation, collection: collection),
             ofKind: .client
         )
         span.updateAttributes { attributes in
             attributes.merge(self.baseAttributes)
-            attributes[self.names.databaseQuerySummary] = summary
-            attributes[self.names.databaseOperationName] = operation
-            attributes[self.names.databaseCollectionName] = collection
+            attributes["db.query.summary"] = summary
+            attributes["db.operation.name"] = operation
+            attributes["db.collection.name"] = collection
             if self.recordsQueryText {
-                attributes[self.names.databaseQueryText] = queryText
+                attributes["db.query.text"] = queryText
             }
         }
         return span
     }
 
-    func startTransactionSpan() -> any Span {
-        let span = self.tracer.startSpan("TRANSACTION", ofKind: .internal)
+    func startTransactionSpan() -> (any Span)? {
+        guard let tracer = self.activeTracer else { return nil }
+        let span = tracer.startSpan("TRANSACTION", ofKind: .internal)
         span.attributes.merge(self.scopeAttributes)
         return span
     }
 
     /// Records `error.type`, `db.response.status_code` and the span status for a failed operation.
-    ///
-    /// The error itself is not recorded on the span: Postgres interpolates user data into the error.
     @usableFromInline
     func recordError(_ error: any Error, in span: (any Span)?) {
         guard let span else { return }
         let psqlError = error as? PSQLError
         span.updateAttributes { attributes in
-            attributes[self.names.errorType] = psqlError?.tracingErrorType ?? "_OTHER"
-            attributes[self.names.databaseResponseStatusCode] = psqlError?.tracingStatusCode
+            attributes["error.type"] = psqlError?.tracingErrorType ?? "_OTHER"
+            attributes["db.response.status_code"] = psqlError?.tracingStatusCode
         }
         span.setStatus(.init(code: .error))
     }
@@ -128,7 +126,7 @@ struct PostgresTracing: Sendable {
     @usableFromInline
     func recordReturnedRows(of rows: PostgresRowSequence, in span: (any Span)?) {
         guard self.recordsReturnedRows else { return }
-        span?.attributes[self.names.databaseResponseReturnedRows] = rows.stream.receivedRowCount.load(ordering: .relaxed)
+        span?.attributes["db.response.returned_rows"] = rows.stream.receivedRowCount.load(ordering: .relaxed)
     }
 }
 

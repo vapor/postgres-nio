@@ -50,9 +50,9 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
     @usableFromInline
-    let tracing: PostgresTracing?
+    let tracing: PostgresTracing
 
-    init(channel: any Channel, connectionID: ID, logger: Logger, tracing: PostgresTracing?) {
+    init(channel: any Channel, connectionID: ID, logger: Logger, tracing: PostgresTracing) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
@@ -687,7 +687,7 @@ extension PostgresConnection {
         isolation: isolated (any Actor)? = #isolation,
         _ process: (PostgresConnection) async throws -> sending Result
     ) async throws -> sending Result {
-        let span = self.tracing?.startTransactionSpan()
+        let span = self.tracing.startTransactionSpan()
         defer { span?.end() }
 
         // `withValue` doesn't return `sending` so the compiler marks this as an error, without `nonisolated(unsafe)`.
@@ -698,7 +698,7 @@ extension PostgresConnection {
                 try await self.query("BEGIN;", logger: logger, summary: "BEGIN") { _ in }
             } catch {
                 let transactionError = PostgresTransactionError(file: file, line: line, beginError: error)
-                self.tracing?.recordError(transactionError, in: span)
+                self.tracing.recordError(transactionError, in: span)
                 throw transactionError
             }
 
@@ -721,7 +721,7 @@ extension PostgresConnection {
                     transactionError.commitError = error
                 }
 
-                self.tracing?.recordError(transactionError, in: span)
+                self.tracing.recordError(transactionError, in: span)
                 throw transactionError
             }
         }
@@ -757,7 +757,7 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> Result {
-        let span = self.tracing?.startSpan(queryText: query.sql, summary: summary)
+        let span = self.tracing.startSpan(queryText: query.sql, summary: summary)
         defer { span?.end() }
 
         do {
@@ -765,10 +765,10 @@ extension PostgresConnection {
             defer { rows.invalidate(query: query, file: file, line: line) }
 
             let result = try await body(rows)
-            self.tracing?.recordReturnedRows(of: rows, in: span)
+            self.tracing.recordReturnedRows(of: rows, in: span)
             return result
         } catch {
-            self.tracing?.recordError(error, in: span)
+            self.tracing.recordError(error, in: span)
             throw error
         }
     }
@@ -805,7 +805,7 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
-        let span = self.tracing?.startSpan(queryText: query.sql, summary: summary)
+        let span = self.tracing.startSpan(queryText: query.sql, summary: summary)
         defer { span?.end() }
 
         do {
@@ -814,10 +814,10 @@ extension PostgresConnection {
 
             let result = try await body(rows)
             let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
-            self.tracing?.recordReturnedRows(of: rows, in: span)
+            self.tracing.recordReturnedRows(of: rows, in: span)
             return (result, metadata)
         } catch {
-            self.tracing?.recordError(error, in: span)
+            self.tracing.recordError(error, in: span)
             throw error
         }
     }
