@@ -53,7 +53,7 @@ jobs:
           - postgres-image: postgres:14
             postgres-auth: trust
     container:
-      image: swift:6.4-resolut
+      image: swift:6.4-resolute
       volumes: [ 'pgrunshare:/var/run/postgresql' ]
     runs-on: ubuntu-24.04
     env: &psql_shared_env
