@@ -439,7 +439,6 @@ struct AsyncPostgresConnectionTests {
                     #expect(!connection.isClosed, "Connection should survive!")
                 }
 
-                // A fixed delay could cancel a scheduled consumer before it reads any rows.
                 let firstRow: Void? = await started.first { _ in true }
                 try #require(firstRow != nil, "Query ended before consuming its first row")
 
