@@ -29,6 +29,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.1"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
         .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.5.0"),
+        .package(url: "https://github.com/apple/swift-distributed-tracing.git", from: "1.7.4"),
     ],
     targets: [
         .target(
@@ -48,6 +49,7 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "ServiceLifecycle", package: "swift-service-lifecycle"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings + [.enableExperimentalFeature("Lifetimes")]
         ),
@@ -76,6 +78,8 @@ let package = Package(
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "NIOTestUtils", package: "swift-nio"),
                 .product(name: "ServiceLifecycleTestKit", package: "swift-service-lifecycle"),
+                .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "InMemoryTracing", package: "swift-distributed-tracing"),
             ],
             swiftSettings: swiftSettings
         ),
