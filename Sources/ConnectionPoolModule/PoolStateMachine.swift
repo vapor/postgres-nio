@@ -369,7 +369,7 @@ struct PoolStateMachine<
     mutating func releaseConnection(_ connection: Connection, streams: UInt16) -> Action {
         switch self.connections.releaseConnection(connection.id, streams: streams) {
         case .available(let index, let context):
-            return self.handleAvailableConnection(index: index, availableContext: context, justEstablished: false)
+            return self.handleAvailableConnection(index: index, availableContext: context)
         case .closeConnection(let closeAction):
             self.cacheNoMoreConnectionsAllowed = false
             return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
@@ -414,7 +414,13 @@ struct PoolStateMachine<
 
         let (index, context) = self.connections.newConnectionEstablished(connection, maxStreams: maxStreams)
 
-        return self.handleAvailableConnection(index: index, availableContext: context, justEstablished: true)
+        let lifetimeTimer: Timer? = if self.configuration.maximumConnectionLifetime != nil {
+            self.mapTimers(self.connections.scheduleLifetimeTimer(at: index))
+        } else {
+            nil
+        }
+
+        return self.handleAvailableConnection(index: index, availableContext: context, lifetimeTimer: lifetimeTimer)
     }
 
     @inlinable
@@ -635,7 +641,7 @@ struct PoolStateMachine<
         precondition(self.configuration.keepAliveDuration != nil)
         switch self.connections.keepAliveSucceeded(connection.id) {
         case .available(let index, let context):
-            return self.handleAvailableConnection(index: index, availableContext: context, justEstablished: false)
+            return self.handleAvailableConnection(index: index, availableContext: context)
         case .closeConnection(let closeAction):
             self.cacheNoMoreConnectionsAllowed = false
             return .init(request: .none, connection: .closeConnection(closeAction.connection, closeAction.timersToCancel))
@@ -835,14 +841,8 @@ struct PoolStateMachine<
     /*private*/ mutating func handleAvailableConnection(
         index: Int,
         availableContext: ConnectionGroup.AvailableConnectionContext,
-        justEstablished: Bool
+        lifetimeTimer: Timer? = nil
     ) -> Action {
-        let lifetimeTimer: Timer? = if justEstablished, self.configuration.maximumConnectionLifetime != nil {
-            self.mapTimers(self.connections.scheduleLifetimeTimer(at: index))
-        } else {
-            nil
-        }
-
         // this connection was busy before
         let requests = self.requestQueue.pop(max: availableContext.info.availableStreams)
 
@@ -863,13 +863,14 @@ struct PoolStateMachine<
             }
             let scheduledTimers: TinyFastSequence = lifetimeTimer.map { [$0] } ?? []
             let cancelledTimers = TinyFastSequence(leaseResult.timersToCancel)
-            let connectionAction = self.createMultipleConnectionsAction(
-                connectionsRequired, cancelledTimers: cancelledTimers, scheduledTimers: scheduledTimers
-            ) ?? (
-                scheduledTimers.isEmpty 
-                ? .cancelTimers(cancelledTimers) 
-                : .makeConnectionsCancelAndScheduleTimers([], cancelledTimers, scheduledTimers)
-            )
+            let connectionAction: ConnectionAction =
+                if let action = self.createMultipleConnectionsAction(connectionsRequired, cancelledTimers: cancelledTimers, scheduledTimers: scheduledTimers) {
+                    action
+                } else if scheduledTimers.isEmpty {
+                    .cancelTimers(cancelledTimers)
+                } else {
+                    .makeConnectionsCancelAndScheduleTimers([], cancelledTimers, scheduledTimers)
+                }
 
             return .init(
                 request: .leaseConnection(requests, leaseResult.connection),
