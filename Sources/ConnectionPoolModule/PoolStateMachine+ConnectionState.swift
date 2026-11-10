@@ -123,7 +123,7 @@ extension PoolStateMachine {
             /// to: `.closing`, `.closed`.
             case draining(Connection, usedStreams: UInt16)
             /// The pool has given the order to the connection to close. Valid transitions to: `.closed`
-            case closing(Connection)
+            case closing(Connection, usedStreams: UInt16)
             /// The connection is closed. Final state.
             case closed
         }
@@ -315,7 +315,12 @@ extension PoolStateMachine {
 
                 if scheduleIdleTimeoutTimer {
                     idleTimerState = self._nextTimer()
-                    idleTimer = ConnectionTimer(timerID: idleTimerState!.timerID, connectionID: self.id, usecase: .keepAlive)
+                    // This is the IDLE TIMEOUT timer: with `usecase: .keepAlive` it ran for
+                    // the keep-alive duration instead of the idle timeout, the idle timeout
+                    // never fired for these connections, and if the timer did fire it was
+                    // dispatched to `keepAliveIfIdle` on a connection that already had a
+                    // keep-alive running → preconditionFailure.
+                    idleTimer = ConnectionTimer(timerID: idleTimerState!.timerID, connectionID: self.id, usecase: .idleTimeout)
                 }
                 self.state = .idle(connection, maxStreams: maxStreams, keepAlive: .scheduled(keepAliveTimer), idleTimer: idleTimerState)
                 return Max2Sequence(idleTimer, nil)
@@ -323,7 +328,12 @@ extension PoolStateMachine {
             case .idle(let connection, let maxStreams, keepAlive: .running(let usingStream), idleTimer: .none):
                 if scheduleIdleTimeoutTimer {
                     idleTimerState = self._nextTimer()
-                    idleTimer = ConnectionTimer(timerID: idleTimerState!.timerID, connectionID: self.id, usecase: .keepAlive)
+                    // This is the IDLE TIMEOUT timer: with `usecase: .keepAlive` it ran for
+                    // the keep-alive duration instead of the idle timeout, the idle timeout
+                    // never fired for these connections, and if the timer did fire it was
+                    // dispatched to `keepAliveIfIdle` on a connection that already had a
+                    // keep-alive running → preconditionFailure.
+                    idleTimer = ConnectionTimer(timerID: idleTimerState!.timerID, connectionID: self.id, usecase: .idleTimeout)
                 }
                 self.state = .idle(connection, maxStreams: maxStreams, keepAlive: .running(usingStream), idleTimer: idleTimerState)
                 return Max2Sequence(keepAliveTimer, idleTimer)
@@ -471,14 +481,20 @@ extension PoolStateMachine {
                 precondition(usedStreams >= returnedStreams)
                 let newUsedStreams = usedStreams - returnedStreams
                 if newUsedStreams == 0 {
-                    self.state = .closing(connection)
+                    self.state = .closing(connection, usedStreams: 0)
                     return .drainingComplete(connection)
                 } else {
                     self.state = .draining(connection, usedStreams: newUsedStreams)
                     return .none
                 }
 
-            case .closing, .closed:
+            case .closing(let connection, let usedStreams):
+                // A lease comes back on a connection the pool already closed: the
+                // streams must be subtracted here too, otherwise they stay counted.
+                self.state = .closing(connection, usedStreams: usedStreams >= returnedStreams ? usedStreams - returnedStreams : 0)
+                return .none
+
+            case .closed:
                 return .none
 
             case .backingOff, .starting, .idle:
@@ -672,7 +688,7 @@ extension PoolStateMachine {
         mutating func closeIfIdle() -> CloseAction? {
             switch self.state {
             case .idle(let connection, let maxStreams, var keepAlive, let idleTimerState):
-                self.state = .closing(connection)
+                self.state = .closing(connection, usedStreams: 0)
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .idle,
@@ -717,7 +733,7 @@ extension PoolStateMachine {
                 return nil
 
             case .idle(let connection, let maxStreams, var keepAlive, let idleTimerState):
-                self.state = .closing(connection)
+                self.state = .closing(connection, usedStreams: 0)
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .idle,
@@ -731,7 +747,10 @@ extension PoolStateMachine {
                 )
 
             case .leased(let connection, usedStreams: let usedStreams, maxStreams: let maxStreams, var keepAlive):
-                self.state = .closing(connection)
+                // Streams still leased stay charged to the connection while closing:
+                // they are subtracted on release, or by `closed()` if the connection
+                // dies first. Otherwise they would be lost from the accounting.
+                self.state = .closing(connection, usedStreams: usedStreams)
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .leased,
@@ -744,7 +763,7 @@ extension PoolStateMachine {
                 )
 
             case .draining(let connection, let usedStreams):
-                self.state = .closing(connection)
+                self.state = .closing(connection, usedStreams: usedStreams)
                 return CloseAction(
                     connection: connection,
                     previousConnectionState: .leased,
@@ -835,18 +854,29 @@ extension PoolStateMachine {
                 return ClosedAction(
                     previousConnectionState: .leased,
                     cancelTimers: .init(),
-                    maxStreams: 0,
+                    // `maxStreams` must not be smaller than `usedStreams`: the group
+                    // computes `availableStreams -= maxStreams - usedStreams` in UInt16.
+                    // The free streams were already removed when the connection was
+                    // marked for close, so nothing is left to remove here: reporting
+                    // maxStreams == usedStreams makes that subtraction exactly zero.
+                    maxStreams: usedStreams,
                     usedStreams: usedStreams,
                     wasRunningKeepAlive: false
                 )
 
-            case .closing:
+            case .closing(_, let usedStreams):
                 self.state = .closed
                 return ClosedAction(
                     previousConnectionState: .closing,
                     cancelTimers: .init(),
-                    maxStreams: 0,
-                    usedStreams: 0,
+                    // Same reason as the `.draining` case above: the available streams
+                    // were already removed at close time, so `maxStreams - usedStreams`
+                    // must be zero, not a UInt16 underflow.
+                    maxStreams: usedStreams,
+                    // Streams still leased on a connection that dies before the release
+                    // must be returned to the accounting: once the connection is removed
+                    // no release will ever be able to subtract them.
+                    usedStreams: usedStreams,
                     wasRunningKeepAlive: false
                 )
             }
