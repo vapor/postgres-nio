@@ -816,7 +816,7 @@ extension PoolStateMachine {
             }
 
             let newConnectionRequest: ConnectionRequest?
-            if !shuttingDown, self.connections.count < self.minimumConcurrentConnections {
+            if !shuttingDown, self.stats.active < self.minimumConcurrentConnections {
                 newConnectionRequest = self.createNewConnection()
             } else {
                 newConnectionRequest = .none
