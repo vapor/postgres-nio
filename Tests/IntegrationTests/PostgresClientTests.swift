@@ -329,6 +329,217 @@ struct PostgresClientTests {
         }
     }
 
+    /// The OID is only looked up when the type is first used, so a connection opened before the extension
+    /// was created, like one running migrations, can still use it.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeResolvesLazilyAfterExtensionIsInstalled() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // make sure every query runs on the same connection
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP EXTENSION IF EXISTS ltree CASCADE;")
+            try await client.query("CREATE EXTENSION ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+            let rows = try await client.query("SELECT \(value)")
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            #expect(decoded == [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    /// The OID lookup is still running when the statement gets queued, so the OID has to be resolved
+    /// when `Parse` is sent.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeResolvesLazilyForPreparedStatements() async throws {
+        struct SelectLTree: PostgresPreparedStatement {
+            static let name = "SELECT-ltree-lazy-resolution"
+            static let sql = "SELECT $1"
+            typealias Row = PostgresLTree
+
+            var label: PostgresLTree
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.label)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresRow) throws -> Row {
+                try row.decode(PostgresLTree.self)
+            }
+        }
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            var decoded = [PostgresLTree]()
+            for try await label in try await client.execute(SelectLTree(label: value), logger: logger) {
+                decoded.append(label)
+            }
+            #expect(decoded == [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeBindRoundTrip() async throws {
+        let tableName = "test_client_ltree_bind"
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            try await client.query("DROP TABLE IF EXISTS \"\(unescaped: tableName)\";")
+
+            try await client.query(
+                """
+                CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
+                    id SERIAL PRIMARY KEY,
+                    label ltree NOT NULL
+                );
+                """
+            )
+
+            let inserted = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            try await client.query(
+                """
+                INSERT INTO "\(unescaped: tableName)" (label) VALUES (\(inserted))
+                """
+            )
+
+            let rows = try await client.query(
+                """
+                SELECT label FROM "\(unescaped: tableName)" WHERE label ~ 'foo.*'
+                """
+            )
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            #expect(decoded == [inserted])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeBindInTypeAmbiguousContext() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            let rows = try await client.query("SELECT \(value)")
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            #expect(decoded == [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func qualifiedDataTypeNames() async throws {
+        struct Mood: PostgresDynamicTypeEncodable {
+            let psqlTypeName: String?
+            var psqlType: PostgresDataType { .null }
+            var psqlFormat: PostgresFormat { .text }
+
+            func encode<JSONEncoder: PostgresJSONEncoder>(
+                into byteBuffer: inout ByteBuffer,
+                context: PostgresEncodingContext<JSONEncoder>
+            ) {
+                byteBuffer.writeString("ok")
+            }
+        }
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // make sure every query runs on the same connection, so the `search_path` below applies
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP SCHEMA IF EXISTS type_lookup_a, type_lookup_b CASCADE;")
+            try await client.query("CREATE SCHEMA type_lookup_a;")
+            try await client.query("CREATE SCHEMA type_lookup_b;")
+            try await client.query("CREATE TYPE type_lookup_a.mood AS ENUM ('ok');")
+            try await client.query("CREATE TYPE type_lookup_b.mood AS ENUM ('ok');")
+            try await client.query("SET search_path = public, type_lookup_a;")
+
+            for (name, expected) in [("mood", "mood"), ("type_lookup_b.mood", "type_lookup_b.mood")] {
+                let rows = try await client.query("SELECT pg_typeof(\(Mood(psqlTypeName: name)))::text")
+                var types = [String]()
+                for try await type in rows.decode(String.self) {
+                    types.append(type)
+                }
+                #expect(types == [expected])
+            }
+
+            taskGroup.cancelAll()
+        }
+    }
+
 }
 
 // MARK: - Structured queries
