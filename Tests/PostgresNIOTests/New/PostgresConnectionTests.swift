@@ -361,62 +361,58 @@ import Synchronization
         }
     }
 
-    @Test func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
+    @Test(.timeLimit(.minutes(1)))
+    func testCloseGracefullyClosesWhenInternalQueueIsEmpty() async throws {
         try await self.withAsyncTestingChannel { connection, channel in
-            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup async throws -> () in
-                for _ in 1...2 {
-                    taskGroup.addTask {
-                        let rows = try await connection.query("SELECT 1;", logger: logger)
-                        var iterator = rows.decode(Int.self).makeAsyncIterator()
-                        let first = try await iterator.next()
-                        #expect(first == 1)
-                        let second = try await iterator.next()
-                        #expect(second == nil)
-                    }
-                }
+            let observer = OutboundOperationObserver()
+            try await channel.pipeline.addHandler(observer)
+            var operations = observer.operations.makeAsyncIterator()
 
-                for i in 0...1 {
-                    let listenMessage = try await channel.waitForUnpreparedRequest()
-                    #expect(listenMessage.parse.query == "SELECT 1;")
+            let logger = self.logger
+            async let firstRows = connection.query("SELECT 1;", logger: logger).collect()
+            async let secondRows = connection.query("SELECT 1;", logger: logger).collect()
 
-                    if i == 0 {
-                        taskGroup.addTask {
-                            try await connection.closeGracefully()
-                        }
-                    }
+            // Once both writes are processed, one query is in flight and the other is queued.
+            let firstWrite = await operations.next()
+            #expect(firstWrite == .write)
+            let secondWrite = await operations.next()
+            #expect(secondWrite == .write)
 
-                    try await channel.writeInbound(PostgresBackendMessage.parseComplete)
-                    try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
-                    let intDescription = RowDescription.Column(
-                        name: "",
-                        tableOID: 0,
-                        columnAttributeNumber: 0,
-                        dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary
-                    )
-                    try await channel.writeInbound(PostgresBackendMessage.rowDescription(.init(columns: [intDescription])))
-                    try await channel.testingEventLoop.executeInContext { channel.read() }
-                    try await channel.writeInbound(PostgresBackendMessage.bindComplete)
-                    try await channel.testingEventLoop.executeInContext { channel.read() }
-                    try await channel.writeInbound(PostgresBackendMessage.dataRow([Int(1)]))
-                    try await channel.testingEventLoop.executeInContext { channel.read() }
-                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 1 1"))
-                    try await channel.testingEventLoop.executeInContext { channel.read() }
-                    try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
-                }
+            async let close: Void = connection.closeGracefully()
+            let gracefulShutdown = await operations.next()
+            #expect(gracefulShutdown == .userEvent)
 
-                let terminate = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
-                #expect(terminate == .terminate)
-                try await channel.closeFuture.get()
-                #expect(!channel.isActive)
+            for _ in 0...1 {
+                let request = try await channel.waitForUnpreparedRequest()
+                #expect(request.parse.query == "SELECT 1;")
 
-                while let taskResult = await taskGroup.nextResult() {
-                    switch taskResult {
-                    case .success:
-                        break
-                    case .failure(let failure):
-                        Issue.record("Unexpected error: \(failure)")
-                    }
-                }
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                let intDescription = RowDescription.Column(
+                    name: "",
+                    tableOID: 0,
+                    columnAttributeNumber: 0,
+                    dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary
+                )
+                try await channel.writeInbound(PostgresBackendMessage.rowDescription(.init(columns: [intDescription])))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.dataRow([Int(1)]))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 1"))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            }
+
+            let terminate = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+            #expect(terminate == .terminate)
+            try await channel.closeFuture.get()
+            #expect(!channel.isActive)
+
+            try await close
+            for rows in try await [firstRows, secondRows] {
+                #expect(try rows.map { try $0.decode(Int.self) } == [1])
             }
         }
     }
@@ -1405,4 +1401,33 @@ struct PrepareRequest {
 struct PreparedRequest {
     var bind: PostgresFrontendMessage.Bind
     var execute: PostgresFrontendMessage.Execute
+}
+
+/// Reports each outbound operation once the handlers closer to the head of the pipeline have processed it.
+///
+/// Add it at the end of the pipeline, so that it forwards operations to `PostgresChannelHandler`.
+private final class OutboundOperationObserver: ChannelOutboundHandler, Sendable {
+    typealias OutboundIn = HandlerTask
+
+    enum Operation {
+        case write
+        case userEvent
+    }
+
+    let operations: AsyncStream<Operation>
+    private let continuation: AsyncStream<Operation>.Continuation
+
+    init() {
+        (self.operations, self.continuation) = AsyncStream.makeStream()
+    }
+
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        context.write(data, promise: promise)
+        self.continuation.yield(.write)
+    }
+
+    func triggerUserOutboundEvent(context: ChannelHandlerContext, event: Any, promise: EventLoopPromise<Void>?) {
+        context.triggerUserOutboundEvent(event, promise: promise)
+        self.continuation.yield(.userEvent)
+    }
 }
