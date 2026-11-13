@@ -302,6 +302,44 @@ struct IntegrationTests {
         }
     }
 
+    @Test func copyIntoFromCSV() async throws {
+        try await withConnection { connection in
+            _ = try? await connection.query("DROP TABLE copy_table", logger: .psqlTest)
+            _ = try await connection.query("CREATE TABLE copy_table (id INT, name VARCHAR(100))", logger: .psqlTest)
+
+            var options = PostgresCopyFromFormat.CSVOptions()
+            options.delimiter = ";"
+            options.quote = "'"
+            options.escape = "\\"
+            options.header = .bool(true)
+            try await connection.copyFrom(table: "copy_table", columns: ["id", "name"], format: .csv(options), logger: .psqlTest) { writer in
+                var buffer = ByteBuffer()
+                // Header line, skipped by the backend because of `HEADER true`.
+                buffer.writeString("id;name\n")
+                // Quoted value containing the delimiter.
+                buffer.writeString("1;'Alice; Jr.'\n")
+                // Quoted value containing the quote character, escaped with the custom escape character.
+                buffer.writeString("42;'Bob \\'The Builder\\''\n")
+                // Unquoted empty value is NULL in CSV format.
+                buffer.writeString("7;\n")
+                try await writer.write(buffer)
+            }
+            let rows = try await connection.query("SELECT id, name FROM copy_table ORDER BY id").get().rows.map {
+                try $0.decode((Int, String?).self)
+            }
+            guard rows.count == 3 else {
+                Issue.record("Expected 3 rows, received \(rows.count)")
+                return
+            }
+            #expect(rows[0].0 == 1)
+            #expect(rows[0].1 == "Alice; Jr.")
+            #expect(rows[1].0 == 7)
+            #expect(rows[1].1 == nil)
+            #expect(rows[2].0 == 42)
+            #expect(rows[2].1 == "Bob 'The Builder'")
+        }
+    }
+
     @Test func copyIntoFromIsTerminatedByThrowingErrorFromClosure() async throws {
         struct MyError: Error, CustomStringConvertible {
             var description: String { "My error" }

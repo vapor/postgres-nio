@@ -241,9 +241,53 @@ public struct PostgresCopyFromFormat: Sendable {
         public init() {}
     }
 
+    /// Specifies whether the file contains a header line with the names of each column in the file.
+    public struct HeaderOption: Sendable {
+        enum Backing: Sendable {
+            case bool(Bool)
+            case match
+        }
+
+        let backing: Backing
+
+        /// If the option is set to `true`, the first line is discarded on input.
+        public static func bool(_ bool: Bool) -> Self { .init(backing: .bool(bool)) }
+
+        /// The number and names of the columns in the header line 
+        /// must match the actual column names of the table, in order;
+        /// otherwise an error is raised.
+        public static let match: Self = .init(backing: .match)
+    }
+
+    /// Options that can be used to modify the `CSV` format of a COPY operation.
+    public struct CSVOptions: Sendable {
+        /// The delimiter that separates columns in the data.
+        ///
+        /// See the `DELIMITER` option in Postgres's `COPY` command.
+        public var delimiter: UnicodeScalar? = nil
+
+        /// Quote character used in CSV format.
+        ///
+        /// See the `QUOTE` option in Postgres's `COPY` command.
+        public var quote: UnicodeScalar? = nil
+        
+        /// Escape character used in CSV format.
+        ///
+        /// See the `ESCAPE` option in Postgres's `COPY` command.
+        public var escape: UnicodeScalar? = nil
+
+        /// Whether the input contains a header line.
+        ///
+        /// See the `HEADER` option in Postgres's `COPY` command.
+        public var header: HeaderOption? = nil
+
+        public init() {}
+    }
+
     enum Format {
         case text(TextOptions)
         case binary(BinaryOptions)
+        case csv(CSVOptions)
     }
 
     var format: Format
@@ -256,6 +300,11 @@ public struct PostgresCopyFromFormat: Sendable {
     /// Copy data to Postgres in binary format.
     public static func binary(_ options: BinaryOptions) -> PostgresCopyFromFormat {
         return PostgresCopyFromFormat(format: .binary(options))
+    }
+
+    /// Copy data to Postgres in CSV format.
+    public static func csv(_ options: CSVOptions) -> PostgresCopyFromFormat {
+        return PostgresCopyFromFormat(format: .csv(options))
     }
 }
 
@@ -288,9 +337,34 @@ private func buildCopyFromQuery(
             // Set the delimiter as a Unicode code point. This avoids the possibility of SQL injection.
             queryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
         }
+
     case .binary:
         queryOptions.append("FORMAT binary")
+
+    case .csv(let options):
+        queryOptions.append("FORMAT csv")
+        if let delimiter = options.delimiter {
+            // Set the delimiter as a Unicode code point. This avoids the possibility of SQL injection.
+            queryOptions.append("DELIMITER U&'\\\(String(format: "%04x", delimiter.value))'")
+        }
+        if let escape = options.escape {
+            // Set the escape character as a Unicode code point. This avoids the possibility of SQL injection.
+            queryOptions.append("ESCAPE U&'\\\(String(format: "%04x", escape.value))'")
+        }
+        if let quote = options.quote {
+            // Set the quote character as a Unicode code point. This avoids the possibility of SQL injection.
+            queryOptions.append("QUOTE U&'\\\(String(format: "%04x", quote.value))'")
+        }
+        if let header = options.header {
+            switch header.backing {
+            case .bool(let value):
+                queryOptions.append("HEADER \(value)")
+            case .match:
+                queryOptions.append("HEADER match")
+            }
+        }
     }
+
     precondition(!queryOptions.isEmpty)
     query += " WITH ("
     query += queryOptions.map { "\($0)" }.joined(separator: ",")
