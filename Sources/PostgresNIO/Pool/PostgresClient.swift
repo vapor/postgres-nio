@@ -472,6 +472,68 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows.
+    /// - Returns: The result of the `body` closure.
+    @inlinable
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> Result where Row == Statement.Row {
+        let logger = logger ?? Self.loggingDisabled
+        let lease = try await self.leaseConnection()
+
+        defer { lease.release() }
+
+        return try await lease.connection.execute(preparedStatement, logger: logger, file: file, line: line, body)
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary, and return the
+    /// statement's metadata alongside the `body` closure's result.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// The metadata is derived from the command tag the server sends after the last row, so `body` must
+    /// iterate the sequence to its end. If it returns early the statement is cancelled and the method throws
+    /// `PSQLError.rowSequenceNotFullyConsumed`.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows. Must consume the sequence to its end.
+    /// - Returns: The result of the `body` closure and the statement metadata.
+    @inlinable
+    @_disfavoredOverload
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) where Row == Statement.Row {
+        let logger = logger ?? Self.loggingDisabled
+        let lease = try await self.leaseConnection()
+
+        defer { lease.release() }
+
+        return try await lease.connection.execute(preparedStatement, logger: logger, file: file, line: line, body)
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary.
     public func execute<Statement: PostgresPreparedStatement, Row>(
         _ preparedStatement: Statement,
         logger: Logger? = nil,

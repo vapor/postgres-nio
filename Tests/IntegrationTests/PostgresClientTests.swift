@@ -349,6 +349,34 @@ extension PostgresClientTests {
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredExecuteReturnsBodyResult() async throws {
+        struct Series: PostgresPreparedStatement {
+            static let sql = "SELECT generate_series(1, $1)"
+            typealias Row = Int
+            var upTo: Int
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.upTo)
+                return bindings
+            }
+            func decodeRow(_ row: PostgresRow) throws -> Row {
+                try row.decode(Row.self)
+            }
+        }
+
+        try await self.withClient { client, logger in
+            let sum = try await client.execute(Series(upTo: 100), logger: logger) { rows in
+                var sum = 0
+                for try await value in rows {
+                    sum += value
+                }
+                return sum
+            }
+            #expect(sum == 5050)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func structuredQueryVoidBody() async throws {
         try await self.withClient { client, logger in
             try await client.query("SELECT 1", logger: logger) { rows in
