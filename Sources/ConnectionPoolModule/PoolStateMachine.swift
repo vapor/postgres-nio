@@ -342,6 +342,13 @@ struct PoolStateMachine<
                 request: requestAction,
                 connection: .none
             )
+        } else if self.connections.stats.active < self.configuration.minimumConnectionCount {
+            // A minimum connection is closing. `connectionClosed` starts its replacement,
+            // which will pick up this request
+            return .init(
+                request: requestAction, 
+                connection: .none
+            )
         } else if let request = self.connections.createNewDemandConnectionIfPossible() {
             // Can we create a demand connection
             return .init(
