@@ -319,12 +319,17 @@ import Testing
         #expect(state.connected(connection, maxStreams: 4) == .idle(availableStreams: 4, newIdle: true))
         #expect(state.lease(streams: 2) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        guard case .markedForClose(availableStreams: let availableStreams, keepAliveWasRunning: let keepAliveWasRunning) = state.markForClose() else {
+        guard case .markedForClose(
+            availableStreams: let availableStreams, 
+            keepAliveWasRunning: let keepAliveWasRunning, 
+            lifetimeTimerCancellation: let lifetimeTimerCancellation
+        ) = state.markForClose() else {
             Issue.record("Expected markedForClose action for leased connection")
             return
         }
         #expect(availableStreams == 2) // maxStreams(4) - usedStreams(2) - keepAlive(0)
         #expect(keepAliveWasRunning == false)
+        #expect(lifetimeTimerCancellation == nil)
         #expect(!state.isAvailable)
         #expect(state.isLeased)
         #expect(state.isDraining)
@@ -352,12 +357,17 @@ import Testing
         #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
         #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
-        guard case .markedForClose(availableStreams: let availableStreams, keepAliveWasRunning: let keepAliveWasRunning) = state.markForClose() else {
+        guard case .markedForClose(
+            availableStreams: let availableStreams, 
+            keepAliveWasRunning: let keepAliveWasRunning, 
+            lifetimeTimerCancellation: let lifetimeTimerCancellation
+        ) = state.markForClose() else {
             Issue.record("Expected markedForClose")
             return
         }
         #expect(availableStreams == 0) // fully used
         #expect(keepAliveWasRunning == false)
+        #expect(lifetimeTimerCancellation == nil)
 
         // Release all streams — should transition to closing
         #expect(state.release(streams: 1) == .drainingComplete(connection))
@@ -391,12 +401,17 @@ import Testing
         #expect(state.lease(streams: 1) == .init(connection: connection, timersToCancel: .init(), wasIdle: true))
 
         // Mark for close — keepAlive is running
-        guard case .markedForClose(availableStreams: let availableStreams, keepAliveWasRunning: let keepAliveWasRunning) = state.markForClose() else {
+        guard case .markedForClose(
+            availableStreams: let availableStreams, 
+            keepAliveWasRunning: let keepAliveWasRunning,
+            lifetimeTimerCancellation: let lifetimeTimerCancellation
+        ) = state.markForClose() else {
             Issue.record("Expected markedForClose")
             return
         }
         #expect(availableStreams == 98) // maxStreams(100) - usedStreams(1) - keepAlive(1)
         #expect(keepAliveWasRunning == true)
+        #expect(lifetimeTimerCancellation == nil)
         #expect(state.isDraining)
 
         // Release all streams — should transition to closing immediately (don't wait for keepAlive)
@@ -616,5 +631,84 @@ import Testing
 
         // Release last: usedStreams = 0 → idle
         #expect(state.release(streams: 1) == .available(.idle(availableStreams: 2, newIdle: true)))
+    }
+
+    // MARK: - maxLifetimeTimer tests
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lifetimeTimerIsReturnedOnIdleClose() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+
+        let lifetimeTimer = state.scheduleLifetimeTimer()
+        #expect(lifetimeTimer.usecase == .maxLifetime)
+
+        let parkResult = state.parkConnection(scheduleKeepAliveTimer: true, scheduleIdleTimeoutTimer: true)
+        guard let keepAliveTimer = parkResult.first, let idleTimer = parkResult.second else {
+            Issue.record("Expected to get two timers")
+            return
+        }
+
+        let lifetimeToken = MockTimerCancellationToken(lifetimeTimer)
+        let keepAliveToken = MockTimerCancellationToken(keepAliveTimer)
+        let idleToken = MockTimerCancellationToken(idleTimer)
+        #expect(state.timerScheduled(lifetimeTimer, cancelContinuation: lifetimeToken) == nil)
+        #expect(state.timerScheduled(keepAliveTimer, cancelContinuation: keepAliveToken) == nil)
+        #expect(state.timerScheduled(idleTimer, cancelContinuation: idleToken) == nil)
+
+        guard let closeAction = state.closeIfIdle() else {
+            Issue.record("Expected close action")
+            return
+        }
+        #expect(Set(closeAction.cancelTimers) == [keepAliveToken, idleToken, lifetimeToken])
+
+        // must not be handed out a second time
+        #expect(state.closed().cancelTimers.isEmpty)
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testLifetimeTimerIsReturnedWhenLeasedConnectionIsMarkedForClose() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+
+        let lifetimeTimer = state.scheduleLifetimeTimer()
+        #expect(lifetimeTimer.usecase == .maxLifetime)
+
+        let lifetimeToken = MockTimerCancellationToken(lifetimeTimer)
+        #expect(state.timerScheduled(lifetimeTimer, cancelContinuation: lifetimeToken) == nil)
+
+        #expect(state.lease().timersToCancel.isEmpty)
+        
+        guard case .markedForClose(_, _, lifetimeTimerCancellation: let lifetimeTimerCancellation) = state.markForClose() else {
+            Issue.record("Expected markedForClose action for leased connection")
+            return
+        }
+        #expect(lifetimeTimerCancellation == lifetimeToken)
+
+        // timer canceled in markForClose
+        #expect(state.closed().cancelTimers == [])
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testLifetimeTimerIsReturnedOnClosed() {
+        let connectionID = 1
+        var state = TestConnectionState(id: connectionID)
+        let connection = MockConnection(id: connectionID)
+        #expect(state.connected(connection, maxStreams: 1) == .idle(availableStreams: 1, newIdle: true))
+
+        let lifetimeTimer = state.scheduleLifetimeTimer()
+        #expect(lifetimeTimer.usecase == .maxLifetime)
+
+        let lifetimeToken = MockTimerCancellationToken(lifetimeTimer)
+        #expect(state.timerScheduled(lifetimeTimer, cancelContinuation: lifetimeToken) == nil)
+
+        // Connection is idle, we get a close from outside
+        let closedAction = state.closed()
+
+        #expect(Set(closedAction.cancelTimers) == [lifetimeToken])
     }
 }
