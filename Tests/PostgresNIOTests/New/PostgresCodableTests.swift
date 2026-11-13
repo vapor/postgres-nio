@@ -1,10 +1,10 @@
-import XCTest
+import Testing
 @testable import PostgresNIO
 import NIOCore
 
-final class PostgresCodableTests: XCTestCase {
-
-    func testDecodeAnOptionalFromARow() {
+@Suite
+struct PostgresCodableTests {
+    @Test func decodeAnOptionalFromARow() throws {
         let row = PostgresRow(
             data: .makeTestDataRow(nil, ByteBuffer(string: "Hello world!")),
             lookupTable: ["id": 0, "name": 1],
@@ -30,13 +30,12 @@ final class PostgresCodableTests: XCTestCase {
             ]
         )
 
-        var result: (String?, String?)
-        XCTAssertNoThrow(result = try row.decode((String?, String?).self, context: .default))
-        XCTAssertNil(result.0)
-        XCTAssertEqual(result.1, "Hello world!")
+        let result = try row.decode((String?, String?).self, context: .default)
+        #expect(result.0 == nil)
+        #expect(result.1 == "Hello world!")
     }
 
-    func testDecodeMissingValueError() {
+    @Test func decodeMissingValueError() {
         let row = PostgresRow(
             data: .makeTestDataRow(nil),
             lookupTable: ["name": 0],
@@ -53,13 +52,14 @@ final class PostgresCodableTests: XCTestCase {
             ]
         )
 
-        XCTAssertThrowsError(try row.decode(String.self, context: .default)) {
-            XCTAssertEqual(($0 as? PostgresDecodingError)?.line, #line - 1)
-            XCTAssertEqual(($0 as? PostgresDecodingError)?.file, #fileID)
-
-            XCTAssertEqual(($0 as? PostgresDecodingError)?.code, .missingData)
-            XCTAssert(($0 as? PostgresDecodingError)?.targetType == String.self)
-            XCTAssertEqual(($0 as? PostgresDecodingError)?.postgresType, .text)
+        let error = #expect(throws: PostgresDecodingError.self) {
+            try row.decode(String.self, context: .default)
         }
+        #expect(error?.line == #line - 3)
+        #expect(error?.file == #fileID)
+
+        #expect(error?.code == .missingData)
+        #expect(error?.targetType == String.self)
+        #expect(error?.postgresType == .text)
     }
 }
