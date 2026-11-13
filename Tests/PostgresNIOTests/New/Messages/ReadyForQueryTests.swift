@@ -1,11 +1,11 @@
-import XCTest
+import Testing
 import NIOCore
 import NIOTestUtils
 @testable import PostgresNIO
 
-class ReadyForQueryTests: XCTestCase {
-
-    func testDecode() {
+@Suite
+struct ReadyForQueryTests {
+    @Test func decode() {
         var buffer = ByteBuffer()
         
         let states: [PostgresBackendMessage.TransactionState] = [
@@ -13,8 +13,8 @@ class ReadyForQueryTests: XCTestCase {
             .inFailedTransaction,
             .inTransaction,
         ]
-        
-        states.forEach { state in
+
+        for state in states {
             buffer.writeBackendMessage(id: .readyForQuery) { buffer in
                 switch state {
                 case .idle:
@@ -31,13 +31,15 @@ class ReadyForQueryTests: XCTestCase {
             .readyForQuery(state)
         }
         
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }))
-
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, expected)],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
+            )
+        }
     }
     
-    func testDecodeInvalidLength() {
+    @Test func decodeInvalidLength() {
         var buffer = ByteBuffer()
         
         buffer.writeBackendMessage(id: .readyForQuery) { buffer in
@@ -45,30 +47,32 @@ class ReadyForQueryTests: XCTestCase {
             buffer.writeInteger(UInt8(ascii: "I"))
         }
         
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PostgresMessageDecodingError)
+        #expect(throws: PostgresMessageDecodingError.self) { 
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
+            )
         }
     }
     
-    func testDecodeUnexpectedAscii() {
+    @Test func decodeUnexpectedAscii() {
         var buffer = ByteBuffer()
         
         buffer.writeBackendMessage(id: .readyForQuery) { buffer in
             buffer.writeInteger(UInt8(ascii: "F"))
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PostgresMessageDecodingError)
+
+        #expect(throws: PostgresMessageDecodingError.self) { 
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
+            )
         }
     }
     
-    func testDebugDescription() {
-        XCTAssertEqual(String(reflecting: PostgresBackendMessage.TransactionState.idle), ".idle")
-        XCTAssertEqual(String(reflecting: PostgresBackendMessage.TransactionState.inTransaction), ".inTransaction")
-        XCTAssertEqual(String(reflecting: PostgresBackendMessage.TransactionState.inFailedTransaction), ".inFailedTransaction")
+    @Test func debugDescription() {
+        #expect(String(reflecting: PostgresBackendMessage.TransactionState.idle) == ".idle")
+        #expect(String(reflecting: PostgresBackendMessage.TransactionState.inTransaction) == ".inTransaction")
+        #expect(String(reflecting: PostgresBackendMessage.TransactionState.inFailedTransaction) == ".inFailedTransaction")
     }
 }
