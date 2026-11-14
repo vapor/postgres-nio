@@ -395,7 +395,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                 promise: promise
             )
 
-            connection.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+            connection.writeTask(HandlerTask.extendedQuery(context), failing: promise)
 
             promise.futureResult.whenFailure { _ in
                 lease.release()
@@ -494,7 +494,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
                 logger: logger,
                 promise: promise
             ))
-            connection.channel.write(task, promise: nil)
+            connection.writeTask(task, failing: promise)
 
             promise.futureResult.whenFailure { _ in
                 lease.release()

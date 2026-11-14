@@ -1,3 +1,4 @@
+import Atomics
 import NIOCore
 import NIOPosix
 import NIOEmbedded
@@ -9,6 +10,294 @@ import Synchronization
 @Suite struct PostgresConnectionTests {
 
     let logger = Logger(label: "PostgresConnectionTests")
+
+    @Test(.timeLimit(.minutes(1)))
+    func testAsyncQueryOnClosedConnectionFailsInsteadOfHanging() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            do { try await connection.close() }
+            catch {
+                Issue.record("Could not close the test connection")
+                return
+            }
+            #expect(!channel.isActive)
+            do {
+                _ = try await connection.query("SELECT 1", logger: self.logger)
+                Issue.record("Expected closed connection failure")
+            } catch let error as PSQLError {
+                #expect(error.code == .clientClosedConnection)
+                #expect(error.underlying as? ChannelError == .ioOnClosedChannel)
+            } catch {
+                Issue.record("Expected a PostgreSQL connection error")
+            }
+        }
+    }
+
+    enum ClosedFutureOperation: CaseIterable, Equatable, Sendable {
+        case collect, rows, sendQuery, sendQueryAll, prepare, execute, closeStatement, closePortal
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: ClosedFutureOperation.allCases)
+    func testFutureOperationOnClosedConnectionFailsInsteadOfHanging(_ operation: ClosedFutureOperation) async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            do {
+                try await connection.close()
+                #expect(!channel.isActive)
+                let future: EventLoopFuture<Void>
+                switch operation {
+                case .collect:
+                    let query: EventLoopFuture<PostgresQueryResult> = connection.query("SELECT 1", logger: self.logger)
+                    future = query.map { _ in }
+                case .rows:
+                    future = connection.query("SELECT 1", logger: self.logger) { _ in
+                        Issue.record("Closed query delivered a row")
+                    }.map { _ in }
+                case .sendQuery:
+                    future = connection.send(PostgresCommands.query("SELECT 1", onRow: { _ in
+                        Issue.record("Closed request delivered a row")
+                    }), logger: self.logger)
+                case .sendQueryAll:
+                    future = connection.send(PostgresCommands.queryAll("SELECT 1", onResult: { _ in
+                        Issue.record("Closed request delivered a result")
+                    }), logger: self.logger)
+                case .prepare:
+                    future = connection.prepareStatement("SELECT 1", with: "closed", logger: self.logger).map { _ in }
+                case .execute:
+                    future = connection.execute(.init(name: "closed", binds: .init(), rowDescription: nil), logger: self.logger).map { _ in }
+                case .closeStatement:
+                    future = connection.close(.preparedStatement("closed"), logger: self.logger)
+                case .closePortal:
+                    future = connection.close(.portal("closed"), logger: self.logger)
+                }
+                do {
+                    try await future.get()
+                    Issue.record("Expected the closed operation to fail")
+                } catch let error as PSQLError {
+                    #expect(operation != .sendQuery && operation != .sendQueryAll)
+                    #expect(error.code == .clientClosedConnection)
+                    #expect(error.underlying as? ChannelError == .ioOnClosedChannel)
+                } catch PostgresError.connectionClosed {
+                    #expect(operation == .sendQuery || operation == .sendQueryAll)
+                } catch {
+                    Issue.record("Expected a PostgreSQL closed connection error")
+                }
+            } catch {
+                Issue.record("Could not close the test connection")
+            }
+        }
+    }
+
+    struct ClosedPreparedCommand: PostgresPreparedStatement {
+        static let sql = "SELECT 1"
+        typealias Row = ()
+        func makeBindings() -> PostgresBindings { .init() }
+        func decodeRow(_ row: PostgresRow) -> () { () }
+    }
+
+    private func assertClosedAsyncFailure(_ operation: (PostgresConnection) async throws -> Void) async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            do {
+                try await connection.close()
+                #expect(!channel.isActive)
+                do {
+                    try await operation(connection)
+                    Issue.record("Expected the closed async operation to fail")
+                } catch let error as PSQLError {
+                    #expect(error.code == .clientClosedConnection)
+                    #expect(error.underlying as? ChannelError == .ioOnClosedChannel)
+                } catch {
+                    Issue.record("Expected a PostgreSQL closed connection error")
+                }
+            } catch {
+                Issue.record("Could not close the test connection")
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testAsyncPreparedRowsOnClosedConnectionFailsInsteadOfHanging() async throws {
+        try await self.assertClosedAsyncFailure { connection in
+            let rows = try await connection.execute(TestPrepareStatement(state: "active"), logger: self.logger)
+            for try await _ in rows { Issue.record("Closed statement delivered a row") }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testAsyncPreparedCommandOnClosedConnectionFailsInsteadOfHanging() async throws {
+        try await self.assertClosedAsyncFailure { connection in
+            let _: String = try await connection.execute(ClosedPreparedCommand(), logger: self.logger)
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testScopedQueryOnClosedConnectionFailsInsteadOfHanging() async throws {
+        try await self.assertClosedAsyncFailure { connection in
+            let _: Int = try await connection.query("SELECT 1", logger: self.logger) { (_: PostgresRowSequence) async throws -> Int in
+                Issue.record("Closed scoped query invoked its body")
+                return 0
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testScopedQueryWithMetadataOnClosedConnectionFailsInsteadOfHanging() async throws {
+        try await self.assertClosedAsyncFailure { connection in
+            let _: (result: Int, metadata: PostgresQueryMetadata) = try await connection.query("SELECT 1", logger: self.logger) { (_: PostgresRowSequence) async throws -> Int in
+                Issue.record("Closed scoped query invoked its metadata body")
+                return 0
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testAcceptedQueryCompletesWritePromiseBeforeQueryResponse() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            let queryPromise = channel.eventLoop.makePromise(of: PSQLRowStream.self)
+            let writePromise = channel.eventLoop.makePromise(of: Void.self)
+            let completed = ManagedAtomic(false)
+            queryPromise.futureResult.whenComplete { _ in completed.store(true, ordering: .relaxed) }
+            let context = ExtendedQueryContext(query: "SELECT 1", logger: self.logger, promise: queryPromise)
+            channel.write(HandlerTask.extendedQuery(context), promise: writePromise)
+            do {
+                try await writePromise.futureResult.get()
+                let queryIsPending = !completed.load(ordering: .relaxed)
+                #expect(queryIsPending)
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                try await channel.writeInbound(PostgresBackendMessage.noData)
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 0"))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+                let stream = try await queryPromise.futureResult.get()
+                let rows = try await stream.all().get()
+                #expect(rows.isEmpty)
+            } catch {
+                Issue.record("Accepted query did not finish its independent promises")
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testAcceptedCloseReceiptDoesNotCompleteTheCloseResult() async throws {
+        try await self.withAsyncTestingChannel { _, channel in
+            do {
+                let result = channel.eventLoop.makePromise(of: Void.self)
+                let receipt = channel.eventLoop.makePromise(of: Void.self)
+                let completed = ManagedAtomic(false)
+                result.futureResult.whenComplete { _ in completed.store(true, ordering: .relaxed) }
+                let context = CloseCommandContext(target: .preparedStatement("receipt"), logger: self.logger, promise: result)
+                channel.write(HandlerTask.closeCommand(context), promise: receipt)
+                try await receipt.futureResult.get()
+                let resultIsPending = !completed.load(ordering: .relaxed)
+                #expect(resultIsPending)
+                let closeMessage = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+                let syncMessage = try await channel.waitForOutboundWrite(as: PostgresFrontendMessage.self)
+                #expect(closeMessage == .close(.preparedStatement("receipt")))
+                #expect(syncMessage == .sync)
+                try await channel.writeInbound(PostgresBackendMessage.closeComplete)
+                try await result.futureResult.get()
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+            } catch {
+                Issue.record("Close acceptance and server result did not finish independently")
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testPreparedReceiptsCompleteWhilePreparationWaitsAndAfterCachedFailure() async throws {
+        try await self.withAsyncTestingChannel { _, channel in
+            do {
+                let first = channel.eventLoop.makePromise(of: PSQLRowStream.self)
+                let waiting = channel.eventLoop.makePromise(of: PSQLRowStream.self)
+                let firstReceipt = channel.eventLoop.makePromise(of: Void.self)
+                let waitingReceipt = channel.eventLoop.makePromise(of: Void.self)
+                let completions = ManagedAtomic(0)
+                first.futureResult.whenComplete { _ in _ = completions.wrappingIncrementThenLoad(ordering: .relaxed) }
+                waiting.futureResult.whenComplete { _ in _ = completions.wrappingIncrementThenLoad(ordering: .relaxed) }
+                func task(_ result: EventLoopPromise<PSQLRowStream>) -> HandlerTask {
+                    .executePreparedStatement(.init(name: "receipt", sql: "SELECT 1", bindings: .init(),
+                        bindingDataTypes: [], logger: self.logger, promise: result))
+                }
+                channel.write(task(first), promise: firstReceipt)
+                channel.write(task(waiting), promise: waitingReceipt)
+                try await firstReceipt.futureResult.get()
+                try await waitingReceipt.futureResult.get()
+                let completionCount = completions.load(ordering: .relaxed)
+                #expect(completionCount == 0)
+                _ = try await channel.waitForPrepareRequest()
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [.sqlState: "26000"])))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                for result in [first, waiting] {
+                    do {
+                        _ = try await result.futureResult.get()
+                        Issue.record("Preparation should have failed")
+                    } catch let error as PSQLError {
+                        #expect(error.serverInfo?[.sqlState] == "26000")
+                    } catch {
+                        Issue.record("Expected the preparation error")
+                    }
+                }
+                let cached = channel.eventLoop.makePromise(of: PSQLRowStream.self)
+                let cachedReceipt = channel.eventLoop.makePromise(of: Void.self)
+                channel.write(task(cached), promise: cachedReceipt)
+                try await cachedReceipt.futureResult.get()
+                do {
+                    _ = try await cached.futureResult.get()
+                    Issue.record("Cached preparation should have failed")
+                } catch let error as PSQLError {
+                    #expect(error.serverInfo?[.sqlState] == "26000")
+                } catch {
+                    Issue.record("Expected the cached preparation error")
+                }
+            } catch {
+                Issue.record("Prepared statement acceptance lost its independent result")
+            }
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func testCachedPreparedExecutionReceiptKeepsItsResultPending() async throws {
+        try await self.withAsyncTestingChannel { _, channel in
+            do {
+                func task(_ result: EventLoopPromise<PSQLRowStream>) -> HandlerTask {
+                    .executePreparedStatement(.init(name: "cached-receipt", sql: "SELECT 1 WHERE false", bindings: .init(),
+                        bindingDataTypes: [], logger: self.logger, promise: result))
+                }
+                let first = channel.eventLoop.makePromise(of: PSQLRowStream.self)
+                let firstReceipt = channel.eventLoop.makePromise(of: Void.self)
+                channel.write(task(first), promise: firstReceipt)
+                try await firstReceipt.futureResult.get()
+                _ = try await channel.waitForPrepareRequest()
+                try await channel.sendPrepareResponse(parameterDescription: .init(dataTypes: []), rowDescription: .init(columns: [
+                    .init(name: "value", tableOID: 0, columnAttributeNumber: 0, dataType: .int4,
+                        dataTypeSize: 4, dataTypeModifier: -1, format: .binary)
+                ]))
+                _ = try await channel.waitForPreparedRequest()
+                try await channel.sendPreparedResponse(dataRows: [], commandTag: "SELECT 0")
+                let firstStream = try await first.futureResult.get()
+                let firstRows = try await firstStream.all().get()
+                #expect(firstRows.isEmpty)
+
+                let cached = channel.eventLoop.makePromise(of: PSQLRowStream.self)
+                let receipt = channel.eventLoop.makePromise(of: Void.self)
+                let completed = ManagedAtomic(false)
+                cached.futureResult.whenComplete { _ in completed.store(true, ordering: .relaxed) }
+                channel.write(task(cached), promise: receipt)
+                try await receipt.futureResult.get()
+                let resultIsPending = !completed.load(ordering: .relaxed)
+                #expect(resultIsPending)
+                _ = try await channel.waitForPreparedRequest()
+                try await channel.sendPreparedResponse(dataRows: [], commandTag: "SELECT 0")
+                let stream = try await cached.futureResult.get()
+                let rows = try await stream.all().get()
+                #expect(rows.isEmpty)
+            } catch {
+                Issue.record("Cached execution acceptance did not preserve its separate result")
+            }
+        }
+    }
 
     @Test func testConnectionFailure() {
         // We start a local server and close it immediately to ensure that the port
