@@ -868,6 +868,46 @@ extension PostgresClientTests {
         }
     }
 
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func executeThrowsWhenBodyDoesNotConsumeToTheEnd() async throws {
+        struct Series: PostgresPreparedStatement {
+            static let sql = "SELECT generate_series(1, $1)"
+            var upTo: Int
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.upTo)
+                return bindings
+            }
+            func decodeRow(_ row: PostgresRow) throws -> Int {
+                try row.decode(Int.self)
+            }
+        }
+
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            do {
+                (_, _) = try await client.execute(Series(upTo: 1_000_000), logger: logger) { rows -> Int? in
+                    for try await value in rows {
+                        return value
+                    }
+                    return nil
+                }
+                Issue.record("Expected execute to throw")
+            } catch let error as PSQLError {
+                #expect(error.code == .rowSequenceNotFullyConsumed)
+                #expect(error.query?.sql == Series.sql)
+                #expect(error.file == #fileID)
+            }
+
+            let (sum, metadata) = try await client.execute(Series(upTo: 3), logger: logger) { rows in
+                var sum = 0
+                for try await value in rows { sum += value }
+                return sum
+            }
+            #expect(sum == 6)
+            #expect(metadata.rows == 3)
+        }
+    }
+
     // MARK: Helpers
 
     private func withClient(
