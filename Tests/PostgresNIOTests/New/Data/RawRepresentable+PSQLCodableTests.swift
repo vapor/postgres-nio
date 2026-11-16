@@ -28,19 +28,17 @@ struct RawRepresentable_PSQLCodableTests {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int16(4)) // out of bounds
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 
     @Test func decodeInvalidUnderlyingTypeValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(1)) // out of bounds
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.failure) {
             try MyRawRepresentable(from: &buffer, type: Int32.psqlType, format: .binary, context: .default)
         }
-        #expect(error == .failure)
     }
 }
