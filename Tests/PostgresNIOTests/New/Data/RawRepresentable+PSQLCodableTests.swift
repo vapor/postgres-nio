@@ -10,7 +10,7 @@ struct RawRepresentable_PSQLCodableTests {
         case production = 3
     }
 
-    @Test func testRoundTrip() throws {
+    @Test func roundTrip() throws {
         let values: [MyRawRepresentable] = [.testing, .staging, .production]
 
         for value in values {
@@ -24,7 +24,7 @@ struct RawRepresentable_PSQLCodableTests {
         }
     }
 
-    @Test func testDecodeInvalidRawTypeValue() {
+    @Test func decodeInvalidRawTypeValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int16(4)) // out of bounds
 
@@ -34,7 +34,7 @@ struct RawRepresentable_PSQLCodableTests {
         #expect(error == .failure)
     }
 
-    @Test func testDecodeInvalidUnderlyingTypeValue() {
+    @Test func decodeInvalidUnderlyingTypeValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(1)) // out of bounds
 
@@ -43,5 +43,4 @@ struct RawRepresentable_PSQLCodableTests {
         }
         #expect(error == .failure)
     }
-
 }
