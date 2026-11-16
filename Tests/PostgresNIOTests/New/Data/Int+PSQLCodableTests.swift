@@ -1,6 +1,5 @@
-import XCTest
-@testable import PostgresNIO
+import Testing
+import PostgresNIO
 
-class Int_PSQLCodableTests: XCTestCase {
-    
-}
+@Suite
+struct Int_PSQLCodableTests {}

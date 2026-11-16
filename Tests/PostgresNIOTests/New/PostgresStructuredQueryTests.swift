@@ -302,6 +302,96 @@ import Logging
         }
     }
 
+    @Test func executeBodyReceivesDecodedRows() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    let names = try await connection.execute(PostgresConnectionTests.TestPrepareStatement(state: "active"), logger: .psqlTest) { rows in
+                        var names = [String]()
+                        for try await name in rows {
+                            names.append(name)
+                        }
+                        return names
+                    }
+                    #expect(names == ["alice"])
+                }
+
+                let prepareRequest = try await channel.waitForPrepareRequest()
+                #expect(prepareRequest.parse.query == PostgresConnectionTests.TestPrepareStatement.sql)
+                try await channel.sendPrepareResponse(parameterDescription: .init(dataTypes: [.text]), rowDescription: .init(columns: [.textColumn(named: "datname")]))
+
+                _ = try await channel.waitForPreparedRequest()
+                try await channel.sendPreparedResponse(dataRows: [["alice"]], commandTag: "SELECT 1")
+
+                try await taskGroup.waitForAll()
+            }
+
+            try await self.runSimpleSelect(on: connection, channel: channel)
+        }
+    }
+
+    @Test func executeReturnsMetadataAlongsideBodyResult() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask {
+                    let (names, metadata) = try await connection.execute(PostgresConnectionTests.TestPrepareStatement(state: "active"), logger: .psqlTest) { rows in
+                        var names = [String]()
+                        for try await name in rows {
+                            names.append(name)
+                        }
+                        return names
+                    }
+                    #expect(names == ["alice"])
+                    #expect(metadata.command == "SELECT")
+                    #expect(metadata.rows == 1)
+                }
+
+                _ = try await channel.waitForPrepareRequest()
+                try await channel.sendPrepareResponse(parameterDescription: .init(dataTypes: [.text]), rowDescription: .init(columns: [.textColumn(named: "datname")]))
+
+                _ = try await channel.waitForPreparedRequest()
+                try await channel.sendPreparedResponse(dataRows: [["alice"]], commandTag: "SELECT 1")
+
+                try await taskGroup.waitForAll()
+            }
+        }
+    }
+
+    @Test func executedStatementEscapingTheScopeCannotBeConsumed() async throws {
+        let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+            try await PostgresStructuredQueryTests().withAsyncTestingChannel { connection, channel in
+                try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+                    let scopeExited = Signal()
+
+                    taskGroup.addTask {
+                        let escaped = try await connection.execute(PostgresConnectionTests.TestPrepareStatement(state: "active"), logger: .psqlTest) { rows in
+                            rows
+                        }
+                        scopeExited.signal()
+
+                        for try await name in escaped {
+                            Issue.record("Escaped consumer received row \(name)")
+                        }
+                    }
+
+                    _ = try await channel.waitForPrepareRequest()
+                    try await channel.sendPrepareResponse(parameterDescription: .init(dataTypes: [.text]), rowDescription: .init(columns: [.textColumn(named: "datname")]))
+
+                    _ = try await channel.waitForPreparedRequest()
+                    try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                    try await channel.testingEventLoop.executeInContext { channel.read() }
+                    // This waits for the scope signal, so after this we're out of scope and can return remaining rows.
+                    await scopeExited.wait()
+                    try await channel.sendUnpreparedQueryEnd(dataRows: [["alice"], ["bob"]], commandTag: "SELECT 2")
+
+                    try await taskGroup.waitForAll()
+                }
+            }
+        }
+        let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
+        #expect(stderr.contains("A PostgresRowSequence was consumed after the closure"))
+    }
+
     // MARK: - Helpers
 
     /// Runs a `SELECT 1` through the structured API and asserts it round-trips. Used to prove that
