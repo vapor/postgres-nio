@@ -1,46 +1,44 @@
-import XCTest
+import Testing
 import NIOCore
 @testable import PostgresNIO
 
-class RawRepresentable_PSQLCodableTests: XCTestCase {
-
+@Suite
+struct RawRepresentable_PSQLCodableTests {
     enum MyRawRepresentable: Int16, PostgresCodable {
         case testing = 1
         case staging = 2
         case production = 3
     }
 
-    func testRoundTrip() {
+    @Test func roundTrip() throws {
         let values: [MyRawRepresentable] = [.testing, .staging, .production]
 
         for value in values {
             var buffer = ByteBuffer()
-            XCTAssertNoThrow(try value.encode(into: &buffer, context: .default))
-            XCTAssertEqual(MyRawRepresentable.psqlType, Int16.psqlType)
-            XCTAssertEqual(buffer.readableBytes, 2)
+            try value.encode(into: &buffer, context: .default)
+            #expect(MyRawRepresentable.psqlType == Int16.psqlType)
+            #expect(buffer.readableBytes == 2)
 
-            var result: MyRawRepresentable?
-            XCTAssertNoThrow(result = try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default))
-            XCTAssertEqual(value, result)
+            let result = try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default)
+            #expect(value == result)
         }
     }
 
-    func testDecodeInvalidRawTypeValue() {
+    @Test func decodeInvalidRawTypeValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int16(4)) // out of bounds
 
-        XCTAssertThrowsError(try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try MyRawRepresentable(from: &buffer, type: Int16.psqlType, format: .binary, context: .default)
         }
     }
 
-    func testDecodeInvalidUnderlyingTypeValue() {
+    @Test func decodeInvalidUnderlyingTypeValue() {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int32(1)) // out of bounds
 
-        XCTAssertThrowsError(try MyRawRepresentable(from: &buffer, type: Int32.psqlType, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try MyRawRepresentable(from: &buffer, type: Int32.psqlType, format: .binary, context: .default)
         }
     }
-
 }
