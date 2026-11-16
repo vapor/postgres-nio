@@ -184,10 +184,21 @@ struct TinyFastSequence<Element>: Sequence {
     }
 }
 
-extension TinyFastSequence: Equatable where Element: Equatable {}
+extension TinyFastSequence: Equatable where Element: Equatable {
+    @inlinable
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.count == rhs.count && lhs.elementsEqual(rhs)
+    }
+}
 extension TinyFastSequence.Base: Equatable where Element: Equatable {}
 
-extension TinyFastSequence: Hashable where Element: Hashable {}
+extension TinyFastSequence: Hashable where Element: Hashable {
+    @inlinable
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(self.count)
+        for element in self { hasher.combine(element) }
+    }
+}
 extension TinyFastSequence.Base: Hashable where Element: Hashable {}
 
 extension TinyFastSequence: Sendable where Element: Sendable {}
