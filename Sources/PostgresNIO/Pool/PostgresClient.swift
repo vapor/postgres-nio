@@ -425,9 +425,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Run a query on the Postgres server the client is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -436,6 +435,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
     /// - Returns: The result of the `body` closure.
+    @inlinable
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
@@ -453,9 +453,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Run a query on the Postgres server the client is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -465,6 +464,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - body: The closure that's used to consume the query result.
     /// - Returns: The result of the `body` closure and the query metadata.
     @_disfavoredOverload
+    @inlinable
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
@@ -555,7 +555,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     // MARK: - Private Methods -
 
-    private func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
+    @usableFromInline
+    func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
         if !self.runningAtomic.load(ordering: .relaxed) {
             self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }
@@ -569,6 +570,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         PostgresConnection.defaultEventLoopGroup
     }
 
+    @usableFromInline
     static let loggingDisabled = Logger(label: "Postgres-do-not-log", factory: { _ in SwiftLogNoOpLogHandler() })
 }
 

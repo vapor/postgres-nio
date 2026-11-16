@@ -1081,7 +1081,7 @@ extension ConnectionStateMachine {
              .uncleanShutdown,
              .unlistenFailed:
             return true
-        case .queryCancelled, .notEnoughColumns, .rowSequenceUsedOutsideScope, .rowSequenceNotFullyConsumed:
+        case .queryCancelled, .notEnoughColumns, .rowSequenceNotFullyConsumed:
             return false
         case .server, .listenFailed:
             guard error.serverInfo?[.sqlState] != nil else {

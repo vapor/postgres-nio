@@ -426,25 +426,18 @@ extension PostgresClientTests {
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func structuredQueryEscapedSequenceIsInvalidated() async throws {
-        try await self.withClient(maximumConnections: 1) { client, logger in
-            let escaped = try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { (rows: PostgresRowSequence) in
-                rows
-            }
+    @Test func structuredQueryEscapedSequenceTrapsWhenConsumed() async throws {
+        let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+            try await PostgresClientTests().withClient(maximumConnections: 1) { client, logger in
+                let escaped = try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { (rows: PostgresRowSequence) in
+                    rows
+                }
 
-            var rowsSeen = 0
-            do {
-                for try await _ in escaped { rowsSeen += 1 }
-                Issue.record("Expected escaped sequence to throw")
-            } catch let error as PSQLError {
-                #expect(error.code == .rowSequenceUsedOutsideScope)
-            }
-            #expect(rowsSeen < 1_000_000, "Escaped sequence must not deliver the whole result")
-
-            try await client.query("SELECT 1", logger: logger) { rows in
-                for try await _ in rows {}
+                for try await _ in escaped {}
             }
         }
+        let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
+        #expect(stderr.contains("A PostgresRowSequence was consumed after the closure"))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
