@@ -884,7 +884,7 @@ extension PostgresConnection {
 
         do {
             return try await promise.futureResult.map { $0.asyncSequence() }.get()
-        }  catch var error as PSQLError {
+        } catch var error as PSQLError {
             error.file = file
             error.line = line
             error.query = query
