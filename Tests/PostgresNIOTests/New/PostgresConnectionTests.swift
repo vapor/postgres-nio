@@ -1173,6 +1173,77 @@ import Synchronization
         }
     }
 
+    @Test func testDataTypeIsOnlyLookedUpOncePerConnection() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup in
+                let ltree = PostgresLTree("a.b")
+                for _ in 1...2 {
+                    taskGroup.addTask {
+                        _ = try await connection.query("SELECT \(ltree)", logger: logger)
+                    }
+                }
+
+                var lookups = 0
+                var queries = 0
+                while queries < 2 {
+                    let request = try await channel.waitForUnpreparedRequest()
+                    if request.parse.query.contains("pg_type") {
+                        lookups += 1
+                    } else {
+                        // the type wasn't found, so `psqlType` is used
+                        #expect(request.parse.parameters == [.null])
+                        queries += 1
+                    }
+                    // no rows for the lookup, so the type doesn't exist
+                    try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 0"))
+                    try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+                }
+                #expect(lookups == 1)
+
+                try await taskGroup.waitForAll()
+            }
+        }
+    }
+
+    @Test func testDataTypeIsLookedUpAgainAfterLookupFailed() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { [logger] taskGroup in
+                let ltree = PostgresLTree("a.b")
+                taskGroup.addTask {
+                    _ = try await connection.query("SELECT \(ltree)", logger: logger)
+                    _ = try await connection.query("SELECT \(ltree)", logger: logger)
+                }
+
+                // the first lookup fails, e.g. because it ran inside an aborted transaction
+                let failedLookup = try await channel.waitForUnpreparedRequest()
+                #expect(failedLookup.parse.query.contains("pg_type"))
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                    .sqlState : "25P02" // in_failed_sql_transaction
+                ])))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                var lookups = 0
+                var queries = 0
+                while queries < 2 {
+                    let request = try await channel.waitForUnpreparedRequest()
+                    if request.parse.query.contains("pg_type") {
+                        lookups += 1
+                    } else {
+                        queries += 1
+                    }
+                    try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                    try await channel.writeInbound(PostgresBackendMessage.commandComplete("SELECT 0"))
+                    try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+                }
+                // the second query looked the type up again
+                #expect(lookups == 1)
+
+                try await taskGroup.waitForAll()
+            }
+        }
+    }
+
     func withAsyncTestingChannel(_ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
         let channel = try await NIOAsyncTestingChannel(loop: eventLoop) { channel in
