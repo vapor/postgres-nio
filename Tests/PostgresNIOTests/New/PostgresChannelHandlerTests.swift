@@ -31,10 +31,7 @@ struct PostgresChannelHandlerTests {
         }
 
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
-        var maybeMessage: PostgresFrontendMessage?
-        #expect(throws: Never.self) {
-            maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
-        }
+        let maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
         guard case .startup(let startup) = maybeMessage else {
             Issue.record("Unexpected message")
             return
@@ -77,10 +74,7 @@ struct PostgresChannelHandlerTests {
         embedded.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: ""))
         
         // startup message should be issued
-        var maybeStartupMessage: PostgresFrontendMessage?
-        #expect(throws: Never.self) {
-            maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
-        }
+        let maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
         guard case .startup(let startupMessage) = maybeStartupMessage else {
             Issue.record("Unexpected message")
             return
@@ -232,10 +226,7 @@ struct PostgresChannelHandlerTests {
         ], loop: self.eventLoop)
 
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
-        var maybeMessage: PostgresFrontendMessage?
-        #expect(throws: Never.self) {
-            maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
-        }
+        let maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
         guard case .startup(let startup) = maybeMessage else {
             Issue.record("Unexpected message")
             return
@@ -259,7 +250,9 @@ struct PostgresChannelHandlerTests {
         buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
         buffer.writeMultipleIntegers(UInt8(ascii: "Z"), UInt32(5), UInt8(ascii: "I"))
 
-        #expect(throws: (any Error).self) { try embedded.writeInbound(buffer) }
+        let error = #expect(throws: PSQLError.self) { try embedded.writeInbound(buffer) }
+        #expect(error?.code == .unexpectedBackendMessage)
+        #expect(error?.backendMessage == .readyForQuery(.idle))
         #expect(!embedded.isActive)
     }
 
