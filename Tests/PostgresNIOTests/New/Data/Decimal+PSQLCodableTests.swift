@@ -9,7 +9,7 @@ import NIOCore
 #endif
 
 @Suite
-class Decimal_PSQLCodableTests {
+struct Decimal_PSQLCodableTests {
     @Test func roundTrip() throws {
         let values: [Decimal] = [1.1, .pi, -5e-12, 0.00000080216390553684]
 
@@ -27,10 +27,9 @@ class Decimal_PSQLCodableTests {
         var buffer = ByteBuffer()
         buffer.writeInteger(Int64(0))
 
-        let error = #expect(throws: PostgresDecodingError.Code.self) {
+        #expect(throws: PostgresDecodingError.Code.typeMismatch) {
             try Decimal(from: &buffer, type: .int8, format: .binary, context: .default)
         }
-        #expect(error == .typeMismatch)
     }
 
 }
