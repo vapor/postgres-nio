@@ -31,7 +31,10 @@ struct PostgresChannelHandlerTests {
         }
 
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
-        let maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
+        var maybeMessage: PostgresFrontendMessage?
+        #expect(throws: Never.self) {
+            maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
+        }
         guard case .startup(let startup) = maybeMessage else {
             Issue.record("Unexpected message")
             return
@@ -74,7 +77,10 @@ struct PostgresChannelHandlerTests {
         embedded.pipeline.fireUserInboundEventTriggered(TLSUserEvent.handshakeCompleted(negotiatedProtocol: ""))
         
         // startup message should be issued
-        let maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
+        var maybeStartupMessage: PostgresFrontendMessage?
+        #expect(throws: Never.self) {
+            maybeStartupMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
+        }
         guard case .startup(let startupMessage) = maybeStartupMessage else {
             Issue.record("Unexpected message")
             return
@@ -226,7 +232,10 @@ struct PostgresChannelHandlerTests {
         ], loop: self.eventLoop)
 
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
-        let maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
+        var maybeMessage: PostgresFrontendMessage?
+        #expect(throws: Never.self) {
+            maybeMessage = try embedded.readOutbound(as: PostgresFrontendMessage.self)
+        }
         guard case .startup(let startup) = maybeMessage else {
             Issue.record("Unexpected message")
             return
