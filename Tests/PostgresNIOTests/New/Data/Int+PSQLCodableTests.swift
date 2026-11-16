@@ -1,5 +1,5 @@
 import Testing
-@testable import PostgresNIO
+import PostgresNIO
 
 @Suite
 struct Int_PSQLCodableTests {}
