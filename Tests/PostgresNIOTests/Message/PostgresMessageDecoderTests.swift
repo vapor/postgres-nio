@@ -1,11 +1,12 @@
 import PostgresNIO
-import XCTest
+import Testing
 import NIOTestUtils
 import NIOCore
 
-class PostgresMessageDecoderTests: XCTestCase {
+@Suite
+struct PostgresMessageDecoderTests {
     @available(*, deprecated, message: "Tests deprecated API")
-    func testMessageDecoder() {
+    @Test func testMessageDecoder() {
         let sample: [UInt8] = [
             0x52, // R - authentication
                 0x00, 0x00, 0x00, 0x0C, // length = 12
@@ -29,11 +30,11 @@ class PostgresMessageDecoderTests: XCTestCase {
                 0x01, 0x01, 0x01, 0x01,
             ])
         ]
-        XCTAssertNoThrow(try XCTUnwrap(ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(input, output)],
-            decoderFactory: {
-                PostgresMessageDecoder()
-            }
-        )))
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(input, output)],
+                decoderFactory: { PostgresMessageDecoder() }
+            )
+        }
     }
 }
