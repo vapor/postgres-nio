@@ -1545,6 +1545,75 @@ import Testing
             }
         }
     }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func testMaxConnectionLifetimeWaitsForLeasedConnection() async throws {
+        let factory = MockConnectionFactory<MockClock>()
+
+        var config = ConnectionPoolConfiguration()
+        config.minimumConnectionCount = 1
+        config.maximumConnectionLifetime = .seconds(10)
+
+        let clock = MockClock()
+
+        let pool = ConnectionPool(
+            configuration: config,
+            idGenerator: ConnectionIDGenerator(),
+            requestType: ConnectionRequest<MockConnection>.self,
+            keepAliveBehavior: MockPingPongBehavior(keepAliveFrequency: nil, connectionType: MockConnection.self),
+            observabilityDelegate: NoOpConnectionPoolMetrics(connectionIDType: MockConnection.ID.self),
+            clock: clock
+        ) {
+            try await factory.makeConnection(id: $0, for: $1)
+        }
+
+        await withTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask_ {
+                await pool.run()
+            }
+
+            // Wait for connection to be established
+            let createdConnection = await factory.nextConnectAttempt { _ in
+                return 1
+            }
+
+            do {
+                // Lease the connection
+                var connectionLease = try await pool.leaseConnection()
+                #expect(connectionLease.connection === createdConnection)
+
+                // Advance clock to simulate timer being triggered
+                let lifetimeDeadline = await clock.nextTimerScheduled()
+                clock.advance(to: lifetimeDeadline)
+
+                // Release the connection — pool should close it and create a replacement
+                connectionLease.release()
+
+                // The old connection is being closed by the pool; complete the close
+                try await createdConnection.signalToClose
+                createdConnection.closeIfClosing()
+
+                // Pool should create a replacement (minimumConnectionCount=1)
+                let replacementConnection = await factory.nextConnectAttempt { _ in
+                    return 1
+                }
+                #expect(replacementConnection.id != createdConnection.id)
+
+                // Verify pool still works with replacement
+                connectionLease = try await pool.leaseConnection()
+                #expect(connectionLease.connection === replacementConnection)
+                connectionLease.release()
+            } catch {
+                Issue.record("Unexpected error: \(error)")
+            }
+
+            // Shut down cleanly
+            taskGroup.cancelAll()
+            for connection in factory.runningConnections {
+                connection.closeIfClosing()
+            }
+        }
+    }
 }
 
 struct ConnectionFuture: ConnectionRequestProtocol {

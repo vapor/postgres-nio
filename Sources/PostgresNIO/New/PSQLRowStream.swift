@@ -1,3 +1,4 @@
+import Atomics
 import NIOCore
 import Logging
 
@@ -58,6 +59,7 @@ final class PSQLRowStream: Sendable {
     internal let rowDescription: [RowDescription.Column]
     private let lookupTable: [String: Int]
     private let downstreamStateBox: NIOLoopBoundBox<DownstreamState>
+    private let invalidation = ManagedAtomicLazyReference<InvalidatedError>()
 
     init(
         source: Source,
@@ -156,19 +158,37 @@ final class PSQLRowStream: Sendable {
             source.finish(error)
         }
 
-        return PostgresRowSequence(producer.sequence, lookupTable: self.lookupTable, columns: self.rowDescription)
+        return PostgresRowSequence(producer.sequence, stream: self, lookupTable: self.lookupTable, columns: self.rowDescription)
     }
 
-    /// Disallows further consumption of the stream by throwing an error on the next consumption attempt.
-    /// Currently this is only used to disallow consuming the stream used outside of the structured query API closure.
-    /// The buffer is drained before throwing, so if we have rows queued they will still be yielded before throwing the error.
-    func invalidate(error: any Error) {
+    /// Disallows further consumption of the stream and cancels the query if it is still running.
+    /// Currently this is only used once the structured query API closure returns. Consuming the stream afterwards
+    /// is a programmer error that triggers a precondition failure, see ``preconditionNotInvalidated()``.
+    func invalidate(file: String, line: Int) {
+        let error = self.invalidation.storeIfNilThenLoad(InvalidatedError(file: file, line: line))
         if self.eventLoop.inEventLoop {
             self.invalidate0(error: error)
         } else {
             self.eventLoop.execute {
                 self.invalidate0(error: error)
             }
+        }
+    }
+
+    /// Traps if the stream was invalidated.
+    func preconditionNotInvalidated() {
+        if let error = self.invalidation.load() {
+            preconditionFailure("A PostgresRowSequence was consumed after the closure of the query started at \(error.file):\(error.line) returned. The sequence must not escape the closure it was passed to.")
+        }
+    }
+
+    private final class InvalidatedError: Error, Sendable {
+        let file: String
+        let line: Int
+
+        init(file: String, line: Int) {
+            self.file = file
+            self.line = line
         }
     }
 

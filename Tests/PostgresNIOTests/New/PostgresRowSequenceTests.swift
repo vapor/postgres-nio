@@ -1,4 +1,5 @@
 import Atomics
+import NIOConcurrencyHelpers
 import NIOEmbedded
 import NIOPosix
 import Testing
@@ -727,6 +728,41 @@ import Logging
         #expect(rowSequence == nil, "Surpress warning")
         try await eventLoop.submit { }.get() // wait for the hop to complete
         #expect(dataSource.cancelCount == 1)
+    }
+
+    @Test func testIteratingAnInvalidatedStreamTrapsBeforeYieldingBufferedRows() async throws {
+        let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+            let dataSource = MockRowDataSource()
+            let eventLoop = NIOSingletons.posixEventLoopGroup.next()
+            let stream = try await eventLoop.submit {
+                PSQLRowStream(
+                    source: .stream(
+                        [
+                            .init(name: "test", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: 0, format: .binary)
+                        ],
+                        dataSource
+                    ),
+                    eventLoop: eventLoop,
+                    logger: .psqlTest
+                )
+            }.get()
+
+            let rowSequence = try await eventLoop.submit {
+                let rowSequence = stream.asyncSequence()
+                stream.receive([[ByteBuffer(integer: Int64(1))]])
+                return rowSequence
+            }.get()
+
+            // block the event loop, so the invalidation is not processed there before we iterate
+            let neverOpened = ConditionLock(value: false)
+            eventLoop.execute { neverOpened.lock(whenValue: true) }
+            stream.invalidate(file: "EscapeSite.swift", line: 42)
+
+            var iterator = rowSequence.makeAsyncIterator()
+            _ = try await iterator.next()
+        }
+        let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
+        #expect(stderr.contains("A PostgresRowSequence was consumed after the closure of the query started at EscapeSite.swift:42 returned."))
     }
 }
 

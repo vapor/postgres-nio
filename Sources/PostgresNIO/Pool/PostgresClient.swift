@@ -136,6 +136,15 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
+            /// The maximum amount of time a connection is kept open, measured from when it was established.
+            /// `nil` means connections are never closed because of their age. Defaults to `nil`.
+            ///
+            /// Once a connection reaches its lifetime, it is closed immediately if it is idle. If it is currently
+            /// leased, it no longer accepts new leases and is closed once it has been released. In-flight queries
+            /// are never interrupted. To avoid closing many connections at once, each connection's lifetime is
+            /// reduced by a random amount of up to 2.5%.
+            public var maximumConnectionLifetime: Duration? = nil
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -427,9 +436,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Run a query on the Postgres server the client is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -438,6 +446,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
     /// - Returns: The result of the `body` closure.
+    @inlinable
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
@@ -455,9 +464,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     /// Run a query on the Postgres server the client is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
@@ -467,6 +475,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     ///   - body: The closure that's used to consume the query result.
     /// - Returns: The result of the `body` closure and the query metadata.
     @_disfavoredOverload
+    @inlinable
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
@@ -480,6 +489,68 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         defer { lease.release() }
 
         return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows.
+    /// - Returns: The result of the `body` closure.
+    @inlinable
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> Result where Row == Statement.Row {
+        let logger = logger ?? Self.loggingDisabled
+        let lease = try await self.leaseConnection()
+
+        defer { lease.release() }
+
+        return try await lease.connection.execute(preparedStatement, logger: logger, file: file, line: line, body)
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary, and return the
+    /// statement's metadata alongside the `body` closure's result.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// The metadata is derived from the command tag the server sends after the last row, so `body` must
+    /// iterate the sequence to its end. If it returns early the statement is cancelled and the method throws
+    /// `PSQLError.rowSequenceNotFullyConsumed`.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows. Must consume the sequence to its end.
+    /// - Returns: The result of the `body` closure and the statement metadata.
+    @inlinable
+    @_disfavoredOverload
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger? = nil,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) where Row == Statement.Row {
+        let logger = logger ?? Self.loggingDisabled
+        let lease = try await self.leaseConnection()
+
+        defer { lease.release() }
+
+        return try await lease.connection.execute(preparedStatement, logger: logger, file: file, line: line, body)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary.
@@ -557,7 +628,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
     // MARK: - Private Methods -
 
-    private func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
+    @usableFromInline
+    func leaseConnection() async throws -> ConnectionLease<PostgresConnection> {
         if !self.runningAtomic.load(ordering: .relaxed) {
             self.backgroundLogger.warning("Trying to lease connection from `PostgresClient`, but `PostgresClient.run()` hasn't been called yet.")
         }
@@ -583,6 +655,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         PostgresConnection.defaultEventLoopGroup
     }
 
+    @usableFromInline
     static let loggingDisabled = Logger(label: "Postgres-do-not-log", factory: { _ in SwiftLogNoOpLogHandler() })
 }
 
@@ -613,6 +686,7 @@ extension ConnectionPoolConfiguration {
         self.maximumConnectionSoftLimit = config.options.maximumConnections
         self.maximumConnectionHardLimit = config.options.maximumConnections
         self.idleTimeout = config.options.connectionIdleTimeout
+        self.maximumConnectionLifetime = config.options.maximumConnectionLifetime
     }
 }
 

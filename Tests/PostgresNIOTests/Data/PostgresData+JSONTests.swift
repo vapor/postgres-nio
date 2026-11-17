@@ -1,21 +1,22 @@
 import PostgresNIO
-import XCTest
+import Testing
 
-class PostgresData_JSONTests: XCTestCase {
+@Suite
+struct PostgresData_JSONTests {
     @available(*, deprecated, message: "Testing deprecated functionality")
-    func testJSONBConvertible() {
+    @Test func jsonbConvertible() {
         struct Object: PostgresJSONBCodable {
             let foo: Int
             let bar: Int
         }
 
-        XCTAssertEqual(Object.postgresDataType, .jsonb)
+        #expect(Object.postgresDataType == .jsonb)
 
         let postgresData = Object(foo: 1, bar: 2).postgresData
-        XCTAssertEqual(postgresData?.type, .jsonb)
+        #expect(postgresData?.type == .jsonb)
 
         let object = Object(postgresData: postgresData!)
-        XCTAssertEqual(object?.foo, 1)
-        XCTAssertEqual(object?.bar, 2)
+        #expect(object?.foo == 1)
+        #expect(object?.bar == 2)
     }
 }
