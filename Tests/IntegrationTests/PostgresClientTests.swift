@@ -5,6 +5,7 @@ import NIOSSL
 import Logging
 import Atomics
 import Foundation
+import Metrics
 import MetricsTestKit
 
 @Suite(.serialized)
@@ -47,9 +48,10 @@ struct PostgresClientTests {
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func poolTimersAreRecorded() async throws {
         let metrics = TestMetrics()
-        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
-        clientConfig.options.metrics = .init(factory: metrics)
-        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton)
+        let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        let client = withMetricsFactory(metrics) {
+            PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton)
+        }
 
         try await withThrowingTaskGroup(of: Void.self) { taskGroup in
             taskGroup.addTask {

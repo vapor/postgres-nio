@@ -136,10 +136,6 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// keep alive query of `SELECT 1;` every `30` seconds.
             public var keepAliveBehavior: KeepAliveBehavior? = KeepAliveBehavior()
 
-            /// Configures the metrics recorded for the client's connection pool and its connections.
-            /// See ``PostgresMetricsConfiguration``.
-            public var metrics: PostgresMetricsConfiguration = .init()
-
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -290,7 +286,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
         let factory = ConnectionFactory(config: configuration, eventLoopGroup: eventLoopGroup, logger: backgroundLogger)
         let metrics = PostgresClientMetrics(
             logger: backgroundLogger,
-            configuration: configuration.options.metrics,
+            factory: MetricsSystem.factory,
             minimumConnections: configuration.options.minimumConnections,
             maximumConnections: configuration.options.maximumConnections
         )

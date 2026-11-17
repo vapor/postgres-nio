@@ -1,40 +1,24 @@
 import Metrics
-import NIOConcurrencyHelpers
 import NIOCore
 
+/// Records the query metrics of a connection.
+///
+/// Metrics are created from `MetricsSystem.factory` in the task that runs the query, so a factory bound with
+/// `withMetricsFactory` applies to that query. That's also why timers can't be kept on the connection.
 struct PostgresMetrics: Sendable {
-    private let factory: any MetricsFactory
-    private let operationDurationLabel: String
-    private let errorTypeKey: String
-    private let statusCodeKey: String
-    private let otherErrorTypeValue: String
     /// `db.system.name`, `db.namespace`, `server.address` and `server.port`, which every query reports.
     private let baseDimensions: [(String, String)]
-    /// Successful queries carry no `error.type`, so they always use the same timer.
-    private let successTimer: Timer
-    /// Keyed by `error.type`. `db.response.status_code` needs no key of its own, as it is derived from the same
-    /// error as `error.type`.
-    private let errorTimers = NIOLockedValueBox<[String: Timer]>([:])
 
-    /// Creates the handles a connection records into, or `nil` when metrics emission is disabled.
-    init?(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?) {
-        let metrics = configuration.options.metrics
-        guard let factory = metrics.factory else { return nil }
-        self.factory = factory
-        self.operationDurationLabel = metrics.labels.operationDuration
-        self.errorTypeKey = metrics.dimensions.errorTypeKey
-        self.statusCodeKey = metrics.dimensions.statusCodeKey
-        self.otherErrorTypeValue = metrics.dimensions.otherErrorTypeValue
-
-        var dimensions = [(metrics.dimensions.databaseSystemKey, metrics.dimensions.databaseSystemValue)]
+    init(configuration: PostgresConnection.InternalConfiguration, remoteAddress: SocketAddress?) {
+        var dimensions = [("db.system.name", "postgresql")]
         if let database = configuration.database {
-            dimensions.append((metrics.dimensions.databaseNamespaceKey, database))
+            dimensions.append(("db.namespace", database))
         }
         func appendServer(address: String, port: Int?) {
-            dimensions.append((metrics.dimensions.serverAddressKey, address))
+            dimensions.append(("server.address", address))
             // The conventions only ask for the port when it isn't the default one.
             if let port, port != 5432 {
-                dimensions.append((metrics.dimensions.serverPortKey, String(port)))
+                dimensions.append(("server.port", String(port)))
             }
         }
         switch configuration.connection {
@@ -52,12 +36,12 @@ struct PostgresMetrics: Sendable {
             }
         }
         self.baseDimensions = dimensions
-        self.successTimer = Timer(label: metrics.labels.operationDuration, dimensions: dimensions, factory: factory)
     }
 
-    /// The instant to measure latency from.
-    func startTiming() -> NIODeadline {
-        .now()
+    /// The instant to measure latency from, or `nil` when no metrics backend is set up, so that no work is done
+    /// for metrics nobody collects.
+    func startTiming() -> NIODeadline? {
+        MetricsSystem.factory is NOOPMetricsHandler ? nil : .now()
     }
 
     /// Record a latency sample for a query if metrics timing was started.
@@ -68,32 +52,15 @@ struct PostgresMetrics: Sendable {
     func record(start: NIODeadline?, error: (any Error)?) {
         guard let start else { return }
         let elapsed = NIODeadline.now() - start
+        var dimensions = self.baseDimensions
         if let error {
             let psqlError = error as? PSQLError
-            self.errorTimer(
-                errorType: psqlError?.metricsErrorType ?? self.otherErrorTypeValue,
-                statusCode: psqlError?.metricsStatusCode
-            ).recordNanoseconds(elapsed.nanoseconds)
-        } else {
-            self.successTimer.recordNanoseconds(elapsed.nanoseconds)
-        }
-    }
-
-    /// The timer for a failure, created from the connection's factory on first use.
-    private func errorTimer(errorType: String, statusCode: String?) -> Timer {
-        self.errorTimers.withLockedValue { timers in
-            if let cached = timers[errorType] {
-                return cached
+            dimensions.append(("error.type", psqlError?.metricsErrorType ?? "_OTHER"))
+            if let statusCode = psqlError?.metricsStatusCode {
+                dimensions.append(("db.response.status_code", statusCode))
             }
-            var dimensions = self.baseDimensions
-            dimensions.append((self.errorTypeKey, errorType))
-            if let statusCode {
-                dimensions.append((self.statusCodeKey, statusCode))
-            }
-            let timer = Timer(label: self.operationDurationLabel, dimensions: dimensions, factory: self.factory)
-            timers[errorType] = timer
-            return timer
         }
+        Timer(label: "db.client.operation.duration", dimensions: dimensions).recordNanoseconds(elapsed.nanoseconds)
     }
 }
 

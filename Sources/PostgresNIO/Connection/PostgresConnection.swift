@@ -49,9 +49,9 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
 
-    let metrics: PostgresMetrics?
+    let metrics: PostgresMetrics
 
-    init(channel: any Channel, connectionID: ID, logger: Logger, metrics: PostgresMetrics?) {
+    init(channel: any Channel, connectionID: ID, logger: Logger, metrics: PostgresMetrics) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
@@ -740,7 +740,7 @@ extension PostgresConnection {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
 
-        let start = self.metrics?.startTiming()
+        let start = self.metrics.startTiming()
         var failure: (any Error)?
 
         do {
@@ -752,16 +752,16 @@ extension PostgresConnection {
             error.file = file
             error.line = line
             error.query = query
-            self.metrics?.record(start: start, error: error)
+            self.metrics.record(start: start, error: error)
             throw error // rethrow with more metadata
         } catch {
-            self.metrics?.record(start: start, error: error)
+            self.metrics.record(start: start, error: error)
             throw error
         }
 
         defer {
             stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line))
-            self.metrics?.record(start: start, error: failure)
+            self.metrics.record(start: start, error: failure)
         }
 
         do {
@@ -801,7 +801,7 @@ extension PostgresConnection {
         let stream: PSQLRowStream
         let sequence: PostgresRowSequence
 
-        let start = self.metrics?.startTiming()
+        let start = self.metrics.startTiming()
         var failure: (any Error)?
 
         do {
@@ -812,16 +812,16 @@ extension PostgresConnection {
             error.file = file
             error.line = line
             error.query = query
-            self.metrics?.record(start: start, error: error)
+            self.metrics.record(start: start, error: error)
             throw error // rethrow with more metadata
         } catch {
-            self.metrics?.record(start: start, error: error)
+            self.metrics.record(start: start, error: error)
             throw error
         }
 
         defer {
             stream.invalidate(error: PSQLError(code: .rowSequenceUsedOutsideScope, query: query, file: file, line: line))
-            self.metrics?.record(start: start, error: failure)
+            self.metrics.record(start: start, error: failure)
         }
 
         let result: Result

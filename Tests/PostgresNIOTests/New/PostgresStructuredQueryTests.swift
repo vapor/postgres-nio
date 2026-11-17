@@ -3,6 +3,7 @@ import NIOEmbedded
 import NIOConcurrencyHelpers
 import Testing
 import Logging
+import Metrics
 import MetricsTestKit
 @testable import PostgresNIO
 
@@ -473,7 +474,7 @@ import MetricsTestKit
     }
 
     private func withAsyncTestingChannel(
-        metricsFactory: TestMetrics? = nil,
+        metricsFactory: any MetricsFactory = MetricsSystem.factory,
         _ body: (PostgresConnection, NIOAsyncTestingChannel) async throws -> ()
     ) async throws {
         let eventLoop = NIOAsyncTestingEventLoop()
@@ -483,15 +484,12 @@ import MetricsTestKit
         }
         try await channel.connect(to: .makeAddressResolvingHost("localhost", port: 5432))
 
-        var configuration = PostgresConnection.Configuration(
+        let configuration = PostgresConnection.Configuration(
             establishedChannel: channel,
             username: "username",
             password: "postgres",
             database: "database"
         )
-        if let metricsFactory {
-            configuration.options.metrics = .init(factory: metricsFactory)
-        }
 
         let logger = self.logger
         async let connectionPromise = PostgresConnection.connect(on: eventLoop, configuration: configuration, id: 1, logger: logger)
@@ -504,7 +502,9 @@ import MetricsTestKit
         let connection = try await connectionPromise
 
         do {
-            try await body(connection, channel)
+            try await withMetricsFactory(metricsFactory) {
+                try await body(connection, channel)
+            }
         } catch {
             try? await connection.close()
             throw error

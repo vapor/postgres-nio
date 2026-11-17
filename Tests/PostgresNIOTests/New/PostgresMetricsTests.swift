@@ -1,36 +1,31 @@
 @testable import PostgresNIO
 import Logging
+import Metrics
 import MetricsTestKit
 import NIOCore
 import Testing
 
 @Suite struct PostgresMetricsTests {
-    func makeMetrics(
-        _ connection: PostgresConnection.InternalConfiguration.Connection,
-        database: String? = "app",
-        factory: TestMetrics
-    ) -> PostgresMetrics? {
-        var options = PostgresConnection.Configuration.Options()
-        options.metrics = .init(factory: factory)
+    func makeMetrics(_ connection: PostgresConnection.InternalConfiguration.Connection, database: String? = "app") -> PostgresMetrics {
         let configuration = PostgresConnection.InternalConfiguration(
-            connection: connection, username: "user", password: nil, database: database, tls: .disable, options: options
+            connection: connection, username: "user", password: nil, database: database, tls: .disable, options: .init()
         )
         return PostgresMetrics(configuration: configuration, remoteAddress: nil)
     }
 
-    @Test func noFactoryDisablesMetrics() {
-        var options = PostgresConnection.Configuration.Options()
-        options.metrics = .init(factory: nil)
-        let configuration = PostgresConnection.InternalConfiguration(
-            connection: .unresolvedTCP(host: "db", port: 5432), username: "user", password: nil, database: nil, tls: .disable, options: options
-        )
-        #expect(PostgresMetrics(configuration: configuration, remoteAddress: nil) == nil)
+    @Test func noBackendSkipsTiming() {
+        let metrics = self.makeMetrics(.unresolvedTCP(host: "db", port: 5432))
+        withMetricsFactory(NOOPMetricsHandler.instance) {
+            #expect(metrics.startTiming() == nil)
+        }
     }
 
     @Test func successReportsBaseDimensionsWithoutDefaultPort() throws {
         let factory = TestMetrics()
-        let metrics = try #require(self.makeMetrics(.unresolvedTCP(host: "db", port: 5432), factory: factory))
-        metrics.record(start: metrics.startTiming(), error: nil)
+        let metrics = self.makeMetrics(.unresolvedTCP(host: "db", port: 5432))
+        withMetricsFactory(factory) {
+            metrics.record(start: metrics.startTiming(), error: nil)
+        }
 
         let timer = try factory.expectTimer("db.client.operation.duration", [
             ("db.system.name", "postgresql"), ("db.namespace", "app"), ("server.address", "db"),
@@ -40,63 +35,51 @@ import Testing
 
     @Test func failureAddsErrorTypeAndNonDefaultPort() throws {
         let factory = TestMetrics()
-        let metrics = try #require(self.makeMetrics(.unresolvedTCP(host: "db", port: 6543), database: nil, factory: factory))
-        metrics.record(start: metrics.startTiming(), error: PSQLError.server(.init(fields: [.sqlState: "42P01"])))
-        metrics.record(start: metrics.startTiming(), error: CancellationError())
+        let metrics = self.makeMetrics(.unresolvedTCP(host: "db", port: 6543), database: nil)
+        withMetricsFactory(factory) {
+            metrics.record(start: metrics.startTiming(), error: PSQLError.server(.init(fields: [.sqlState: "42P01"])))
+            metrics.record(start: metrics.startTiming(), error: CancellationError())
+        }
 
         let base = [("db.system.name", "postgresql"), ("server.address", "db"), ("server.port", "6543")]
         #expect(try factory.expectTimer("db.client.operation.duration", base + [("error.type", "42P01"), ("db.response.status_code", "42P01")]).values.count == 1)
         #expect(try factory.expectTimer("db.client.operation.duration", base + [("error.type", "_OTHER")]).values.count == 1)
     }
 
-    @Test func queryLabelsAndDimensionsCanBeOverridden() throws {
-        let factory = TestMetrics()
-        var options = PostgresConnection.Configuration.Options()
-        options.metrics = .init(factory: factory)
-        options.metrics.labels.operationDuration = "query.duration"
-        options.metrics.dimensions.databaseSystemKey = "system"
-        options.metrics.dimensions.errorTypeKey = "failure"
-        options.metrics.dimensions.otherErrorTypeValue = "unknown"
-        let configuration = PostgresConnection.InternalConfiguration(
-            connection: .unresolvedUDS(path: "/tmp/pg"), username: "user", password: nil, database: nil, tls: .disable, options: options
-        )
-        let metrics = try #require(PostgresMetrics(configuration: configuration, remoteAddress: nil))
-        metrics.record(start: metrics.startTiming(), error: CancellationError())
+    @Test func eachQueryUsesTheFactoryOfItsTask() throws {
+        let first = TestMetrics()
+        let second = TestMetrics()
+        let metrics = self.makeMetrics(.unresolvedUDS(path: "/tmp/.s.PGSQL.5432"))
+        withMetricsFactory(first) {
+            metrics.record(start: metrics.startTiming(), error: nil)
+        }
+        withMetricsFactory(second) {
+            metrics.record(start: metrics.startTiming(), error: nil)
+            metrics.record(start: metrics.startTiming(), error: nil)
+        }
 
-        let timer = try factory.expectTimer("query.duration", [
-            ("system", "postgresql"), ("server.address", "/tmp/pg"), ("failure", "unknown"),
-        ])
-        #expect(timer.values.count == 1)
+        let dimensions = [("db.system.name", "postgresql"), ("db.namespace", "app"), ("server.address", "/tmp/.s.PGSQL.5432")]
+        #expect(try first.expectTimer("db.client.operation.duration", dimensions).values.count == 1)
+        #expect(try second.expectTimer("db.client.operation.duration", dimensions).values.count == 2)
     }
 
-    @Test func poolLabelsAndDimensionsCanBeOverridden() throws {
+    @Test func poolMetricsUseTheGivenFactory() throws {
         let factory = TestMetrics()
-        var configuration = PostgresMetricsConfiguration(factory: factory)
-        configuration.labels.waitTime = "pool.wait"
-        configuration.dimensions.connectionPoolNameValue = "replica"
-        let metrics = PostgresClientMetrics(
-            logger: Logger(label: "test"), configuration: configuration, minimumConnections: 2, maximumConnections: 8
-        )
+        let metrics = PostgresClientMetrics(logger: Logger(label: "test"), factory: factory, minimumConnections: 2, maximumConnections: 8)
         metrics.poolInstruments?.waitTime.recordNanoseconds(1)
 
-        let pool = [("db.client.connection.pool.name", "replica")]
-        let timer = try factory.expectTimer("pool.wait", pool)
-        #expect(timer.values == [1])
+        let pool = [("db.client.connection.pool.name", "postgresnio-connection-pool")]
+        #expect(try factory.expectTimer("db.client.connection.wait_time", pool).values == [1])
         #expect(try factory.expectRecorder("db.client.connection.max", pool).values == [8])
         #expect(try factory.expectRecorder("db.client.connection.idle.max", pool).values == [8])
         #expect(try factory.expectRecorder("db.client.connection.idle.min", pool).values == [2])
     }
 
-    @Test func timersAreReusedPerOutcome() throws {
-        let factory = TestMetrics()
-        let metrics = try #require(self.makeMetrics(.unresolvedUDS(path: "/tmp/.s.PGSQL.5432"), factory: factory))
-        metrics.record(start: metrics.startTiming(), error: nil)
-        metrics.record(start: metrics.startTiming(), error: nil)
-
-        let timer = try factory.expectTimer("db.client.operation.duration", [
-            ("db.system.name", "postgresql"), ("db.namespace", "app"), ("server.address", "/tmp/.s.PGSQL.5432"),
-        ])
-        #expect(timer.values.count == 2)
+    @Test func poolMetricsAreDisabledWithoutABackend() {
+        let metrics = PostgresClientMetrics(
+            logger: Logger(label: "test"), factory: NOOPMetricsHandler.instance, minimumConnections: 0, maximumConnections: 1
+        )
+        #expect(metrics.poolInstruments == nil)
     }
 }
 
