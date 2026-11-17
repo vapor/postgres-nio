@@ -1,18 +1,20 @@
 import NIOCore
-import XCTest
+import Testing
+
 @testable import PostgresNIO
 
-class PSQLMetadataTests: XCTestCase {
-    func testSelect() {
-        XCTAssertEqual(100, PostgresQueryMetadata(string: "SELECT 100")?.rows)
-        XCTAssertNotNil(PostgresQueryMetadata(string: "SELECT"))
-        XCTAssertNil(PostgresQueryMetadata(string: "SELECT")?.rows)
-        XCTAssertNil(PostgresQueryMetadata(string: "SELECT 100 100"))
+@Suite
+struct PSQLMetadataTests {
+    @Test func select() {
+        #expect(100 == PostgresQueryMetadata(string: "SELECT 100")?.rows)
+        #expect(PostgresQueryMetadata(string: "SELECT") != nil)
+        #expect(PostgresQueryMetadata(string: "SELECT")?.rows == nil)
+        #expect(PostgresQueryMetadata(string: "SELECT 100 100") == nil)
     }
 
-    func testUpdate() {
-        XCTAssertEqual(100, PostgresQueryMetadata(string: "UPDATE 100")?.rows)
-        XCTAssertNil(PostgresQueryMetadata(string: "UPDATE"))
-        XCTAssertNil(PostgresQueryMetadata(string: "UPDATE 100 100"))
+    @Test func update() {
+        #expect(100 == PostgresQueryMetadata(string: "UPDATE 100")?.rows)
+        #expect(PostgresQueryMetadata(string: "UPDATE") == nil)
+        #expect(PostgresQueryMetadata(string: "UPDATE 100 100") == nil)
     }
 }
