@@ -1,20 +1,26 @@
-import XCTest
 import NIOCore
-@testable import PostgresNIO
+import PostgresNIO
+import Testing
 
-class String_PSQLCodableTests: XCTestCase {
+#if canImport(FoundationEssentials)
+    import FoundationEssentials
+#else
+    import Foundation
+#endif
 
-    func testEncode() {
+@Suite
+class String_PSQLCodableTests {
+    @Test func encode() {
         let value = "Hello World"
         var buffer = ByteBuffer()
 
         value.encode(into: &buffer, context: .default)
 
-        XCTAssertEqual(String.psqlType, .text)
-        XCTAssertEqual(buffer.readString(length: buffer.readableBytes), value)
+        #expect(String.psqlType == .text)
+        #expect(buffer.readString(length: buffer.readableBytes) == value)
     }
 
-    func testDecodeStringFromTextVarchar() {
+    @Test func decodeStringFromTextVarchar() throws {
         let expected = "Hello World"
         var buffer = ByteBuffer()
         buffer.writeString(expected)
@@ -25,42 +31,39 @@ class String_PSQLCodableTests: XCTestCase {
 
         for dataType in dataTypes {
             var loopBuffer = buffer
-            var result: String?
-            XCTAssertNoThrow(result = try String(from: &loopBuffer, type: dataType, format: .binary, context: .default))
-            XCTAssertEqual(result, expected)
+            let result = try String(from: &loopBuffer, type: dataType, format: .binary, context: .default)
+            #expect(result == expected)
         }
     }
 
-    func testDecodeFromUUID() {
+    @Test func decodeFromUUID() throws {
         let uuid = UUID()
         var buffer = ByteBuffer()
         uuid.encode(into: &buffer, context: .default)
 
-        var decoded: String?
-        XCTAssertNoThrow(decoded = try String(from: &buffer, type: .uuid, format: .binary, context: .default))
-        XCTAssertEqual(decoded, uuid.uuidString)
+        let decoded = try String(from: &buffer, type: .uuid, format: .binary, context: .default)
+        #expect(decoded == uuid.uuidString)
     }
 
-    func testDecodeFailureFromInvalidUUID() {
+    @Test func decodeFailureFromInvalidUUID() {
         let uuid = UUID()
         var buffer = ByteBuffer()
         uuid.encode(into: &buffer, context: .default)
         // this makes only 15 bytes readable. this should lead to an error
         buffer.moveReaderIndex(forwardBy: 1)
 
-        XCTAssertThrowsError(try String(from: &buffer, type: .uuid, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try String(from: &buffer, type: .uuid, format: .binary, context: .default)
         }
     }
 
-    func testDecodeFromJSONB() {
+    @Test func decodeFromJSONB() throws {
         let json = #"{"hello": "world"}"#
         var buffer = ByteBuffer()
         buffer.writeInteger(UInt8(1))
         buffer.writeString(json)
 
-        var decoded: String?
-        XCTAssertNoThrow(decoded = try String(from: &buffer, type: .jsonb, format: .binary, context: .default))
-        XCTAssertEqual(decoded, json)
+        let decoded = try String(from: &buffer, type: .jsonb, format: .binary, context: .default)
+        #expect(decoded == json)
     }
 }
