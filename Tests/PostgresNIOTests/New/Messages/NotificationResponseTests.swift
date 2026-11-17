@@ -1,62 +1,69 @@
-import XCTest
 import NIOCore
 import NIOTestUtils
+import Testing
+
 @testable import PostgresNIO
 
-class NotificationResponseTests: XCTestCase {
-    
-    func testDecode() {
+@Suite
+struct NotificationResponseTests {
+    @Test func decode() {
         let expected: [PostgresBackendMessage] = [
             .notification(.init(backendPID: 123, channel: "test", payload: "hello")),
             .notification(.init(backendPID: 123, channel: "test", payload: "world")),
             .notification(.init(backendPID: 123, channel: "foo", payload: "bar"))
         ]
-        
+
         var buffer = ByteBuffer()
-        expected.forEach { message in
+        for message in expected {
             guard case .notification(let notification) = message else {
-                return XCTFail("Expected only to get notifications here!")
+                Issue.record("Expected only to get notifications here!")
+                return
             }
-            
+
             buffer.writeBackendMessage(id: .notificationResponse) { buffer in
                 buffer.writeInteger(notification.backendPID)
                 buffer.writeNullTerminatedString(notification.channel)
                 buffer.writeNullTerminatedString(notification.payload)
             }
         }
-        
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, expected)],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }))
+
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, expected)],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
+            )
+        }
     }
-    
-    func testDecodeFailureBecauseOfMissingNullTermination() {
+
+    @Test func decodeFailureBecauseOfMissingNullTermination() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .notificationResponse) { buffer in
             buffer.writeInteger(Int32(123))
             buffer.writeString("test")
             buffer.writeString("hello")
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PostgresMessageDecodingError)
+
+        #expect(throws: PostgresMessageDecodingError.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
+            )
         }
     }
-    
-    func testDecodeFailureBecauseOfMissingNullTerminationInValue() {
+
+    @Test func decodeFailureBecauseOfMissingNullTerminationInValue() {
         var buffer = ByteBuffer()
         buffer.writeBackendMessage(id: .notificationResponse) { buffer in
             buffer.writeInteger(Int32(123))
             buffer.writeNullTerminatedString("hello")
             buffer.writeString("world")
         }
-        
-        XCTAssertThrowsError(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: [(buffer, [])],
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) })) {
-            XCTAssert($0 is PostgresMessageDecodingError)
+
+        #expect(throws: PostgresMessageDecodingError.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: [(buffer, [])],
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: true) }
+            )
         }
     }
 }
