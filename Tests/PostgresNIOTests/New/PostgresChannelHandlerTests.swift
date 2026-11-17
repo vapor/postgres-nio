@@ -64,7 +64,7 @@ struct PostgresChannelHandlerTests {
         ], loop: self.eventLoop)
 
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
-        try #expect(.sslRequest == embedded.readOutbound(as: PostgresFrontendMessage.self))
+        #expect(try .sslRequest == embedded.readOutbound(as: PostgresFrontendMessage.self))
         try embedded.writeInbound(PostgresBackendMessage.sslSupported)
         
         // a NIOSSLHandler has been added, after it SSL had been negotiated
@@ -104,7 +104,7 @@ struct PostgresChannelHandlerTests {
         ], loop: self.eventLoop)
 
         embedded.connect(to: try .init(ipAddress: "0.0.0.0", port: 5432), promise: nil)
-        try #expect(.sslRequest == embedded.readOutbound(as: PostgresFrontendMessage.self))
+        #expect(try .sslRequest == embedded.readOutbound(as: PostgresFrontendMessage.self))
 
         var responseBuffer = ByteBuffer()
         responseBuffer.writeInteger(UInt8(ascii: "S"))
