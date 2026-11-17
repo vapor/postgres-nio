@@ -49,7 +49,6 @@ public final class PostgresConnection: Sendable {
     public let id: ID
 
     private let _logger: Logger
-    @usableFromInline
     let tracing: PostgresTracing
 
     init(channel: any Channel, connectionID: ID, logger: Logger, tracing: PostgresTracing) {
@@ -329,7 +328,7 @@ public final class PostgresConnection: Sendable {
         let context = ExtendedQueryContext(
             name: name,
             query: query,
-            bindingDataTypes: [],
+            parameterTypes: .explicit([]),
             logger: logger,
             promise: promise
         )
@@ -733,9 +732,8 @@ extension PostgresConnection {
 extension PostgresConnection {
     /// Run a query on the Postgres server the connection is connected to.
     /// 
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// A span is created for the query, lasting until `body` returns. See ``PostgresTracingConfiguration``.
     ///
@@ -757,28 +755,21 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> Result {
-        let span = self.tracing.startSpan(queryText: query.sql, summary: summary)
-        defer { span?.end() }
-
-        do {
-            let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
-            defer { rows.invalidate(query: query, file: file, line: line) }
-
-            let result = try await body(rows)
-            self.tracing.recordReturnedRows(of: rows, in: span)
-            return result
-        } catch {
-            self.tracing.recordError(error, in: span)
-            throw error
-        }
+        try await self.withScopedRows(
+            summary: summary,
+            query: query,
+            file: file,
+            line: line,
+            start: { try await self.startScopedQuery(query, logger: logger, file: file, line: line) },
+            body
+        )
     }
 
     /// Run a query on the Postgres server the connection is connected to and return the query's metadata
     /// alongside the `body` closure's result.
     ///
-    /// The result of the query can only be consumed inside of the `body` closure and attempting to
-    /// consume the stream outside of the closure will throw `PSQLError.rowSequenceUsedOutsideScope`.
-    /// Rows that were already buffered when body returned are still delivered before the error is thrown.
+    /// The result of the query can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
     ///
     /// The metadata is derived from the command tag the server sends after the last row, so `body` must
     /// iterate the sequence to its end. If it returns early the query is cancelled and the method throws
@@ -805,17 +796,38 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
+        try await self.withScopedRows(
+            summary: summary,
+            query: query,
+            file: file,
+            line: line,
+            start: { try await self.startScopedQuery(query, logger: logger, file: file, line: line) }
+        ) {
+            let result = try await body($0)
+            let metadata = try await self.consumedMetadata(of: $0, query: query, file: file, line: line)
+            return (result, metadata)
+        }
+    }
+
+    @usableFromInline
+    func withScopedRows<Result>(
+        summary: String?,
+        query: PostgresQuery,
+        file: String,
+        line: Int,
+        start: () async throws -> PostgresRowSequence,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> Result {
         let span = self.tracing.startSpan(queryText: query.sql, summary: summary)
         defer { span?.end() }
 
         do {
-            let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
-            defer { rows.invalidate(query: query, file: file, line: line) }
+            let rows = try await start()
+            defer { rows.invalidate(file: file, line: line) }
 
             let result = try await body(rows)
-            let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
             self.tracing.recordReturnedRows(of: rows, in: span)
-            return (result, metadata)
+            return result
         } catch {
             self.tracing.recordError(error, in: span)
             throw error
@@ -844,6 +856,107 @@ extension PostgresConnection {
                 throw PSQLError.invalidCommandTag(consumedCommandTag)
             }
             return metadata
+        } catch var error as PSQLError {
+            error.file = file
+            error.line = line
+            error.query = query
+            throw error // rethrow with more metadata
+        }
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows.
+    /// - Returns: The result of the `body` closure.
+    @inlinable
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> Result where Row == Statement.Row {
+        let query = try PostgresQuery(unsafeSQL: Statement.sql, binds: preparedStatement.makeBindings())
+        return try await self.withScopedRows(
+            summary: Statement.name,
+            query: query,
+            file: file,
+            line: line,
+            start: { try await self.startScopedExecute(Statement.self, query, logger: logger, file: file, line: line) }
+        ) {
+            try await body($0.map { try preparedStatement.decodeRow($0) })
+        }
+    }
+
+    /// Execute a prepared statement, taking care of the preparation when necessary, and return the
+    /// statement's metadata alongside the `body` closure's result.
+    ///
+    /// The result of the statement can only be consumed inside of the `body` closure. Attempting to
+    /// consume the stream outside of the closure is a programmer error, and will trigger a precondition failure.
+    ///
+    /// The metadata is derived from the command tag the server sends after the last row, so `body` must
+    /// iterate the sequence to its end. If it returns early the statement is cancelled and the method throws
+    /// `PSQLError.rowSequenceNotFullyConsumed`.
+    ///
+    /// - Parameters:
+    ///   - preparedStatement: The ``PostgresPreparedStatement`` to execute
+    ///   - logger: The `Logger` to log into for the statement
+    ///   - file: The file the statement was executed in. Used for better error reporting.
+    ///   - line: The line the statement was executed in. Used for better error reporting.
+    ///   - body: The closure that's used to consume the decoded rows. Must consume the sequence to its end.
+    /// - Returns: The result of the `body` closure and the statement metadata.
+    @inlinable
+    @_disfavoredOverload
+    public func execute<Statement: PostgresPreparedStatement, Row, Result>(
+        _ preparedStatement: Statement,
+        logger: Logger,
+        file: String = #fileID,
+        line: Int = #line,
+        _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
+    ) async throws -> (result: Result, metadata: PostgresQueryMetadata) where Row == Statement.Row {
+        let query = try PostgresQuery(unsafeSQL: Statement.sql, binds: preparedStatement.makeBindings())
+        return try await self.withScopedRows(
+            summary: Statement.name,
+            query: query,
+            file: file,
+            line: line,
+            start: { try await self.startScopedExecute(Statement.self, query, logger: logger, file: file, line: line) }
+        ) {
+            let result = try await body($0.map { try preparedStatement.decodeRow($0) })
+            let metadata = try await self.consumedMetadata(of: $0, query: query, file: file, line: line)
+            return (result, metadata)
+        }
+    }
+
+    @usableFromInline
+    func startScopedExecute<Statement: PostgresPreparedStatement>(
+        _ statement: Statement.Type,
+        _ query: PostgresQuery,
+        logger: Logger,
+        file: String,
+        line: Int
+    ) async throws -> PostgresRowSequence {
+        let promise = self.channel.eventLoop.makePromise(of: PSQLRowStream.self)
+        let task = HandlerTask.executePreparedStatement(.init(
+            name: Statement.name,
+            sql: Statement.sql,
+            bindings: query.binds,
+            bindingDataTypes: Statement.bindingDataTypes,
+            logger: logger,
+            promise: promise
+        ))
+        self.channel.write(task, promise: nil)
+
+        do {
+            return try await promise.futureResult.map { $0.asyncSequence() }.get()
         } catch var error as PSQLError {
             error.file = file
             error.line = line

@@ -1,7 +1,6 @@
 import NIOCore
 import Tracing
 
-@usableFromInline
 struct PostgresTracing: Sendable {
     private let recordsQueryText: Bool
     private let recordsReturnedRows: Bool
@@ -80,7 +79,6 @@ struct PostgresTracing: Sendable {
         return tracer is NoOpTracer ? nil : tracer
     }
 
-    @usableFromInline
     func startSpan(
         queryText: String,
         summary: String? = nil,
@@ -112,7 +110,6 @@ struct PostgresTracing: Sendable {
     }
 
     /// Records `error.type`, `db.response.status_code` and the span status for a failed operation.
-    @usableFromInline
     func recordError(_ error: any Error, in span: (any Span)?) {
         guard let span else { return }
         let psqlError = error as? PSQLError
@@ -123,7 +120,6 @@ struct PostgresTracing: Sendable {
         span.setStatus(.init(code: .error))
     }
 
-    @usableFromInline
     func recordReturnedRows(of rows: PostgresRowSequence, in span: (any Span)?) {
         guard self.recordsReturnedRows else { return }
         span?.attributes["db.response.returned_rows"] = rows.stream.receivedRowCount.load(ordering: .relaxed)

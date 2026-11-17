@@ -1,10 +1,16 @@
-import XCTest
 import Atomics
 import NIOCore
-@testable import PostgresNIO
+import PostgresNIO
+import Testing
 
-class JSON_PSQLCodableTests: XCTestCase {
+#if canImport(FoundationEssentials)
+    import FoundationEssentials
+#else
+    import Foundation
+#endif
 
+@Suite
+struct JSON_PSQLCodableTests {
     struct Hello: Equatable, Codable, PostgresCodable {
         let hello: String
 
@@ -13,30 +19,28 @@ class JSON_PSQLCodableTests: XCTestCase {
         }
     }
 
-    func testRoundTrip() {
+    @Test func roundTrip() throws {
         var buffer = ByteBuffer()
         let hello = Hello(name: "world")
-        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .default))
-        XCTAssertEqual(Hello.psqlType, .jsonb)
+        try hello.encode(into: &buffer, context: .default)
+        #expect(Hello.psqlType == .jsonb)
 
         // verify jsonb prefix byte
-        XCTAssertEqual(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self), 1)
+        #expect(buffer.getInteger(at: buffer.readerIndex, as: UInt8.self) == 1)
 
-        var result: Hello?
-        XCTAssertNoThrow(result = try Hello(from: &buffer, type: .jsonb, format: .binary, context: .default))
-        XCTAssertEqual(result, hello)
+        let result = try Hello(from: &buffer, type: .jsonb, format: .binary, context: .default)
+        #expect(result == hello)
     }
 
-    func testDecodeFromJSON() {
+    @Test func decodeFromJSON() throws {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
 
-        var result: Hello?
-        XCTAssertNoThrow(result = try Hello(from: &buffer, type: .json, format: .binary, context: .default))
-        XCTAssertEqual(result, Hello(name: "world"))
+        let result = try Hello(from: &buffer, type: .json, format: .binary, context: .default)
+        #expect(result == Hello(name: "world"))
     }
 
-    func testDecodeFromJSONAsText() {
+    @Test func decodeFromJSONAsText() throws {
         let combinations : [(PostgresFormat, PostgresDataType)] = [
             (.text, .json), (.text, .jsonb),
         ]
@@ -45,31 +49,30 @@ class JSON_PSQLCodableTests: XCTestCase {
 
         for (format, dataType) in combinations {
             var loopBuffer = buffer
-            var result: Hello?
-            XCTAssertNoThrow(result = try Hello(from: &loopBuffer, type: dataType, format: format, context: .default))
-            XCTAssertEqual(result, Hello(name: "world"))
+            let result = try Hello(from: &loopBuffer, type: dataType, format: format, context: .default)
+            #expect(result == Hello(name: "world"))
         }
     }
 
-    func testDecodeFromJSONBWithoutVersionPrefixByte() {
+    @Test func ecodeFromJSONBWithoutVersionPrefixByte() {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
 
-        XCTAssertThrowsError(try Hello(from: &buffer, type: .jsonb, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .failure)
+        #expect(throws: PostgresDecodingError.Code.failure) {
+            try Hello(from: &buffer, type: .jsonb, format: .binary, context: .default)
         }
     }
 
-    func testDecodeFromJSONBWithWrongDataType() {
+    @Test func decodeFromJSONBWithWrongDataType() {
         var buffer = ByteBuffer()
         buffer.writeString(#"{"hello":"world"}"#)
 
-        XCTAssertThrowsError(try Hello(from: &buffer, type: .text, format: .binary, context: .default)) {
-            XCTAssertEqual($0 as? PostgresDecodingError.Code, .typeMismatch)
+        #expect(throws: PostgresDecodingError.Code.typeMismatch) {
+            try Hello(from: &buffer, type: .text, format: .binary, context: .default)
         }
     }
 
-    func testCustomEncoderIsUsed() {
+    @Test func customEncoderIsUsed() throws {
         final class TestEncoder: PostgresJSONEncoder {
             let encodeHits = ManagedAtomic(0)
 
@@ -85,7 +88,7 @@ class JSON_PSQLCodableTests: XCTestCase {
         let hello = Hello(name: "world")
         let encoder = TestEncoder()
         var buffer = ByteBuffer()
-        XCTAssertNoThrow(try hello.encode(into: &buffer, context: .init(jsonEncoder: encoder)))
-        XCTAssertEqual(encoder.encodeHits.load(ordering: .relaxed), 1)
+        try hello.encode(into: &buffer, context: .init(jsonEncoder: encoder))
+        #expect(encoder.encodeHits.load(ordering: .relaxed) == 1)
     }
 }

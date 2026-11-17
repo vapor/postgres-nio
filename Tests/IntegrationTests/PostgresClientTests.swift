@@ -329,6 +329,217 @@ struct PostgresClientTests {
         }
     }
 
+    /// The OID is only looked up when the type is first used, so a connection opened before the extension
+    /// was created, like one running migrations, can still use it.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeResolvesLazilyAfterExtensionIsInstalled() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // make sure every query runs on the same connection
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP EXTENSION IF EXISTS ltree CASCADE;")
+            try await client.query("CREATE EXTENSION ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+            let rows = try await client.query("SELECT \(value)")
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            #expect(decoded == [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    /// The OID lookup is still running when the statement gets queued, so the OID has to be resolved
+    /// when `Parse` is sent.
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeResolvesLazilyForPreparedStatements() async throws {
+        struct SelectLTree: PostgresPreparedStatement {
+            static let name = "SELECT-ltree-lazy-resolution"
+            static let sql = "SELECT $1"
+            typealias Row = PostgresLTree
+
+            var label: PostgresLTree
+
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.label)
+                return bindings
+            }
+
+            func decodeRow(_ row: PostgresRow) throws -> Row {
+                try row.decode(PostgresLTree.self)
+            }
+        }
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            var decoded = [PostgresLTree]()
+            for try await label in try await client.execute(SelectLTree(label: value), logger: logger) {
+                decoded.append(label)
+            }
+            #expect(decoded == [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeBindRoundTrip() async throws {
+        let tableName = "test_client_ltree_bind"
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            try await client.query("DROP TABLE IF EXISTS \"\(unescaped: tableName)\";")
+
+            try await client.query(
+                """
+                CREATE TABLE IF NOT EXISTS "\(unescaped: tableName)" (
+                    id SERIAL PRIMARY KEY,
+                    label ltree NOT NULL
+                );
+                """
+            )
+
+            let inserted = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            try await client.query(
+                """
+                INSERT INTO "\(unescaped: tableName)" (label) VALUES (\(inserted))
+                """
+            )
+
+            let rows = try await client.query(
+                """
+                SELECT label FROM "\(unescaped: tableName)" WHERE label ~ 'foo.*'
+                """
+            )
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            #expect(decoded == [inserted])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func lTreeBindInTypeAmbiguousContext() async throws {
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        let client = PostgresClient(configuration: .makeTestConfiguration(), eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("CREATE EXTENSION IF NOT EXISTS ltree;")
+
+            let value = PostgresLTree(labels: ["foo", "bar", "baz"])
+
+            let rows = try await client.query("SELECT \(value)")
+
+            var decoded = [PostgresLTree]()
+            for try await label in rows.decode(PostgresLTree.self) {
+                decoded.append(label)
+            }
+            #expect(decoded == [value])
+
+            taskGroup.cancelAll()
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func qualifiedDataTypeNames() async throws {
+        struct Mood: PostgresDynamicTypeEncodable {
+            let psqlTypeName: String?
+            var psqlType: PostgresDataType { .null }
+            var psqlFormat: PostgresFormat { .text }
+
+            func encode<JSONEncoder: PostgresJSONEncoder>(
+                into byteBuffer: inout ByteBuffer,
+                context: PostgresEncodingContext<JSONEncoder>
+            ) {
+                byteBuffer.writeString("ok")
+            }
+        }
+
+        var mlogger = Logger(label: "test")
+        mlogger.logLevel = .debug
+        let logger = mlogger
+
+        var clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        // make sure every query runs on the same connection, so the `search_path` below applies
+        clientConfig.options.maximumConnections = 1
+        let client = PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton, backgroundLogger: logger)
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.query("DROP SCHEMA IF EXISTS type_lookup_a, type_lookup_b CASCADE;")
+            try await client.query("CREATE SCHEMA type_lookup_a;")
+            try await client.query("CREATE SCHEMA type_lookup_b;")
+            try await client.query("CREATE TYPE type_lookup_a.mood AS ENUM ('ok');")
+            try await client.query("CREATE TYPE type_lookup_b.mood AS ENUM ('ok');")
+            try await client.query("SET search_path = public, type_lookup_a;")
+
+            for (name, expected) in [("mood", "mood"), ("type_lookup_b.mood", "type_lookup_b.mood")] {
+                let rows = try await client.query("SELECT pg_typeof(\(Mood(psqlTypeName: name)))::text")
+                var types = [String]()
+                for try await type in rows.decode(String.self) {
+                    types.append(type)
+                }
+                #expect(types == [expected])
+            }
+
+            taskGroup.cancelAll()
+        }
+    }
+
 }
 
 // MARK: - Structured queries
@@ -340,6 +551,34 @@ extension PostgresClientTests {
             let sum = try await client.query("SELECT generate_series(1, 100)", logger: logger) { rows in
                 var sum = 0
                 for try await (value) in rows.decode(Int.self) {
+                    sum += value
+                }
+                return sum
+            }
+            #expect(sum == 5050)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func structuredExecuteReturnsBodyResult() async throws {
+        struct Series: PostgresPreparedStatement {
+            static let sql = "SELECT generate_series(1, $1)"
+            typealias Row = Int
+            var upTo: Int
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.upTo)
+                return bindings
+            }
+            func decodeRow(_ row: PostgresRow) throws -> Row {
+                try row.decode(Row.self)
+            }
+        }
+
+        try await self.withClient { client, logger in
+            let sum = try await client.execute(Series(upTo: 100), logger: logger) { rows in
+                var sum = 0
+                for try await value in rows {
                     sum += value
                 }
                 return sum
@@ -426,25 +665,18 @@ extension PostgresClientTests {
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
-    @Test func structuredQueryEscapedSequenceIsInvalidated() async throws {
-        try await self.withClient(maximumConnections: 1) { client, logger in
-            let escaped = try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { (rows: PostgresRowSequence) in
-                rows
-            }
+    @Test func structuredQueryEscapedSequenceTrapsWhenConsumed() async throws {
+        let result = await #expect(processExitsWith: .failure, observing: [\.standardErrorContent]) {
+            try await PostgresClientTests().withClient(maximumConnections: 1) { client, logger in
+                let escaped = try await client.query("SELECT generate_series(1, 1000000)", logger: logger) { (rows: PostgresRowSequence) in
+                    rows
+                }
 
-            var rowsSeen = 0
-            do {
-                for try await _ in escaped { rowsSeen += 1 }
-                Issue.record("Expected escaped sequence to throw")
-            } catch let error as PSQLError {
-                #expect(error.code == .rowSequenceUsedOutsideScope)
-            }
-            #expect(rowsSeen < 1_000_000, "Escaped sequence must not deliver the whole result")
-
-            try await client.query("SELECT 1", logger: logger) { rows in
-                for try await _ in rows {}
+                for try await _ in escaped {}
             }
         }
+        let stderr = String(decoding: try #require(result).standardErrorContent, as: UTF8.self)
+        #expect(stderr.contains("A PostgresRowSequence was consumed after the closure"))
     }
 
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
@@ -633,6 +865,46 @@ extension PostgresClientTests {
                 for try await _ in rows {}
             }
             #expect(metadata.rows == 1)
+        }
+    }
+
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func executeThrowsWhenBodyDoesNotConsumeToTheEnd() async throws {
+        struct Series: PostgresPreparedStatement {
+            static let sql = "SELECT generate_series(1, $1)"
+            var upTo: Int
+            func makeBindings() -> PostgresBindings {
+                var bindings = PostgresBindings()
+                bindings.append(self.upTo)
+                return bindings
+            }
+            func decodeRow(_ row: PostgresRow) throws -> Int {
+                try row.decode(Int.self)
+            }
+        }
+
+        try await self.withClient(maximumConnections: 1) { client, logger in
+            do {
+                (_, _) = try await client.execute(Series(upTo: 1_000_000), logger: logger) { rows -> Int? in
+                    for try await value in rows {
+                        return value
+                    }
+                    return nil
+                }
+                Issue.record("Expected execute to throw")
+            } catch let error as PSQLError {
+                #expect(error.code == .rowSequenceNotFullyConsumed)
+                #expect(error.query?.sql == Series.sql)
+                #expect(error.file == #fileID)
+            }
+
+            let (sum, metadata) = try await client.execute(Series(upTo: 3), logger: logger) { rows in
+                var sum = 0
+                for try await value in rows { sum += value }
+                return sum
+            }
+            #expect(sum == 6)
+            #expect(metadata.rows == 3)
         }
     }
 
