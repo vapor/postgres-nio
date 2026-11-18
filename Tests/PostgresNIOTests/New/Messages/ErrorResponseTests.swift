@@ -1,12 +1,13 @@
-import XCTest
 import NIOCore
 import NIOTestUtils
+import Testing
+
 @testable import PostgresNIO
 
-class ErrorResponseTests: XCTestCase {
-    
-    func testDecode() {
-        let fields: [PostgresBackendMessage.Field : String] = [
+@Suite
+struct ErrorResponseTests {
+    @Test func decode() {
+        let fields: [PostgresBackendMessage.Field: String] = [
             .file: "auth.c",
             .routine: "auth_failed",
             .line: "334",
@@ -21,15 +22,18 @@ class ErrorResponseTests: XCTestCase {
                 buffer.writeInteger(key.rawValue, as: UInt8.self)
                 buffer.writeNullTerminatedString(value)
             }
-            buffer.writeInteger(0, as: UInt8.self) // signal done
+            buffer.writeInteger(0, as: UInt8.self)  // signal done
         }
-        
+
         let expectedInOuts = [
-            (buffer, [PostgresBackendMessage.error(.init(fields: fields))]),
+            (buffer, [PostgresBackendMessage.error(.init(fields: fields))])
         ]
-        
-        XCTAssertNoThrow(try ByteToMessageDecoderVerifier.verifyDecoder(
-            inputOutputPairs: expectedInOuts,
-            decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }))
+
+        #expect(throws: Never.self) {
+            try ByteToMessageDecoderVerifier.verifyDecoder(
+                inputOutputPairs: expectedInOuts,
+                decoderFactory: { PostgresBackendMessageDecoder(hasAlreadyReceivedBytes: false) }
+            )
+        }
     }
 }
