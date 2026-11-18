@@ -1,8 +1,8 @@
-import Atomics
 import Logging
 import NIOCore
 import NIOEmbedded
 import NIOPosix
+import Synchronization
 import Testing
 
 @testable import PostgresNIO
@@ -106,6 +106,7 @@ struct PSQLRowStreamTests {
         #expect(rows.count == 6)
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowAfterStreamHasFinished() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -129,9 +130,9 @@ struct PSQLRowStreamTests {
         #expect(dataSource.hitDemand == 0)
 
         // attach consumer
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
             let value = try row.decode(String.self, context: .default)
             #expect(value == "\(expected)")
         }
@@ -142,6 +143,7 @@ struct PSQLRowStreamTests {
         #expect(stream.commandTag == "SELECT 2")
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowThrowsErrorOnInitialBatch() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -167,9 +169,9 @@ struct PSQLRowStreamTests {
         #expect(dataSource.hitDemand == 0)
 
         // attach consumer
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
             #expect(try row.decode(String.self, context: .default) == "\(expected)")
             if expected == 1 {
                 throw OnRowError(row: expected)
@@ -183,6 +185,7 @@ struct PSQLRowStreamTests {
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowBeforeStreamHasFinished() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -204,9 +207,9 @@ struct PSQLRowStreamTests {
         #expect(dataSource.hitDemand == 0, "Before we have a consumer demand is not signaled")
 
         // attach consumer
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
             let value = try row.decode(String.self, context: .default)
             #expect(value == "\(expected)")
         }
@@ -244,6 +247,7 @@ struct PSQLRowStreamTests {
         #expect(stream.commandTag == "")
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowOnFailedStream() throws {
         let stream = PSQLRowStream(
             source: .noRows(.failure(PSQLError.serverClosedConnection(underlying: nil))),
@@ -251,9 +255,9 @@ struct PSQLRowStreamTests {
             logger: self.logger
         )
 
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { _ in
-            counter.wrappingIncrement(ordering: .relaxed)
+            counter.wrappingAdd(1, ordering: .relaxed)
         }
 
         #expect(counter.load(ordering: .relaxed) == 0, "Expected the closure to never be called")
@@ -262,6 +266,7 @@ struct PSQLRowStreamTests {
         }
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowThrowsErrorOnLaterBatch() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -274,9 +279,9 @@ struct PSQLRowStreamTests {
         )
 
         // attach consumer, while the stream is still streaming
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
             #expect(try row.decode(String.self, context: .default) == "\(expected)")
             if expected == 2 {
                 throw OnRowError(row: expected)
@@ -312,6 +317,7 @@ struct PSQLRowStreamTests {
         #expect(dataSource.hitCancel == 1)
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowClosureThrowsAfterTheStreamWasCompletedReentrantly() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -324,9 +330,9 @@ struct PSQLRowStreamTests {
         )
 
         // attach consumer, while the stream is still streaming
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
             // reentrantly complete the stream, before throwing. The promise is succeeded at this
             // point, which means the throw afterwards must be swallowed.
             stream.receive(completion: .success("SELECT 1"))
@@ -341,6 +347,7 @@ struct PSQLRowStreamTests {
         #expect(stream.commandTag == "SELECT 1")
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func onRowFailsIfStreamFails() {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
@@ -352,9 +359,9 @@ struct PSQLRowStreamTests {
             logger: self.logger
         )
 
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { _ in
-            counter.wrappingIncrement(ordering: .relaxed)
+            counter.wrappingAdd(1, ordering: .relaxed)
         }
         #expect(dataSource.hitDemand == 1)
 
@@ -416,6 +423,7 @@ struct PSQLRowStreamTests {
         #expect(stream.commandTag == "SELECT 1")
     }
 
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
     @Test func consumersCanBeAttachedFromOffTheEventLoop() async throws {
         let eventLoop = NIOSingletons.posixEventLoopGroup.next()
         let logger = self.logger
@@ -440,9 +448,9 @@ struct PSQLRowStreamTests {
             )
         }.get()
 
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         try await onRowStream.onRow { _ in
-            counter.wrappingIncrement(ordering: .relaxed)
+            counter.wrappingAdd(1, ordering: .relaxed)
         }.get()
         #expect(counter.load(ordering: .relaxed) == 0)
     }
