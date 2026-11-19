@@ -13,7 +13,7 @@ Currently, a user can see that a request was slow, but not which query made it s
 The spans listed here are taken from the [OTel Semantic Conventions for database clients](https://opentelemetry.io/docs/specs/semconv/db/database-spans/).
 We emit one span per:
 - structured `query` call (`SELECT`, `INSERT`, `DELETE`, and so on);
-- prepared statement preparation;
+- prepared statement execution, including the preparation the first time a connection runs the statement;
 - `COPY ... FROM STDIN` import;
 - `withTransaction` block.
 
@@ -50,7 +50,7 @@ The spec defines a fallback chain for the span name:
 4. `{db.system.name}` (`postgresql` by default)
 
 The PSQL conventions say `db.operation.name` should only be recorded "if the operation is executed via a higher-level API that does not support multiple operation names", and that it "SHOULD NOT be extracted from `db.query.text`". We therefore never parse SQL to obtain it. What we can know without touching the query text is:
-- prepared statements: we can read it from the Swift type name (`PostgresPreparedStatement.name`);
+- prepared statements: the Swift type name (`PostgresPreparedStatement.name`) is a low cardinality summary, so it becomes `db.query.summary` and names the span;
 - `COPY`: the target table comes from the API, so `db.collection.name` is set and `db.operation.name` is `COPY`;
 - transactions: we write `BEGIN`, `COMMIT` and `ROLLBACK` ourselves, so naming them is not extraction. The scope span is named `TRANSACTION`.
 
@@ -85,7 +85,7 @@ The table below applies to query, prepared statement and `COPY` spans. `db.syste
 | `error.type`                | Conditionally required, if and only if the operation failed                                                      | string | Class of error. See Errors.                                                                         | `23505`; `cancelled`; `_OTHER`       |
 | `server.port`               | Conditionally required, if not 5432 and `server.address` is set                                                  | int    | Server port number.                                                                                 | `6432`                               |
 | `db.collection.name`        | Recommended, if the operation is executed via a higher-level API that does not support multiple collection names | string | The name of a table. Never extracted from `db.query.text`.                                          | `customers`                          |
-| `db.operation.name`         | Recommended, if derivable from the API surface                                                                   | string | The operation being executed. See Naming.                                                           | `COPY`; `PREPARE`                    |
+| `db.operation.name`         | Recommended, if derivable from the API surface                                                                   | string | The operation being executed. See Naming.                                                           | `COPY`                               |
 | `db.query.summary`          | Recommended, if supplied by the caller                                                                           | string | Low cardinality summary of the query.                                                               | `SELECT users`; `get user by id`     |
 | `db.query.text`             | Recommended                                                                                                      | string | The query as sent, verbatim, with native placeholders.                                              | `SELECT * FROM users WHERE id = $1`  |
 | `server.address`            | Recommended                                                                                                      | string | Name of the database host, or the socket path.                                                      | `example.com`; `/tmp/.s.PGSQL.5432`  |
@@ -94,7 +94,7 @@ The table below applies to query, prepared statement and `COPY` spans. `db.syste
 | `db.response.returned_rows` | Opt-In                                                                                                           | int    | Number of rows returned by the operation.                                                           | `30`                                 |
 
 Notes: 
-  - Prepared statement preparation: `db.query.text` is the statement being prepared and `db.operation.name` is `PREPARE`. No `db.response.returned_rows`.
+  - Prepared statements: `db.query.summary` is the Swift type name. No `db.operation.name`.
   - `COPY`: `db.collection.name` is known from the API and is set. No `db.query.summary`.
   - Transaction scope: `db.system.name`, `db.namespace` and `server.*` only. No query-level attributes as those live on the child spans.
 
