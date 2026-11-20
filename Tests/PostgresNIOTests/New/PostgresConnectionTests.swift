@@ -815,6 +815,58 @@ import Synchronization
         }
     }
 
+    @Test func testCopyFromCSV() async throws {
+        try await expectCopyFrom(format: .csv(.init())) { writer in
+            try await writer.write(ByteBuffer(staticString: "1,\"Alice, Jr.\"\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT csv)"#)
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel, _ in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "1,\"Alice, Jr.\"\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
+    @Test func testCopyFromCSVWithOptions() async throws {
+        var options = PostgresCopyFromFormat.CSVOptions()
+        options.delimiter = ";"
+        options.quote = "'"
+        options.escape = "\\"
+        options.header = .bool(true)
+        try await expectCopyFrom(format: .csv(options)) { writer in
+            try await writer.write(ByteBuffer(staticString: "id;name\n1;'Alice'\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT csv,DELIMITER U&'\003b',ESCAPE U&'\005c',QUOTE U&'\0027',HEADER true)"#)
+            #expect(copyRequest.bind.parameters == [])
+        } mockBackend: { channel, _ in
+            let data = try await channel.waitForCopyData()
+            #expect(String(buffer: data.data) == "id;name\n1;'Alice'\n")
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
+    @Test(arguments: [
+        (PostgresCopyFromFormat.HeaderOption.bool(true), "HEADER true"),
+        (PostgresCopyFromFormat.HeaderOption.bool(false), "HEADER false"),
+        (PostgresCopyFromFormat.HeaderOption.match, "HEADER match"),
+    ])
+    func testCopyFromCSVHeaderOption(header: PostgresCopyFromFormat.HeaderOption, expectedClause: String) async throws {
+        var options = PostgresCopyFromFormat.CSVOptions()
+        options.header = header
+        try await expectCopyFrom(format: .csv(options)) { writer in
+            try await writer.write(ByteBuffer(staticString: "id,name\n1,Alice\n"))
+        } validateCopyRequest: { copyRequest in
+            #expect(copyRequest.parse.query == #"COPY "copy_table"("id","name") FROM STDIN WITH (FORMAT csv,"# + expectedClause + ")")
+        } mockBackend: { channel, _ in
+            let data = try await channel.waitForCopyData()
+            #expect(data.result == .done)
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+        }
+    }
+
     @Test func testCopyFromWriterFails() async throws {
         struct MyError: Error {}
 
