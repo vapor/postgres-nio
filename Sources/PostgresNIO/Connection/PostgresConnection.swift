@@ -300,6 +300,15 @@ public final class PostgresConnection: Sendable {
         }
     }
 
+    func writeTask<Value>(_ task: HandlerTask, failing promise: EventLoopPromise<Value>) {
+        // The result promise cannot acknowledge acceptance before the server responds.
+        let writePromise = self.channel.eventLoop.makePromise(of: Void.self)
+        writePromise.futureResult.whenFailure { error in
+            promise.fail(PSQLError.clientClosedConnection(underlying: error))
+        }
+        self.channel.write(task, promise: writePromise)
+    }
+
     // MARK: Query
 
     private func queryStream(_ query: PostgresQuery, logger: Logger) -> EventLoopFuture<PSQLRowStream> {
@@ -316,7 +325,7 @@ public final class PostgresConnection: Sendable {
             promise: promise
         )
 
-        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        self.writeTask(HandlerTask.extendedQuery(context), failing: promise)
 
         return promise.futureResult
     }
@@ -333,7 +342,7 @@ public final class PostgresConnection: Sendable {
             promise: promise
         )
 
-        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        self.writeTask(HandlerTask.extendedQuery(context), failing: promise)
         return promise.futureResult.map { rowDescription in
             PSQLPreparedStatement(name: name, query: query, connection: self, rowDescription: rowDescription)
         }
@@ -349,7 +358,7 @@ public final class PostgresConnection: Sendable {
             logger: logger,
             promise: promise)
 
-        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        self.writeTask(HandlerTask.extendedQuery(context), failing: promise)
         return promise.futureResult
     }
 
@@ -357,7 +366,7 @@ public final class PostgresConnection: Sendable {
         let promise = self.channel.eventLoop.makePromise(of: Void.self)
         let context = CloseCommandContext(target: target, logger: logger, promise: promise)
 
-        self.channel.write(HandlerTask.closeCommand(context), promise: nil)
+        self.writeTask(HandlerTask.closeCommand(context), failing: promise)
         return promise.futureResult
     }
 
@@ -526,7 +535,7 @@ extension PostgresConnection {
             promise: promise
         )
 
-        self.channel.write(HandlerTask.extendedQuery(context), promise: nil)
+        self.writeTask(HandlerTask.extendedQuery(context), failing: promise)
 
         do {
             return try await promise.futureResult.map({ $0.asyncSequence() }).get()
@@ -612,7 +621,7 @@ extension PostgresConnection {
             logger: logger,
             promise: promise
         ))
-        self.channel.write(task, promise: nil)
+        self.writeTask(task, failing: promise)
         do {
             return try await promise.futureResult
                 .map { $0.asyncSequence() }
@@ -647,7 +656,7 @@ extension PostgresConnection {
             logger: logger,
             promise: promise
         ))
-        self.channel.write(task, promise: nil)
+        self.writeTask(task, failing: promise)
         do {
             return try await promise.futureResult
                 .map { $0.commandTag }
