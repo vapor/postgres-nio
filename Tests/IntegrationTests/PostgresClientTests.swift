@@ -5,6 +5,8 @@ import NIOSSL
 import Logging
 import Atomics
 import Foundation
+import Metrics
+import MetricsTestKit
 
 @Suite(.serialized)
 struct PostgresClientTests {
@@ -43,6 +45,33 @@ struct PostgresClientTests {
         }
     }
     
+    @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
+    @Test func poolTimersAreRecorded() async throws {
+        let metrics = TestMetrics()
+        let clientConfig = PostgresClient.Configuration.makeTestConfiguration()
+        let client = withMetricsFactory(metrics) {
+            PostgresClient(configuration: clientConfig, eventLoopGroup: MultiThreadedEventLoopGroup.singleton)
+        }
+
+        try await withThrowingTaskGroup(of: Void.self) { taskGroup in
+            taskGroup.addTask {
+                await client.run()
+            }
+
+            try await client.withConnection { connection in
+                _ = try await connection.query("SELECT 1", logger: Logger(label: "test"))
+            }
+
+            taskGroup.cancelAll()
+        }
+
+        let pool = [("db.client.connection.pool.name", "postgresnio-connection-pool")]
+        #expect(try metrics.expectTimer("db.client.connection.create_time", pool).values.count == 1)
+        #expect(try metrics.expectTimer("db.client.connection.create_time", pool).values.first! > 0)
+        #expect(try metrics.expectTimer("db.client.connection.wait_time", pool).values.count == 1)
+        #expect(try metrics.expectTimer("db.client.connection.use_time", pool).values.count == 1)
+    }
+
     @available(macOS 13.0, iOS 16.0, tvOS 16.0, watchOS 9.0, *)
     @Test func transaction() async throws {
         var mlogger = Logger(label: "test")

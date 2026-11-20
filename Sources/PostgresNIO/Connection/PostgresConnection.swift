@@ -49,10 +49,13 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
 
-    init(channel: any Channel, connectionID: ID, logger: Logger) {
+    let metrics: PostgresMetrics
+
+    init(channel: any Channel, connectionID: ID, logger: Logger, metrics: PostgresMetrics) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
+        self.metrics = metrics
     }
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
@@ -233,7 +236,12 @@ public final class PostgresConnection: Sendable {
                     )
                 }
 
-                let connection = PostgresConnection(channel: channel, connectionID: connectionID, logger: logger)
+                let connection = PostgresConnection(
+                    channel: channel,
+                    connectionID: connectionID,
+                    logger: logger,
+                    metrics: PostgresMetrics(configuration: configuration, remoteAddress: channel.remoteAddress)
+                )
                 return connection.start(configuration: configuration).map { _ in
                     timeoutTask.cancel()
                     return connection
@@ -729,10 +737,12 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> Result {
-        let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
-        defer { rows.invalidate(file: file, line: line) }
-
-        return try await body(rows)
+        try await self.withScopedRows(
+            file: file,
+            line: line,
+            start: { try await self.startScopedQuery(query, logger: logger, file: file, line: line) },
+            body
+        )
     }
 
     /// Run a query on the Postgres server the connection is connected to and return the query's metadata
@@ -761,12 +771,38 @@ extension PostgresConnection {
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) {
-        let rows = try await self.startScopedQuery(query, logger: logger, file: file, line: line)
-        defer { rows.invalidate(file: file, line: line) }
+        try await self.withScopedRows(
+            file: file,
+            line: line,
+            start: { try await self.startScopedQuery(query, logger: logger, file: file, line: line) }
+        ) {
+            let result = try await body($0)
+            let metadata = try await self.consumedMetadata(of: $0, query: query, file: file, line: line)
+            return (result, metadata)
+        }
+    }
 
-        let result = try await body(rows)
-        let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
-        return (result, metadata)
+    /// Runs `body` on the rows `start` produces, invalidates them once `body` returns and records the
+    /// operation's duration, from before `start` until `body` returns.
+    @usableFromInline
+    func withScopedRows<Result>(
+        file: String,
+        line: Int,
+        start: () async throws -> PostgresRowSequence,
+        _ body: (PostgresRowSequence) async throws -> Result
+    ) async throws -> Result {
+        let startTime = self.metrics.startTiming()
+        do {
+            let rows = try await start()
+            defer { rows.invalidate(file: file, line: line) }
+
+            let result = try await body(rows)
+            self.metrics.record(start: startTime, error: nil)
+            return result
+        } catch {
+            self.metrics.record(start: startTime, error: error)
+            throw error
+        }
     }
 
     @usableFromInline
@@ -820,10 +856,13 @@ extension PostgresConnection {
         _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
     ) async throws -> Result where Row == Statement.Row {
         let query = try PostgresQuery(unsafeSQL: Statement.sql, binds: preparedStatement.makeBindings())
-        let rows = try await startScopedExecute(Statement.self, query, logger: logger, file: file, line: line)
-        defer { rows.invalidate(file: file, line: line) }
-
-        return try await body(rows.map { try preparedStatement.decodeRow($0) })
+        return try await self.withScopedRows(
+            file: file,
+            line: line,
+            start: { try await self.startScopedExecute(Statement.self, query, logger: logger, file: file, line: line) }
+        ) {
+            try await body($0.map { try preparedStatement.decodeRow($0) })
+        }
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary, and return the
@@ -853,14 +892,15 @@ extension PostgresConnection {
         _ body: (AsyncThrowingMapSequence<PostgresRowSequence, Row>) async throws -> Result
     ) async throws -> (result: Result, metadata: PostgresQueryMetadata) where Row == Statement.Row {
         let query = try PostgresQuery(unsafeSQL: Statement.sql, binds: preparedStatement.makeBindings())
-        let rows = try await startScopedExecute(Statement.self, query, logger: logger, file: file, line: line)
-        defer { rows.invalidate(file: file, line: line) }
-
-        let result = try await body(rows.map { try preparedStatement.decodeRow($0) })
-
-        let metadata = try await self.consumedMetadata(of: rows, query: query, file: file, line: line)
-
-        return (result, metadata)
+        return try await self.withScopedRows(
+            file: file,
+            line: line,
+            start: { try await self.startScopedExecute(Statement.self, query, logger: logger, file: file, line: line) }
+        ) {
+            let result = try await body($0.map { try preparedStatement.decodeRow($0) })
+            let metadata = try await self.consumedMetadata(of: $0, query: query, file: file, line: line)
+            return (result, metadata)
+        }
     }
 
     @usableFromInline

@@ -1,5 +1,6 @@
-
-public protocol ConnectionPoolObservabilityDelegate: Sendable {
+/// Observes what happens inside a ``ConnectionPool``: connections being created, kept alive and closed, and,
+/// through ``ConnectionPoolStatisticsReporter/report(statistics:)``, snapshots of the pool's state.
+public protocol ConnectionPoolObservabilityDelegate: ConnectionPoolStatisticsReporter, Sendable {
     associatedtype ConnectionID: Hashable & Sendable
 
     /// The connection with the given ID has started trying to establish a connection. The outcome
@@ -59,4 +60,6 @@ public struct NoOpConnectionPoolMetrics<ConnectionID: Hashable & Sendable>: Conn
     public func connectionClosed(id: ConnectionID, error: (any Error)?) {}
 
     public func requestQueueDepthChanged(_ newDepth: Int) {}
+
+    public func report(statistics: ConnectionPoolStatistics) {}
 }
