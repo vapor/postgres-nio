@@ -784,6 +784,83 @@ import Synchronization
         }
     }
 
+    @Test func testErrorAfterCommandCompleteFailsQuery() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+                taskGroup.addTask {
+                    let error = await #expect(throws: PSQLError.self) {
+                        try await connection.query("INSERT INTO child (parent_id) VALUES (42)", logger: .psqlTest)
+                    }
+                    #expect(error?.serverInfo?[.sqlState] == "23503")
+                    // Send another query to ensure that the connection can still be used. We don't wait for this
+                    // to finish, just to receive its messages on the other side.
+                    _ = connection.simpleQuery("DUMMY")
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.sendUnpreparedRequestWithNoParametersBindResponse()
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("INSERT 0 1"))
+                // The backend checks a deferred constraint when it commits the statement. That is after it has
+                // sent the `CommandComplete`.
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                    .message: #"insert or update on table "child" violates foreign key constraint "child_parent_id_fkey""#,
+                    .sqlState: "23503" // foreign_key_violation
+                ])))
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
+            }
+        }
+    }
+
+    @Test func testErrorAfterCommandCompleteFailsRowSequence() async throws {
+        try await self.withAsyncTestingChannel { connection, channel in
+            try await withThrowingTaskGroup(of: Void.self) { taskGroup async throws -> () in
+                taskGroup.addTask {
+                    let rows = try await connection.query(
+                        "INSERT INTO child (parent_id) VALUES (42) RETURNING parent_id", logger: .psqlTest
+                    )
+                    let error = await #expect(throws: PSQLError.self) {
+                        for try await _ in rows {}
+                    }
+                    #expect(error?.serverInfo?[.sqlState] == "23503")
+                    // Send another query to ensure that the connection can still be used. We don't wait for this
+                    // to finish, just to receive its messages on the other side.
+                    _ = connection.simpleQuery("DUMMY")
+                }
+
+                _ = try await channel.waitForUnpreparedRequest()
+                try await channel.writeInbound(PostgresBackendMessage.parseComplete)
+                try await channel.writeInbound(PostgresBackendMessage.parameterDescription(.init(dataTypes: [])))
+                try await channel.writeInbound(PostgresBackendMessage.rowDescription(.init(columns: [
+                    .init(
+                        name: "parent_id",
+                        tableOID: 12222,
+                        columnAttributeNumber: 1,
+                        dataType: .int4,
+                        dataTypeSize: 4,
+                        dataTypeModifier: -1,
+                        format: .binary
+                    )
+                ])))
+                try await channel.writeInbound(PostgresBackendMessage.bindComplete)
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.dataRow([ByteBuffer(integer: Int32(42))]))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.commandComplete("INSERT 0 1"))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                    .message: #"insert or update on table "child" violates foreign key constraint "child_parent_id_fkey""#,
+                    .sqlState: "23503" // foreign_key_violation
+                ])))
+                try await channel.testingEventLoop.executeInContext { channel.read() }
+                try await channel.writeInbound(PostgresBackendMessage.readyForQuery(.idle))
+
+                _ = try await channel.waitForUnpreparedRequest() // Await the dummy query messages
+            }
+        }
+    }
+
     @Test func testCopyFromSucceeds() async throws {
         try await expectCopyFrom { writer in
             try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
@@ -864,6 +941,23 @@ import Synchronization
             try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
                 .message: #"invalid input syntax for type integer: "1Alice""#,
                 .sqlState : "22P02" // invalid_text_representation
+            ])))
+        }
+    }
+
+    @Test func testCopyFromBackendSendsErrorAfterCommandComplete() async throws {
+        try await expectCopyFrom { writer in
+            try await writer.write(ByteBuffer(staticString: "1\tAlice\n"))
+        } validateCopyFromError: { error in
+            #expect((error as? PSQLError)?.serverInfo?[.sqlState] == "23503")
+        } mockBackend: { channel, _ in
+            _ = try await channel.waitForCopyData()
+            try await channel.writeInbound(PostgresBackendMessage.commandComplete("COPY 1"))
+            // The backend checks a deferred constraint when it commits the statement. That is after it has sent
+            // the `CommandComplete`.
+            try await channel.writeInbound(PostgresBackendMessage.error(.init(fields: [
+                .message: #"insert or update on table "copy_table" violates foreign key constraint "copy_table_id_fkey""#,
+                .sqlState : "23503" // foreign_key_violation
             ])))
         }
     }

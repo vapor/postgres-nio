@@ -19,7 +19,9 @@ import Logging
         #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
         #expect(state.noDataReceived() == .wait)
         #expect(state.bindCompleteReceived() == .wait)
-        #expect(state.commandCompletedReceived("DELETE 1") == .succeedQuery(promise, with: .init(value: .noRows(.tag("DELETE 1")), logger: logger)))
+        // The result is held back until the backend is ready for the next query.
+        #expect(state.commandCompletedReceived("DELETE 1") == .wait)
+        #expect(state.handOutHeldQueryResult() == .succeedQuery(promise, with: .init(value: .noRows(.tag("DELETE 1")), logger: logger)))
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
     
@@ -73,7 +75,9 @@ import Logging
         #expect(state.dataRowReceived(row5) == .wait)
         #expect(state.dataRowReceived(row6) == .wait)
         
-        #expect(state.commandCompletedReceived("SELECT 2") == .forwardStreamComplete([row5, row6], commandTag: "SELECT 2"))
+        // The end of the stream is held back until the backend is ready for the next query.
+        #expect(state.commandCompletedReceived("SELECT 2") == .wait)
+        #expect(state.handOutHeldQueryResult() == .forwardStreamComplete([row5, row6], commandTag: "SELECT 2"))
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
@@ -154,6 +158,7 @@ import Logging
         #expect(state.readEventCaught() == .read)
 
         #expect(state.commandCompletedReceived("SELECT 2") == .wait)
+        #expect(state.handOutHeldQueryResult() == .wait)
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
@@ -196,6 +201,7 @@ import Logging
         #expect(state.readEventCaught() == .read)
 
         #expect(state.commandCompletedReceived("SELECT 4") == .wait)
+        #expect(state.handOutHeldQueryResult() == .wait)
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
     }
 
@@ -315,5 +321,138 @@ import Logging
         #expect(state.errorReceived(serverError) == .wait)
 
         #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
+    }
+
+    @Test func testErrorAfterCommandCompleteFailsQueryWithoutRows() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "INSERT INTO table (id) VALUES (\(1))"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        #expect(state.enqueue(task: .extendedQuery(queryContext)) == .sendParseDescribeBindExecuteSync(query))
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+        #expect(state.noDataReceived() == .wait)
+        #expect(state.bindCompleteReceived() == .wait)
+        #expect(state.commandCompletedReceived("INSERT 0 1") == .wait)
+
+        // The backend checks a deferred constraint when it commits the statement, which is after it has sent
+        // the `CommandComplete`.
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "ERROR", .sqlState: "23503"])
+        #expect(state.errorReceived(serverError) == .failQuery(promise, with: .server(serverError), cleanupContext: .none))
+
+        #expect(state.handOutHeldQueryResult() == .wait)
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
+    }
+
+    @Test func testErrorAfterCommandCompleteFailsRowStream() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "INSERT INTO table (id) VALUES (\(1)) RETURNING id"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        #expect(state.enqueue(task: .extendedQuery(queryContext)) == .sendParseDescribeBindExecuteSync(query))
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+
+        let columns: [RowDescription.Column] = [
+            .init(name: "id", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: -1, format: .binary)
+        ]
+        #expect(state.rowDescriptionReceived(.init(columns: columns)) == .wait)
+        #expect(state.bindCompleteReceived() == .succeedQuery(promise, with: .init(value: .rowDescription(columns), logger: logger)))
+        #expect(state.dataRowReceived([ByteBuffer(integer: 1)]) == .wait)
+        #expect(state.commandCompletedReceived("INSERT 0 1") == .wait)
+
+        // The consumer may ask for more rows while the end of the stream is held back. We keep reading to receive
+        // the `ReadyForQuery`.
+        #expect(state.requestQueryRows() == .wait)
+        #expect(state.channelReadComplete() == .wait)
+        #expect(state.readEventCaught() == .read)
+
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "ERROR", .sqlState: "23503"])
+        #expect(state.errorReceived(serverError) == .forwardStreamError(.server(serverError), read: false, cleanupContext: .none))
+
+        #expect(state.handOutHeldQueryResult() == .wait)
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
+    }
+
+    @Test func testErrorAfterCommandCompleteOfCancelledQueryDoesNotKillConnection() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "INSERT INTO table (id) VALUES (\(1)) RETURNING id"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        #expect(state.enqueue(task: .extendedQuery(queryContext)) == .sendParseDescribeBindExecuteSync(query))
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+
+        let columns: [RowDescription.Column] = [
+            .init(name: "id", tableOID: 0, columnAttributeNumber: 0, dataType: .int8, dataTypeSize: 8, dataTypeModifier: -1, format: .binary)
+        ]
+        #expect(state.rowDescriptionReceived(.init(columns: columns)) == .wait)
+        #expect(state.bindCompleteReceived() == .succeedQuery(promise, with: .init(value: .rowDescription(columns), logger: logger)))
+        #expect(state.cancel() == .forwardStreamError(.queryCancelled, read: false, cleanupContext: nil))
+        #expect(state.commandCompletedReceived("INSERT 0 1") == .wait)
+
+        let serverError = PostgresBackendMessage.ErrorResponse(fields: [.severity: "ERROR", .sqlState: "23503"])
+        #expect(state.errorReceived(serverError) == .wait)
+
+        #expect(state.handOutHeldQueryResult() == .wait)
+        #expect(state.readyForQueryReceived(.idle) == .fireEventReadyForQuery)
+    }
+
+    @Test func testQueuedQueryStartsAfterHeldResultIsHandedOut() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "DELETE FROM table WHERE id=\(1)"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        let nextPromise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        nextPromise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let nextQuery: PostgresQuery = "DELETE FROM table WHERE id=\(2)"
+        let nextQueryContext = ExtendedQueryContext(query: nextQuery, logger: logger, promise: nextPromise)
+
+        #expect(state.enqueue(task: .extendedQuery(queryContext)) == .sendParseDescribeBindExecuteSync(query))
+        #expect(state.enqueue(task: .extendedQuery(nextQueryContext)) == .wait)
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+        #expect(state.noDataReceived() == .wait)
+        #expect(state.bindCompleteReceived() == .wait)
+        #expect(state.commandCompletedReceived("DELETE 1") == .wait)
+        #expect(state.handOutHeldQueryResult() == .succeedQuery(promise, with: .init(value: .noRows(.tag("DELETE 1")), logger: logger)))
+        #expect(state.readyForQueryReceived(.idle) == .sendParseDescribeBindExecuteSync(nextQuery))
+    }
+
+    @Test func testConnectionClosedBeforeReadyForQueryFailsQuery() throws {
+        var state = try ConnectionStateMachine.makeReadyForQuery()
+
+        let logger = Logger.psqlTest
+        let promise = EmbeddedEventLoop().makePromise(of: PSQLRowStream.self)
+        promise.fail(PSQLError.uncleanShutdown) // we don't care about the error at all.
+        let query: PostgresQuery = "DELETE FROM table WHERE id=\(1)"
+        let queryContext = ExtendedQueryContext(query: query, logger: logger, promise: promise)
+
+        #expect(state.enqueue(task: .extendedQuery(queryContext)) == .sendParseDescribeBindExecuteSync(query))
+        #expect(state.parseCompleteReceived() == .wait)
+        #expect(state.parameterDescriptionReceived(.init(dataTypes: [.int8])) == .wait)
+        #expect(state.noDataReceived() == .wait)
+        #expect(state.bindCompleteReceived() == .wait)
+        #expect(state.commandCompletedReceived("DELETE 1") == .wait)
+
+        // Without a `ReadyForQuery` we do not know whether the backend has committed the statement.
+        let error = PSQLError.serverClosedConnection(underlying: nil)
+        #expect(state.closed() == .failQuery(promise, with: error, cleanupContext: .init(action: .fireChannelInactive, tasks: [], error: error, closePromise: nil)))
     }
 }
