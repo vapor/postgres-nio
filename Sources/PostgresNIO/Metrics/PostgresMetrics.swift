@@ -55,8 +55,8 @@ struct PostgresMetrics: Sendable {
         var dimensions = self.baseDimensions
         if let error {
             let psqlError = error as? PSQLError
-            dimensions.append(("error.type", psqlError?.metricsErrorType ?? "_OTHER"))
-            if let statusCode = psqlError?.metricsStatusCode {
+            dimensions.append(("error.type", psqlError?.telemetryErrorType ?? "_OTHER"))
+            if let statusCode = psqlError?.telemetryStatusCode {
                 dimensions.append(("db.response.status_code", statusCode))
             }
         }
@@ -66,16 +66,16 @@ struct PostgresMetrics: Sendable {
 
 extension PSQLError {
     /// The value to report as `error.type`: `cancelled` for cancelled queries, otherwise the
-    /// ``metricsStatusCode``. `nil` when the error carries no recognisable code.
-    var metricsErrorType: String? {
-        self.code == .queryCancelled ? "cancelled" : self.metricsStatusCode
+    /// ``telemetryStatusCode``. `nil` when the error carries no recognisable code.
+    var telemetryErrorType: String? {
+        self.code == .queryCancelled ? "cancelled" : self.telemetryStatusCode
     }
 
     /// The SQLSTATE to report as `db.response.status_code`, or `nil` when the error didn't come from the server.
     ///
     /// A SQLSTATE is accepted only when it looks like one - five upper-case ASCII letters or digits, such as
     /// `42P01` - so that a server returning unusual text cannot inflate the cardinality of the metric.
-    var metricsStatusCode: String? {
+    var telemetryStatusCode: String? {
         guard self.code == .server, let sqlState = self.serverInfo?[.sqlState] else {
             return nil
         }

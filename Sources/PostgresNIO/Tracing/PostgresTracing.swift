@@ -114,8 +114,8 @@ struct PostgresTracing: Sendable {
         guard let span else { return }
         let psqlError = error as? PSQLError
         span.updateAttributes { attributes in
-            attributes["error.type"] = psqlError?.metricsErrorType ?? "_OTHER"
-            attributes["db.response.status_code"] = psqlError?.metricsStatusCode
+            attributes["error.type"] = psqlError?.telemetryErrorType ?? "_OTHER"
+            attributes["db.response.status_code"] = psqlError?.telemetryStatusCode
         }
         span.setStatus(.init(code: .error))
     }
