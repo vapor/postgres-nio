@@ -83,22 +83,24 @@ import Testing
     }
 }
 
-@Suite struct PostgresMetricsErrorTypeTests {
+@Suite struct PostgresTelemetryErrorTypeTests {
     @Test func serverErrorReportsItsSQLState() {
-        #expect(PSQLError.server(.init(fields: [.sqlState: "42P01"])).metricsErrorType == "42P01")
+        #expect(PSQLError.server(.init(fields: [.sqlState: "42P01"])).telemetryErrorType == "42P01")
     }
 
-    @Test func malformedSQLStateIsNotReported() {
-        #expect(PSQLError.server(.init(fields: [.sqlState: "not a code"])).metricsErrorType == nil)
-        #expect(PSQLError.server(.init(fields: [.sqlState: "42p01"])).metricsErrorType == nil)
+    @Test(arguments: ["not a code", "42p01", "2350", "235050", "23a05", "2350!", ""])
+    func malformedSQLStateIsNotReported(sqlState: String) {
+        let error = PSQLError.server(.init(fields: [.sqlState: sqlState]))
+        #expect(error.telemetryErrorType == nil)
+        #expect(error.telemetryStatusCode == nil)
     }
 
     @Test func cancelledQueryReportsCancelled() {
-        #expect(PSQLError.queryCancelled.metricsErrorType == "cancelled")
-        #expect(PSQLError.queryCancelled.metricsStatusCode == nil)
+        #expect(PSQLError.queryCancelled.telemetryErrorType == "cancelled")
+        #expect(PSQLError.queryCancelled.telemetryStatusCode == nil)
     }
 
     @Test func otherClientErrorsAreNotReported() {
-        #expect(PSQLError.serverClosedConnection(underlying: nil).metricsErrorType == nil)
+        #expect(PSQLError.serverClosedConnection(underlying: nil).telemetryErrorType == nil)
     }
 }

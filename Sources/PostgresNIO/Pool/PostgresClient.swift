@@ -145,6 +145,9 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
             /// reduced by a random amount of up to 2.5%.
             public var maximumConnectionLifetime: Duration? = nil
 
+            /// Tracing configuration.
+            public var tracing: PostgresTracingConfiguration = PostgresTracingConfiguration()
+
             /// Create an options structure with default values.
             ///
             /// Most users should not need to adjust the defaults.
@@ -442,6 +445,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
+    ///   - summary: A low-cardinality summary of the query (e.g. `SELECT users`), used as the span's name and
+    ///              recorded as `db.query.summary`. Must not contain values, such as an id.
     ///   - file: The file the query was started in. Used for better error reporting.
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
@@ -450,6 +455,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
+        summary: String? = nil,
         file: String = #fileID,
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
@@ -459,7 +465,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         defer { lease.release() }
 
-        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+        return try await lease.connection.query(query, logger: logger, summary: summary, file: file, line: line, body)
     }
 
     /// Run a query on the Postgres server the client is connected to.
@@ -470,6 +476,8 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     /// - Parameters:
     ///   - query: The ``PostgresQuery`` to run
     ///   - logger: The `Logger` to log into for the query
+    ///   - summary: A low-cardinality summary of the query (e.g. `SELECT users`), used as the span's name and
+    ///              recorded as `db.query.summary`. Must not contain values, such as an id.
     ///   - file: The file the query was started in. Used for better error reporting.
     ///   - line: The line the query was started in. Used for better error reporting.
     ///   - body: The closure that's used to consume the query result.
@@ -479,6 +487,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
     public func query<Result>(
         _ query: PostgresQuery,
         logger: Logger? = nil,
+        summary: String? = nil,
         file: String = #fileID,
         line: Int = #line,
         _ body: (PostgresRowSequence) async throws -> Result
@@ -488,7 +497,7 @@ public final class PostgresClient: Sendable, ServiceLifecycle.Service {
 
         defer { lease.release() }
 
-        return try await lease.connection.query(query, logger: logger, file: file, line: line, body)
+        return try await lease.connection.query(query, logger: logger, summary: summary, file: file, line: line, body)
     }
 
     /// Execute a prepared statement, taking care of the preparation when necessary.

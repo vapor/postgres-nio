@@ -60,6 +60,8 @@ final class PSQLRowStream: Sendable {
     private let lookupTable: [String: Int]
     private let downstreamStateBox: NIOLoopBoundBox<DownstreamState>
     private let invalidation = ManagedAtomicLazyReference<InvalidatedError>()
+    /// The number of rows the server has sent for this query so far. Used for tracing.
+    let receivedRowCount = ManagedAtomic(0)
 
     init(
         source: Source,
@@ -481,6 +483,7 @@ final class PSQLRowStream: Sendable {
         self.logger.trace("Row stream received rows", metadata: [
             "row_count": "\(newRows.count)"
         ])
+        self.receivedRowCount.wrappingIncrement(by: newRows.count, ordering: .relaxed)
 
         let action = self.downstreamStateBox.withValue { state -> ReceiveRowsAction in
             switch state {
