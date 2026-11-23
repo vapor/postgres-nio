@@ -50,13 +50,16 @@ public final class PostgresConnection: Sendable {
 
     private let _logger: Logger
     let tracing: PostgresTracing
+    let metrics: PostgresMetrics
 
-    init(channel: any Channel, connectionID: ID, logger: Logger, tracing: PostgresTracing) {
+    init(channel: any Channel, connectionID: ID, logger: Logger, metrics: PostgresMetrics, tracing: PostgresTracing) {
         self.channel = channel
         self.id = connectionID
         self._logger = logger
+        self.metrics = metrics
         self.tracing = tracing
     }
+
     deinit {
         assert(self.isClosed, "PostgresConnection deinitialized before being closed.")
     }
@@ -240,6 +243,7 @@ public final class PostgresConnection: Sendable {
                     channel: channel,
                     connectionID: connectionID,
                     logger: logger,
+                    metrics: PostgresMetrics(configuration: configuration, remoteAddress: channel.remoteAddress),
                     tracing: PostgresTracing(configuration: configuration, remoteAddress: channel.remoteAddress)
                 )
                 return connection.start(configuration: configuration).map { _ in
@@ -809,6 +813,8 @@ extension PostgresConnection {
         }
     }
 
+    /// Runs `body` on the rows `start` produces, invalidates them once `body` returns and records the
+    /// operation's span and duration, from before `start` until `body` returns.
     @usableFromInline
     func withScopedRows<Result>(
         summary: String?,
@@ -820,15 +826,18 @@ extension PostgresConnection {
     ) async throws -> Result {
         let span = self.tracing.startSpan(queryText: query.sql, summary: summary)
         defer { span?.end() }
+        let startTime = self.metrics.startTiming()
 
         do {
             let rows = try await start()
             defer { rows.invalidate(file: file, line: line) }
 
             let result = try await body(rows)
+            self.metrics.record(start: startTime, error: nil)
             self.tracing.recordReturnedRows(of: rows, in: span)
             return result
         } catch {
+            self.metrics.record(start: startTime, error: error)
             self.tracing.recordError(error, in: span)
             throw error
         }

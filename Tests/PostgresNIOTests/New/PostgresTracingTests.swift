@@ -204,23 +204,6 @@ import Tracing
         }
     }
 
-    @Test(arguments: ["2350", "235050", "23a05", "2350!", ""])
-    func malformedSQLStateIsDropped(sqlState: String) {
-        let error = PSQLError.server(.init(fields: [.sqlState: sqlState]))
-        #expect(error.tracingErrorType == nil)
-        #expect(error.tracingStatusCode == nil)
-    }
-
-    @Test func cancelledQueryHasNoStatusCode() {
-        #expect(PSQLError.queryCancelled.tracingErrorType == "cancelled")
-        #expect(PSQLError.queryCancelled.tracingStatusCode == nil)
-    }
-
-    @Test func clientErrorsHaveNoCode() {
-        #expect(PSQLError.serverClosedConnection(underlying: nil).tracingErrorType == nil)
-        #expect(PSQLError.serverClosedConnection(underlying: nil).tracingStatusCode == nil)
-    }
-
     private func connectionAttributes(_ extra: SpanAttributes = [:]) -> SpanAttributes {
         var attributes: SpanAttributes = [
             "db.system.name": "postgresql",

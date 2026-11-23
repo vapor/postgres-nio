@@ -1,13 +1,59 @@
 import _ConnectionPoolModule
 import Logging
+import Metrics
+import NIOConcurrencyHelpers
 
 final class PostgresClientMetrics: ConnectionPoolObservabilityDelegate {
     typealias ConnectionID = PostgresConnection.ID
 
-    let logger: Logger
+    struct PoolInstruments {
+        let idleConnections: Gauge
+        let usedConnections: Gauge
+        let pendingRequests: Gauge
+        let createTime: Timer
+        let waitTime: Timer
+        let useTime: Timer
 
-    init(logger: Logger) {
+        init(factory: any MetricsFactory, minimumConnections: Int, maximumConnections: Int) {
+            let pool = [("db.client.connection.pool.name", "postgresnio-connection-pool")]
+
+            // The limits never change, so they are recorded once
+            Gauge(label: "db.client.connection.max", dimensions: pool, factory: factory).record(maximumConnections)
+            Gauge(label: "db.client.connection.idle.max", dimensions: pool, factory: factory).record(maximumConnections)
+            Gauge(label: "db.client.connection.idle.min", dimensions: pool, factory: factory).record(minimumConnections)
+
+            self.idleConnections = Gauge(label: "db.client.connection.count", dimensions: pool + [("db.client.connection.state", "idle")], factory: factory)
+            self.usedConnections = Gauge(label: "db.client.connection.count", dimensions: pool + [("db.client.connection.state", "used")], factory: factory)
+            self.pendingRequests = Gauge(label: "db.client.connection.pending_requests", dimensions: pool, factory: factory)
+            self.createTime = Timer(label: "db.client.connection.create_time", dimensions: pool, factory: factory)
+            self.waitTime = Timer(label: "db.client.connection.wait_time", dimensions: pool, factory: factory)
+            self.useTime = Timer(label: "db.client.connection.use_time", dimensions: pool, factory: factory)
+        }
+    }
+
+    let logger: Logger
+    let poolInstruments: PoolInstruments?
+    private let lastStatisticsID = NIOLockedValueBox(0)
+
+    init(logger: Logger, factory: any MetricsFactory, minimumConnections: Int, maximumConnections: Int) {
         self.logger = logger
+        self.poolInstruments = factory is NOOPMetricsHandler
+            ? nil
+            : PoolInstruments(factory: factory, minimumConnections: minimumConnections, maximumConnections: maximumConnections)
+    }
+
+    func report(statistics: ConnectionPoolStatistics) {
+        guard let instruments = self.poolInstruments else { return }
+
+        // Snapshots can arrive out of order
+        self.lastStatisticsID.withLockedValue { lastID in
+            guard statistics.id > lastID else { return }
+            lastID = statistics.id
+
+            instruments.idleConnections.record(statistics.idleConnectionCount)
+            instruments.usedConnections.record(statistics.usedConnectionCount)
+            instruments.pendingRequests.record(statistics.pendingRequests)
+        }
     }
 
     func startedConnecting(id: ConnectionID) {

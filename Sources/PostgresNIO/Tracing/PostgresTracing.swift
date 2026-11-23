@@ -114,8 +114,8 @@ struct PostgresTracing: Sendable {
         guard let span else { return }
         let psqlError = error as? PSQLError
         span.updateAttributes { attributes in
-            attributes["error.type"] = psqlError?.tracingErrorType ?? "_OTHER"
-            attributes["db.response.status_code"] = psqlError?.tracingStatusCode
+            attributes["error.type"] = psqlError?.metricsErrorType ?? "_OTHER"
+            attributes["db.response.status_code"] = psqlError?.metricsStatusCode
         }
         span.setStatus(.init(code: .error))
     }
@@ -123,29 +123,5 @@ struct PostgresTracing: Sendable {
     func recordReturnedRows(of rows: PostgresRowSequence, in span: (any Span)?) {
         guard self.recordsReturnedRows else { return }
         span?.attributes["db.response.returned_rows"] = rows.stream.receivedRowCount.load(ordering: .relaxed)
-    }
-}
-
-extension PSQLError {
-    /// The value to report as `error.type`: `cancelled` for cancelled queries, otherwise the
-    /// ``tracingStatusCode``. `nil` when the error carries no recognisable code.
-    ///
-    /// A cancelled query is not a server error, so a user may want to filter these out.
-    var tracingErrorType: String? {
-        self.code == .queryCancelled ? "cancelled" : self.tracingStatusCode
-    }
-
-    /// The SQLSTATE to report as `db.response.status_code`, or `nil` when the error didn't come from the server.
-    ///
-    /// A SQLSTATE is accepted only when it looks like one, five upper-case ASCII letters or digits such as
-    /// `42P01`, so that a server returning unusual text cannot inflate the cardinality of the attribute.
-    var tracingStatusCode: String? {
-        guard self.code == .server, let sqlState = self.serverInfo?[.sqlState] else {
-            return nil
-        }
-        guard sqlState.count == 5, sqlState.allSatisfy({ $0.isASCII && ($0.isUppercase || $0.isNumber) }) else {
-            return nil
-        }
-        return sqlState
     }
 }

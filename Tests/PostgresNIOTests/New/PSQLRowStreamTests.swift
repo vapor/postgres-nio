@@ -1,40 +1,41 @@
-import Atomics
-import NIOCore
 import Logging
-import XCTest
-@testable import PostgresNIO
 import NIOCore
 import NIOEmbedded
 import NIOPosix
+import Synchronization
+import Testing
 
-final class PSQLRowStreamTests: XCTestCase {
+@testable import PostgresNIO
+
+@Suite
+struct PSQLRowStreamTests {
     let logger = Logger(label: "PSQLRowStreamTests")
     let eventLoop = EmbeddedEventLoop()
 
-    func testEmptyStream() {
+    @Test func emptyStream() throws {
         let stream = PSQLRowStream(
             source: .noRows(.success(.tag("INSERT 0 1"))),
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        
-        XCTAssertEqual(try stream.all().wait(), [])
-        XCTAssertEqual(stream.commandTag, "INSERT 0 1")
+
+        #expect(try stream.all().wait() == [])
+        #expect(stream.commandTag == "INSERT 0 1")
     }
-    
-    func testFailedStream() {
+
+    @Test func failedStream() {
         let stream = PSQLRowStream(
             source: .noRows(.failure(PSQLError.serverClosedConnection(underlying: nil))),
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        
-        XCTAssertThrowsError(try stream.all().wait()) {
-            XCTAssertEqual($0 as? PSQLError, .serverClosedConnection(underlying: nil))
+
+        #expect(throws: PSQLError.serverClosedConnection(underlying: nil)) {
+            try stream.all().wait()
         }
     }
-    
-    func testGetArrayAfterStreamHasFinished() {
+
+    @Test func getArrayAfterStreamHasFinished() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -44,27 +45,26 @@ final class PSQLRowStreamTests: XCTestCase {
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        XCTAssertEqual(dataSource.hitCancel, 0)
-        
+        #expect(dataSource.hitDemand == 0)
+        #expect(dataSource.hitCancel == 0)
+
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")]
         ])
-        
-        XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
+
+        #expect(dataSource.hitDemand == 0, "Before we have a consumer demand is not signaled")
         stream.receive(completion: .success("SELECT 2"))
-        
+
         // attach consumer
         let future = stream.all()
-        XCTAssertEqual(dataSource.hitDemand, 0) // TODO: Is this right?
-        
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try future.wait())
-        XCTAssertEqual(rows?.count, 2)
+        #expect(dataSource.hitDemand == 0)  // TODO: Is this right?
+
+        let rows = try future.wait()
+        #expect(rows.count == 2)
     }
 
-    func testGetArrayBeforeStreamHasFinished() {
+    @Test func getArrayBeforeStreamHasFinished() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -74,40 +74,40 @@ final class PSQLRowStreamTests: XCTestCase {
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        XCTAssertEqual(dataSource.hitCancel, 0)
-        
+        #expect(dataSource.hitDemand == 0)
+        #expect(dataSource.hitCancel == 0)
+
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")]
         ])
-        
-        XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
-        
+
+        #expect(dataSource.hitDemand == 0, "Before we have a consumer demand is not signaled")
+
         // attach consumer
         let future = stream.all()
-        XCTAssertEqual(dataSource.hitDemand, 1)
-        
+        #expect(dataSource.hitDemand == 1)
+
         stream.receive([
             [ByteBuffer(string: "2")],
             [ByteBuffer(string: "3")]
         ])
-        XCTAssertEqual(dataSource.hitDemand, 2)
-        
+        #expect(dataSource.hitDemand == 2)
+
         stream.receive([
             [ByteBuffer(string: "4")],
             [ByteBuffer(string: "5")]
         ])
-        XCTAssertEqual(dataSource.hitDemand, 3)
-        
+        #expect(dataSource.hitDemand == 3)
+
         stream.receive(completion: .success("SELECT 2"))
-        
-        var rows: [PostgresRow]?
-        XCTAssertNoThrow(rows = try future.wait())
-        XCTAssertEqual(rows?.count, 6)
+
+        let rows = try future.wait()
+        #expect(rows.count == 6)
     }
-    
-    func testOnRowAfterStreamHasFinished() {
+
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowAfterStreamHasFinished() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -117,32 +117,34 @@ final class PSQLRowStreamTests: XCTestCase {
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        XCTAssertEqual(dataSource.hitCancel, 0)
-        
+        #expect(dataSource.hitDemand == 0)
+        #expect(dataSource.hitCancel == 0)
+
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")]
         ])
-        
+
         stream.receive(completion: .success("SELECT 2"))
-        
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        
+
+        #expect(dataSource.hitDemand == 0)
+
         // attach consumer
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
+            let value = try row.decode(String.self, context: .default)
+            #expect(value == "\(expected)")
         }
-        XCTAssertEqual(counter.load(ordering: .relaxed), 2)
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        
-        XCTAssertNoThrow(try future.wait())
-        XCTAssertEqual(stream.commandTag, "SELECT 2")
+        #expect(counter.load(ordering: .relaxed) == 2)
+        #expect(dataSource.hitDemand == 0)
+
+        try future.wait()
+        #expect(stream.commandTag == "SELECT 2")
     }
 
-    func testOnRowThrowsErrorOnInitialBatch() {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowThrowsErrorOnInitialBatch() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -152,38 +154,39 @@ final class PSQLRowStreamTests: XCTestCase {
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        XCTAssertEqual(dataSource.hitCancel, 0)
-        
+        #expect(dataSource.hitDemand == 0)
+        #expect(dataSource.hitCancel == 0)
+
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")],
             [ByteBuffer(string: "2")],
             [ByteBuffer(string: "3")],
         ])
-        
+
         stream.receive(completion: .success("SELECT 2"))
-        
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        
+
+        #expect(dataSource.hitDemand == 0)
+
         // attach consumer
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
+            #expect(try row.decode(String.self, context: .default) == "\(expected)")
             if expected == 1 {
                 throw OnRowError(row: expected)
             }
         }
-        XCTAssertEqual(counter.load(ordering: .relaxed), 2) // one more than where we excited, because we already incremented
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        
-        XCTAssertThrowsError(try future.wait()) {
-            XCTAssertEqual($0 as? OnRowError, OnRowError(row: 1))
+        #expect(counter.load(ordering: .relaxed) == 2)  // one more than where we excited, because we already incremented
+        #expect(dataSource.hitDemand == 0)
+
+        #expect(throws: OnRowError(row: 1)) {
+            try future.wait()
         }
     }
 
-    func testOnRowBeforeStreamHasFinished() {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowBeforeStreamHasFinished() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -193,75 +196,78 @@ final class PSQLRowStreamTests: XCTestCase {
             eventLoop: self.eventLoop,
             logger: self.logger
         )
-        XCTAssertEqual(dataSource.hitDemand, 0)
-        XCTAssertEqual(dataSource.hitCancel, 0)
-        
+        #expect(dataSource.hitDemand == 0)
+        #expect(dataSource.hitCancel == 0)
+
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")]
         ])
-        
-        XCTAssertEqual(dataSource.hitDemand, 0, "Before we have a consumer demand is not signaled")
-        
+
+        #expect(dataSource.hitDemand == 0, "Before we have a consumer demand is not signaled")
+
         // attach consumer
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
+            let value = try row.decode(String.self, context: .default)
+            #expect(value == "\(expected)")
         }
-        XCTAssertEqual(counter.load(ordering: .relaxed), 2)
-        XCTAssertEqual(dataSource.hitDemand, 1)
-        
+        #expect(counter.load(ordering: .relaxed) == 2)
+        #expect(dataSource.hitDemand == 1)
+
         stream.receive([
             [ByteBuffer(string: "2")],
             [ByteBuffer(string: "3")]
         ])
-        XCTAssertEqual(counter.load(ordering: .relaxed), 4)
-        XCTAssertEqual(dataSource.hitDemand, 2)
-        
+        #expect(counter.load(ordering: .relaxed) == 4)
+        #expect(dataSource.hitDemand == 2)
+
         stream.receive([
             [ByteBuffer(string: "4")],
             [ByteBuffer(string: "5")]
         ])
-        XCTAssertEqual(counter.load(ordering: .relaxed), 6)
-        XCTAssertEqual(dataSource.hitDemand, 3)
-        
+        #expect(counter.load(ordering: .relaxed) == 6)
+        #expect(dataSource.hitDemand == 3)
+
         stream.receive(completion: .success("SELECT 6"))
-        
-        XCTAssertNoThrow(try future.wait())
-        XCTAssertEqual(stream.commandTag, "SELECT 6")
+
+        try future.wait()
+        #expect(stream.commandTag == "SELECT 6")
     }
 
-    func testEmptyResponseHasEmptyCommandTag() {
+    @Test func emptyResponseHasEmptyCommandTag() throws {
         let stream = PSQLRowStream(
             source: .noRows(.success(.emptyResponse)),
             eventLoop: self.eventLoop,
             logger: self.logger
         )
 
-        XCTAssertEqual(try stream.all().wait(), [])
-        XCTAssertEqual(stream.commandTag, "")
+        #expect(try stream.all().wait() == [])
+        #expect(stream.commandTag == "")
     }
 
-    func testOnRowOnFailedStream() {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowOnFailedStream() throws {
         let stream = PSQLRowStream(
             source: .noRows(.failure(PSQLError.serverClosedConnection(underlying: nil))),
             eventLoop: self.eventLoop,
             logger: self.logger
         )
 
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { _ in
-            counter.wrappingIncrement(ordering: .relaxed)
+            counter.wrappingAdd(1, ordering: .relaxed)
         }
 
-        XCTAssertEqual(counter.load(ordering: .relaxed), 0, "Expected the closure to never be called")
-        XCTAssertThrowsError(try future.wait()) {
-            XCTAssertEqual($0 as? PSQLError, .serverClosedConnection(underlying: nil))
+        #expect(counter.load(ordering: .relaxed) == 0, "Expected the closure to never be called")
+        #expect(throws: PSQLError.serverClosedConnection(underlying: nil)) {
+            try future.wait()
         }
     }
 
-    func testOnRowThrowsErrorOnLaterBatch() {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowThrowsErrorOnLaterBatch() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -273,45 +279,46 @@ final class PSQLRowStreamTests: XCTestCase {
         )
 
         // attach consumer, while the stream is still streaming
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
-            XCTAssertEqual(try row.decode(String.self, context: .default), "\(expected)")
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
+            #expect(try row.decode(String.self, context: .default) == "\(expected)")
             if expected == 2 {
                 throw OnRowError(row: expected)
             }
         }
-        XCTAssertEqual(dataSource.hitDemand, 1)
+        #expect(dataSource.hitDemand == 1)
 
         stream.receive([
             [ByteBuffer(string: "0")],
             [ByteBuffer(string: "1")]
         ])
-        XCTAssertEqual(counter.load(ordering: .relaxed), 2)
-        XCTAssertEqual(dataSource.hitDemand, 2)
-        XCTAssertEqual(dataSource.hitCancel, 0)
+        #expect(counter.load(ordering: .relaxed) == 2)
+        #expect(dataSource.hitDemand == 2)
+        #expect(dataSource.hitCancel == 0)
 
         stream.receive([
             [ByteBuffer(string: "2")],
             [ByteBuffer(string: "3")]
         ])
-        XCTAssertEqual(counter.load(ordering: .relaxed), 3, "Expected the stream to stop forwarding rows after the throw")
-        XCTAssertEqual(dataSource.hitDemand, 2, "Expected no further demand after the throw")
-        XCTAssertEqual(dataSource.hitCancel, 1, "Expected the data source to be cancelled")
+        #expect(counter.load(ordering: .relaxed) == 3, "Expected the stream to stop forwarding rows after the throw")
+        #expect(dataSource.hitDemand == 2, "Expected no further demand after the throw")
+        #expect(dataSource.hitCancel == 1, "Expected the data source to be cancelled")
 
-        XCTAssertThrowsError(try future.wait()) {
-            XCTAssertEqual($0 as? OnRowError, OnRowError(row: 2))
+        #expect(throws: OnRowError(row: 2)) {
+            try future.wait()
         }
 
         // everything the connection sends after the failure must be ignored
         stream.receive([[ByteBuffer(string: "4")]])
         stream.receive(completion: .success("SELECT 4"))
         stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
-        XCTAssertEqual(counter.load(ordering: .relaxed), 3)
-        XCTAssertEqual(dataSource.hitCancel, 1)
+        #expect(counter.load(ordering: .relaxed) == 3)
+        #expect(dataSource.hitCancel == 1)
     }
 
-    func testOnRowClosureThrowsAfterTheStreamWasCompletedReentrantly() {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowClosureThrowsAfterTheStreamWasCompletedReentrantly() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -323,9 +330,9 @@ final class PSQLRowStreamTests: XCTestCase {
         )
 
         // attach consumer, while the stream is still streaming
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { row in
-            let expected = counter.loadThenWrappingIncrement(ordering: .relaxed)
+            let expected = counter.wrappingAdd(1, ordering: .relaxed).oldValue
             // reentrantly complete the stream, before throwing. The promise is succeeded at this
             // point, which means the throw afterwards must be swallowed.
             stream.receive(completion: .success("SELECT 1"))
@@ -333,14 +340,15 @@ final class PSQLRowStreamTests: XCTestCase {
         }
 
         stream.receive([[ByteBuffer(string: "0")]])
-        XCTAssertEqual(counter.load(ordering: .relaxed), 1)
-        XCTAssertEqual(dataSource.hitCancel, 0, "Expected the data source to not be cancelled, since it is done already")
+        #expect(counter.load(ordering: .relaxed) == 1)
+        #expect(dataSource.hitCancel == 0, "Expected the data source to not be cancelled, since it is done already")
 
-        XCTAssertNoThrow(try future.wait())
-        XCTAssertEqual(stream.commandTag, "SELECT 1")
+        try future.wait()
+        #expect(stream.commandTag == "SELECT 1")
     }
 
-    func testOnRowFailsIfStreamFails() {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func onRowFailsIfStreamFails() {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -351,23 +359,23 @@ final class PSQLRowStreamTests: XCTestCase {
             logger: self.logger
         )
 
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         let future = stream.onRow { _ in
-            counter.wrappingIncrement(ordering: .relaxed)
+            counter.wrappingAdd(1, ordering: .relaxed)
         }
-        XCTAssertEqual(dataSource.hitDemand, 1)
+        #expect(dataSource.hitDemand == 1)
 
         stream.receive([[ByteBuffer(string: "0")]])
-        XCTAssertEqual(counter.load(ordering: .relaxed), 1)
+        #expect(counter.load(ordering: .relaxed) == 1)
 
         stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
 
-        XCTAssertThrowsError(try future.wait()) {
-            XCTAssertEqual($0 as? PSQLError, .serverClosedConnection(underlying: nil))
+        #expect(throws: PSQLError.serverClosedConnection(underlying: nil)) {
+            try future.wait()
         }
     }
 
-    func testGetArrayFailsIfStreamFails() {
+    @Test func getArrayFailsIfStreamFails() {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -379,19 +387,19 @@ final class PSQLRowStreamTests: XCTestCase {
         )
 
         let future = stream.all()
-        XCTAssertEqual(dataSource.hitDemand, 1)
+        #expect(dataSource.hitDemand == 1)
 
         stream.receive([[ByteBuffer(string: "0")]])
-        XCTAssertEqual(dataSource.hitDemand, 2)
+        #expect(dataSource.hitDemand == 2)
 
         stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
 
-        XCTAssertThrowsError(try future.wait()) {
-            XCTAssertEqual($0 as? PSQLError, .serverClosedConnection(underlying: nil))
+        #expect(throws: PSQLError.serverClosedConnection(underlying: nil)) {
+            try future.wait()
         }
     }
 
-    func testCompletionsAfterTheStreamHasFinishedAreIgnored() {
+    @Test func completionsAfterTheStreamHasFinishedAreIgnored() throws {
         let dataSource = CountingDataSource()
         let stream = PSQLRowStream(
             source: .stream(
@@ -406,16 +414,17 @@ final class PSQLRowStreamTests: XCTestCase {
         stream.receive([[ByteBuffer(string: "0")]])
         stream.receive(completion: .success("SELECT 1"))
 
-        XCTAssertEqual(try future.wait().count, 1)
-        XCTAssertEqual(stream.commandTag, "SELECT 1")
+        #expect(try future.wait().count == 1)
+        #expect(stream.commandTag == "SELECT 1")
 
         // further completions must not change the outcome
         stream.receive(completion: .success("SELECT 2"))
         stream.receive(completion: .failure(PSQLError.serverClosedConnection(underlying: nil)))
-        XCTAssertEqual(stream.commandTag, "SELECT 1")
+        #expect(stream.commandTag == "SELECT 1")
     }
 
-    func testConsumersCanBeAttachedFromOffTheEventLoop() async throws {
+    @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
+    @Test func consumersCanBeAttachedFromOffTheEventLoop() async throws {
         let eventLoop = NIOSingletons.posixEventLoopGroup.next()
         let logger = self.logger
 
@@ -427,9 +436,9 @@ final class PSQLRowStreamTests: XCTestCase {
             )
         }.get()
 
-        XCTAssertFalse(eventLoop.inEventLoop)
+        #expect(eventLoop.inEventLoop == false)
         let rows = try await allStream.all().get()
-        XCTAssertEqual(rows, [])
+        #expect(rows == [])
 
         let onRowStream = try await eventLoop.submit {
             PSQLRowStream(
@@ -439,11 +448,11 @@ final class PSQLRowStreamTests: XCTestCase {
             )
         }.get()
 
-        let counter = ManagedAtomic(0)
+        let counter = Atomic(0)
         try await onRowStream.onRow { _ in
-            counter.wrappingIncrement(ordering: .relaxed)
+            counter.wrappingAdd(1, ordering: .relaxed)
         }.get()
-        XCTAssertEqual(counter.load(ordering: .relaxed), 0)
+        #expect(counter.load(ordering: .relaxed) == 0)
     }
 
     func makeColumnDescription(name: String, dataType: PostgresDataType, format: PostgresFormat) -> RowDescription.Column {
@@ -464,16 +473,16 @@ private struct OnRowError: Error, Equatable {
 }
 
 class CountingDataSource: PSQLRowsDataSource {
-    
+
     var hitDemand: Int = 0
     var hitCancel: Int = 0
-    
+
     init() {}
-    
+
     func cancel(for stream: PSQLRowStream) {
         self.hitCancel += 1
     }
-    
+
     func request(for stream: PSQLRowStream) {
         self.hitDemand += 1
     }
