@@ -11,6 +11,18 @@ struct ExtendedQueryStateMachine {
         case pendingBackpressureRelieve(EventLoopPromise<Void>)
     }
 
+    /// What the caller of a query is handed once the backend reports `ReadyForQuery`.
+    private enum HeldResult {
+        /// The query returned no rows. Its promise is succeeded with the given result.
+        case noRows(EventLoopPromise<PSQLRowStream>, QueryResult)
+        /// The query returned rows. The rows that were not forwarded yet are forwarded and the stream is completed.
+        case rows([DataRow])
+        /// The data of a `COPY` was transferred. Its continuation is resumed.
+        case copy(CheckedContinuation<Void, any Error>)
+        /// The query was cancelled. There is nobody left to hand a result to.
+        case cancelled
+    }
+
     private enum State {
         case initialized(ExtendedQueryContext)
         case messagesSent(ExtendedQueryContext)
@@ -41,6 +53,14 @@ struct ExtendedQueryStateMachine {
         /// Indicates that the current query was cancelled and we want to drain rows from the connection ASAP
         case drain([RowDescription.Column])
         
+        /// We received a `CommandComplete` and hold the query's result back until the backend reports
+        /// `ReadyForQuery`.
+        ///
+        /// The backend commits a statement that ran outside of a transaction block when it handles our `Sync`
+        /// message, which is after it has sent `CommandComplete`. If that commit fails, for example because a
+        /// deferred constraint is violated, the backend sends an `ErrorResponse` before `ReadyForQuery`. The query
+        /// must fail with that error then.
+        case commandCompleteReceived(HeldResult, commandTag: String)
         case commandComplete(commandTag: String)
         case error(PSQLError)
         
@@ -188,7 +208,7 @@ struct ExtendedQueryStateMachine {
                 return .forwardStreamError(.queryCancelled, read: true)
             }
 
-        case .commandComplete, .emptyQueryResponseReceived, .error, .drain:
+        case .commandCompleteReceived, .commandComplete, .emptyQueryResponseReceived, .error, .drain:
             // the stream has already finished.
             return .wait
 
@@ -303,6 +323,7 @@ struct ExtendedQueryStateMachine {
              .bindCompleteReceived,
              .streaming,
              .drain,
+             .commandCompleteReceived,
              .commandComplete,
              .error,
              .copyingData,
@@ -344,6 +365,7 @@ struct ExtendedQueryStateMachine {
              .emptyQueryResponseReceived,
              .rowDescriptionReceived,
              .bindCompleteReceived,
+             .commandCompleteReceived,
              .commandComplete,
              .error,
              .copyingData,
@@ -360,9 +382,9 @@ struct ExtendedQueryStateMachine {
             switch context.query {
             case .unnamed(_, let eventLoopPromise), .executeStatement(_, let eventLoopPromise):
                 return self.avoidingStateMachineCoW { state -> Action in
-                    state = .commandComplete(commandTag: commandTag)
                     let result = QueryResult(value: .noRows(.tag(commandTag)), logger: context.logger)
-                    return .succeedQuery(eventLoopPromise, with: result)
+                    state = .commandCompleteReceived(.noRows(eventLoopPromise, result), commandTag: commandTag)
+                    return .wait
                 }
             case .copyFrom:
                 // We expect to transition through `copyingData` to `copyingFinished` before receiving a
@@ -373,20 +395,27 @@ struct ExtendedQueryStateMachine {
             }
 
         case .copyingFinished(let continuation, let successful):
+            guard successful else {
+                // We have not sent a `Sync` yet, so there is no `ReadyForQuery` to wait for.
+                return self.avoidingStateMachineCoW { state -> Action in
+                    state = .commandComplete(commandTag: commandTag)
+                    return .succeedQueryContinuation(continuation, sync: true)
+                }
+            }
             return self.avoidingStateMachineCoW { state -> Action in
-                state = .commandComplete(commandTag: commandTag)
-                return .succeedQueryContinuation(continuation, sync: !successful)
+                state = .commandCompleteReceived(.copy(continuation), commandTag: commandTag)
+                return .wait
             }
             
         case .streaming(_, var demandStateMachine):
             return self.avoidingStateMachineCoW { state -> Action in
-                state = .commandComplete(commandTag: commandTag)
-                return .forwardStreamComplete(demandStateMachine.end(), commandTag: commandTag)
+                state = .commandCompleteReceived(.rows(demandStateMachine.end()), commandTag: commandTag)
+                return .wait
             }
 
         case .drain:
             precondition(self.isCancelled)
-            self.state = .commandComplete(commandTag: commandTag)
+            self.state = .commandCompleteReceived(.cancelled, commandTag: commandTag)
             return .wait
         
         case .initialized,
@@ -396,6 +425,7 @@ struct ExtendedQueryStateMachine {
              .noDataMessageReceived,
              .emptyQueryResponseReceived,
              .rowDescriptionReceived,
+             .commandCompleteReceived,
              .commandComplete,
              .error,
              .copyingData:
@@ -405,6 +435,29 @@ struct ExtendedQueryStateMachine {
         }
     }
     
+    /// The backend is ready for the next query. Hands out the result that is held back since `CommandComplete`.
+    mutating func readyForQueryReceived() -> Action {
+        guard case .commandCompleteReceived(let heldResult, let commandTag) = self.state else {
+            // All other states either have handed out their result already or do not expect a `ReadyForQuery`.
+            // The `ConnectionStateMachine` tells them apart with `isComplete`.
+            return .wait
+        }
+
+        return self.avoidingStateMachineCoW { state -> Action in
+            state = .commandComplete(commandTag: commandTag)
+            switch heldResult {
+            case .noRows(let eventLoopPromise, let result):
+                return .succeedQuery(eventLoopPromise, with: result)
+            case .rows(let rows):
+                return .forwardStreamComplete(rows, commandTag: commandTag)
+            case .copy(let continuation):
+                return .succeedQueryContinuation(continuation, sync: false)
+            case .cancelled:
+                return .wait
+            }
+        }
+    }
+
     mutating func copyInResponseReceived(_ copyInResponse: PostgresBackendMessage.CopyInResponse) -> Action {
         guard case .bindCompleteReceived(let queryContext) = self.state,
             case .copyFrom(_, let triggerCopy) = queryContext.query else {
@@ -509,6 +562,9 @@ struct ExtendedQueryStateMachine {
             return self.setAndFireError(error)
         case .streaming, .drain:
             return self.setAndFireError(error)
+        case .commandCompleteReceived:
+            // The statement ran, but the backend failed to commit it.
+            return self.setAndFireError(error)
         case .commandComplete, .emptyQueryResponseReceived:
             return self.setAndFireError(.unexpectedBackendMessage(.error(errorMessage)))
         case .error:
@@ -550,6 +606,11 @@ struct ExtendedQueryStateMachine {
         case .drain:
             return .wait
 
+        case .commandCompleteReceived:
+            // All rows have been received. The consumer gets the remaining rows and the end of the stream, once
+            // the backend reports `ReadyForQuery`.
+            return .wait
+
         case .initialized,
              .messagesSent,
              .parseCompleteReceived,
@@ -574,6 +635,7 @@ struct ExtendedQueryStateMachine {
     mutating func channelReadComplete() -> Action {
         switch self.state {
         case .initialized,
+             .commandCompleteReceived,
              .commandComplete,
              .drain,
              .error,
@@ -629,6 +691,7 @@ struct ExtendedQueryStateMachine {
                 }
             }
         case .initialized,
+             .commandCompleteReceived,
              .commandComplete,
              .emptyQueryResponseReceived,
              .drain,
@@ -688,6 +751,22 @@ struct ExtendedQueryStateMachine {
         case .drain:
             self.state = .error(error)
             return .evaluateErrorAtConnectionLevel(error)
+
+        case .commandCompleteReceived(let heldResult, _):
+            self.state = .error(error)
+            switch heldResult {
+            case .noRows(let eventLoopPromise, _):
+                if self.isCancelled {
+                    return .evaluateErrorAtConnectionLevel(error)
+                }
+                return .failQuery(eventLoopPromise, with: error)
+            case .rows:
+                return .forwardStreamError(error, read: false)
+            case .copy(let continuation):
+                return .failQueryContinuation(.void(continuation), with: error, sync: false)
+            case .cancelled:
+                return .evaluateErrorAtConnectionLevel(error)
+            }
             
         case .streaming(_, var streamStateMachine):
             self.state = .error(error)
@@ -729,7 +808,8 @@ struct ExtendedQueryStateMachine {
              .streaming,
              .drain,
              .copyingData,
-             .copyingFinished:
+             .copyingFinished,
+             .commandCompleteReceived:
             return false
 
         case .modifying:

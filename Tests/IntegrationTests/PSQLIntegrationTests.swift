@@ -335,6 +335,35 @@ struct IntegrationTests {
         }
     }
 
+    @Test func copyIntoFromViolatesDeferredConstraint() async throws {
+        try await withConnection { connection in
+            try await connection.query("DROP TABLE IF EXISTS copy_child, copy_parent", logger: .psqlTest)
+            try await connection.query("CREATE TABLE copy_parent (id INT PRIMARY KEY)", logger: .psqlTest)
+            try await connection.query(
+                "CREATE TABLE copy_child (parent_id INT REFERENCES copy_parent (id) DEFERRABLE INITIALLY DEFERRED)",
+                logger: .psqlTest
+            )
+
+            // The backend checks the deferred constraint when it commits the `COPY`. At this point it has reported
+            // the `COPY` as complete already.
+            let error = await #expect(throws: PSQLError.self) {
+                try await connection.copyFrom(
+                    table: "copy_child", columns: ["parent_id"], logger: .psqlTest
+                ) { writer in
+                    try await writer.write(ByteBuffer(staticString: "42\n"))
+                }
+            }
+            #expect(error?.serverInfo?[.sqlState] == "23503")  // foreign_key_violation
+
+            // the connection survived this and nothing was stored:
+            for try await count in try await connection.query("SELECT count(*)::int FROM copy_child", logger: .psqlTest).decode(Int.self) {
+                #expect(count == 0)
+            }
+
+            try await connection.query("DROP TABLE copy_child, copy_parent", logger: .psqlTest)
+        }
+    }
+
     @Test func syntaxErrorInGeneratedQuery() async throws {
         try await withConnection { connection in
             let error = await #expect(throws: PSQLError.self) {

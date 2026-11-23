@@ -145,6 +145,9 @@ final class PostgresChannelHandler: ChannelDuplexHandler, RemovableChannelHandle
         case .portalSuspended:
             action = self.state.portalSuspendedReceived()
         case .readyForQuery(let transactionState):
+            // A query holds its result back until the backend is ready for the next query. The result is handed
+            // out first, then the state machine moves on to the next task.
+            self.run(self.state.handOutHeldQueryResult(), with: context)
             action = self.state.readyForQueryReceived(transactionState)
         case .rowDescription(let rowDescription):
             action = self.state.rowDescriptionReceived(rowDescription)

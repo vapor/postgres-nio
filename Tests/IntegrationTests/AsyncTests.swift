@@ -163,6 +163,40 @@ struct AsyncPostgresConnectionTests {
         }
     }
 
+    @Test func deferredConstraintViolationFailsQuery() async throws {
+        try await withConnection { connection in
+            try await connection.query("DROP TABLE IF EXISTS deferred_child, deferred_parent", logger: .psqlTest)
+            try await connection.query("CREATE TABLE deferred_parent (id INT PRIMARY KEY)", logger: .psqlTest)
+            try await connection.query(
+                "CREATE TABLE deferred_child (parent_id INT REFERENCES deferred_parent (id) DEFERRABLE INITIALLY DEFERRED)",
+                logger: .psqlTest
+            )
+
+            // Outside of a transaction block, the backend checks a deferred constraint when it commits the
+            // statement. At this point it has reported the statement as complete already.
+            let error = await #expect(throws: PSQLError.self) {
+                try await connection.query("INSERT INTO deferred_child (parent_id) VALUES (\(42))", logger: .psqlTest)
+            }
+            #expect(error?.serverInfo?[.sqlState] == "23503")  // foreign_key_violation
+
+            // With `RETURNING` the row is received before the commit fails.
+            let rows = try await connection.query(
+                "INSERT INTO deferred_child (parent_id) VALUES (\(42)) RETURNING parent_id", logger: .psqlTest
+            )
+            let returningError = await #expect(throws: PSQLError.self) {
+                for try await _ in rows {}
+            }
+            #expect(returningError?.serverInfo?[.sqlState] == "23503")  // foreign_key_violation
+
+            // the connection survived this and nothing was stored:
+            for try await count in try await connection.query("SELECT count(*)::int FROM deferred_child", logger: .psqlTest).decode(Int.self) {
+                #expect(count == 0)
+            }
+
+            try await connection.query("DROP TABLE deferred_child, deferred_parent", logger: .psqlTest)
+        }
+    }
+
     @Test func select10times10kRows() async throws {
 
         let start = 1

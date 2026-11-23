@@ -541,6 +541,22 @@ struct ConnectionStateMachine {
         return .forwardNotificationToListeners(notification)
     }
     
+    /// Hands out the result of the running query, if it is held back until the backend reports `ReadyForQuery`.
+    ///
+    /// Must be called for every `ReadyForQuery` message, before `readyForQueryReceived(_:)`. The state machine
+    /// stays in the query's state while the returned action runs. A task that is enqueued from a callback of the
+    /// query's result is therefore queued behind the tasks that are waiting already.
+    mutating func handOutHeldQueryResult() -> ConnectionAction {
+        guard case .extendedQuery(var queryState, let connectionContext) = self.state, !queryState.isComplete else {
+            return .wait
+        }
+
+        self.state = .modifying // avoid CoW
+        let action = queryState.readyForQueryReceived()
+        self.state = .extendedQuery(queryState, connectionContext)
+        return self.modify(with: action)
+    }
+
     mutating func readyForQueryReceived(_ transactionState: PostgresBackendMessage.TransactionState) -> ConnectionAction {
         switch self.state {
         case .authenticated(let backendKeyData, let parameters):
