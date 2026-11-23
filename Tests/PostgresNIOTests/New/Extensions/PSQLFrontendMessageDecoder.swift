@@ -181,7 +181,17 @@ extension PostgresFrontendMessage {
             return .copyFail(CopyFail(message: message))
 
         case .close:
-            preconditionFailure("TODO: Unimplemented")
+            guard let target = buffer.readInteger(as: UInt8.self), let name = buffer.readNullTerminatedString() else {
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: String.self)
+            }
+            switch target {
+            case UInt8(ascii: "S"):
+                return .close(.preparedStatement(name))
+            case UInt8(ascii: "P"):
+                return .close(.portal(name))
+            default:
+                throw PSQLPartialDecodingError.fieldNotDecodable(type: UInt8.self)
+            }
 
         case .describe:
             switch buffer.readInteger(as: UInt8.self) {
